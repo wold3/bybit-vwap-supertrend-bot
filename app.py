@@ -45,12 +45,12 @@ def webhook():
     update_price(symbol, price)
     update_trailing(symbol)
 
-    # EXIT 조건
+    # EXIT
     if should_exit(symbol, price):
         execute("SELL", symbol, qty)
         send_message(f"🚨 EXIT {symbol} @ {price}")
         pos["active"] = False
-        return jsonify({"status": "exit"})
+        return jsonify({"exit": True})
 
     # 손실 제한
     if pos["daily_pnl"] <= MAX_DAILY_LOSS:
