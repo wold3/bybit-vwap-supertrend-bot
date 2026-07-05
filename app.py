@@ -2,12 +2,11 @@ import logging
 
 from flask import Flask, jsonify, request
 
-from bybit_api import execute
 from config import DEBUG, HOST, PORT
 from signal_parser import validate
 from state import can_trade, get_status
+from bybit_api import execute
 from telegram import send_error, send_status, send_trade
-
 from strategy_wrapper import execute_strategy
 
 
@@ -30,6 +29,10 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 
+# =====================================================
+# BASIC ROUTES
+# =====================================================
+
 @app.route("/")
 def index():
     return jsonify({
@@ -47,6 +50,73 @@ def health():
     })
 
 
+# =====================================================
+# PnL API
+# =====================================================
+
+@app.route("/pnl")
+def pnl():
+    return jsonify(get_status())
+
+
+# =====================================================
+# DASHBOARD (HTML UI)
+# =====================================================
+
+@app.route("/dashboard")
+def dashboard():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Trading Bot Dashboard</title>
+        <meta http-equiv="refresh" content="5">
+        <style>
+            body {
+                font-family: Arial;
+                background: #0f172a;
+                color: #e2e8f0;
+                text-align: center;
+                padding-top: 50px;
+            }
+            .box {
+                display: inline-block;
+                padding: 20px;
+                border-radius: 10px;
+                background: #1e293b;
+                margin: 10px;
+                min-width: 200px;
+            }
+        </style>
+    </head>
+    <body>
+
+        <h1>📊 Trading Bot Dashboard</h1>
+
+        <div class="box">
+            <h2>Status</h2>
+            <p>RUNNING</p>
+        </div>
+
+        <div class="box">
+            <h2>API</h2>
+            <p>/pnl</p>
+        </div>
+
+        <div class="box">
+            <h2>Refresh</h2>
+            <p>5 sec auto</p>
+        </div>
+
+    </body>
+    </html>
+    """
+
+
+# =====================================================
+# WEBHOOK (MAIN TRADING ENGINE)
+# =====================================================
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
 
@@ -63,7 +133,7 @@ def webhook():
             return jsonify({"error": result}), 400
 
         if not can_trade():
-            return jsonify({"error": "Rate limit"}), 429
+            return jsonify({"error": "Rate limit exceeded"}), 429
 
         signal = result["signal"]
         symbol = result["symbol"]
@@ -71,7 +141,7 @@ def webhook():
         price = result["price"]
 
         # =================================================
-        # CORE DECISION ENGINE (Strategy Wrapper)
+        # STRATEGY ENGINE
         # =================================================
 
         decision = execute_strategy(signal, price)
@@ -79,7 +149,7 @@ def webhook():
         if not decision["success"]:
 
             logger.info(
-                "Filtered | reason=%s | signal=%s",
+                "FILTERED | reason=%s | signal=%s",
                 decision["reason"],
                 signal,
             )
@@ -91,7 +161,7 @@ def webhook():
                 "regime": decision["regime"],
             })
 
-        final_signal = signal  # TV signal 기준 실행
+        final_signal = signal
 
         logger.info(
             "EXECUTE | signal=%s | strategy=%s | regime=%s",
@@ -110,9 +180,9 @@ def webhook():
             qty,
         )
 
-        if not order.get("success", True):
+        if not order.get("success", False):
 
-            send_error(order.get("error", "Unknown Error"))
+            send_error(order.get("error", "Unknown error"))
 
             return jsonify(order), 500
 
@@ -141,11 +211,15 @@ def webhook():
         }), 500
 
 
+# =====================================================
+# MAIN
+# =====================================================
+
 if __name__ == "__main__":
 
-    logger.info("Starting Bybit AI Trading Bot...")
+    logger.info("Starting Trading Bot...")
 
-    send_status("🚀 Bot Started")
+    send_status("🚀 Trading Bot Started")
 
     app.run(
         host=HOST,
