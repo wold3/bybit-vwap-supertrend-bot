@@ -9,12 +9,7 @@ def send_message(text):
 
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": text
-    }
-
     try:
-        requests.post(url, json=payload, timeout=5)
+        requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": text}, timeout=5)
     except Exception as e:
         print("[TELEGRAM ERROR]", e)
