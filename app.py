@@ -2,13 +2,9 @@ from flask import Flask, request, jsonify
 
 from signal_parser import validate
 from bybit_api import execute
-from state import (
-    can_trade,
-    position,
-    update_position,
-    update_pnl
-)
-from config import TRAILING_STEP, MAX_DAILY_LOSS
+from state import can_trade, position, update_position, update_pnl
+from telegram import send_message
+from config import MAX_DAILY_LOSS, TRAILING_STEP
 
 app = Flask(__name__)
 
@@ -21,37 +17,32 @@ def webhook():
     ok, result = validate(data)
 
     if not ok:
+        send_message(f"❌ INVALID: {result}")
         return jsonify({"error": result}), 400
 
-    # 🔥 손실 제한 체크
+    # 손실 제한
     if position["daily_pnl"] <= MAX_DAILY_LOSS:
-        return jsonify({"error": "daily loss limit reached"}), 403
+        send_message("⚠️ DAILY LOSS LIMIT HIT")
+        return jsonify({"error": "loss limit"}), 403
 
     if not can_trade():
-        return jsonify({"error": "trade limit reached"}), 429
+        send_message("⚠️ TRADE LIMIT REACHED")
+        return jsonify({"error": "limit"}), 429
 
     signal = result["signal"]
 
-    # 🔥 트레일링 로직 (단순 구조)
-    if signal == "BUY":
+    # 실행
+    res = execute(signal, result["symbol"], result["qty"])
 
-        entry_price = data.get("price", 0)
-        profit = data.get("profit", 0)
-
-        update_position(entry_price, profit)
-
-    elif signal == "SELL":
-
-        if position["highest_profit"] >= TRAILING_STEP:
-            print("[TRAILING EXIT] profit protected")
-
-    res = execute(
-        signal,
-        result["symbol"],
-        result["qty"]
+    # 텔레그램 알림
+    send_message(
+        f"📊 TRADE\n"
+        f"{signal}\n"
+        f"{result['symbol']}\n"
+        f"qty: {result['qty']}"
     )
 
-    print(f"[EXECUTE] {signal} | {result['symbol']} | {result['qty']}")
+    print(f"[EXECUTE] {signal} {result['symbol']}")
 
     return jsonify({
         "success": True,
