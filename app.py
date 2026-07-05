@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 
 from signal_parser import validate
 from bybit_api import execute
+from state import can_trade
 
 app = Flask(__name__)
 
@@ -16,15 +17,20 @@ def webhook():
     if not ok:
         return jsonify({"error": result}), 400
 
+    if not can_trade():
+        return jsonify({"error": "trade limit reached"}), 429
+
     res = execute(
         result["signal"],
         result["symbol"],
         result["qty"]
     )
 
+    print(f"[EXECUTE] {result['signal']} | {result['symbol']} | {result['qty']}")
+
     return jsonify({
         "success": True,
-        "result": str(res)
+        "result": res
     })
 
 
