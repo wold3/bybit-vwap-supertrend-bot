@@ -4,10 +4,16 @@ from flask import Flask, jsonify, request
 
 from bybit_api import execute
 from config import DEBUG, HOST, PORT
-from rl_predictor_dqn import decide
 from signal_parser import validate
 from state import can_trade, get_status
 from telegram import send_error, send_status, send_trade
+
+from strategy_wrapper import execute_strategy
+
+
+# =====================================================
+# Logging
+# =====================================================
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,6 +21,11 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+# =====================================================
+# Flask App
+# =====================================================
 
 app = Flask(__name__)
 
@@ -44,85 +55,79 @@ def webhook():
         data = request.get_json(silent=True)
 
         if data is None:
-            return jsonify({
-                "error": "Invalid JSON."
-            }), 400
+            return jsonify({"error": "Invalid JSON"}), 400
 
         ok, result = validate(data)
 
         if not ok:
-            return jsonify({
-                "error": result
-            }), 400
+            return jsonify({"error": result}), 400
 
         if not can_trade():
-            return jsonify({
-                "error": "Rate limit exceeded."
-            }), 429
+            return jsonify({"error": "Rate limit"}), 429
 
-        tv_signal = result["signal"]
+        signal = result["signal"]
         symbol = result["symbol"]
         qty = result["qty"]
         price = result["price"]
 
-        ai_action = decide(price)
+        # =================================================
+        # CORE DECISION ENGINE (Strategy Wrapper)
+        # =================================================
 
-        action_map = {
-            0: "HOLD",
-            1: "BUY",
-            2: "SELL"
-        }
+        decision = execute_strategy(signal, price)
 
-        ai_signal = action_map.get(ai_action, "HOLD")
+        if not decision["success"]:
 
-        logger.info(
-            "TV=%s AI=%s SYMBOL=%s QTY=%s PRICE=%s",
-            tv_signal,
-            ai_signal,
-            symbol,
-            qty,
-            price
-        )
-
-        if ai_signal == "HOLD":
-
-            return jsonify({
-                "status": "hold",
-                "reason": "AI HOLD"
-            })
-
-        if ai_signal != tv_signal:
-
-            logger.info("Signal filtered.")
+            logger.info(
+                "Filtered | reason=%s | signal=%s",
+                decision["reason"],
+                signal,
+            )
 
             return jsonify({
                 "status": "filtered",
-                "tv_signal": tv_signal,
-                "ai_signal": ai_signal
+                "reason": decision["reason"],
+                "strategy": decision["strategy"],
+                "regime": decision["regime"],
             })
 
-        order = execute(
-            ai_signal,
-            symbol,
-            qty
+        final_signal = signal  # TV signal 기준 실행
+
+        logger.info(
+            "EXECUTE | signal=%s | strategy=%s | regime=%s",
+            final_signal,
+            decision["strategy"],
+            decision["regime"],
         )
 
-        if not order.get("success", False):
+        # =================================================
+        # ORDER EXECUTION
+        # =================================================
+
+        order = execute(
+            final_signal,
+            symbol,
+            qty,
+        )
+
+        if not order.get("success", True):
 
             send_error(order.get("error", "Unknown Error"))
 
             return jsonify(order), 500
 
         send_trade(
-            ai_signal,
+            final_signal,
             symbol,
             qty,
-            price
+            price,
         )
 
         return jsonify({
             "status": "success",
-            "order": order
+            "strategy": decision["strategy"],
+            "regime": decision["regime"],
+            "order": order,
         })
 
     except Exception as e:
@@ -140,10 +145,10 @@ if __name__ == "__main__":
 
     logger.info("Starting Bybit AI Trading Bot...")
 
-    send_status("🚀 Bybit AI Trading Bot Started")
+    send_status("🚀 Bot Started")
 
     app.run(
         host=HOST,
         port=PORT,
-        debug=DEBUG
+        debug=DEBUG,
     )
