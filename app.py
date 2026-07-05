@@ -2,19 +2,13 @@ from flask import Flask, request, jsonify
 
 from signal_parser import validate
 from bybit_api import execute
-from state import (
-    positions,
-    get_position,
-    can_trade,
-    update_price,
-    update_trailing,
-    should_exit
-)
-
+from state import positions, get_position, can_trade, update_price, update_trailing, should_exit
 from telegram import send_message
 from config import USE_AI_FILTER, MAX_DAILY_LOSS
 from ai_filter import allow_trade
 from position_sizer import calculate_qty
+from strategy_router import should_trade
+from market_regime import get_market_regime
 
 app = Flask(__name__)
 
@@ -27,14 +21,24 @@ def webhook():
     ok, result = validate(data)
 
     if not ok:
-        send_message(f"❌ INVALID {result}")
         return jsonify({"error": result}), 400
 
     symbol = result["symbol"]
     price = float(data.get("price", 0))
-    qty = result["qty"]
+    signal = result["signal"]
 
     pos = get_position(symbol)
+
+    # 시장 상태
+    regime = get_market_regime()
+
+    allowed, regime_name = should_trade(signal)
+
+    if not allowed:
+        return jsonify({
+            "blocked": regime_name,
+            "regime": regime
+        }), 403
 
     # AI 필터
     if USE_AI_FILTER:
@@ -48,7 +52,7 @@ def webhook():
 
     # EXIT
     if should_exit(symbol, price):
-        execute("EXIT", symbol, qty)
+        execute("EXIT", symbol, result["qty"])
         send_message(f"🚨 EXIT {symbol} @ {price}")
         pos["active"] = False
         return jsonify({"exit": True})
@@ -62,7 +66,7 @@ def webhook():
         return jsonify({"error": "limit"}), 429
 
     # 진입
-    if result["signal"] == "BUY":
+    if signal == "BUY":
 
         stop_loss = price * 0.99
         qty = calculate_qty(price, stop_loss)
@@ -75,7 +79,12 @@ def webhook():
 
         execute("BUY", symbol, qty)
 
-        send_message(f"📈 ENTRY {symbol} @ {price} qty={qty}")
+        send_message(
+            f"📈 ENTRY {symbol}\n"
+            f"Price: {price}\n"
+            f"Qty: {qty}\n"
+            f"Regime: {regime}"
+        )
 
     return jsonify({"ok": True})
 
