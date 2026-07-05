@@ -4,6 +4,7 @@ WEBHOOK_SECRET = "1234"
 
 DEFAULT_SYMBOL = "BTCUSDT"
 
-TESTNET = True
+# 🔥 True = 테스트넷 / False = 실거래
+TESTNET = False
 
 MAX_TRADES_PER_MIN = 3
