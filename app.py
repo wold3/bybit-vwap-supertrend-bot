@@ -1,46 +1,30 @@
-from flask import Flask, request
+from flask import Flask, jsonify
 
-from system import EconomySystem
-from environment import Environment
+from world import World
 
 app = Flask(__name__)
 
-system = EconomySystem()
-env = Environment()
+world = World()
 
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
+@app.route("/step", methods=["GET"])
+def step():
 
-    data = request.get_json()
+    price = world.step()
 
-    price_input = data["price"]
-
-    # ==========================
-    # MACRO + AGENTS
-    # ==========================
-
-    actions, liquidity = system.step(price_input)
-
-    # ==========================
-    # MARKET SIMULATION
-    # ==========================
-
-    price, rewards = env.step(actions, liquidity)
-
-    # ==========================
-    # UPDATE AGENTS
-    # ==========================
-
-    for i, agent in enumerate(system.agents):
-        agent.update(rewards[i])
-
-    return {
+    return jsonify({
         "price": price,
-        "liquidity": liquidity,
-        "actions": actions,
-        "rewards": rewards
-    }
+        "population": len(world.agents)
+    })
+
+
+@app.route("/status")
+def status():
+
+    return jsonify({
+        "price": world.market.price,
+        "agents": len(world.agents)
+    })
 
 
 if __name__ == "__main__":
