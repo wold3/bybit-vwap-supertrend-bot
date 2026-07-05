@@ -15,9 +15,9 @@ class Metrics:
         if len(self.prices) < 2:
             return 0.0
 
-        m = sum(self.prices) / len(self.prices)
+        mean = sum(self.prices) / len(self.prices)
 
-        return sum((p - m) ** 2 for p in self.prices) / len(self.prices)
+        return sum((p - mean) ** 2 for p in self.prices) / len(self.prices)
 
     def trend(self):
 
