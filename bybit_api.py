@@ -1,7 +1,6 @@
 """
-bybit_api.py
-
-Bybit V5 Trading Engine
+bybit_api.py (V2)
+Bybit V5 Real Trading Engine
 """
 
 import logging
@@ -14,31 +13,35 @@ from config import (
     CATEGORY,
     DEFAULT_SYMBOL,
     ORDER_QTY,
-    ACCOUNT_TYPE,
-    LOG_FILE
+    POSITION_IDX,
+    LEVERAGE,
+    TRADE_LOG
 )
 
-# -----------------------------------
-# Logging
-# -----------------------------------
+# ======================================
+# Logger
+# ======================================
 
 logger = logging.getLogger("bybit")
 
 if not logger.handlers:
     logger.setLevel(logging.INFO)
 
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(message)s"
-    )
+    handler = logging.FileHandler(TRADE_LOG)
+    formatter = logging.Formatter("%(asctime)s | %(message)s")
+    handler.setFormatter(formatter)
 
-    file_handler = logging.FileHandler(LOG_FILE)
-    file_handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
-    logger.addHandler(file_handler)
 
-# -----------------------------------
+def log(msg):
+    print(msg)
+    logger.info(msg)
+
+
+# ======================================
 # Session
-# -----------------------------------
+# ======================================
 
 session = HTTP(
     testnet=TESTNET,
@@ -46,75 +49,111 @@ session = HTTP(
     api_secret=BYBIT_API_SECRET
 )
 
-# -----------------------------------
-# Helpers
-# -----------------------------------
 
-def log(msg):
-    print(msg)
-    logger.info(msg)
-
-# -----------------------------------
+# ======================================
 # Account
-# -----------------------------------
+# ======================================
 
-def get_wallet_balance():
-    """
-    계좌 잔고 조회
-    """
-
+def get_balance():
     try:
-
-        result = session.get_wallet_balance(
-            accountType=ACCOUNT_TYPE
-        )
-
-        return result
-
+        return session.get_wallet_balance(accountType="UNIFIED")
     except Exception as e:
-
-        log(f"BALANCE ERROR : {e}")
-
+        log(f"BALANCE ERROR: {e}")
         return None
 
-# -----------------------------------
+
+# ======================================
 # Position
-# -----------------------------------
+# ======================================
 
 def get_position(symbol=DEFAULT_SYMBOL):
 
     try:
 
-        result = session.get_positions(
+        res = session.get_positions(
             category=CATEGORY,
             symbol=symbol
         )
 
-        if "result" not in result:
-            return None
-
-        positions = result["result"]["list"]
-
-        if len(positions) == 0:
-            return None
-
-        return positions[0]
+        return res["result"]["list"][0]
 
     except Exception as e:
-
-        log(f"POSITION ERROR : {e}")
-
+        log(f"POSITION ERROR: {e}")
         return None
 
-# -----------------------------------
-# Current Side
-# -----------------------------------
 
-def get_position_side(symbol=DEFAULT_SYMBOL):
+def get_side(symbol=DEFAULT_SYMBOL):
 
     pos = get_position(symbol)
 
-    if pos is None:
+    if not pos:
+        return None
+
+    size = float(pos["size"])
+
+    if size == 0:
+        return None
+
+    return "LONG" if pos["side"] == "Buy" else "SHORT"
+
+
+# ======================================
+# Leverage
+# ======================================
+
+def set_leverage(symbol=DEFAULT_SYMBOL):
+
+    try:
+
+        session.set_leverage(
+            category=CATEGORY,
+            symbol=symbol,
+            buyLeverage=str(LEVERAGE),
+            sellLeverage=str(LEVERAGE)
+        )
+
+        log(f"LEVERAGE SET: {LEVERAGE}")
+
+    except Exception as e:
+        log(f"LEVERAGE ERROR: {e}")
+
+
+# ======================================
+# Order Core
+# ======================================
+
+def order(side, qty, symbol=DEFAULT_SYMBOL, reduce=False):
+
+    try:
+
+        res = session.place_order(
+            category=CATEGORY,
+            symbol=symbol,
+            side=side,
+            orderType="Market",
+            qty=str(qty),
+            reduceOnly=reduce,
+            positionIdx=POSITION_IDX
+        )
+
+        log(f"ORDER {side} | {symbol} | {qty}")
+
+        return res
+
+    except Exception as e:
+        log(f"ORDER ERROR: {e}")
+        return None
+
+
+# ======================================
+# Close Position
+# ======================================
+
+def close(symbol=DEFAULT_SYMBOL):
+
+    pos = get_position(symbol)
+
+    if not pos:
         return None
 
     size = float(pos["size"])
@@ -124,298 +163,112 @@ def get_position_side(symbol=DEFAULT_SYMBOL):
 
     side = pos["side"]
 
-    if side == "Buy":
-        return "LONG"
+    close_side = "Sell" if side == "Buy" else "Buy"
 
-    if side == "Sell":
-        return "SHORT"
-
-    return None
-
-# -----------------------------------
-# Order
-# -----------------------------------
-
-def market_order(
-    side,
-    qty=ORDER_QTY,
-    symbol=DEFAULT_SYMBOL,
-    reduce_only=False
-):
-
-    try:
-
-        result = session.place_order(
-            category=CATEGORY,
-            symbol=symbol,
-            side=side,
-            orderType="Market",
-            qty=qty,
-            reduceOnly=reduce_only
-        )
-
-        log(
-            f"ORDER SUCCESS | "
-            f"{side} | "
-            f"{qty} | "
-            f"{symbol}"
-        )
-
-        return result
-
-    except Exception as e:
-
-        log(f"ORDER ERROR : {e}")
-
-        return None
-
-# -----------------------------------
-# Close Position
-# -----------------------------------
-
-def close_position(symbol=DEFAULT_SYMBOL):
-
-    try:
-
-        pos = get_position(symbol)
-
-        if pos is None:
-            log("NO POSITION")
-
-            return
-
-        size = float(pos["size"])
-
-        if size <= 0:
-            log("POSITION SIZE = 0")
-
-            return
-
-        side = pos["side"]
-
-        close_side = "Sell"
-
-        if side == "Sell":
-            close_side = "Buy"
-
-        result = market_order(
-            side=close_side,
-            qty=size,
-            symbol=symbol,
-            reduce_only=True
-        )
-
-        log(
-            f"CLOSE POSITION | "
-            f"{symbol} | "
-            f"{size}"
-        )
-
-        return result
-
-    except Exception as e:
-
-        log(f"CLOSE ERROR : {e}")
-
-        return None
-# -----------------------------------
-# Long
-# -----------------------------------
-
-def open_long(
-    symbol=DEFAULT_SYMBOL,
-    qty=ORDER_QTY
-):
-    """
-    Long 진입
-    """
-
-    side = get_position_side(symbol)
-
-    if side == "LONG":
-        log("SKIP : Already LONG")
-        return None
-
-    if side == "SHORT":
-        log("Reverse SHORT -> LONG")
-        close_position(symbol)
-
-    return market_order(
-        side="Buy",
-        qty=qty,
-        symbol=symbol
+    return order(
+        close_side,
+        size,
+        symbol,
+        reduce=True
     )
 
 
-# -----------------------------------
-# Short
-# -----------------------------------
+# ======================================
+# Trading Actions
+# ======================================
 
-def open_short(
-    symbol=DEFAULT_SYMBOL,
-    qty=ORDER_QTY
-):
-    """
-    Short 진입
-    """
+def long(symbol=DEFAULT_SYMBOL, qty=ORDER_QTY):
 
-    side = get_position_side(symbol)
+    side = get_side(symbol)
+
+    if side == "LONG":
+        log("ALREADY LONG")
+        return None
 
     if side == "SHORT":
-        log("SKIP : Already SHORT")
+        close(symbol)
+
+    return order("Buy", qty, symbol)
+
+
+def short(symbol=DEFAULT_SYMBOL, qty=ORDER_QTY):
+
+    side = get_side(symbol)
+
+    if side == "SHORT":
+        log("ALREADY SHORT")
         return None
 
     if side == "LONG":
-        log("Reverse LONG -> SHORT")
-        close_position(symbol)
+        close(symbol)
 
-    return market_order(
-        side="Sell",
-        qty=qty,
-        symbol=symbol
-    )
+    return order("Sell", qty, symbol)
 
-
-# -----------------------------------
-# Exit Long
-# -----------------------------------
 
 def exit_long(symbol=DEFAULT_SYMBOL):
-    """
-    Long 청산
-    """
 
-    side = get_position_side(symbol)
-
-    if side != "LONG":
-        log("No LONG Position")
+    if get_side(symbol) != "LONG":
         return None
 
-    return close_position(symbol)
+    return close(symbol)
 
-
-# -----------------------------------
-# Exit Short
-# -----------------------------------
 
 def exit_short(symbol=DEFAULT_SYMBOL):
-    """
-    Short 청산
-    """
 
-    side = get_position_side(symbol)
-
-    if side != "SHORT":
-        log("No SHORT Position")
+    if get_side(symbol) != "SHORT":
         return None
 
-    return close_position(symbol)
+    return close(symbol)
 
 
-# -----------------------------------
-# Reverse
-# -----------------------------------
+def reverse_long(symbol=DEFAULT_SYMBOL, qty=ORDER_QTY):
 
-def reverse_to_long(
-    symbol=DEFAULT_SYMBOL,
-    qty=ORDER_QTY
-):
-    """
-    어떤 포지션이든 LONG으로 전환
-    """
-
-    side = get_position_side(symbol)
-
-    if side == "LONG":
-        log("Already LONG")
-        return None
-
-    if side == "SHORT":
-        close_position(symbol)
-
-    return open_long(
-        symbol=symbol,
-        qty=qty
-    )
+    close(symbol)
+    return long(symbol, qty)
 
 
-def reverse_to_short(
-    symbol=DEFAULT_SYMBOL,
-    qty=ORDER_QTY
-):
-    """
-    어떤 포지션이든 SHORT으로 전환
-    """
+def reverse_short(symbol=DEFAULT_SYMBOL, qty=ORDER_QTY):
 
-    side = get_position_side(symbol)
-
-    if side == "SHORT":
-        log("Already SHORT")
-        return None
-
-    if side == "LONG":
-        close_position(symbol)
-
-    return open_short(
-        symbol=symbol,
-        qty=qty
-    )
+    close(symbol)
+    return short(symbol, qty)
 
 
-# -----------------------------------
-# TradingView Signal
-# -----------------------------------
+# ======================================
+# Webhook Executor
+# ======================================
 
-def execute_signal(
-    signal,
-    symbol=DEFAULT_SYMBOL,
-    qty=ORDER_QTY
-):
-    """
-    TradingView Webhook 신호 처리
-    """
+def execute(signal, symbol=DEFAULT_SYMBOL, qty=ORDER_QTY):
 
     signal = signal.upper()
 
-    log(f"SIGNAL : {signal}")
+    log(f"SIGNAL: {signal}")
 
     if signal == "BUY":
-        return reverse_to_long(symbol, qty)
+        return reverse_long(symbol, qty)
 
-    elif signal == "SHORT":
-        return reverse_to_short(symbol, qty)
+    if signal == "SHORT":
+        return reverse_short(symbol, qty)
 
-    elif signal == "SELL":
+    if signal == "SELL":
         return exit_long(symbol)
 
-    elif signal == "EXIT":
+    if signal == "EXIT":
         return exit_short(symbol)
 
-    else:
-        log(f"UNKNOWN SIGNAL : {signal}")
-        return None
-ping()
+    log(f"UNKNOWN SIGNAL: {signal}")
+    return None
 
-get_wallet_balance()
 
-get_position()
+# ======================================
+# Test
+# ======================================
 
-get_position_side()
+if __name__ == "__main__":
 
-market_order()
+    print("BYBIT API TEST")
 
-close_position()
+    set_leverage()
 
-open_long()
+    print(get_balance())
 
-open_short()
-
-exit_long()
-
-exit_short()
-
-reverse_to_long()
-
-reverse_to_short()
-
-execute_signal()        
+    print(get_position())
