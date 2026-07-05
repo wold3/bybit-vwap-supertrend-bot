@@ -8,8 +8,9 @@ TESTNET = False
 
 MAX_TRADES_PER_MIN = 3
 
-# 🔥 트레일링 스탑 (%)
 TRAILING_STEP = 0.5
-
-# 🔥 하루 손실 제한 (%)
 MAX_DAILY_LOSS = -3.0
+
+# Telegram
+TELEGRAM_TOKEN = "YOUR_TELEGRAM_TOKEN"
+TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"
