@@ -218,3 +218,204 @@ def close_position(symbol=DEFAULT_SYMBOL):
         log(f"CLOSE ERROR : {e}")
 
         return None
+# -----------------------------------
+# Long
+# -----------------------------------
+
+def open_long(
+    symbol=DEFAULT_SYMBOL,
+    qty=ORDER_QTY
+):
+    """
+    Long 진입
+    """
+
+    side = get_position_side(symbol)
+
+    if side == "LONG":
+        log("SKIP : Already LONG")
+        return None
+
+    if side == "SHORT":
+        log("Reverse SHORT -> LONG")
+        close_position(symbol)
+
+    return market_order(
+        side="Buy",
+        qty=qty,
+        symbol=symbol
+    )
+
+
+# -----------------------------------
+# Short
+# -----------------------------------
+
+def open_short(
+    symbol=DEFAULT_SYMBOL,
+    qty=ORDER_QTY
+):
+    """
+    Short 진입
+    """
+
+    side = get_position_side(symbol)
+
+    if side == "SHORT":
+        log("SKIP : Already SHORT")
+        return None
+
+    if side == "LONG":
+        log("Reverse LONG -> SHORT")
+        close_position(symbol)
+
+    return market_order(
+        side="Sell",
+        qty=qty,
+        symbol=symbol
+    )
+
+
+# -----------------------------------
+# Exit Long
+# -----------------------------------
+
+def exit_long(symbol=DEFAULT_SYMBOL):
+    """
+    Long 청산
+    """
+
+    side = get_position_side(symbol)
+
+    if side != "LONG":
+        log("No LONG Position")
+        return None
+
+    return close_position(symbol)
+
+
+# -----------------------------------
+# Exit Short
+# -----------------------------------
+
+def exit_short(symbol=DEFAULT_SYMBOL):
+    """
+    Short 청산
+    """
+
+    side = get_position_side(symbol)
+
+    if side != "SHORT":
+        log("No SHORT Position")
+        return None
+
+    return close_position(symbol)
+
+
+# -----------------------------------
+# Reverse
+# -----------------------------------
+
+def reverse_to_long(
+    symbol=DEFAULT_SYMBOL,
+    qty=ORDER_QTY
+):
+    """
+    어떤 포지션이든 LONG으로 전환
+    """
+
+    side = get_position_side(symbol)
+
+    if side == "LONG":
+        log("Already LONG")
+        return None
+
+    if side == "SHORT":
+        close_position(symbol)
+
+    return open_long(
+        symbol=symbol,
+        qty=qty
+    )
+
+
+def reverse_to_short(
+    symbol=DEFAULT_SYMBOL,
+    qty=ORDER_QTY
+):
+    """
+    어떤 포지션이든 SHORT으로 전환
+    """
+
+    side = get_position_side(symbol)
+
+    if side == "SHORT":
+        log("Already SHORT")
+        return None
+
+    if side == "LONG":
+        close_position(symbol)
+
+    return open_short(
+        symbol=symbol,
+        qty=qty
+    )
+
+
+# -----------------------------------
+# TradingView Signal
+# -----------------------------------
+
+def execute_signal(
+    signal,
+    symbol=DEFAULT_SYMBOL,
+    qty=ORDER_QTY
+):
+    """
+    TradingView Webhook 신호 처리
+    """
+
+    signal = signal.upper()
+
+    log(f"SIGNAL : {signal}")
+
+    if signal == "BUY":
+        return reverse_to_long(symbol, qty)
+
+    elif signal == "SHORT":
+        return reverse_to_short(symbol, qty)
+
+    elif signal == "SELL":
+        return exit_long(symbol)
+
+    elif signal == "EXIT":
+        return exit_short(symbol)
+
+    else:
+        log(f"UNKNOWN SIGNAL : {signal}")
+        return None
+ping()
+
+get_wallet_balance()
+
+get_position()
+
+get_position_side()
+
+market_order()
+
+close_position()
+
+open_long()
+
+open_short()
+
+exit_long()
+
+exit_short()
+
+reverse_to_long()
+
+reverse_to_short()
+
+execute_signal()        
