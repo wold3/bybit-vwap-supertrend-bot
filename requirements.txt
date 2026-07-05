@@ -1,4 +1,1 @@
-Flask
-pybit
-python-dotenv
-requests
+flask
