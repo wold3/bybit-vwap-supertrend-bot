@@ -4,22 +4,17 @@ from flask import Flask, jsonify, request
 
 from config import DEBUG, HOST, PORT
 from signal_parser import validate
-from state import (
-    can_trade,
-    get_status,
-    compute_reward_from_market,
-    update_trade_result
-)
+from state import can_trade, get_status, compute_reward, update_trade_result
 from bybit_api import execute
-from telegram import send_error, send_status, send_trade
-from strategy_wrapper import execute_strategy
 from dqn_agent import Agent
+from portfolio import PortfolioAgent
+from telegram import send_trade, send_error
 
 
 app = Flask(__name__)
-logger = logging.getLogger(__name__)
 
 agent = Agent()
+portfolio = PortfolioAgent()
 
 
 # ==========================
@@ -43,55 +38,58 @@ def webhook():
         if not can_trade():
             return {"error": "Rate limit"}, 429
 
-        signal = result["signal"]
-        symbol = result["symbol"]
-        qty = result["qty"]
-        price = result["price"]
+        price_map = result["prices"]  # dict 형태 가정
+
+        symbols = portfolio.symbols
 
         # ==========================
-        # AI ACTION
+        # MULTI STATE BUILD
         # ==========================
 
-        state_vec = [price, 0, 0]
-        action = agent.act(state_vec)
+        market_states = {
+            s: [price_map[s], 0, 0]
+            for s in symbols
+        }
 
-        ai_signal = ["HOLD", "BUY", "SELL"][action]
-
-        # ==========================
-        # FILTER
-        # ==========================
-
-        decision = execute_strategy(signal, price)
-
-        if not decision["success"]:
-            return {"status": "filtered"}
+        actions = {}
+        pnls = {}
 
         # ==========================
-        # EXECUTE TRADE
+        # AI DECISION PER SYMBOL
         # ==========================
 
-        order = execute(ai_signal, symbol, qty)
+        for symbol in symbols:
 
-        if not order.get("success"):
-            send_error(order.get("error"))
-            return order, 500
+            state_vec = market_states[symbol]
 
-        send_trade(ai_signal, symbol, qty, price)
+            action = agent.act(state_vec)
+
+            actions[symbol] = action
+
+            signal = ["HOLD", "BUY", "SELL"][action]
+
+            if signal == "HOLD":
+                pnls[symbol] = 0
+                continue
+
+            order = execute(signal, symbol, 0.001)
+
+            pnls[symbol] = 0  # 실제 pnl 연결 가능
 
         # ==========================
-        # REAL REWARD (IMPORTANT)
+        # REWARD (PORTFOLIO LEVEL)
         # ==========================
 
-        reward = compute_reward_from_market(symbol)
+        reward = compute_reward(pnls)
 
-        next_state = [price, 0, 0]
+        for symbol in symbols:
 
-        agent.buffer.push(
-            state_vec,
-            action,
-            reward,
-            next_state
-        )
+            agent.buffer.push(
+                market_states[symbol],
+                actions[symbol],
+                reward,
+                market_states[symbol]
+            )
 
         agent.train()
         agent.soft_update()
@@ -100,12 +98,11 @@ def webhook():
 
         return {
             "status": "success",
-            "action": ai_signal,
-            "reward": reward
+            "reward": reward,
+            "actions": actions
         }
 
     except Exception as e:
-        logger.exception(e)
         send_error(str(e))
         return {"error": str(e)}, 500
 
@@ -114,8 +111,6 @@ def webhook():
 # MAIN
 # ==========================
 if __name__ == "__main__":
-
-    send_status("🚀 Real PnL DQN Bot Started")
 
     app.run(
         host=HOST,
