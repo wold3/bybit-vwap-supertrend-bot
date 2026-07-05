@@ -1,10 +1,6 @@
 from pybit.unified_trading import HTTP
 
-from config import (
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
-    TESTNET,
-)
+from config import BYBIT_API_KEY, BYBIT_API_SECRET, TESTNET
 
 session = HTTP(
     testnet=TESTNET,
@@ -34,21 +30,11 @@ def execute(signal, symbol, qty):
             timeInForce="IOC",
         )
 
-        return {
-            "success": True,
-            "response": response,
-        }
+        return {"success": True, "response": response}
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-        }
+        return {"success": False, "error": str(e)}
 
-
-# =====================================================
-# REAL PNL (핵심 추가)
-# =====================================================
 
 def get_unrealized_pnl(symbol):
 
