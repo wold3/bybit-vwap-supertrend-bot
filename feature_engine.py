@@ -18,7 +18,7 @@ def get_feature_vector(price, orderbook=None):
     h = list(PRICE_HISTORY)
 
     if len(h) < 10:
-        return [float(price), 0, 0, 0, 0]
+        return [float(price), 0.0, 0.0, 0.0, 0.0]
 
     sma = sum(h) / len(h)
     trend = (h[-1] - sma) / sma if sma else 0.0
