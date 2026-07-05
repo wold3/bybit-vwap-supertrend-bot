@@ -6,17 +6,18 @@ from bybit_api import execute
 from strategy_wrapper import execute_strategy
 from telegram import send_trade, send_error
 
-from transformer_agent import TransformerAgent
 from sequence_builder import build_sequence
-from state import compute_reward, update_trade_result
+from ssl_trainer import SSLTrainer
+from transformer_agent import TransformerAgent
 from risk_engine import RiskEngine
 
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
+ssl = SSLTrainer()
 agent = TransformerAgent()
-risk_engine = RiskEngine()
+risk = RiskEngine()
 
 
 @app.route("/webhook", methods=["POST"])
@@ -32,27 +33,30 @@ def webhook():
         orderbook = data.get("orderbook")
 
         # ==========================
-        # STATE SEQUENCE
+        # SEQUENCE
         # ==========================
 
         state_seq = build_sequence(price, orderbook)
+
+        # ==========================
+        # SELF-SUPERVISED LEARNING
+        # ==========================
+
+        ssl.add(state_seq)
+        ssl.train_step()
+
+        # ==========================
+        # POLICY (Transformer)
+        # ==========================
 
         action = agent.act(state_seq)
 
         signal = ["HOLD", "BUY", "SELL"][action]
 
-        # ==========================
-        # STRATEGY FILTER
-        # ==========================
-
         decision = execute_strategy(signal, price)
 
         if not decision["success"]:
             return {"status": "filtered"}
-
-        # ==========================
-        # EXECUTION
-        # ==========================
 
         order = execute(signal, symbol, qty)
 
@@ -63,29 +67,28 @@ def webhook():
         send_trade(signal, symbol, qty, price)
 
         # ==========================
-        # PnL (SIMPLIFIED HOOK)
+        # RISK-ADJUSTED REWARD
         # ==========================
 
-        pnl = 0.0  # real execution 연결 가능
+        pnl = 0.0  # real PnL 연결 가능
 
-        reward = compute_reward(pnl)
+        risk.update(pnl)
+        reward = risk.risk_penalty(pnl)
 
         agent.store(state_seq, action, reward)
-
         agent.train()
-
-        update_trade_result(pnl)
 
         return {
             "status": "success",
             "signal": signal,
-            "reward": reward,
-            "cvar": risk_engine.cvar()
+            "cvar": risk.cvar()
         }
 
     except Exception as e:
+
         logger.exception(e)
         send_error(str(e))
+
         return {"error": str(e)}, 500
 
 
