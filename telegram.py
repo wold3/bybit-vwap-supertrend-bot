@@ -1,8 +1,8 @@
 import requests
+
 from config import TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
 
-
-def send_message(text):
+def send(text):
 
     if not TELEGRAM_TOKEN:
         return
