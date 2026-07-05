@@ -13,7 +13,7 @@ def validate(data):
     symbol = data.get("symbol", DEFAULT_SYMBOL)
     qty = float(data.get("qty", ORDER_QTY))
 
-    if signal not in ["BUY", "SELL", "SHORT", "EXIT"]:
+    if signal not in ["BUY", "SELL", "EXIT"]:
         return False, "bad signal"
 
     return True, {
