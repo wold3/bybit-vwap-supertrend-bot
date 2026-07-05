@@ -4,10 +4,13 @@ from flask import Flask, jsonify, request
 
 from config import DEBUG, HOST, PORT
 from signal_parser import validate
-from state import can_trade, get_status
+from state import can_trade, get_status, update_pnl
 from bybit_api import execute
 from telegram import send_error, send_status, send_trade
 from strategy_wrapper import execute_strategy
+
+# 👉 추가 (트레이드 저장)
+from trade_db import init_db, insert_trade
 
 
 # =====================================================
@@ -30,7 +33,14 @@ app = Flask(__name__)
 
 
 # =====================================================
-# BASIC ROUTES
+# INIT DB
+# =====================================================
+
+init_db()
+
+
+# =====================================================
+# ROUTES
 # =====================================================
 
 @app.route("/")
@@ -50,71 +60,30 @@ def health():
     })
 
 
-# =====================================================
-# PnL API
-# =====================================================
-
 @app.route("/pnl")
 def pnl():
     return jsonify(get_status())
 
 
-# =====================================================
-# DASHBOARD (HTML UI)
-# =====================================================
-
 @app.route("/dashboard")
 def dashboard():
     return """
-    <!DOCTYPE html>
     <html>
     <head>
-        <title>Trading Bot Dashboard</title>
+        <title>Trading Bot</title>
         <meta http-equiv="refresh" content="5">
-        <style>
-            body {
-                font-family: Arial;
-                background: #0f172a;
-                color: #e2e8f0;
-                text-align: center;
-                padding-top: 50px;
-            }
-            .box {
-                display: inline-block;
-                padding: 20px;
-                border-radius: 10px;
-                background: #1e293b;
-                margin: 10px;
-                min-width: 200px;
-            }
-        </style>
     </head>
-    <body>
-
-        <h1>📊 Trading Bot Dashboard</h1>
-
-        <div class="box">
-            <h2>Status</h2>
-            <p>RUNNING</p>
-        </div>
-
-        <div class="box">
-            <h2>API</h2>
-            <p>/pnl</p>
-        </div>
-
-        <div class="box">
-            <h2>Refresh</h2>
-            <p>5 sec auto</p>
-        </div>
-
+    <body style="background:#0f172a;color:white;text-align:center;">
+        <h1>Trading Bot Dashboard</h1>
+        <p>Status: RUNNING</p>
+        <p>Check /pnl</p>
     </body>
     </html>
     """
 
 
 # =====================================================
-# WEBHOOK (MAIN TRADING ENGINE)
+# WEBHOOK
 # =====================================================
 
 @app.route("/webhook", methods=["POST"])
@@ -174,11 +143,7 @@ def webhook():
         # ORDER EXECUTION
         # =================================================
 
-        order = execute(
-            final_signal,
-            symbol,
-            qty,
-        )
+        order = execute(final_signal, symbol, qty)
 
         if not order.get("success", False):
 
@@ -186,11 +151,22 @@ def webhook():
 
             return jsonify(order), 500
 
-        send_trade(
+        # =================================================
+        # SUCCESS ACTIONS
+        # =================================================
+
+        send_trade(final_signal, symbol, qty, price)
+
+        insert_trade(symbol, final_signal, qty, price, 0)
+
+        # (선택) pnl 업데이트 - 현재 단순 구조
+        update_pnl(0)
+
+        logger.info(
+            "TRADE DONE | %s %s %s",
             final_signal,
             symbol,
-            qty,
-            price,
+            qty
         )
 
         return jsonify({
