@@ -1,18 +1,21 @@
-import json
-import os
-from config import STATE_FILE
+import time
+
+trade_count = 0
+last_reset = time.time()
 
 
-def load_state():
+def can_trade():
+    global trade_count, last_reset
 
-    if not os.path.exists(STATE_FILE):
-        return {}
+    now = time.time()
 
-    with open(STATE_FILE, "r") as f:
-        return json.load(f)
+    # 1분마다 초기화
+    if now - last_reset > 60:
+        trade_count = 0
+        last_reset = now
 
+    if trade_count >= 3:
+        return False
 
-def save_state(state):
-
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f)
+    trade_count += 1
+    return True
