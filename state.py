@@ -13,7 +13,7 @@ def can_trade():
         trade_count = 0
         last_reset = now
 
-    if trade_count >= 3:
+    if trade_count >= MAX_TRADES_PER_MIN:
         return False
 
     trade_count += 1
