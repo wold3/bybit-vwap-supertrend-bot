@@ -19,5 +19,7 @@ LEVERAGE = int(os.getenv("LEVERAGE", "5"))
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
+MAX_DAILY_LOSS = float(os.getenv("MAX_DAILY_LOSS", "50"))
+
 TRADE_LOG = "logs/trade.log"
 WEBHOOK_LOG = "logs/webhook.log"
