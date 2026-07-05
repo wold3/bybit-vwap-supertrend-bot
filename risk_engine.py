@@ -1,12 +1,6 @@
-import time
-
 state = {
     "daily_pnl": 0,
-    "start_balance": 1000,
-    "peak_balance": 1000,
-    "consecutive_losses": 0,
-    "halt": False,
-    "last_reset": time.time()
+    "consecutive_losses": 0
 }
 
 
@@ -22,15 +16,10 @@ def update_pnl(pnl):
 
 def should_stop_trading():
 
-    drawdown = (state["peak_balance"] - state["start_balance"]) / state["start_balance"] * 100
-
     if state["daily_pnl"] <= -30:
         return True
 
     if state["consecutive_losses"] >= 5:
-        return True
-
-    if drawdown >= 5:
         return True
 
     return False
