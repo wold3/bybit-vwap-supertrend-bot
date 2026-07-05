@@ -7,17 +7,16 @@ from strategy_wrapper import execute_strategy
 from telegram import send_trade, send_error
 
 from sequence_builder import build_sequence
-from ssl_trainer import SSLTrainer
-from transformer_agent import TransformerAgent
-from risk_engine import RiskEngine
+from world_agent import WorldAgent
+from imagination_trainer import ImaginationTrainer
+from feature_engine import get_feature_vector
 
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-ssl = SSLTrainer()
-agent = TransformerAgent()
-risk = RiskEngine()
+agent = WorldAgent()
+trainer = ImaginationTrainer()
 
 
 @app.route("/webhook", methods=["POST"])
@@ -33,20 +32,13 @@ def webhook():
         orderbook = data.get("orderbook")
 
         # ==========================
-        # SEQUENCE
+        # STATE SEQUENCE
         # ==========================
 
         state_seq = build_sequence(price, orderbook)
 
         # ==========================
-        # SELF-SUPERVISED LEARNING
-        # ==========================
-
-        ssl.add(state_seq)
-        ssl.train_step()
-
-        # ==========================
-        # POLICY (Transformer)
+        # WORLD MODEL ACTION
         # ==========================
 
         action = agent.act(state_seq)
@@ -58,6 +50,10 @@ def webhook():
         if not decision["success"]:
             return {"status": "filtered"}
 
+        # ==========================
+        # EXECUTION
+        # ==========================
+
         order = execute(signal, symbol, qty)
 
         if not order.get("success"):
@@ -67,33 +63,24 @@ def webhook():
         send_trade(signal, symbol, qty, price)
 
         # ==========================
-        # RISK-ADJUSTED REWARD
+        # IMAGINATION TRAINING
         # ==========================
 
-        pnl = 0.0  # real PnL 연결 가능
-
-        risk.update(pnl)
-        reward = risk.risk_penalty(pnl)
-
-        agent.store(state_seq, action, reward)
-        agent.train()
+        trainer.push(state_seq)
+        trainer.train_step()
 
         return {
             "status": "success",
-            "signal": signal,
-            "cvar": risk.cvar()
+            "signal": signal
         }
 
     except Exception as e:
-
         logger.exception(e)
         send_error(str(e))
-
         return {"error": str(e)}, 500
 
 
 if __name__ == "__main__":
-
     app.run(
         host=HOST,
         port=PORT,
