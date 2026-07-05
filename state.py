@@ -4,9 +4,9 @@ trade_count = 0
 last_reset = time.time()
 
 positions = {
-    "BTCUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0},
-    "ETHUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0},
-    "SOLUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0}
+    "BTCUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0, "stop_loss": 0},
+    "ETHUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0, "stop_loss": 0},
+    "SOLUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0, "stop_loss": 0}
 }
 
 
@@ -59,7 +59,3 @@ def update_trailing(symbol):
 def should_exit(symbol, price):
     pos = positions[symbol]
     return pos["active"] and price <= pos["trailing_stop"]
-
-
-def update_pnl(symbol, pnl):
-    positions[symbol]["daily_pnl"] += pnl
