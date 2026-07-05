@@ -4,9 +4,9 @@ trade_count = 0
 last_reset = time.time()
 
 positions = {
-    "BTCUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0},
-    "ETHUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0},
-    "SOLUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0}
+    "BTCUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0},
+    "ETHUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0},
+    "SOLUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0}
 }
 
 
@@ -17,13 +17,11 @@ def get_position(symbol):
 def can_trade():
     global trade_count, last_reset
 
-    now = time.time()
-
-    if now - last_reset > 60:
+    if time.time() - last_reset > 60:
         trade_count = 0
-        last_reset = now
+        last_reset = time.time()
 
-    if trade_count >= 3:
+    if trade_count >= MAX_TRADES_PER_MIN:
         return False
 
     trade_count += 1
@@ -31,9 +29,11 @@ def can_trade():
 
 
 def update_price(symbol, price):
-    pos = positions[symbol]
-    if pos["active"]:
-        pos["highest_price"] = max(pos["highest_price"], price)
+    if positions[symbol]["active"]:
+        positions[symbol]["highest_price"] = max(
+            positions[symbol]["highest_price"],
+            price
+        )
 
 
 def update_trailing(symbol):
@@ -42,11 +42,11 @@ def update_trailing(symbol):
     if not pos["active"]:
         return
 
-    entry = pos["entry_price"]
-    high = pos["highest_price"]
-
-    if high > entry * 1.01:
-        pos["trailing_stop"] = max(pos["trailing_stop"], high * 0.995)
+    if pos["highest_price"] > pos["entry_price"] * 1.01:
+        pos["trailing_stop"] = max(
+            pos["trailing_stop"],
+            pos["highest_price"] * 0.995
+        )
 
 
 def should_exit(symbol, price):
