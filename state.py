@@ -1,7 +1,5 @@
 import time
 import threading
-
-from config import MAX_TRADES_PER_MIN, MAX_DAILY_LOSS, MAX_LOSS_STREAK
 from bybit_api import get_unrealized_pnl
 
 lock = threading.Lock()
@@ -16,10 +14,6 @@ state = {
 }
 
 
-# ==========================
-# TRADE LIMIT
-# ==========================
-
 def can_trade():
 
     with lock:
@@ -30,37 +24,26 @@ def can_trade():
             state["trade_count"] = 0
             state["last_reset"] = now
 
-        if state["trade_count"] >= MAX_TRADES_PER_MIN:
+        if state["trade_count"] >= 3:
             return False
 
         state["trade_count"] += 1
         return True
 
 
-# ==========================
-# REAL PNL
-# ==========================
-
 def get_real_pnl(symbol):
     return get_unrealized_pnl(symbol)
 
 
-# ==========================
-# REWARD ENGINE (IMPORTANT)
-# ==========================
+def compute_reward(pnls: dict):
 
-def compute_reward_from_market(symbol):
+    total = sum(pnls.values())
 
-    pnl = get_real_pnl(symbol)
+    if total > 0:
+        return total * 1.2
 
-    if pnl > 0:
-        return pnl * 1.3
-    return pnl * 1.7
+    return total * 1.5
 
-
-# ==========================
-# UPDATE STATE
-# ==========================
 
 def update_trade_result(value):
 
@@ -70,32 +53,6 @@ def update_trade_result(value):
         state["balance"] += value
         state["equity"].append(state["balance"])
 
-        if value < 0:
-            state["loss_streak"] += 1
-        else:
-            state["loss_streak"] = 0
-
-
-# ==========================
-# RISK CHECK
-# ==========================
-
-def should_stop():
-
-    with lock:
-
-        if state["pnl"] <= -MAX_DAILY_LOSS:
-            return True
-
-        if state["loss_streak"] >= MAX_LOSS_STREAK:
-            return True
-
-        return False
-
-
-# ==========================
-# STATUS
-# ==========================
 
 def get_status():
 
@@ -104,7 +61,6 @@ def get_status():
         return {
             "balance": state["balance"],
             "pnl": state["pnl"],
-            "loss_streak": state["loss_streak"],
-            "trade_count": state["trade_count"],
             "equity_latest": state["equity"][-1],
+            "equity_points": len(state["equity"]),
         }
