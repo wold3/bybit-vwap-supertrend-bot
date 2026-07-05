@@ -4,9 +4,9 @@ trade_count = 0
 last_reset = time.time()
 
 positions = {
-    "BTCUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0, "stop_loss": 0},
-    "ETHUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0, "stop_loss": 0},
-    "SOLUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0, "stop_loss": 0}
+    "BTCUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0},
+    "ETHUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0},
+    "SOLUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0}
 }
 
 
@@ -44,9 +44,6 @@ def update_trailing(symbol):
 
     entry = pos["entry_price"]
     high = pos["highest_price"]
-
-    if entry == 0:
-        return
 
     if high > entry * 1.01:
         pos["trailing_stop"] = max(pos["trailing_stop"], high * 0.995)
