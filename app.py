@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 
 from world import World
 from persistence import save, load
@@ -7,6 +7,11 @@ app = Flask(__name__)
 
 world = World()
 world = load(world)
+
+
+@app.route("/")
+def dashboard():
+    return render_template("dashboard.html")
 
 
 @app.route("/step")
@@ -21,21 +26,14 @@ def step():
     })
 
 
-@app.route("/metrics")
-def metrics():
-
-    return jsonify({
-        "volatility": world.metrics.volatility(),
-        "trend": world.metrics.trend()
-    })
-
-
 @app.route("/status")
 def status():
 
     return jsonify({
         "price": world.market.price,
-        "population": len(world.agents)
+        "population": len(world.agents),
+        "volatility": world.metrics.volatility(),
+        "trend": world.metrics.trend()
     })
 
 
