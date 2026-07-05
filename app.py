@@ -24,7 +24,7 @@ def webhook():
 
     return jsonify({
         "success": True,
-        "result": str(res)
+        "result": res
     })
 
 
