@@ -22,7 +22,7 @@ def execute(signal, symbol, qty):
             qty=str(qty)
         )
 
-    elif signal == "SHORT":
+    if signal == "SHORT":
         return session.place_order(
             category="linear",
             symbol=symbol,
@@ -31,8 +31,7 @@ def execute(signal, symbol, qty):
             qty=str(qty)
         )
 
-    elif signal == "SELL":
-        # 포지션 청산 (단순 버전)
+    if signal in ["SELL", "EXIT"]:
         return session.place_order(
             category="linear",
             symbol=symbol,
@@ -41,4 +40,4 @@ def execute(signal, symbol, qty):
             qty=str(qty)
         )
 
-    return {"error": "unknown signal"}
+    return {"error": "invalid signal"}
