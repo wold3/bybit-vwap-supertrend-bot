@@ -13,7 +13,6 @@ world = load(world)
 def step():
 
     price = world.step()
-
     save(world)
 
     return jsonify({
