@@ -1,17 +1,18 @@
 from market_regime import get_market_regime
+from strategy_engine import trend_strategy, range_strategy, downtrend_strategy
 
 
-def should_trade(signal):
+def route(signal, price_action):
 
     regime = get_market_regime()
 
     if regime == "TREND_UP":
-        return True, regime
+        return trend_strategy(signal), regime
 
     if regime == "RANGE":
-        return False, regime
+        return range_strategy(price_action), regime
 
     if regime == "TREND_DOWN":
-        return False, regime
+        return downtrend_strategy(signal), regime
 
-    return False, "UNKNOWN"
+    return False, regime
