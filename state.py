@@ -19,7 +19,7 @@ def can_trade():
         trade_count = 0
         last_reset = now
 
-    if trade_count >= 3:
+    if trade_count >= MAX_TRADES_PER_MIN:
         return False
 
     trade_count += 1
@@ -36,3 +36,9 @@ def update_position(entry_price, profit):
 def update_pnl(pnl):
     global position
     position["daily_pnl"] += pnl
+
+
+def reset_day():
+    global position
+    position["daily_pnl"] = 0
+    position["highest_profit"] = 0
