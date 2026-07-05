@@ -28,12 +28,10 @@ def get_feature_vector(price, orderbook=None):
     imbalance = 0.0
 
     if orderbook:
-
         bids = orderbook.get("bids", [])
         asks = orderbook.get("asks", [])
 
         if bids and asks:
-
             bid_vol = sum(float(b[1]) for b in bids[:5])
             ask_vol = sum(float(a[1]) for a in asks[:5])
 
