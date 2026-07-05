@@ -52,7 +52,7 @@ RISK_PER_TRADE = float(
 )
 
 # =====================================================
-# Risk
+# Risk Management
 # =====================================================
 
 MAX_DAILY_LOSS = float(
@@ -118,7 +118,7 @@ DATABASE_URL = os.getenv(
 
 MODEL_PATH = os.getenv(
     "MODEL_PATH",
-    "models/best_model.zip"
+    "models/best_model.pth"
 )
 
 REPLAY_BUFFER_SIZE = int(
@@ -151,6 +151,26 @@ EPSILON_DECAY = float(
 
 TARGET_UPDATE = int(
     os.getenv("TARGET_UPDATE", "100")
+)
+
+# =====================================================
+# Backtest
+# =====================================================
+
+INITIAL_BALANCE = float(
+    os.getenv("INITIAL_BALANCE", "1000")
+)
+
+# =====================================================
+# Watchdog
+# =====================================================
+
+CHECK_INTERVAL = int(
+    os.getenv("CHECK_INTERVAL", "10")
+)
+
+MAX_RESTART = int(
+    os.getenv("MAX_RESTART", "20")
 )
 
 # =====================================================
