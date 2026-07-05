@@ -1,5 +1,5 @@
 from pybit.unified_trading import HTTP
-from config import TESTNET
+from config import TESTNET, TAKE_PROFIT_PCT, STOP_LOSS_PCT
 
 API_KEY = "YOUR_API_KEY"
 API_SECRET = "YOUR_API_SECRET"
@@ -19,25 +19,20 @@ def execute(signal, symbol, qty):
             symbol=symbol,
             side="Buy",
             orderType="Market",
-            qty=str(qty)
+            qty=str(qty),
+            takeProfit=str(TAKE_PROFIT_PCT),
+            stopLoss=str(STOP_LOSS_PCT)
         )
 
-    if signal == "SHORT":
+    elif signal in ["SHORT", "SELL", "EXIT"]:
         return session.place_order(
             category="linear",
             symbol=symbol,
             side="Sell",
             orderType="Market",
-            qty=str(qty)
-        )
-
-    if signal in ["SELL", "EXIT"]:
-        return session.place_order(
-            category="linear",
-            symbol=symbol,
-            side="Sell",
-            orderType="Market",
-            qty=str(qty)
+            qty=str(qty),
+            takeProfit=str(TAKE_PROFIT_PCT),
+            stopLoss=str(STOP_LOSS_PCT)
         )
 
     return {"error": "invalid signal"}
