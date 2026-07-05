@@ -1,13 +1,10 @@
 import pandas as pd
 
-INITIAL_BALANCE = 1000
-
-
 def run_backtest(file):
 
     df = pd.read_csv(file)
 
-    balance = INITIAL_BALANCE
+    balance = 1000
     position = 0
     entry = 0
     wins = 0
