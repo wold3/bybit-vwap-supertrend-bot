@@ -4,17 +4,17 @@ from flask import Flask, jsonify, request
 
 from config import DEBUG, HOST, PORT
 from signal_parser import validate
-from state import can_trade, get_status, update_trade_result, compute_reward
+from state import (
+    can_trade,
+    get_status,
+    compute_reward_from_market,
+    update_trade_result
+)
 from bybit_api import execute
 from telegram import send_error, send_status, send_trade
 from strategy_wrapper import execute_strategy
-
 from dqn_agent import Agent
 
-
-# ==========================
-# INIT
-# ==========================
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def webhook():
         price = result["price"]
 
         # ==========================
-        # AI DECISION
+        # AI ACTION
         # ==========================
 
         state_vec = [price, 0, 0]
@@ -67,7 +67,7 @@ def webhook():
             return {"status": "filtered"}
 
         # ==========================
-        # EXECUTE
+        # EXECUTE TRADE
         # ==========================
 
         order = execute(ai_signal, symbol, qty)
@@ -79,12 +79,10 @@ def webhook():
         send_trade(ai_signal, symbol, qty, price)
 
         # ==========================
-        # LEARNING STEP (NEW)
+        # REAL REWARD (IMPORTANT)
         # ==========================
 
-        pnl = 0  # 실제 pnl 연결 가능
-
-        reward = compute_reward(pnl)
+        reward = compute_reward_from_market(symbol)
 
         next_state = [price, 0, 0]
 
@@ -98,11 +96,12 @@ def webhook():
         agent.train()
         agent.soft_update()
 
-        update_trade_result(pnl)
+        update_trade_result(reward)
 
         return {
             "status": "success",
-            "action": ai_signal
+            "action": ai_signal,
+            "reward": reward
         }
 
     except Exception as e:
@@ -116,7 +115,7 @@ def webhook():
 # ==========================
 if __name__ == "__main__":
 
-    send_status("🚀 DQN Trading Bot Started")
+    send_status("🚀 Real PnL DQN Bot Started")
 
     app.run(
         host=HOST,
