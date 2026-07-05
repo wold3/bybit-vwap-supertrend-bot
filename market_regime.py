@@ -8,4 +8,4 @@ def get_market_regime():
         return "TREND_UP"
     elif r < 0.66:
         return "RANGE"
-    return "TREND_DOWN"
+    return "SAFE"
