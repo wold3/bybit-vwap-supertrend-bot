@@ -27,6 +27,10 @@ class TransformerAgent:
 
             return int(torch.argmax(logits))
 
+    def store(self, state_seq, action, reward):
+
+        self.memory.append((state_seq, action, reward))
+
     def train(self, batch_size=32):
 
         if len(self.memory) < batch_size:
@@ -45,7 +49,3 @@ class TransformerAgent:
             self.opt.zero_grad()
             loss.backward()
             self.opt.step()
-
-    def store(self, state_seq, action, reward):
-
-        self.memory.append((state_seq, action, reward))
