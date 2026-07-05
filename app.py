@@ -6,7 +6,7 @@ from config import HOST, PORT, DEBUG
 from signal_parser import validate
 from rl_predictor_dqn import decide
 from bybit_api import execute
-from state import can_trade
+from state import can_trade, get_status
 
 try:
     from telegram import send
@@ -35,7 +35,7 @@ def index():
 def health():
     return jsonify({
         "status": "ok",
-        "service": "bybit-ai-bot"
+        "trade_status": get_status()
     })
 
 
@@ -48,7 +48,7 @@ def webhook():
 
         if data is None:
             return jsonify({
-                "error": "invalid json"
+                "error": "Invalid JSON."
             }), 400
 
         ok, result = validate(data)
@@ -60,53 +60,71 @@ def webhook():
 
         if not can_trade():
             return jsonify({
-                "error": "rate_limit"
+                "error": "Rate limit exceeded."
             }), 429
 
+        signal = result["signal"]
         symbol = result["symbol"]
         qty = result["qty"]
+        price = result["price"]
 
-        price = float(data.get("price", 0))
+        # AI 판단
+        ai_action = decide(price)
 
-        action = decide(price)
+        action_map = {
+            0: "HOLD",
+            1: "BUY",
+            2: "SELL"
+        }
 
-        if action == 0:
+        ai_signal = action_map.get(ai_action, "HOLD")
 
-            logging.info("HOLD %s", symbol)
+        logging.info(
+            "Webhook=%s | AI=%s | %s %.6f",
+            signal,
+            ai_signal,
+            symbol,
+            qty
+        )
 
+        # HOLD이면 주문하지 않음
+        if ai_signal == "HOLD":
             return jsonify({
-                "action": "HOLD"
+                "status": "ok",
+                "action": "HOLD",
+                "reason": "AI decision"
             })
 
-        if action == 1:
-
-            response = execute("BUY", symbol, qty)
-
-            logging.info("BUY %s %.6f", symbol, qty)
-
-            send(f"BUY {symbol} qty={qty}")
-
+        # TradingView와 AI가 같은 방향일 때만 주문
+        if signal != ai_signal:
             return jsonify({
-                "action": "BUY",
-                "result": response
+                "status": "filtered",
+                "tv_signal": signal,
+                "ai_signal": ai_signal
             })
 
-        if action == 2:
+        order = execute(
+            ai_signal,
+            symbol,
+            qty
+        )
 
-            response = execute("SELL", symbol, qty)
+        if not order.get("success", False):
 
-            logging.info("SELL %s %.6f", symbol, qty)
+            logging.error(order)
 
-            send(f"SELL {symbol} qty={qty}")
+            return jsonify(order), 500
 
-            return jsonify({
-                "action": "SELL",
-                "result": response
-            })
+        send(f"{ai_signal} {symbol} qty={qty}")
 
         return jsonify({
-            "action": "UNKNOWN"
-        }), 400
+            "status": "success",
+            "signal": ai_signal,
+            "symbol": symbol,
+            "qty": qty,
+            "price": price,
+            "order": order
+        })
 
     except Exception as e:
 
@@ -119,7 +137,7 @@ def webhook():
 
 if __name__ == "__main__":
 
-    logging.info("Starting Bybit AI Bot...")
+    logging.info("Starting Bybit AI Trading Bot...")
 
     app.run(
         host=HOST,
