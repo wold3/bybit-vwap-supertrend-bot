@@ -7,10 +7,7 @@ def get_balance():
 
 def calculate_qty(entry_price, stop_loss):
 
-    balance = get_balance()
-
-    risk = balance * RISK_PER_TRADE
-
+    risk = get_balance() * RISK_PER_TRADE
     distance = abs(entry_price - stop_loss)
 
     if distance == 0:
