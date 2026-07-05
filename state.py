@@ -48,12 +48,8 @@ def update_trailing(symbol):
     if entry == 0:
         return
 
-    gain_pct = ((high - entry) / entry) * 100
-
-    if gain_pct < 1:
-        return
-
-    pos["trailing_stop"] = max(pos["trailing_stop"], high * 0.995)
+    if high > entry * 1.01:
+        pos["trailing_stop"] = max(pos["trailing_stop"], high * 0.995)
 
 
 def should_exit(symbol, price):
