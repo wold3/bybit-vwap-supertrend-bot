@@ -1,20 +1,20 @@
 import logging
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify
 
-from config import DEBUG, HOST, PORT
-from signal_parser import validate
-from state import compute_real_pnl, update_trade_result, get_status
+from config import HOST, PORT, DEBUG
 from bybit_api import execute
-from feature_engine import get_feature_vector
-from dqn_agent import Agent
-from telegram import send_trade, send_error
 from strategy_wrapper import execute_strategy
+from state import update_trade_result
+from telegram import send_trade, send_error
+
+from transformer_agent import TransformerAgent
+from sequence_builder import build_sequence
 
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
-agent = Agent()
+agent = TransformerAgent()
 
 
 @app.route("/webhook", methods=["POST"])
@@ -22,33 +22,25 @@ def webhook():
 
     try:
 
-        data = request.get_json(silent=True)
+        data = request.get_json()
 
-        if not data:
-            return {"error": "Invalid JSON"}, 400
-
-        ok, result = validate(data)
-
-        if not ok:
-            return {"error": result}, 400
-
-        symbol = result["symbol"]
-        price = result["price"]
-        qty = result["qty"]
-        orderbook = result.get("orderbook", None)
+        symbol = data["symbol"]
+        price = data["price"]
+        qty = data["qty"]
+        orderbook = data.get("orderbook")
 
         # ==========================
-        # FEATURE
+        # SEQUENCE STATE
         # ==========================
 
-        state_vec = get_feature_vector(price, orderbook)
+        state_seq = build_sequence(price, orderbook)
 
-        action = agent.act(state_vec)
+        action = agent.act(state_seq)
 
         signal = ["HOLD", "BUY", "SELL"][action]
 
         # ==========================
-        # FILTER
+        # STRATEGY FILTER
         # ==========================
 
         decision = execute_strategy(signal, price)
@@ -57,7 +49,7 @@ def webhook():
             return {"status": "filtered"}
 
         # ==========================
-        # EXECUTE
+        # EXECUTE TRADE
         # ==========================
 
         order = execute(signal, symbol, qty)
@@ -69,24 +61,21 @@ def webhook():
         send_trade(signal, symbol, qty, price)
 
         # ==========================
-        # REAL PnL REWARD
+        # REWARD (SIMPLIFIED)
         # ==========================
 
-        reward = compute_real_pnl(price, price, qty, state_vec[2])
+        reward = 0.0  # real pnl 연결 가능
 
-        next_state = get_feature_vector(price, orderbook)
-
-        agent.buffer.push(state_vec, action, reward, next_state)
+        agent.store(state_seq, action, reward)
 
         agent.train()
-        agent.soft_update()
 
         update_trade_result(reward)
 
         return {
             "status": "success",
             "signal": signal,
-            "reward": reward
+            "state_shape": len(state_seq)
         }
 
     except Exception as e:
