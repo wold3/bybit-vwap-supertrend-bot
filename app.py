@@ -14,6 +14,7 @@ from state import (
 from telegram import send_message
 from config import USE_AI_FILTER, MAX_DAILY_LOSS
 from ai_filter import allow_trade
+from position_sizer import calculate_qty
 
 app = Flask(__name__)
 
@@ -41,13 +42,13 @@ def webhook():
         if not ok_filter:
             return jsonify({"blocked": reason}), 403
 
-    # 트레일링 업데이트
+    # 트레일링
     update_price(symbol, price)
     update_trailing(symbol)
 
     # EXIT
     if should_exit(symbol, price):
-        execute("SELL", symbol, qty)
+        execute("EXIT", symbol, qty)
         send_message(f"🚨 EXIT {symbol} @ {price}")
         pos["active"] = False
         return jsonify({"exit": True})
@@ -63,14 +64,18 @@ def webhook():
     # 진입
     if result["signal"] == "BUY":
 
+        stop_loss = price * 0.99
+        qty = calculate_qty(price, stop_loss)
+
         pos["active"] = True
         pos["entry_price"] = price
         pos["highest_price"] = price
-        pos["trailing_stop"] = price * 0.995
+        pos["stop_loss"] = stop_loss
+        pos["trailing_stop"] = stop_loss
 
         execute("BUY", symbol, qty)
 
-        send_message(f"📈 ENTRY {symbol} @ {price}")
+        send_message(f"📈 ENTRY {symbol} @ {price} qty={qty}")
 
     return jsonify({"ok": True})
 
