@@ -4,7 +4,7 @@ from signal_parser import validate
 from bybit_api import execute
 from state import can_trade, position, update_position, update_pnl
 from telegram import send_message
-from config import MAX_DAILY_LOSS, TRAILING_STEP
+from config import MAX_DAILY_LOSS
 
 app = Flask(__name__)
 
@@ -17,29 +17,33 @@ def webhook():
     ok, result = validate(data)
 
     if not ok:
-        send_message(f"❌ INVALID: {result}")
+        send_message(f"❌ INVALID SIGNAL: {result}")
         return jsonify({"error": result}), 400
 
-    # 손실 제한
+    # 🔥 손실 제한
     if position["daily_pnl"] <= MAX_DAILY_LOSS:
-        send_message("⚠️ DAILY LOSS LIMIT HIT")
-        return jsonify({"error": "loss limit"}), 403
+        send_message("⚠️ DAILY LOSS LIMIT HIT - STOP TRADING")
+        return jsonify({"error": "daily loss limit"}), 403
 
+    # 🔥 거래 제한
     if not can_trade():
         send_message("⚠️ TRADE LIMIT REACHED")
-        return jsonify({"error": "limit"}), 429
+        return jsonify({"error": "trade limit"}), 429
 
     signal = result["signal"]
 
-    # 실행
-    res = execute(signal, result["symbol"], result["qty"])
+    res = execute(
+        signal,
+        result["symbol"],
+        result["qty"]
+    )
 
-    # 텔레그램 알림
+    # 🔔 텔레그램 알림
     send_message(
-        f"📊 TRADE\n"
-        f"{signal}\n"
-        f"{result['symbol']}\n"
-        f"qty: {result['qty']}"
+        f"📊 TRADE EXECUTED\n"
+        f"Signal: {signal}\n"
+        f"Symbol: {result['symbol']}\n"
+        f"Qty: {result['qty']}"
     )
 
     print(f"[EXECUTE] {signal} {result['symbol']}")
