@@ -1,20 +1,33 @@
 from flask import Flask, jsonify
 
 from world import World
+from persistence import save, load
 
 app = Flask(__name__)
 
 world = World()
+world = load(world)
 
 
-@app.route("/step", methods=["GET"])
+@app.route("/step")
 def step():
 
     price = world.step()
 
+    save(world)
+
     return jsonify({
         "price": price,
         "population": len(world.agents)
+    })
+
+
+@app.route("/metrics")
+def metrics():
+
+    return jsonify({
+        "volatility": world.metrics.volatility(),
+        "trend": world.metrics.trend()
     })
 
 
@@ -23,7 +36,7 @@ def status():
 
     return jsonify({
         "price": world.market.price,
-        "agents": len(world.agents)
+        "population": len(world.agents)
     })
 
 
