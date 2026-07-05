@@ -6,15 +6,14 @@ class Environment:
     def __init__(self, n_agents=3):
 
         self.market = Market()
-        self.n_agents = n_agents
         self.positions = [0] * n_agents
 
-    def step(self, actions):
+    def step(self, actions, liquidity):
 
-        buy = sum(1 for a in actions if a == 1)
-        sell = sum(1 for a in actions if a == 2)
+        buy = sum(a == 1 for a in actions)
+        sell = sum(a == 2 for a in actions)
 
-        price = self.market.step(buy, sell)
+        price = self.market.step(buy, sell, liquidity)
 
         rewards = []
 
