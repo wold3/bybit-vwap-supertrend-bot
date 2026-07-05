@@ -3,14 +3,15 @@ import time
 trade_count = 0
 last_reset = time.time()
 
-position = {
-    "active": False,
-    "entry_price": 0,
-    "highest_price": 0,
-    "trailing_stop": 0,
-    "daily_pnl": 0,
-    "trades": 0
+positions = {
+    "BTCUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0},
+    "ETHUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0},
+    "SOLUSDT": {"active": False, "entry_price": 0, "highest_price": 0, "trailing_stop": 0, "daily_pnl": 0}
 }
+
+
+def get_position(symbol):
+    return positions.get(symbol)
 
 
 def can_trade():
@@ -22,52 +23,49 @@ def can_trade():
         trade_count = 0
         last_reset = now
 
-    if trade_count >= MAX_TRADES_PER_MIN:
+    if trade_count >= 3:
         return False
 
     trade_count += 1
     return True
 
 
-def add_trade():
-    position["trades"] += 1
-
-
-def update_price(price):
-    if not position["active"]:
+def update_price(symbol, price):
+    pos = positions[symbol]
+    if not pos["active"]:
         return
 
-    position["highest_price"] = max(position["highest_price"], price)
+    pos["highest_price"] = max(pos["highest_price"], price)
 
 
-def update_trailing():
-    entry = position["entry_price"]
-    high = position["highest_price"]
+def update_trailing(symbol):
+    pos = positions[symbol]
+
+    if not pos["active"]:
+        return
+
+    entry = pos["entry_price"]
+    high = pos["highest_price"]
 
     if entry == 0:
         return
 
     gain_pct = ((high - entry) / entry) * 100
 
-    if gain_pct < 1.0:
+    if gain_pct < 1:
         return
 
-    new_stop = high * (1 - 0.005)
-
-    position["trailing_stop"] = max(position["trailing_stop"], new_stop)
+    pos["trailing_stop"] = max(pos["trailing_stop"], high * 0.995)
 
 
-def should_exit(price):
-    if not position["active"]:
+def should_exit(symbol, price):
+    pos = positions[symbol]
+
+    if not pos["active"]:
         return False
 
-    return price <= position["trailing_stop"]
+    return price <= pos["trailing_stop"]
 
 
-def update_pnl(pnl):
-    position["daily_pnl"] += pnl
-
-
-def reset_day():
-    position["daily_pnl"] = 0
-    position["trades"] = 0
+def update_pnl(symbol, pnl):
+    positions[symbol]["daily_pnl"] += pnl
