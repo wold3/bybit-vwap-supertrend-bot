@@ -4,7 +4,7 @@ from config import TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
 
 def send_message(text):
 
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    if not TELEGRAM_TOKEN:
         return
 
     try:
