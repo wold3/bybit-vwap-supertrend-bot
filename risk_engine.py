@@ -1,25 +1,25 @@
 state = {
-    "daily_pnl": 0,
-    "consecutive_losses": 0
+    "pnl": 0,
+    "loss_streak": 0
 }
 
 
 def update_pnl(pnl):
 
-    state["daily_pnl"] += pnl
+    state["pnl"] += pnl
 
     if pnl < 0:
-        state["consecutive_losses"] += 1
+        state["loss_streak"] += 1
     else:
-        state["consecutive_losses"] = 0
+        state["loss_streak"] = 0
 
 
-def should_stop_trading():
+def should_stop():
 
-    if state["daily_pnl"] <= -30:
+    if state["pnl"] < -30:
         return True
 
-    if state["consecutive_losses"] >= 5:
+    if state["loss_streak"] >= 5:
         return True
 
     return False
