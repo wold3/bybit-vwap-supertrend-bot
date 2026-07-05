@@ -1,51 +1,128 @@
+import logging
+
 from flask import Flask, request, jsonify
 
+from config import HOST, PORT, DEBUG
 from signal_parser import validate
 from rl_predictor_dqn import decide
 from bybit_api import execute
 from state import can_trade
 
+try:
+    from telegram import send
+except ImportError:
+    def send(message):
+        pass
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
 app = Flask(__name__)
+
+
+@app.route("/")
+def index():
+    return jsonify({
+        "name": "Bybit AI Trading Bot",
+        "status": "running"
+    })
+
+
+@app.route("/health")
+def health():
+    return jsonify({
+        "status": "ok",
+        "service": "bybit-ai-bot"
+    })
 
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
 
-    data = request.get_json(force=True)
+    try:
 
-    ok, result = validate(data)
+        data = request.get_json(silent=True)
 
-    if not ok:
-        return {"error": result}, 400
+        if data is None:
+            return jsonify({
+                "error": "invalid json"
+            }), 400
 
-    symbol = result["symbol"]
-    qty = result["qty"]
+        ok, result = validate(data)
 
-    price = float(data.get("price", 0))
+        if not ok:
+            return jsonify({
+                "error": result
+            }), 400
 
-    action = decide(price)
+        if not can_trade():
+            return jsonify({
+                "error": "rate_limit"
+            }), 429
 
-    if not can_trade():
-        return {"error": "rate_limit"}, 429
+        symbol = result["symbol"]
+        qty = result["qty"]
 
-    if action == 0:
-        return {"action": "HOLD"}
+        price = float(data.get("price", 0))
 
-    if action == 1:
-        execute("BUY", symbol, qty)
-        return {"action": "BUY"}
+        action = decide(price)
 
-    if action == 2:
-        execute("SELL", symbol, qty)
-        return {"action": "SELL"}
+        if action == 0:
 
-    return {"ok": True}
+            logging.info("HOLD %s", symbol)
 
+            return jsonify({
+                "action": "HOLD"
+            })
 
-@app.route("/health")
-def health():
-    return {"status": "ok"}
+        if action == 1:
+
+            response = execute("BUY", symbol, qty)
+
+            logging.info("BUY %s %.6f", symbol, qty)
+
+            send(f"BUY {symbol} qty={qty}")
+
+            return jsonify({
+                "action": "BUY",
+                "result": response
+            })
+
+        if action == 2:
+
+            response = execute("SELL", symbol, qty)
+
+            logging.info("SELL %s %.6f", symbol, qty)
+
+            send(f"SELL {symbol} qty={qty}")
+
+            return jsonify({
+                "action": "SELL",
+                "result": response
+            })
+
+        return jsonify({
+            "action": "UNKNOWN"
+        }), 400
+
+    except Exception as e:
+
+        logging.exception(e)
+
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+
+    logging.info("Starting Bybit AI Bot...")
+
+    app.run(
+        host=HOST,
+        port=PORT,
+        debug=DEBUG
+    )
