@@ -19,7 +19,7 @@ def execute(signal, symbol, qty):
             qty=str(qty)
         )
 
-    elif signal in ["SELL", "EXIT"]:
+    if signal in ["SELL", "EXIT"]:
         return session.place_order(
             category="linear",
             symbol=symbol,
