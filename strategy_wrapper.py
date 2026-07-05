@@ -4,17 +4,13 @@ from risk_engine import should_stop
 
 def execute_strategy(signal, price):
     """
-    전략 실행 Wrapper
-
-    Args:
-        signal (str): TradingView Signal
-        price (float): 현재 가격
-
-    Returns:
-        dict
+    전략 실행 Wrapper (최종 의사결정 레이어)
     """
 
-    # 리스크 체크
+    # ----------------------------
+    # 1. Risk Stop Check
+    # ----------------------------
+
     if should_stop():
         return {
             "success": False,
@@ -23,21 +19,42 @@ def execute_strategy(signal, price):
             "regime": None,
         }
 
-    # 전략 선택
-    result = route(signal, price)
+    # ----------------------------
+    # 2. Strategy Routing
+    # ----------------------------
 
-    if not result["allow"]:
+    allow, regime = route(signal, price)
+
+    # ----------------------------
+    # 3. Filter 결과
+    # ----------------------------
+
+    if not allow:
         return {
             "success": False,
             "reason": "filtered",
-            "strategy": result["strategy"],
-            "regime": result["regime"],
+            "strategy": "none",
+            "regime": regime,
         }
+
+    # ----------------------------
+    # 4. Strategy 결정
+    # ----------------------------
+
+    # regime 기반 단순 전략 매핑
+    if regime == "TREND_UP":
+        strategy = "trend"
+
+    elif regime == "RANGE":
+        strategy = "range"
+
+    else:
+        strategy = "safe"
 
     return {
         "success": True,
-        "strategy": result["strategy"],
-        "regime": result["regime"],
+        "strategy": strategy,
+        "regime": regime,
         "signal": signal,
     }
 
@@ -52,19 +69,15 @@ def can_execute(signal, price):
 
 def get_strategy(signal, price):
     """
-    선택된 전략명 반환
+    선택된 전략 반환
     """
 
-    result = execute_strategy(signal, price)
-
-    return result["strategy"]
+    return execute_strategy(signal, price)["strategy"]
 
 
 def get_regime(signal, price):
     """
-    현재 시장 상태 반환
+    시장 상태 반환
     """
 
-    result = execute_strategy(signal, price)
-
-    return result["regime"]
+    return execute_strategy(signal, price)["regime"]
