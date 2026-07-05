@@ -3,9 +3,9 @@ import pandas as pd
 INITIAL_BALANCE = 1000
 
 
-def run_backtest(csv_file):
+def run_backtest(file):
 
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(file)
 
     balance = INITIAL_BALANCE
     position = 0
@@ -34,16 +34,14 @@ def run_backtest(csv_file):
             trades += 1
             position = 0
 
-    win_rate = (wins / trades) * 100 if trades > 0 else 0
+    win_rate = (wins / trades) * 100 if trades else 0
 
     return {
         "balance": balance,
         "trades": trades,
-        "wins": wins,
         "win_rate": win_rate
     }
 
 
 if __name__ == "__main__":
-    result = run_backtest("data.csv")
-    print(result)
+    print(run_backtest("data.csv"))
