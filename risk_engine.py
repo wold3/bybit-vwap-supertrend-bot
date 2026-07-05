@@ -4,6 +4,7 @@ import numpy as np
 class RiskEngine:
 
     def __init__(self, alpha=0.05):
+
         self.returns = []
         self.alpha = alpha
 
