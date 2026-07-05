@@ -2,7 +2,6 @@ import time
 import threading
 
 from config import MAX_TRADES_PER_MIN, MAX_DAILY_LOSS, MAX_LOSS_STREAK
-from bybit_api import get_unrealized_pnl
 
 lock = threading.Lock()
 
@@ -16,14 +15,8 @@ state = {
 }
 
 
-# =====================================================
-# RATE LIMIT
-# =====================================================
-
 def can_trade():
-
     with lock:
-
         now = time.time()
 
         if now - state["last_reset"] >= 60:
@@ -37,63 +30,43 @@ def can_trade():
         return True
 
 
-# =====================================================
-# REAL PNL SYNC
-# =====================================================
-
-def sync_real_pnl(symbol):
-
-    pnl = get_unrealized_pnl(symbol)
-
+def update_trade_result(pnl):
     with lock:
-
-        state["pnl"] = pnl
-        state["balance"] = 1000.0 + pnl
+        state["pnl"] += pnl
+        state["balance"] += pnl
         state["equity"].append(state["balance"])
 
-    return pnl
+        if pnl < 0:
+            state["loss_streak"] += 1
+        else:
+            state["loss_streak"] = 0
 
-
-# =====================================================
-# RISK CHECK
-# =====================================================
 
 def should_stop():
-
     with lock:
-
         if state["pnl"] <= -MAX_DAILY_LOSS:
             return True
-
         if state["loss_streak"] >= MAX_LOSS_STREAK:
             return True
-
         return False
 
 
-# =====================================================
-# STATUS
-# =====================================================
-
 def get_status():
-
     with lock:
-
         return {
             "balance": state["balance"],
             "pnl": state["pnl"],
             "loss_streak": state["loss_streak"],
             "trade_count": state["trade_count"],
             "equity_latest": state["equity"][-1],
-            "equity_points": len(state["equity"]),
         }
 
 
-# =====================================================
-# EQUITY CURVE
-# =====================================================
+# ==========================
+# 🧠 REWARD FUNCTION (NEW)
+# ==========================
 
-def get_equity_curve():
-
-    with lock:
-        return state["equity"]
+def compute_reward(pnl):
+    if pnl > 0:
+        return pnl * 1.2
+    return pnl * 1.5
