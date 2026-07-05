@@ -40,7 +40,3 @@ def run_backtest(file):
         "trades": trades,
         "win_rate": win_rate
     }
-
-
-if __name__ == "__main__":
-    print(run_backtest("data.csv"))
