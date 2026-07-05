@@ -1,9 +1,6 @@
-import random
-
-def get_features(symbol, price):
+def get_features(price):
 
     return {
-        "volatility": random.random(),
-        "trend_strength": random.random(),
-        "price_action": "normal"
+        "volatility": 0.5,
+        "trend": 0.5
     }
