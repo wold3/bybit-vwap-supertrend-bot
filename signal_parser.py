@@ -9,7 +9,6 @@ def validate(data):
         return False, "bad secret"
 
     return True, {
-        "signal": data.get("signal", "BUY"),
         "symbol": data.get("symbol", DEFAULT_SYMBOL),
         "qty": float(data.get("qty", ORDER_QTY))
     }
