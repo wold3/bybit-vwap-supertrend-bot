@@ -1,20 +1,22 @@
 import logging
-from flask import Flask, request, jsonify
+from flask import Flask, request
 
 from config import HOST, PORT, DEBUG
 from bybit_api import execute
 from strategy_wrapper import execute_strategy
-from state import update_trade_result
 from telegram import send_trade, send_error
 
 from transformer_agent import TransformerAgent
 from sequence_builder import build_sequence
+from state import compute_reward, update_trade_result
+from risk_engine import RiskEngine
 
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
 agent = TransformerAgent()
+risk_engine = RiskEngine()
 
 
 @app.route("/webhook", methods=["POST"])
@@ -30,7 +32,7 @@ def webhook():
         orderbook = data.get("orderbook")
 
         # ==========================
-        # SEQUENCE STATE
+        # STATE SEQUENCE
         # ==========================
 
         state_seq = build_sequence(price, orderbook)
@@ -49,7 +51,7 @@ def webhook():
             return {"status": "filtered"}
 
         # ==========================
-        # EXECUTE TRADE
+        # EXECUTION
         # ==========================
 
         order = execute(signal, symbol, qty)
@@ -61,21 +63,24 @@ def webhook():
         send_trade(signal, symbol, qty, price)
 
         # ==========================
-        # REWARD (SIMPLIFIED)
+        # PnL (SIMPLIFIED HOOK)
         # ==========================
 
-        reward = 0.0  # real pnl 연결 가능
+        pnl = 0.0  # real execution 연결 가능
+
+        reward = compute_reward(pnl)
 
         agent.store(state_seq, action, reward)
 
         agent.train()
 
-        update_trade_result(reward)
+        update_trade_result(pnl)
 
         return {
             "status": "success",
             "signal": signal,
-            "state_shape": len(state_seq)
+            "reward": reward,
+            "cvar": risk_engine.cvar()
         }
 
     except Exception as e:
