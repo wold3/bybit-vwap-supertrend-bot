@@ -17,7 +17,7 @@ state = {
 
 
 # =====================================================
-# TRADE LIMIT
+# RATE LIMIT
 # =====================================================
 
 def can_trade():
@@ -38,7 +38,7 @@ def can_trade():
 
 
 # =====================================================
-# REAL PNL SYNC (핵심)
+# REAL PNL SYNC
 # =====================================================
 
 def sync_real_pnl(symbol):
@@ -87,3 +87,13 @@ def get_status():
             "equity_latest": state["equity"][-1],
             "equity_points": len(state["equity"]),
         }
+
+
+# =====================================================
+# EQUITY CURVE
+# =====================================================
+
+def get_equity_curve():
+
+    with lock:
+        return state["equity"]
