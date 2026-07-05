@@ -16,7 +16,7 @@ def validate_secret(data):
     return True
 
 
-def parse_webhook(data):
+def parse(data):
 
     if not isinstance(data, dict):
         raise SignalError("invalid json")
@@ -45,6 +45,6 @@ def parse_webhook(data):
 def validate(data):
 
     try:
-        return True, parse_webhook(data)
+        return True, parse(data)
     except Exception as e:
         return False, str(e)
