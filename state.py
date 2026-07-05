@@ -11,7 +11,7 @@ positions = {
 
 
 def get_position(symbol):
-    return positions.get(symbol)
+    return positions[symbol]
 
 
 def can_trade():
@@ -32,10 +32,8 @@ def can_trade():
 
 def update_price(symbol, price):
     pos = positions[symbol]
-    if not pos["active"]:
-        return
-
-    pos["highest_price"] = max(pos["highest_price"], price)
+    if pos["active"]:
+        pos["highest_price"] = max(pos["highest_price"], price)
 
 
 def update_trailing(symbol):
@@ -60,11 +58,7 @@ def update_trailing(symbol):
 
 def should_exit(symbol, price):
     pos = positions[symbol]
-
-    if not pos["active"]:
-        return False
-
-    return price <= pos["trailing_stop"]
+    return pos["active"] and price <= pos["trailing_stop"]
 
 
 def update_pnl(symbol, pnl):
