@@ -1,21 +1,14 @@
-import os
-from dotenv import load_dotenv
+ORDER_QTY = 0.001
 
-load_dotenv()
+WEBHOOK_SECRET = "1234"
 
-BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
-BYBIT_API_SECRET = os.getenv("BYBIT_API_SECRET", "")
+DEFAULT_SYMBOL = "BTCUSDT"
 
-TESTNET = os.getenv("TESTNET", "True").lower() == "true"
+TESTNET = True
 
-CATEGORY = "linear"
-POSITION_IDX = int(os.getenv("POSITION_IDX", "0"))
+# 리스크
+MAX_TRADES_PER_MIN = 3
 
-SYMBOLS = os.getenv("SYMBOLS", "BTCUSDT,ETHUSDT").split(",")
-
-ORDER_QTY = float(os.getenv("ORDER_QTY", "0.001"))
-
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
-
-TAKE_PROFIT_PCT = float(os.getenv("TAKE_PROFIT_PCT", "1.5"))
-STOP_LOSS_PCT = float(os.getenv("STOP_LOSS_PCT", "1.0"))
+# TP / SL (%)
+TAKE_PROFIT_PCT = 1.5
+STOP_LOSS_PCT = 1.0
