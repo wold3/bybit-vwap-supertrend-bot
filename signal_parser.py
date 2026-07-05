@@ -1,4 +1,4 @@
-from config import ORDER_QTY, WEBHOOK_SECRET, DEFAULT_SYMBOL
+from config import WEBHOOK_SECRET, DEFAULT_SYMBOL, ORDER_QTY
 
 
 def validate(data):
