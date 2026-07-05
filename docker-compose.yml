@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+
+  # =========================
+  # Trading Bot (Flask + AI + Strategy)
+  # =========================
+  bot:
+    build: .
+    container_name: bybit_trading_bot
+
+    restart: always
+
+    ports:
+      - "5000:5000"
+
+    env_file:
+      - .env
+
+    volumes:
+      - .:/app
+
+    command: python app.py
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+  # =========================
+  # Watchdog (health monitor + auto restart)
+  # =========================
+  watchdog:
+    build: .
+    container_name: bybit_watchdog
+
+    restart: always
+
+    depends_on:
+      - bot
+
+    env_file:
+      - .env
+
+    volumes:
+      - .:/app
+
+    command: python watchdog.py
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
