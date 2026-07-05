@@ -2,22 +2,14 @@ from flask import Flask, request, jsonify
 
 from signal_parser import validate
 from bybit_api import execute
-from state import (
-    can_trade,
-    position,
-    update_position,
-    update_pnl,
-    add_trade
-)
+from state import can_trade, position, add_trade, update_pnl
 from telegram import send_message
-from config import MAX_DAILY_LOSS
+from config import MAX_DAILY_LOSS, USE_AI_FILTER
+from ai_filter import allow_trade
 
 app = Flask(__name__)
 
 
-# =========================
-# WEBHOOK
-# =========================
 @app.route("/webhook", methods=["POST"])
 def webhook():
 
@@ -26,24 +18,29 @@ def webhook():
     ok, result = validate(data)
 
     if not ok:
-        send_message(f"❌ INVALID SIGNAL: {result}")
+        send_message(f"❌ INVALID: {result}")
         return jsonify({"error": result}), 400
 
+    # 🔥 AI 필터
+    if USE_AI_FILTER:
+        allowed, reason = allow_trade()
+        if not allowed:
+            send_message(f"🚫 FILTER: {reason}")
+            return jsonify({"error": reason}), 403
+
+    # 🔥 손실 제한
     if position["daily_pnl"] <= MAX_DAILY_LOSS:
         send_message("⚠️ DAILY LOSS LIMIT HIT")
         return jsonify({"error": "loss limit"}), 403
 
+    # 🔥 거래 제한
     if not can_trade():
-        send_message("⚠️ TRADE LIMIT REACHED")
+        send_message("⚠️ TRADE LIMIT")
         return jsonify({"error": "limit"}), 429
 
     signal = result["signal"]
 
-    res = execute(
-        signal,
-        result["symbol"],
-        result["qty"]
-    )
+    res = execute(signal, result["symbol"], result["qty"])
 
     add_trade()
 
@@ -56,10 +53,7 @@ def webhook():
 
     print(f"[EXECUTE] {signal}")
 
-    return jsonify({
-        "success": True,
-        "result": res
-    })
+    return jsonify({"success": True, "result": res})
 
 
 # =========================
@@ -67,13 +61,7 @@ def webhook():
 # =========================
 @app.route("/pnl")
 def pnl():
-
-    return jsonify({
-        "daily_pnl": position["daily_pnl"],
-        "trades": position["trades"],
-        "highest_profit": position["highest_profit"],
-        "entry_price": position["entry_price"]
-    })
+    return jsonify(position)
 
 
 # =========================
