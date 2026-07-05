@@ -1,12 +1,13 @@
 from flask import Flask, request
 
-from world_agent import WorldAgent
-from bybit_api import execute
-from strategy_wrapper import execute_strategy
+from environment import Environment
+from agent_system import AgentSystem
+from strategy import filter_signal
 
 app = Flask(__name__)
 
-agent = WorldAgent()
+env = Environment()
+system = AgentSystem()
 
 
 @app.route("/webhook", methods=["POST"])
@@ -14,29 +15,46 @@ def webhook():
 
     data = request.get_json()
 
-    symbol = data["symbol"]
     price = data["price"]
-    qty = data["qty"]
 
-    state = [price] * 5
+    # ==========================
+    # AGENT ACTIONS
+    # ==========================
 
-    action = agent.act(state)
+    actions = system.act_all(price)
 
-    signal = ["HOLD", "BUY", "SELL"][action]
+    # ==========================
+    # MARKET STEP
+    # ==========================
 
-    decision = execute_strategy(signal, price)
+    price, rewards = env.step(actions)
 
-    if not decision["success"]:
+    system.update_all(rewards)
+
+    # ==========================
+    # SIGNAL OUTPUT (EMERGENT)
+    # ==========================
+
+    buy = actions.count(1)
+    sell = actions.count(2)
+
+    if buy > sell:
+        signal = "BUY"
+    elif sell > buy:
+        signal = "SELL"
+    else:
+        signal = "HOLD"
+
+    if not filter_signal(signal):
         return {"status": "filtered"}
 
-    order = execute(signal, symbol, qty)
-
     return {
-        "status": "success",
+        "price": price,
         "signal": signal,
-        "order": order
+        "actions": actions,
+        "rewards": rewards
     }
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(host="0.0.0.0", port=5000)
