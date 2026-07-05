@@ -1,87 +1,39 @@
-"""
-signal_parser.py
-
-TradingView Webhook Parser
-"""
-
-from config import DEFAULT_SYMBOL, ORDER_QTY
-
-VALID_SIGNALS = {
-    "BUY",
-    "SELL",
-    "SHORT",
-    "EXIT"
-}
+from config import DEFAULT_SYMBOL, ORDER_QTY, WEBHOOK_SECRET
 
 
 class SignalError(Exception):
     pass
 
 
-def normalize_signal(signal):
+def validate_secret(data):
 
-    if signal is None:
-        raise SignalError("signal is missing")
+    if WEBHOOK_SECRET == "":
+        return True
 
-    signal = str(signal).strip().upper()
+    if data.get("secret") != WEBHOOK_SECRET:
+        raise SignalError("invalid secret")
 
-    if signal not in VALID_SIGNALS:
-        raise SignalError(f"invalid signal : {signal}")
-
-    return signal
-
-
-def normalize_symbol(symbol):
-
-    if symbol is None:
-        return DEFAULT_SYMBOL
-
-    symbol = str(symbol).strip().upper()
-
-    if symbol == "":
-        return DEFAULT_SYMBOL
-
-    return symbol
-
-
-def normalize_qty(qty):
-
-    if qty is None:
-        return ORDER_QTY
-
-    try:
-
-        qty = float(qty)
-
-    except Exception:
-
-        raise SignalError("qty must be numeric")
-
-    if qty <= 0:
-        raise SignalError("qty must be greater than zero")
-
-    return qty
+    return True
 
 
 def parse_webhook(data):
 
-    if data is None:
-        raise SignalError("empty json")
-
     if not isinstance(data, dict):
-        raise SignalError("json object expected")
+        raise SignalError("invalid json")
 
-    signal = normalize_signal(
-        data.get("signal")
-    )
+    validate_secret(data)
 
-    symbol = normalize_symbol(
-        data.get("symbol")
-    )
+    signal = str(data.get("signal", "")).upper()
+    symbol = data.get("symbol", DEFAULT_SYMBOL)
+    qty = data.get("qty", ORDER_QTY)
 
-    qty = normalize_qty(
-        data.get("qty")
-    )
+    if signal not in ["BUY", "SELL", "SHORT", "EXIT"]:
+        raise SignalError("invalid signal")
+
+    try:
+        qty = float(qty)
+    except:
+        raise SignalError("invalid qty")
 
     return {
         "signal": signal,
@@ -93,26 +45,6 @@ def parse_webhook(data):
 def validate(data):
 
     try:
-
-        result = parse_webhook(data)
-
-        return True, result
-
+        return True, parse_webhook(data)
     except Exception as e:
-
         return False, str(e)
-
-
-if __name__ == "__main__":
-
-    sample = {
-        "signal": "BUY",
-        "symbol": "BTCUSDT",
-        "qty": 0.001
-    }
-
-    ok, result = validate(sample)
-
-    print(ok)
-
-    print(result)
