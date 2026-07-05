@@ -9,7 +9,6 @@ def can_trade():
 
     now = time.time()
 
-    # 1분마다 초기화
     if now - last_reset > 60:
         trade_count = 0
         last_reset = now
