@@ -13,10 +13,6 @@ model = MLModel()
 
 def should_enter_market(price, volatility, trend_strength):
 
-    score = model.predict({
-        "price": price,
-        "volatility": volatility,
-        "trend_strength": trend_strength
-    })
+    score = model.predict({})
 
     return score > model.threshold, score
