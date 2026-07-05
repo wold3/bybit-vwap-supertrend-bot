@@ -21,5 +21,11 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 MAX_DAILY_LOSS = float(os.getenv("MAX_DAILY_LOSS", "50"))
 
+TAKE_PROFIT_PCT = float(os.getenv("TAKE_PROFIT_PCT", "1.5"))
+STOP_LOSS_PCT = float(os.getenv("STOP_LOSS_PCT", "1.0"))
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
 TRADE_LOG = "logs/trade.log"
 WEBHOOK_LOG = "logs/webhook.log"
