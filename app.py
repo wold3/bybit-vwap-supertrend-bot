@@ -2,13 +2,17 @@ from flask import Flask, request, jsonify
 
 from signal_parser import validate
 from bybit_api import execute
-from state import positions, get_position, can_trade, update_price, update_trailing, should_exit
+from state import get_position, can_trade, update_price, update_trailing, should_exit, positions
 from telegram import send_message
-from config import USE_AI_FILTER, MAX_DAILY_LOSS
-from ai_filter import allow_trade
-from position_sizer import calculate_qty
+
 from strategy_router import should_trade
 from market_regime import get_market_regime
+from ai_filter import allow_trade
+
+from feature_engine import get_features
+from ml_filter import should_enter_market
+from position_sizer import calculate_qty
+from config import USE_AI_FILTER, MAX_DAILY_LOSS
 
 app = Flask(__name__)
 
@@ -35,16 +39,25 @@ def webhook():
     allowed, regime_name = should_trade(signal)
 
     if not allowed:
-        return jsonify({
-            "blocked": regime_name,
-            "regime": regime
-        }), 403
+        return jsonify({"blocked": regime_name, "regime": regime}), 403
 
     # AI 필터
     if USE_AI_FILTER:
-        ok_filter, reason = allow_trade()
-        if not ok_filter:
+        ok_ai, reason = allow_trade()
+        if not ok_ai:
             return jsonify({"blocked": reason}), 403
+
+    # ML 필터
+    features = get_features(symbol, price)
+
+    ok_ml, score = should_enter_market(
+        price,
+        features["volatility"],
+        features["trend_strength"]
+    )
+
+    if not ok_ml:
+        return jsonify({"blocked": "ml_filter", "score": score}), 403
 
     # 트레일링
     update_price(symbol, price)
@@ -83,7 +96,8 @@ def webhook():
             f"📈 ENTRY {symbol}\n"
             f"Price: {price}\n"
             f"Qty: {qty}\n"
-            f"Regime: {regime}"
+            f"Regime: {regime}\n"
+            f"ML Score: {score}"
         )
 
     return jsonify({"ok": True})
