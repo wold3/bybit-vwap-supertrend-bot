@@ -20,9 +20,6 @@ class Agent:
 
         self.gamma = 0.99
 
-    # ==========================
-    # ACTION
-    # ==========================
     def act(self, state):
 
         if random.random() < 0.1:
@@ -32,9 +29,6 @@ class Agent:
             q = self.model(torch.tensor(state).float())
             return int(torch.argmax(q))
 
-    # ==========================
-    # TRAIN (CORE)
-    # ==========================
     def train(self, batch_size=32):
 
         if len(self.buffer) < batch_size:
@@ -58,9 +52,6 @@ class Agent:
             loss.backward()
             self.opt.step()
 
-    # ==========================
-    # TARGET UPDATE
-    # ==========================
     def soft_update(self, tau=0.01):
 
         for t, m in zip(self.target.parameters(), self.model.parameters()):
