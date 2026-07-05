@@ -3,34 +3,26 @@ import numpy as np
 
 class RiskEngine:
 
-    def __init__(self, alpha=0.05):
+    def __init__(self):
 
-        self.returns = []
-        self.alpha = alpha
+        self.pnl_history = []
 
     def update(self, pnl):
 
-        self.returns.append(float(pnl))
+        self.pnl_history.append(float(pnl))
 
-        if len(self.returns) > 1000:
-            self.returns.pop(0)
+        if len(self.pnl_history) > 1000:
+            self.pnl_history.pop(0)
 
     def cvar(self):
 
-        if len(self.returns) < 20:
+        if len(self.pnl_history) < 20:
             return 0.0
 
-        arr = np.array(self.returns)
+        arr = np.array(self.pnl_history)
 
-        var = np.percentile(arr, self.alpha * 100)
+        var = np.percentile(arr, 5)
 
         tail = arr[arr <= var]
 
-        if len(tail) == 0:
-            return 0.0
-
-        return float(np.mean(tail))
-
-    def risk_penalty(self, pnl):
-
-        return float(pnl) - abs(self.cvar()) * 0.5
+        return float(tail.mean()) if len(tail) else 0.0
