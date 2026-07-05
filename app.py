@@ -17,7 +17,6 @@ def webhook():
     if not ok:
         return jsonify({"error": result}), 400
 
-    # 🔥 리스크 체크
     if not can_trade():
         return jsonify({"error": "trade limit reached"}), 429
 
