@@ -4,7 +4,12 @@ WEBHOOK_SECRET = "1234"
 
 DEFAULT_SYMBOL = "BTCUSDT"
 
-# 🔥 True = 테스트넷 / False = 실거래
 TESTNET = False
 
 MAX_TRADES_PER_MIN = 3
+
+# 🔥 트레일링 스탑 (%)
+TRAILING_STEP = 0.5
+
+# 🔥 하루 손실 제한 (%)
+MAX_DAILY_LOSS = -3.0
