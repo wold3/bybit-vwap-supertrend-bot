@@ -1,7 +1,6 @@
 class Portfolio:
 
     def __init__(self):
-
         self.strategies = {
             "trend": {"capital": 400},
             "range": {"capital": 300},
