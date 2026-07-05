@@ -11,7 +11,7 @@ def update_price(price):
         pass
 
 
-def get_basic_features(price):
+def get_feature_vector(price, orderbook=None):
 
     update_price(price)
 
@@ -21,19 +21,8 @@ def get_basic_features(price):
         return [float(price), 0, 0, 0, 0]
 
     sma = sum(h) / len(h)
-    trend = (h[-1] - sma) / sma if sma else 0
+    trend = (h[-1] - sma) / sma if sma else 0.0
     vol = statistics.pstdev(h)
-
-    return [
-        float(price),
-        float(trend),
-        float(vol),
-    ]
-
-
-def get_feature_vector(price, orderbook=None):
-
-    base = get_basic_features(price)
 
     spread = 0.0
     imbalance = 0.0
@@ -51,4 +40,10 @@ def get_feature_vector(price, orderbook=None):
             spread = float(asks[0][0]) - float(bids[0][0])
             imbalance = (bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-6)
 
-    return base + [spread, imbalance]
+    return [
+        float(price),
+        float(trend),
+        float(vol),
+        float(spread),
+        float(imbalance),
+    ]
