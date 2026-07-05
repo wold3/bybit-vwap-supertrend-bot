@@ -1,13 +1,12 @@
 from flask import Flask, request
 
+from system import EconomySystem
 from environment import Environment
-from agent_system import AgentSystem
-from strategy import filter_signal
 
 app = Flask(__name__)
 
+system = EconomySystem()
 env = Environment()
-system = AgentSystem()
 
 
 @app.route("/webhook", methods=["POST"])
@@ -15,42 +14,30 @@ def webhook():
 
     data = request.get_json()
 
-    price = data["price"]
+    price_input = data["price"]
 
     # ==========================
-    # AGENT ACTIONS
+    # MACRO + AGENTS
     # ==========================
 
-    actions = system.act_all(price)
+    actions, liquidity = system.step(price_input)
 
     # ==========================
-    # MARKET STEP
+    # MARKET SIMULATION
     # ==========================
 
-    price, rewards = env.step(actions)
-
-    system.update_all(rewards)
+    price, rewards = env.step(actions, liquidity)
 
     # ==========================
-    # SIGNAL OUTPUT (EMERGENT)
+    # UPDATE AGENTS
     # ==========================
 
-    buy = actions.count(1)
-    sell = actions.count(2)
-
-    if buy > sell:
-        signal = "BUY"
-    elif sell > buy:
-        signal = "SELL"
-    else:
-        signal = "HOLD"
-
-    if not filter_signal(signal):
-        return {"status": "filtered"}
+    for i, agent in enumerate(system.agents):
+        agent.update(rewards[i])
 
     return {
         "price": price,
-        "signal": signal,
+        "liquidity": liquidity,
         "actions": actions,
         "rewards": rewards
     }
