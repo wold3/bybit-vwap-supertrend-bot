@@ -6,7 +6,7 @@ def validate(data):
     if not isinstance(data, dict):
         return False, "invalid json"
 
-    if WEBHOOK_SECRET and data.get("secret") != WEBHOOK_SECRET:
+    if data.get("secret") != WEBHOOK_SECRET:
         return False, "bad secret"
 
     signal = data.get("signal", "").upper()
