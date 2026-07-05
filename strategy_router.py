@@ -1,18 +1,35 @@
-from market_regime import get_market_regime
-from strategy_engine import trend_strategy, range_strategy, downtrend_strategy
+from strategy_engine import select_strategy
+from portfolio_engine import portfolio
 
 
-def route(signal, price_action):
+def route(signal, price):
+    """
+    시장 상황에 맞는 전략 선택
 
-    regime = get_market_regime()
+    Args:
+        signal (str): TradingView 신호 (BUY, SELL, SHORT, EXIT)
+        price (float): 현재 가격
 
-    if regime == "TREND_UP":
-        return trend_strategy(signal), regime
+    Returns:
+        dict
+    """
 
-    if regime == "RANGE":
-        return range_strategy(price_action), regime
+    allow, strategy, regime = select_strategy(
+        signal,
+        price,
+    )
 
-    if regime == "TREND_DOWN":
-        return downtrend_strategy(signal), regime
+    if not allow:
+        return {
+            "allow": False,
+            "strategy": strategy,
+            "regime": regime,
+        }
 
-    return False, regime
+    allocation = portfolio.allocate(regime)
+
+    return {
+        "allow": True,
+        "strategy": allocation,
+        "regime": regime,
+    }
