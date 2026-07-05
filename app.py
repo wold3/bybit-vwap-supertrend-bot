@@ -1,4 +1,3 @@
-import os
 from flask import Flask, request, jsonify
 
 from signal_parser import validate
@@ -17,15 +16,14 @@ def webhook():
     if not ok:
         return jsonify({"error": result}), 400
 
-    signal = result["signal"]
-    symbol = result["symbol"]
-    qty = result["qty"]
-
-    res = execute(signal, symbol, qty)
+    res = execute(
+        result["signal"],
+        result["symbol"],
+        result["qty"]
+    )
 
     return jsonify({
         "success": True,
-        "signal": signal,
         "result": str(res)
     })
 
