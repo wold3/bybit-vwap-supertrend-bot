@@ -22,6 +22,8 @@ def webhook():
         result["qty"]
     )
 
+    print(f"[EXECUTE] {result['signal']} | {result['symbol']} | {result['qty']}")
+
     return jsonify({
         "success": True,
         "result": res
