@@ -16,6 +16,8 @@ from position_sizer import calculate_qty
 
 from risk_engine import should_stop_trading, update_pnl
 
+from genetic_optimizer import optimizer
+
 app = Flask(__name__)
 
 
@@ -94,6 +96,18 @@ def webhook():
         )
 
     return jsonify({"ok": True})
+
+
+@app.route("/optimize")
+def optimize():
+
+    # 단순 데모: fitness 랜덤 업데이트
+    for i, p in enumerate(optimizer.population):
+        optimizer.evaluate(random.random(), i)
+
+    optimizer.next_generation()
+
+    return jsonify(optimizer.population)
 
 
 @app.route("/pnl")
