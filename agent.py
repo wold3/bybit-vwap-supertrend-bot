@@ -4,22 +4,25 @@ import random
 class Agent:
 
     def __init__(self):
-        self.position = 0
         self.capital = 1000
+        self.strategy = random.uniform(-1, 1)
 
-    def act(self, price, risk_on):
+    def act(self, price):
 
-        if not risk_on:
-            return 2
+        signal = price * self.strategy * random.uniform(-0.01, 0.01)
 
-        signal = random.uniform(-1, 1)
-
-        if signal > 0.3:
-            return 1
-        elif signal < -0.3:
-            return 2
+        if signal > 0.2:
+            return 1  # BUY
+        elif signal < -0.2:
+            return 2  # SELL
 
         return 0
 
-    def update(self, pnl):
-        self.capital += pnl
+    def fitness(self):
+        return self.capital
+
+    def mutate(self):
+
+        child = Agent()
+        child.strategy = self.strategy + random.uniform(-0.2, 0.2)
+        return child
