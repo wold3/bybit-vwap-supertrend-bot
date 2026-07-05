@@ -8,13 +8,13 @@ class Evolution:
 
     def reproduce(self, selected):
 
-        new_pop = []
+        new_agents = []
 
         for a in selected:
-            new_pop.append(a)
-            new_pop.append(a.mutate())
+            new_agents.append(a)
+            new_agents.append(a.mutate())
 
-        return new_pop
+        return new_agents
 
     def step(self, agents):
         return self.reproduce(self.select(agents))
