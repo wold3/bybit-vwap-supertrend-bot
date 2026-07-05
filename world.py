@@ -1,6 +1,7 @@
 from market import Market
 from agent import Agent
 from evolution import Evolution
+from metrics import Metrics
 
 
 class World:
@@ -9,6 +10,8 @@ class World:
 
         self.market = Market()
         self.evo = Evolution()
+        self.metrics = Metrics()
+
         self.agents = [Agent() for _ in range(n_agents)]
 
     def step(self):
@@ -19,6 +22,8 @@ class World:
         sell = sum(a == 2 for a in actions)
 
         price = self.market.step(buy, sell)
+
+        self.metrics.update(price)
 
         for i, a in enumerate(self.agents):
 
