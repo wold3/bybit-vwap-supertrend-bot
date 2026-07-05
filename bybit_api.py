@@ -1,13 +1,10 @@
 from pybit.unified_trading import HTTP
 from config import TESTNET
 
-API_KEY = "YOUR_API_KEY"
-API_SECRET = "YOUR_API_SECRET"
-
 session = HTTP(
     testnet=TESTNET,
-    api_key=API_KEY,
-    api_secret=API_SECRET
+    api_key="YOUR_API_KEY",
+    api_secret="YOUR_API_SECRET"
 )
 
 
@@ -22,7 +19,7 @@ def execute(signal, symbol, qty):
             qty=str(qty)
         )
 
-    elif signal in ["SELL", "SHORT", "EXIT"]:
+    elif signal in ["SELL", "EXIT"]:
         return session.place_order(
             category="linear",
             symbol=symbol,
@@ -31,4 +28,4 @@ def execute(signal, symbol, qty):
             qty=str(qty)
         )
 
-    return {"error": "invalid signal"}
+    return {"error": "invalid"}
