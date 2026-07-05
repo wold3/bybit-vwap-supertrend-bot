@@ -1,12 +1,10 @@
 from pybit.unified_trading import HTTP
-from config import TESTNET
 
 session = HTTP(
-    testnet=TESTNET,
-    api_key="YOUR_API_KEY",
-    api_secret="YOUR_API_SECRET"
+    testnet=False,
+    api_key="YOUR_API",
+    api_secret="YOUR_SECRET"
 )
-
 
 def execute(signal, symbol, qty):
 
@@ -27,5 +25,3 @@ def execute(signal, symbol, qty):
             orderType="Market",
             qty=str(qty)
         )
-
-    return {"error": "invalid"}
