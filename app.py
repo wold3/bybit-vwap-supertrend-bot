@@ -7,14 +7,15 @@ from signal_parser import validate
 from state import can_trade, get_status, compute_reward, update_trade_result
 from bybit_api import execute
 from dqn_agent import Agent
-from portfolio import PortfolioAgent
+from feature_engine import get_feature_vector
 from telegram import send_trade, send_error
+from strategy_wrapper import execute_strategy
 
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 
 agent = Agent()
-portfolio = PortfolioAgent()
 
 
 # ==========================
@@ -38,58 +39,56 @@ def webhook():
         if not can_trade():
             return {"error": "Rate limit"}, 429
 
-        price_map = result["prices"]  # dict 형태 가정
-
-        symbols = portfolio.symbols
-
-        # ==========================
-        # MULTI STATE BUILD
-        # ==========================
-
-        market_states = {
-            s: [price_map[s], 0, 0]
-            for s in symbols
-        }
-
-        actions = {}
-        pnls = {}
+        symbol = result["symbol"]
+        price = result["price"]
+        qty = result["qty"]
+        orderbook = result.get("orderbook", None)
 
         # ==========================
-        # AI DECISION PER SYMBOL
+        # FEATURE VECTOR (NEW)
         # ==========================
 
-        for symbol in symbols:
+        state_vec = get_feature_vector(price, orderbook)
 
-            state_vec = market_states[symbol]
+        action = agent.act(state_vec)
 
-            action = agent.act(state_vec)
-
-            actions[symbol] = action
-
-            signal = ["HOLD", "BUY", "SELL"][action]
-
-            if signal == "HOLD":
-                pnls[symbol] = 0
-                continue
-
-            order = execute(signal, symbol, 0.001)
-
-            pnls[symbol] = 0  # 실제 pnl 연결 가능
+        ai_signal = ["HOLD", "BUY", "SELL"][action]
 
         # ==========================
-        # REWARD (PORTFOLIO LEVEL)
+        # STRATEGY FILTER
         # ==========================
 
-        reward = compute_reward(pnls)
+        decision = execute_strategy(ai_signal, price)
 
-        for symbol in symbols:
+        if not decision["success"]:
+            return {"status": "filtered"}
 
-            agent.buffer.push(
-                market_states[symbol],
-                actions[symbol],
-                reward,
-                market_states[symbol]
-            )
+        # ==========================
+        # EXECUTION
+        # ==========================
+
+        order = execute(ai_signal, symbol, qty)
+
+        if not order.get("success"):
+            send_error(order.get("error"))
+            return order, 500
+
+        send_trade(ai_signal, symbol, qty, price)
+
+        # ==========================
+        # REWARD (simplified hook)
+        # ==========================
+
+        reward = 0.0  # 실거래 PnL 연결 가능
+
+        next_state = get_feature_vector(price, orderbook)
+
+        agent.buffer.push(
+            state_vec,
+            action,
+            reward,
+            next_state
+        )
 
         agent.train()
         agent.soft_update()
@@ -98,11 +97,12 @@ def webhook():
 
         return {
             "status": "success",
-            "reward": reward,
-            "actions": actions
+            "action": ai_signal,
+            "features": state_vec
         }
 
     except Exception as e:
+        logger.exception(e)
         send_error(str(e))
         return {"error": str(e)}, 500
 
