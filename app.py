@@ -5,10 +5,8 @@ from bybit_api import execute
 from state import get_position, can_trade, update_price, update_trailing, should_exit, positions
 from telegram import send_message
 
-from strategy_router import should_trade
-from market_regime import get_market_regime
+from strategy_router import route
 from ai_filter import allow_trade
-
 from feature_engine import get_features
 from ml_filter import should_enter_market
 from position_sizer import calculate_qty
@@ -33,23 +31,20 @@ def webhook():
 
     pos = get_position(symbol)
 
-    # 시장 상태
-    regime = get_market_regime()
-
-    allowed, regime_name = should_trade(signal)
+    # 전략 라우팅
+    features = get_features(symbol, price)
+    allowed, regime = route(signal, features["price_action"])
 
     if not allowed:
-        return jsonify({"blocked": regime_name, "regime": regime}), 403
+        return jsonify({"blocked": regime}), 403
 
     # AI 필터
     if USE_AI_FILTER:
-        ok_ai, reason = allow_trade()
+        ok_ai, _ = allow_trade()
         if not ok_ai:
-            return jsonify({"blocked": reason}), 403
+            return jsonify({"blocked": "ai_filter"}), 403
 
     # ML 필터
-    features = get_features(symbol, price)
-
     ok_ml, score = should_enter_market(
         price,
         features["volatility"],
@@ -72,11 +67,11 @@ def webhook():
 
     # 손실 제한
     if pos["daily_pnl"] <= MAX_DAILY_LOSS:
-        return jsonify({"error": "loss limit"}), 403
+        return jsonify({"error": "loss_limit"}), 403
 
     # 거래 제한
     if not can_trade():
-        return jsonify({"error": "limit"}), 429
+        return jsonify({"error": "rate_limit"}), 429
 
     # 진입
     if signal == "BUY":
