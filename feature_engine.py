@@ -1,96 +1,106 @@
-from collections import deque
 import statistics
+from collections import deque
 
-# 최근 가격 저장
-PRICE_HISTORY = deque(maxlen=100)
+PRICE_HISTORY = deque(maxlen=200)
 
 
 def update_price(price):
-    """
-    가격 히스토리 업데이트
-    """
     try:
         PRICE_HISTORY.append(float(price))
-    except (TypeError, ValueError):
+    except:
         pass
 
 
-def get_features(price):
-    """
-    AI 입력 Feature 생성
+# ==========================
+# BASIC FEATURES
+# ==========================
 
-    Returns
-    -------
-    {
-        price,
-        sma,
-        momentum,
-        volatility,
-        trend
-    }
-    """
+def get_basic_features(price):
 
     update_price(price)
 
-    history = list(PRICE_HISTORY)
+    h = list(PRICE_HISTORY)
 
-    if len(history) < 2:
+    if len(h) < 10:
         return {
             "price": float(price),
-            "sma": float(price),
-            "momentum": 0.0,
-            "volatility": 0.0,
             "trend": 0.0,
+            "volatility": 0.0,
         }
 
-    # -------------------------
-    # SMA
-    # -------------------------
-    sma = sum(history) / len(history)
-
-    # -------------------------
-    # Momentum
-    # -------------------------
-    momentum = history[-1] - history[0]
-
-    # -------------------------
-    # Volatility
-    # -------------------------
-    volatility = statistics.pstdev(history)
-
-    # -------------------------
-    # Trend
-    # -------------------------
-    trend = (history[-1] - sma) / sma if sma else 0.0
+    sma = sum(h) / len(h)
+    volatility = statistics.pstdev(h)
+    trend = (h[-1] - sma) / sma if sma else 0.0
 
     return {
-        "price": round(float(price), 4),
-        "sma": round(sma, 4),
-        "momentum": round(momentum, 4),
-        "volatility": round(volatility, 4),
-        "trend": round(trend, 6),
+        "price": float(price),
+        "trend": trend,
+        "volatility": volatility,
     }
 
 
-def get_feature_vector(price):
-    """
-    DQN/PPO 입력용 벡터 반환
-    """
+# ==========================
+# VOLATILITY REGIME
+# ==========================
 
-    f = get_features(price)
+def get_volatility_regime(price):
+
+    h = list(PRICE_HISTORY)
+
+    if len(h) < 20:
+        return 0  # LOW
+
+    vol = statistics.pstdev(h[-20:])
+
+    if vol < 1:
+        return 0  # LOW
+    elif vol < 3:
+        return 1  # MID
+    else:
+        return 2  # HIGH
+
+
+# ==========================
+# ORDERBOOK FEATURES
+# ==========================
+
+def get_orderbook_features(orderbook):
+
+    if not orderbook:
+        return 0.0, 0.0
+
+    bids = orderbook.get("bids", [])
+    asks = orderbook.get("asks", [])
+
+    if not bids or not asks:
+        return 0.0, 0.0
+
+    bid_vol = sum(float(b[1]) for b in bids[:5])
+    ask_vol = sum(float(a[1]) for a in asks[:5])
+
+    spread = float(asks[0][0]) - float(bids[0][0])
+    imbalance = (bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-6)
+
+    return spread, imbalance
+
+
+# ==========================
+# FINAL FEATURE VECTOR
+# ==========================
+
+def get_feature_vector(price, orderbook=None):
+
+    basic = get_basic_features(price)
+    regime = get_volatility_regime(price)
+
+    spread, imbalance = get_orderbook_features(orderbook)
 
     return [
-        f["price"],
-        f["sma"],
-        f["momentum"],
-        f["volatility"],
-        f["trend"],
+        basic["price"],
+        basic["trend"],
+        basic["volatility"],
+        spread,
+        imbalance,
+        float(regime == 2),  # HIGH
+        float(regime == 1),  # MID
     ]
-
-
-def reset():
-    """
-    가격 히스토리 초기화
-    """
-
-    PRICE_HISTORY.clear()
