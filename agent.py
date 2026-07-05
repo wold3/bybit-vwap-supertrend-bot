@@ -12,9 +12,9 @@ class Agent:
         signal = price * self.strategy * random.uniform(-0.01, 0.01)
 
         if signal > 0.2:
-            return 1  # BUY
+            return 1
         elif signal < -0.2:
-            return 2  # SELL
+            return 2
 
         return 0
 
