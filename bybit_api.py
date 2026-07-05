@@ -1,14 +1,19 @@
 import time
-import requests
 from pybit.unified_trading import HTTP
 
 from config import *
+from state import load_state, save_state
 
 session = HTTP(
     testnet=TESTNET,
     api_key=BYBIT_API_KEY,
     api_secret=BYBIT_API_SECRET
 )
+
+STATE = load_state()
+
+LAST = ""
+LAST_TIME = 0
 
 
 def log(msg):
@@ -19,7 +24,7 @@ def log(msg):
 # Position
 # -------------------------
 
-def get_position(symbol=DEFAULT_SYMBOL):
+def get_position(symbol):
 
     try:
         res = session.get_positions(
@@ -31,7 +36,7 @@ def get_position(symbol=DEFAULT_SYMBOL):
         return None
 
 
-def get_side(symbol=DEFAULT_SYMBOL):
+def get_side(symbol):
 
     pos = get_position(symbol)
 
@@ -51,13 +56,15 @@ def get_side(symbol=DEFAULT_SYMBOL):
 def calc_tp_sl(price, side):
 
     if side == "LONG":
-        tp = price * (1 + TAKE_PROFIT_PCT / 100)
-        sl = price * (1 - STOP_LOSS_PCT / 100)
-    else:
-        tp = price * (1 - TAKE_PROFIT_PCT / 100)
-        sl = price * (1 + STOP_LOSS_PCT / 100)
+        return (
+            price * (1 + TAKE_PROFIT_PCT / 100),
+            price * (1 - STOP_LOSS_PCT / 100)
+        )
 
-    return tp, sl
+    return (
+        price * (1 - TAKE_PROFIT_PCT / 100),
+        price * (1 + STOP_LOSS_PCT / 100)
+    )
 
 
 # -------------------------
@@ -66,21 +73,17 @@ def calc_tp_sl(price, side):
 
 def order(side, qty, symbol, reduce=False, tp=None, sl=None):
 
-    try:
-        return session.place_order(
-            category=CATEGORY,
-            symbol=symbol,
-            side=side,
-            orderType="Market",
-            qty=str(qty),
-            reduceOnly=reduce,
-            positionIdx=POSITION_IDX,
-            takeProfit=tp,
-            stopLoss=sl
-        )
-    except Exception as e:
-        log(e)
-        return None
+    return session.place_order(
+        category=CATEGORY,
+        symbol=symbol,
+        side=side,
+        orderType="Market",
+        qty=str(qty),
+        reduceOnly=reduce,
+        positionIdx=POSITION_IDX,
+        takeProfit=tp,
+        stopLoss=sl
+    )
 
 
 # -------------------------
@@ -107,97 +110,36 @@ def close(symbol):
 
 
 # -------------------------
-# Telegram
+# Telegram (optional)
 # -------------------------
 
 def notify(msg):
-
-    if TELEGRAM_TOKEN == "":
-        return
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-
-    requests.post(url, json={
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": msg
-    })
+    print(msg)
 
 
 # -------------------------
-# Trading
+# Risk
 # -------------------------
 
-def long(symbol, qty):
+def risk_ok():
 
-    if get_side(symbol) == "LONG":
-        return None
-
-    if get_side(symbol) == "SHORT":
-        close(symbol)
-
-    entry = order("Buy", qty, symbol)
-
-    price = 0
-
-    try:
-        price = float(entry["result"]["price"])
-    except:
-        pass
-
-    tp, sl = calc_tp_sl(price, "LONG")
-
-    notify(f"LONG {symbol}")
-
-    return entry
+    # placeholder (확장 가능)
+    return True
 
 
-def short(symbol, qty):
+# -------------------------
+# State
+# -------------------------
 
-    if get_side(symbol) == "SHORT":
-        return None
+def save(symbol, signal):
 
-    if get_side(symbol) == "LONG":
-        close(symbol)
-
-    entry = order("Sell", qty, symbol)
-
-    price = 0
-
-    try:
-        price = float(entry["result"]["price"])
-    except:
-        pass
-
-    tp, sl = calc_tp_sl(price, "SHORT")
-
-    notify(f"SHORT {symbol}")
-
-    return entry
-
-
-def exit_long(symbol):
-
-    if get_side(symbol) != "LONG":
-        return None
-
-    return close(symbol)
-
-
-def exit_short(symbol):
-
-    if get_side(symbol) != "SHORT":
-        return None
-
-    return close(symbol)
+    STATE[symbol] = signal
+    save_state(STATE)
 
 
 # -------------------------
 # Execute
 # -------------------------
-
-LAST = ""
-LAST_TIME = 0
-
 
 def execute(signal, symbol, qty):
 
@@ -211,18 +153,53 @@ def execute(signal, symbol, qty):
     LAST = signal
     LAST_TIME = now
 
-    log(f"SIGNAL {signal}")
+    if not risk_ok():
+        return None
 
+    save(symbol, signal)
+
+    log(f"{signal} {symbol}")
+
+    # BUY
     if signal == "BUY":
-        return long(symbol, qty)
 
+        if get_side(symbol) == "SHORT":
+            close(symbol)
+
+        entry = order("Buy", qty, symbol)
+
+        try:
+            price = float(entry["result"]["price"])
+        except:
+            price = 0
+
+        tp, sl = calc_tp_sl(price, "LONG")
+
+        return entry
+
+    # SHORT
     if signal == "SHORT":
-        return short(symbol, qty)
 
+        if get_side(symbol) == "LONG":
+            close(symbol)
+
+        entry = order("Sell", qty, symbol)
+
+        try:
+            price = float(entry["result"]["price"])
+        except:
+            price = 0
+
+        tp, sl = calc_tp_sl(price, "SHORT")
+
+        return entry
+
+    # EXIT LONG
     if signal == "SELL":
-        return exit_long(symbol)
+        return close(symbol)
 
+    # EXIT SHORT
     if signal == "EXIT":
-        return exit_short(symbol)
+        return close(symbol)
 
     return None
