@@ -1,72 +1,21 @@
-from config import (
-    BATCH_SIZE,
-    MODEL_PATH,
-)
-
-from env import TradingEnv
-from dqn_agent import Agent
+from environment import MarketEnv
+from world_agent import WorldAgent
 
 
-def train(
-    prices,
-    episodes=20,
-):
-    """
-    DQN 학습 루프
-    """
+def train():
 
-    env = TradingEnv()
+    env = MarketEnv()
+    agents = [WorldAgent() for _ in range(3)]
 
-    agent = Agent()
+    price = 100
 
-    for episode in range(episodes):
+    for step in range(500):
 
-        state = env.reset()
+        actions = [a.act([price] * 5) for a in agents]
 
-        total_reward = 0.0
+        price, rewards = env.step(actions)
 
-        last_loss = None
+        for i, agent in enumerate(agents):
+            pass  # placeholder learning hook
 
-        for price in prices:
-
-            action = agent.act(state)
-
-            next_state, reward, done = env.step(
-                action,
-                price,
-            )
-
-            agent.remember(
-                state,
-                action,
-                reward,
-                next_state,
-                done,
-            )
-
-            loss = agent.train(BATCH_SIZE)
-
-            if loss is not None:
-                last_loss = loss
-
-            total_reward += reward
-
-            state = next_state
-
-            if done:
-                break
-
-        agent.update_target()
-
-        print(
-            f"Episode {episode + 1}/{episodes} | "
-            f"Reward={total_reward:.2f} | "
-            f"Loss={last_loss if last_loss is not None else '-'} | "
-            f"Epsilon={agent.epsilon:.4f}"
-        )
-
-    agent.save(MODEL_PATH)
-
-    print(f"Model saved to {MODEL_PATH}")
-
-    return agent
+    return agents
