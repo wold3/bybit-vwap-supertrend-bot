@@ -11,7 +11,6 @@ session = HTTP(
 )
 
 logger = logging.getLogger("bybit")
-logger.setLevel(logging.INFO)
 
 
 def log(msg):
@@ -19,9 +18,9 @@ def log(msg):
     logger.info(msg)
 
 
-# -----------------------
+# -------------------------
 # Position
-# -----------------------
+# -------------------------
 
 def get_position(symbol=DEFAULT_SYMBOL):
 
@@ -48,9 +47,9 @@ def get_side(symbol=DEFAULT_SYMBOL):
     return "LONG" if pos["side"] == "Buy" else "SHORT"
 
 
-# -----------------------
+# -------------------------
 # Order
-# -----------------------
+# -------------------------
 
 def order(side, qty, symbol, reduce=False):
 
@@ -69,9 +68,9 @@ def order(side, qty, symbol, reduce=False):
         return None
 
 
-# -----------------------
+# -------------------------
 # Close
-# -----------------------
+# -------------------------
 
 def close(symbol):
 
@@ -81,19 +80,20 @@ def close(symbol):
         return None
 
     size = float(pos["size"])
-    side = pos["side"]
 
     if size == 0:
         return None
+
+    side = pos["side"]
 
     close_side = "Sell" if side == "Buy" else "Buy"
 
     return order(close_side, size, symbol, reduce=True)
 
 
-# -----------------------
-# Trading logic
-# -----------------------
+# -------------------------
+# Trading
+# -------------------------
 
 def long(symbol, qty):
 
@@ -133,25 +133,42 @@ def exit_short(symbol):
     return close(symbol)
 
 
-# -----------------------
-# Anti duplicate
-# -----------------------
+# -------------------------
+# Risk (basic)
+# -------------------------
 
-LAST_SIGNAL = None
+DAILY_PNL = 0
+
+
+def risk_ok():
+
+    global DAILY_PNL
+
+    return DAILY_PNL > -MAX_DAILY_LOSS
+
+
+# -------------------------
+# Execute
+# -------------------------
+
+LAST = ""
 LAST_TIME = 0
-MIN_GAP = 5
 
 
 def execute(signal, symbol, qty):
 
-    global LAST_SIGNAL, LAST_TIME
+    global LAST, LAST_TIME
+
+    if not risk_ok():
+        log("DAILY LOSS LIMIT")
+        return None
 
     now = time.time()
 
-    if signal == LAST_SIGNAL and now - LAST_TIME < MIN_GAP:
+    if signal == LAST and now - LAST_TIME < 5:
         return None
 
-    LAST_SIGNAL = signal
+    LAST = signal
     LAST_TIME = now
 
     log(f"SIGNAL: {signal}")
