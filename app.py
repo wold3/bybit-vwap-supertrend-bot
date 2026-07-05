@@ -1,24 +1,20 @@
 import logging
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 
-from config import HOST, PORT, DEBUG
-from signal_parser import validate
-from rl_predictor_dqn import decide
 from bybit_api import execute
+from config import DEBUG, HOST, PORT
+from rl_predictor_dqn import decide
+from signal_parser import validate
 from state import can_trade, get_status
-
-try:
-    from telegram import send
-except ImportError:
-    def send(message):
-        pass
-
+from telegram import send_error, send_status, send_trade
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
+
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -27,6 +23,7 @@ app = Flask(__name__)
 def index():
     return jsonify({
         "name": "Bybit AI Trading Bot",
+        "version": "2.0",
         "status": "running"
     })
 
@@ -35,7 +32,7 @@ def index():
 def health():
     return jsonify({
         "status": "ok",
-        "trade_status": get_status()
+        "trade": get_status()
     })
 
 
@@ -63,12 +60,11 @@ def webhook():
                 "error": "Rate limit exceeded."
             }), 429
 
-        signal = result["signal"]
+        tv_signal = result["signal"]
         symbol = result["symbol"]
         qty = result["qty"]
         price = result["price"]
 
-        # AI 판단
         ai_action = decide(price)
 
         action_map = {
@@ -79,27 +75,29 @@ def webhook():
 
         ai_signal = action_map.get(ai_action, "HOLD")
 
-        logging.info(
-            "Webhook=%s | AI=%s | %s %.6f",
-            signal,
+        logger.info(
+            "TV=%s AI=%s SYMBOL=%s QTY=%s PRICE=%s",
+            tv_signal,
             ai_signal,
             symbol,
-            qty
+            qty,
+            price
         )
 
-        # HOLD이면 주문하지 않음
         if ai_signal == "HOLD":
+
             return jsonify({
-                "status": "ok",
-                "action": "HOLD",
-                "reason": "AI decision"
+                "status": "hold",
+                "reason": "AI HOLD"
             })
 
-        # TradingView와 AI가 같은 방향일 때만 주문
-        if signal != ai_signal:
+        if ai_signal != tv_signal:
+
+            logger.info("Signal filtered.")
+
             return jsonify({
                 "status": "filtered",
-                "tv_signal": signal,
+                "tv_signal": tv_signal,
                 "ai_signal": ai_signal
             })
 
@@ -111,24 +109,27 @@ def webhook():
 
         if not order.get("success", False):
 
-            logging.error(order)
+            send_error(order.get("error", "Unknown Error"))
 
             return jsonify(order), 500
 
-        send(f"{ai_signal} {symbol} qty={qty}")
+        send_trade(
+            ai_signal,
+            symbol,
+            qty,
+            price
+        )
 
         return jsonify({
             "status": "success",
-            "signal": ai_signal,
-            "symbol": symbol,
-            "qty": qty,
-            "price": price,
             "order": order
         })
 
     except Exception as e:
 
-        logging.exception(e)
+        logger.exception(e)
+
+        send_error(str(e))
 
         return jsonify({
             "error": str(e)
@@ -137,7 +138,9 @@ def webhook():
 
 if __name__ == "__main__":
 
-    logging.info("Starting Bybit AI Trading Bot...")
+    logger.info("Starting Bybit AI Trading Bot...")
+
+    send_status("🚀 Bybit AI Trading Bot Started")
 
     app.run(
         host=HOST,
