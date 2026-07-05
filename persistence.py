@@ -9,7 +9,10 @@ def save(world):
     data = {
         "price": world.market.price,
         "agents": [
-            {"capital": a.capital, "strategy": a.strategy}
+            {
+                "capital": a.capital,
+                "strategy": a.strategy
+            }
             for a in world.agents
         ]
     }
