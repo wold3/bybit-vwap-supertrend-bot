@@ -1,46 +1,37 @@
 import time
 import threading
 
-from config import (
-    MAX_TRADES_PER_MIN,
-    MAX_DAILY_LOSS,
-    MAX_LOSS_STREAK,
-)
-
+from config import MAX_TRADES_PER_MIN, MAX_DAILY_LOSS, MAX_LOSS_STREAK
 
 # =====================================================
-# Thread Lock (안전성)
+# THREAD SAFE LOCK
 # =====================================================
 
 lock = threading.Lock()
 
-
 # =====================================================
-# Runtime State
+# STATE
 # =====================================================
 
 state = {
+    "balance": 1000.0,
     "pnl": 0.0,
     "loss_streak": 0,
     "trade_count": 0,
     "last_reset": time.time(),
+    "equity": [1000.0],   # equity curve
 }
 
 
 # =====================================================
-# Rate Limiter
+# TRADE LIMIT (1 MIN RULE)
 # =====================================================
 
 def can_trade():
-    """
-    1분당 최대 거래 제한
-    """
-
     with lock:
 
         now = time.time()
 
-        # 1분 리셋
         if now - state["last_reset"] >= 60:
             state["trade_count"] = 0
             state["last_reset"] = now
@@ -49,17 +40,16 @@ def can_trade():
             return False
 
         state["trade_count"] += 1
-
         return True
 
 
 # =====================================================
-# PnL Update
+# PnL UPDATE (REAL EQUITY ENGINE)
 # =====================================================
 
-def update_pnl(pnl):
+def update_trade_result(pnl: float):
     """
-    손익 업데이트
+    실전 기준: 거래 결과 반영 (PnL → balance → equity curve)
     """
 
     with lock:
@@ -67,6 +57,8 @@ def update_pnl(pnl):
         pnl = float(pnl)
 
         state["pnl"] += pnl
+        state["balance"] += pnl
+        state["equity"].append(state["balance"])
 
         if pnl < 0:
             state["loss_streak"] += 1
@@ -75,13 +67,10 @@ def update_pnl(pnl):
 
 
 # =====================================================
-# Risk Check
+# RISK CHECK
 # =====================================================
 
 def should_stop():
-    """
-    리스크 중단 조건
-    """
 
     with lock:
 
@@ -95,42 +84,48 @@ def should_stop():
 
 
 # =====================================================
-# Reset
-# =====================================================
-
-def reset():
-    """
-    상태 초기화
-    """
-
-    with lock:
-
-        state["pnl"] = 0.0
-        state["loss_streak"] = 0
-        state["trade_count"] = 0
-        state["last_reset"] = time.time()
-
-
-# =====================================================
-# Status
+# STATUS API
 # =====================================================
 
 def get_status():
-    """
-    현재 상태 조회
-    """
 
     with lock:
 
         return {
+            "balance": state["balance"],
             "pnl": state["pnl"],
             "loss_streak": state["loss_streak"],
             "trade_count": state["trade_count"],
             "max_trades_per_min": MAX_TRADES_PER_MIN,
-            "daily_loss_limit": MAX_DAILY_LOSS,
+            "max_daily_loss": MAX_DAILY_LOSS,
             "max_loss_streak": MAX_LOSS_STREAK,
-            "seconds_since_reset": round(
-                time.time() - state["last_reset"],
-                2,
-            ),
+            "equity_latest": state["equity"][-1],
+            "equity_points": len(state["equity"]),
+            "seconds_since_reset": round(time.time() - state["last_reset"], 2),
         }
+
+
+# =====================================================
+# EQUITY CURVE API
+# =====================================================
+
+def get_equity_curve():
+
+    with lock:
+        return state["equity"]
+
+
+# =====================================================
+# RESET (optional)
+# =====================================================
+
+def reset():
+
+    with lock:
+
+        state["balance"] = 1000.0
+        state["pnl"] = 0.0
+        state["loss_streak"] = 0
+        state["trade_count"] = 0
+        state["last_reset"] = time.time()
+        state["equity"] = [1000.0]
