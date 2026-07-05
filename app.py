@@ -10,13 +10,18 @@ from ai_filter import allow_trade
 from feature_engine import get_features
 from ml_filter import should_enter_market
 from position_sizer import calculate_qty
-from config import USE_AI_FILTER, MAX_DAILY_LOSS
+
+from risk_engine import should_stop_trading, update_pnl
+from config import USE_AI_FILTER
 
 app = Flask(__name__)
 
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+
+    if should_stop_trading():
+        return jsonify({"blocked": "risk_engine"}), 403
 
     data = request.get_json(force=True, silent=True)
 
@@ -31,20 +36,20 @@ def webhook():
 
     pos = get_position(symbol)
 
-    # 전략 라우팅
+    # 전략
     features = get_features(symbol, price)
     allowed, regime = route(signal, features["price_action"])
 
     if not allowed:
         return jsonify({"blocked": regime}), 403
 
-    # AI 필터
+    # AI
     if USE_AI_FILTER:
         ok_ai, _ = allow_trade()
         if not ok_ai:
             return jsonify({"blocked": "ai_filter"}), 403
 
-    # ML 필터
+    # ML
     ok_ml, score = should_enter_market(
         price,
         features["volatility"],
@@ -61,19 +66,15 @@ def webhook():
     # EXIT
     if should_exit(symbol, price):
         execute("EXIT", symbol, result["qty"])
-        send_message(f"🚨 EXIT {symbol} @ {price}")
+        update_pnl(-1)
         pos["active"] = False
         return jsonify({"exit": True})
-
-    # 손실 제한
-    if pos["daily_pnl"] <= MAX_DAILY_LOSS:
-        return jsonify({"error": "loss_limit"}), 403
 
     # 거래 제한
     if not can_trade():
         return jsonify({"error": "rate_limit"}), 429
 
-    # 진입
+    # ENTRY
     if signal == "BUY":
 
         stop_loss = price * 0.99
@@ -82,7 +83,6 @@ def webhook():
         pos["active"] = True
         pos["entry_price"] = price
         pos["highest_price"] = price
-        pos["stop_loss"] = stop_loss
         pos["trailing_stop"] = stop_loss
 
         execute("BUY", symbol, qty)
