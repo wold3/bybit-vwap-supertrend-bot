@@ -1,12 +1,9 @@
 from flask import Flask, request, jsonify
 
 from signal_parser import validate
-from rl_predictor import decide
+from rl_predictor_dqn import decide
 from bybit_api import execute
-from risk_engine import should_stop, update_pnl
 from state import can_trade
-
-from telegram import send
 
 app = Flask(__name__)
 
@@ -14,39 +11,35 @@ app = Flask(__name__)
 @app.route("/webhook", methods=["POST"])
 def webhook():
 
-    if should_stop():
-        return jsonify({"blocked": "risk"}), 403
-
     data = request.get_json(force=True)
 
     ok, result = validate(data)
 
     if not ok:
-        return jsonify({"error": result}), 400
+        return {"error": result}, 400
 
     symbol = result["symbol"]
-    price = float(data.get("price", 0))
     qty = result["qty"]
+
+    price = float(data.get("price", 0))
 
     action = decide(price)
 
-    # RL 결정
-    if action == 0:
-        return jsonify({"rl": "HOLD"})
-
     if not can_trade():
-        return jsonify({"error": "rate_limit"}), 429
+        return {"error": "rate_limit"}, 429
+
+    if action == 0:
+        return {"action": "HOLD"}
 
     if action == 1:
         execute("BUY", symbol, qty)
-        send(f"BUY {symbol} {price}")
-        return jsonify({"rl": "BUY"})
+        return {"action": "BUY"}
 
     if action == 2:
         execute("SELL", symbol, qty)
-        update_pnl(-1)
-        send(f"SELL {symbol} {price}")
-        return jsonify({"rl": "SELL"})
+        return {"action": "SELL"}
+
+    return {"ok": True}
 
 
 @app.route("/health")
