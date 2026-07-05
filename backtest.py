@@ -24,7 +24,6 @@ def run_backtest(file):
             trades += 1
 
         elif signal == "SELL" and position == 1:
-
             pnl = price - entry
             balance += pnl
 
@@ -34,7 +33,7 @@ def run_backtest(file):
             trades += 1
             position = 0
 
-    win_rate = (wins / trades) * 100 if trades else 0
+    win_rate = (wins / trades * 100) if trades else 0
 
     return {
         "balance": balance,
