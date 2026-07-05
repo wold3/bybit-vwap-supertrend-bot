@@ -1,77 +1,35 @@
-from config import (
-    MAX_DAILY_LOSS,
-    MAX_LOSS_STREAK,
-)
-
-# ==========================
-# Risk State
-# ==========================
-
-state = {
-    "pnl": 0.0,
-    "loss_streak": 0,
-    "trade_count": 0,
-}
+import numpy as np
 
 
-def update_pnl(pnl):
-    """
-    손익(PnL) 업데이트
-    """
+class RiskEngine:
 
-    pnl = float(pnl)
+    def __init__(self, alpha=0.05):
+        self.returns = []
+        self.alpha = alpha
 
-    state["pnl"] += pnl
-    state["trade_count"] += 1
+    def update(self, pnl):
 
-    if pnl < 0:
-        state["loss_streak"] += 1
-    else:
-        state["loss_streak"] = 0
+        self.returns.append(float(pnl))
 
+        if len(self.returns) > 1000:
+            self.returns.pop(0)
 
-def should_stop():
-    """
-    리스크 한도 초과 여부
-    """
+    def cvar(self):
 
-    if state["pnl"] <= -MAX_DAILY_LOSS:
-        return True
+        if len(self.returns) < 20:
+            return 0.0
 
-    if state["loss_streak"] >= MAX_LOSS_STREAK:
-        return True
+        arr = np.array(self.returns)
 
-    return False
+        var = np.percentile(arr, self.alpha * 100)
 
+        tail = arr[arr <= var]
 
-def reset():
-    """
-    리스크 상태 초기화
-    """
+        if len(tail) == 0:
+            return 0.0
 
-    state["pnl"] = 0.0
-    state["loss_streak"] = 0
-    state["trade_count"] = 0
+        return float(np.mean(tail))
 
+    def risk_penalty(self, pnl):
 
-def get_status():
-    """
-    현재 리스크 상태 반환
-    """
-
-    return {
-        "pnl": round(state["pnl"], 2),
-        "loss_streak": state["loss_streak"],
-        "trade_count": state["trade_count"],
-        "max_daily_loss": MAX_DAILY_LOSS,
-        "max_loss_streak": MAX_LOSS_STREAK,
-        "should_stop": should_stop(),
-    }
-
-
-def can_open_position():
-    """
-    신규 포지션 진입 가능 여부
-    """
-
-    return not should_stop()
+        return float(pnl) - abs(self.cvar()) * 0.5
