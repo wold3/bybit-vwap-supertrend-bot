@@ -4,7 +4,7 @@ class Evolution:
 
         agents.sort(key=lambda a: a.fitness(), reverse=True)
 
-        return agents[:len(agents)//2]
+        return agents[:max(2, len(agents)//2)]
 
     def reproduce(self, selected):
 
@@ -17,5 +17,4 @@ class Evolution:
         return new_pop
 
     def step(self, agents):
-
         return self.reproduce(self.select(agents))
