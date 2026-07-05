@@ -1,8 +1,8 @@
 import torch
-import torch.optim as optim
 import random
+import torch.optim as optim
 
-from model_transformer import TransformerPolicy
+from transformer_policy import TransformerPolicy
 
 
 class TransformerAgent:
@@ -27,16 +27,18 @@ class TransformerAgent:
 
             return int(torch.argmax(logits))
 
-    def store(self, state_seq, action, reward):
+    def store(self, s, a, r):
 
-        self.memory.append((state_seq, action, reward))
+        self.memory.append((s, a, r))
 
-    def train(self, batch_size=32):
+    def train(self):
 
-        if len(self.memory) < batch_size:
+        import random
+
+        if len(self.memory) < 32:
             return
 
-        batch = random.sample(self.memory, batch_size)
+        batch = random.sample(self.memory, 32)
 
         for s, a, r in batch:
 
