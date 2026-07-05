@@ -1,5 +1,5 @@
 import time
-import logging
+import requests
 from pybit.unified_trading import HTTP
 
 from config import *
@@ -10,12 +10,9 @@ session = HTTP(
     api_secret=BYBIT_API_SECRET
 )
 
-logger = logging.getLogger("bybit")
-
 
 def log(msg):
     print(msg)
-    logger.info(msg)
 
 
 # -------------------------
@@ -48,10 +45,26 @@ def get_side(symbol=DEFAULT_SYMBOL):
 
 
 # -------------------------
+# TP / SL
+# -------------------------
+
+def calc_tp_sl(price, side):
+
+    if side == "LONG":
+        tp = price * (1 + TAKE_PROFIT_PCT / 100)
+        sl = price * (1 - STOP_LOSS_PCT / 100)
+    else:
+        tp = price * (1 - TAKE_PROFIT_PCT / 100)
+        sl = price * (1 + STOP_LOSS_PCT / 100)
+
+    return tp, sl
+
+
+# -------------------------
 # Order
 # -------------------------
 
-def order(side, qty, symbol, reduce=False):
+def order(side, qty, symbol, reduce=False, tp=None, sl=None):
 
     try:
         return session.place_order(
@@ -61,7 +74,9 @@ def order(side, qty, symbol, reduce=False):
             orderType="Market",
             qty=str(qty),
             reduceOnly=reduce,
-            positionIdx=POSITION_IDX
+            positionIdx=POSITION_IDX,
+            takeProfit=tp,
+            stopLoss=sl
         )
     except Exception as e:
         log(e)
@@ -92,6 +107,23 @@ def close(symbol):
 
 
 # -------------------------
+# Telegram
+# -------------------------
+
+def notify(msg):
+
+    if TELEGRAM_TOKEN == "":
+        return
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+
+    requests.post(url, json={
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": msg
+    })
+
+
+# -------------------------
 # Trading
 # -------------------------
 
@@ -103,7 +135,20 @@ def long(symbol, qty):
     if get_side(symbol) == "SHORT":
         close(symbol)
 
-    return order("Buy", qty, symbol)
+    entry = order("Buy", qty, symbol)
+
+    price = 0
+
+    try:
+        price = float(entry["result"]["price"])
+    except:
+        pass
+
+    tp, sl = calc_tp_sl(price, "LONG")
+
+    notify(f"LONG {symbol}")
+
+    return entry
 
 
 def short(symbol, qty):
@@ -114,7 +159,20 @@ def short(symbol, qty):
     if get_side(symbol) == "LONG":
         close(symbol)
 
-    return order("Sell", qty, symbol)
+    entry = order("Sell", qty, symbol)
+
+    price = 0
+
+    try:
+        price = float(entry["result"]["price"])
+    except:
+        pass
+
+    tp, sl = calc_tp_sl(price, "SHORT")
+
+    notify(f"SHORT {symbol}")
+
+    return entry
 
 
 def exit_long(symbol):
@@ -134,20 +192,6 @@ def exit_short(symbol):
 
 
 # -------------------------
-# Risk (basic)
-# -------------------------
-
-DAILY_PNL = 0
-
-
-def risk_ok():
-
-    global DAILY_PNL
-
-    return DAILY_PNL > -MAX_DAILY_LOSS
-
-
-# -------------------------
 # Execute
 # -------------------------
 
@@ -159,10 +203,6 @@ def execute(signal, symbol, qty):
 
     global LAST, LAST_TIME
 
-    if not risk_ok():
-        log("DAILY LOSS LIMIT")
-        return None
-
     now = time.time()
 
     if signal == LAST and now - LAST_TIME < 5:
@@ -171,7 +211,7 @@ def execute(signal, symbol, qty):
     LAST = signal
     LAST_TIME = now
 
-    log(f"SIGNAL: {signal}")
+    log(f"SIGNAL {signal}")
 
     if signal == "BUY":
         return long(symbol, qty)
