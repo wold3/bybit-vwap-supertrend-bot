@@ -1,6 +1,7 @@
-import time
 import threading
-from bybit_api import get_unrealized_pnl
+import time
+
+from execution_model import simulate_execution
 
 lock = threading.Lock()
 
@@ -8,59 +9,39 @@ state = {
     "balance": 1000.0,
     "pnl": 0.0,
     "loss_streak": 0,
-    "trade_count": 0,
-    "last_reset": time.time(),
     "equity": [1000.0],
 }
 
 
-def can_trade():
+def compute_real_pnl(entry, exit, qty, volatility):
+
+    entry_exec, entry_cost = simulate_execution(entry, qty, volatility)
+    exit_exec, exit_cost = simulate_execution(exit, qty, volatility)
+
+    pnl = (exit_exec - entry_exec) * qty
+    pnl -= (entry_cost + exit_cost) * 0.001
+
+    return pnl
+
+
+def update_trade_result(pnl):
 
     with lock:
 
-        now = time.time()
-
-        if now - state["last_reset"] >= 60:
-            state["trade_count"] = 0
-            state["last_reset"] = now
-
-        if state["trade_count"] >= 3:
-            return False
-
-        state["trade_count"] += 1
-        return True
-
-
-def get_real_pnl(symbol):
-    return get_unrealized_pnl(symbol)
-
-
-def compute_reward(pnls: dict):
-
-    total = sum(pnls.values())
-
-    if total > 0:
-        return total * 1.2
-
-    return total * 1.5
-
-
-def update_trade_result(value):
-
-    with lock:
-
-        state["pnl"] += value
-        state["balance"] += value
+        state["pnl"] += pnl
+        state["balance"] += pnl
         state["equity"].append(state["balance"])
+
+        if pnl < 0:
+            state["loss_streak"] += 1
+        else:
+            state["loss_streak"] = 0
 
 
 def get_status():
 
-    with lock:
-
-        return {
-            "balance": state["balance"],
-            "pnl": state["pnl"],
-            "equity_latest": state["equity"][-1],
-            "equity_points": len(state["equity"]),
-        }
+    return {
+        "balance": state["balance"],
+        "pnl": state["pnl"],
+        "equity_last": state["equity"][-1],
+    }
