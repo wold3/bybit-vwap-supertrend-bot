@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Economy Dashboard</title>
+</head>
+<body>
+
+<h1>Artificial Economy Live</h1>
+
+<p>Price: <span id="price">-</span></p>
+<p>Population: <span id="pop">-</span></p>
+<p>Volatility: <span id="vol">-</span></p>
+<p>Trend: <span id="trend">-</span></p>
+
+<script>
+async function update() {
+
+    const res = await fetch("/status");
+    const data = await res.json();
+
+    document.getElementById("price").innerText = data.price.toFixed(2);
+    document.getElementById("pop").innerText = data.population;
+    document.getElementById("vol").innerText = data.volatility.toFixed(4);
+    document.getElementById("trend").innerText = data.trend.toFixed(2);
+}
+
+setInterval(update, 1000);
+update();
+</script>
+
+</body>
+</html>
