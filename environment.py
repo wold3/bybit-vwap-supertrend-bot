@@ -1,11 +1,11 @@
-from market_simulator import MarketSimulator
+from market import Market
 
 
-class MarketEnv:
+class Environment:
 
     def __init__(self, n_agents=3):
 
-        self.market = MarketSimulator()
+        self.market = Market()
         self.n_agents = n_agents
         self.positions = [0] * n_agents
 
