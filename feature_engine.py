@@ -11,31 +11,32 @@ def update_price(price):
         pass
 
 
-def get_volatility(price):
-
-    h = list(PRICE_HISTORY)
-
-    if len(h) < 20:
-        return 0.0
-
-    return statistics.pstdev(h[-20:])
-
-
-def get_feature_vector(price, orderbook=None):
+def get_basic_features(price):
 
     update_price(price)
 
     h = list(PRICE_HISTORY)
 
     if len(h) < 10:
-        return [price, 0, 0, 0, 0, 0, 0, 0]
+        return [float(price), 0, 0, 0, 0]
 
     sma = sum(h) / len(h)
     trend = (h[-1] - sma) / sma if sma else 0
     vol = statistics.pstdev(h)
 
-    spread = 0
-    imbalance = 0
+    return [
+        float(price),
+        float(trend),
+        float(vol),
+    ]
+
+
+def get_feature_vector(price, orderbook=None):
+
+    base = get_basic_features(price)
+
+    spread = 0.0
+    imbalance = 0.0
 
     if orderbook:
 
@@ -50,13 +51,4 @@ def get_feature_vector(price, orderbook=None):
             spread = float(asks[0][0]) - float(bids[0][0])
             imbalance = (bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-6)
 
-    return [
-        float(price),
-        float(trend),
-        float(vol),
-        float(spread),
-        float(imbalance),
-        float(get_volatility(price) > vol),
-        float(vol > 1),
-        float(vol > 3),
-    ]
+    return base + [spread, imbalance]
