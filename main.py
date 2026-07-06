@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 # =====================================================
-# GLOBAL PRICE STORE
+# GLOBAL PRICE
 # =====================================================
 latest_price = None
 
@@ -34,13 +34,12 @@ latest_price = None
 # =====================================================
 def on_price(price):
     global latest_price
-
     latest_price = price
     update_market_state(price, volume=0)
 
 
 # =====================================================
-# INIT SYSTEM
+# INIT
 # =====================================================
 def init_system():
 
@@ -57,7 +56,7 @@ def init_system():
 
 
 # =====================================================
-# TRADING LOOP (REAL PnL VERSION)
+# TRADING LOOP (TP/SL 포함)
 # =====================================================
 def run_trading():
 
@@ -70,7 +69,7 @@ def run_trading():
         try:
 
             # =========================
-            # WS price 없으면 skip
+            # 1. WS 가격 체크
             # =========================
             if latest_price is None:
                 time.sleep(0.3)
@@ -79,15 +78,31 @@ def run_trading():
             price = latest_price
 
             # =========================
-            # 전략 판단
+            # 2. TP / SL 체크 (핵심)
+            # =========================
+            exit_reason = engine.check_exit(SYMBOL, price)
+
+            if exit_reason:
+                engine.close_position(SYMBOL, exit_reason, price)
+
+                # risk reset (청산 반영)
+                risk_engine.update(0)
+
+                logger.info(f"CLOSE POSITION: {exit_reason} PRICE={price}")
+
+                time.sleep(0.5)
+                continue
+
+            # =========================
+            # 3. 전략 판단
             # =========================
             decision = brain.decide("auto", price)
             strategy = decision["strategy"]
 
             # =========================
-            # 실행 (실제 order)
+            # 4. 실행
             # =========================
-            result = execute_strategy(
+            execute_strategy(
                 signal=strategy,
                 price=price,
                 symbol=SYMBOL,
@@ -95,18 +110,18 @@ def run_trading():
             )
 
             # =========================
-            # REAL PnL 계산 (핵심)
+            # 5. REAL PnL 계산
             # =========================
             pnl = engine.calculate_pnl(SYMBOL, price)
 
             # =========================
-            # risk / learning update
+            # 6. risk / learning
             # =========================
             risk_engine.update(pnl)
             brain.record(strategy, pnl)
 
             # =========================
-            # log
+            # 7. log
             # =========================
             logger.info(
                 f"PRICE={price} STRATEGY={strategy} PNL={pnl}"
@@ -132,9 +147,7 @@ if __name__ == "__main__":
 
     init_system()
 
-    # WS 시작
     ws_client.set_price_callback(on_price)
     ws_client.start()
 
-    # 트레이딩 시작
     run_trading()
