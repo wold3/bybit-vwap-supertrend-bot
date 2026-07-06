@@ -1,105 +1,68 @@
 import threading
 import time
-import logging
-import os
-import webbrowser
 
-from worker import loop
-from websocket_client import ws_client
-from utils.singleton import singleton
+from services.ws_server import start_ws_server
+from execution.execution_engine import engine
+from strategy.strategy_engine import run_strategy
+from watchdog import start_watchdog
 
 
-# =========================================================
-# LOGGER
-# =========================================================
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-
-logger = logging.getLogger("BOT")
-
-
-# =========================================================
-# DASHBOARD URL
-# =========================================================
-DASHBOARD_URL = "http://localhost:5000"
-
-
-# =========================================================
-# CHROME AUTO OPEN
-# =========================================================
-def open_chrome():
-
-    time.sleep(3)
-
-    try:
-        os.system(f'start chrome "{DASHBOARD_URL}"')
-        logger.info("Chrome opened")
-    except Exception as e:
-        logger.error(f"Chrome open failed: {e}")
-
-
-# =========================================================
-# WORKER START
-# =========================================================
-def start_worker():
-
-    threading.Thread(
-        target=loop,
-        daemon=True
-    ).start()
-
-    logger.info("Worker started")
-
-
-# =========================================================
-# WEBSOCKET START
-# =========================================================
+# =====================================================
+# 🔥 WebSocket 서버 실행
+# =====================================================
 def start_ws():
-
-    ws_client.start()
-
-    logger.info("WebSocket started")
+    print("[WS] Starting WebSocket server...")
+    start_ws_server()
 
 
-# =========================================================
-# SYSTEM INIT
-# =========================================================
-def init_system():
+# =====================================================
+# 🔥 전략 루프
+# =====================================================
+def start_strategy():
 
-    logger.info("====================================")
-    logger.info("     AUTO TRADING START SYSTEM      ")
-    logger.info("====================================")
+    print("[STRATEGY] Starting strategy engine...")
+
+    while True:
+
+        try:
+            run_strategy(engine)
+
+        except Exception as e:
+            print("[STRATEGY ERROR]", e)
+
+        time.sleep(1)
 
 
-# =========================================================
-# MAIN
-# =========================================================
+# =====================================================
+# 🔥 메인 실행
+# =====================================================
+def main():
+
+    print("🚀 SYSTEM INIT START")
+
+    # 1. Watchdog
+    start_watchdog()
+    print("Watchdog started")
+
+    # 2. WebSocket 서버 (백그라운드)
+    ws_thread = threading.Thread(target=start_ws, daemon=True)
+    ws_thread.start()
+    print("WebSocket started")
+
+    # 3. Strategy engine (백그라운드)
+    strategy_thread = threading.Thread(target=start_strategy, daemon=True)
+    strategy_thread.start()
+    print("Strategy started")
+
+    # 4. 상태 루프 (메인 유지)
+    print("TRADING SYSTEM RUNNING")
+
+    while True:
+        time.sleep(5)
+
+
+# =====================================================
+# ENTRY POINT
+# =====================================================
 if __name__ == "__main__":
-
-    try:
-
-        # 🔥 싱글 인스턴스 보호
-        singleton.acquire()
-
-        init_system()
-
-        # CORE ENGINE
-        start_worker()
-        start_ws()
-
-        logger.info("SYSTEM RUNNING")
-
-        # 🔥 크롬 자동 실행
-        threading.Thread(target=open_chrome, daemon=True).start()
-
-        # KEEP ALIVE
-        while True:
-            time.sleep(10)
-
-    except KeyboardInterrupt:
-        logger.warning("STOPPED BY USER")
-
-    except Exception as e:
-        logger.error(f"FATAL ERROR: {e}")
+    main()
