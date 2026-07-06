@@ -1,7 +1,8 @@
 import time
 import logging
+import threading
 
-from config import SYMBOL
+from config import SYMBOLS
 
 from api.websocket_client import ws_client
 from api.order_manager import order_manager
@@ -24,13 +25,13 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-latest_price = None
+
+latest_price = {}
 
 
 # =====================================================
 # INIT
 # =====================================================
-
 def init_system():
 
     logger.info("SYSTEM INIT START")
@@ -46,22 +47,18 @@ def init_system():
 
 
 # =====================================================
-# WS CALLBACK
+# WS CALLBACK (multi symbol)
 # =====================================================
+def on_price(symbol, price):
 
-def on_price(price):
-    global latest_price
-    latest_price = price
+    latest_price[symbol] = price
     update_market_state(price, 0)
 
 
 # =====================================================
-# MAIN LOOP
+# SYMBOL WORKER
 # =====================================================
-
-def run_trading():
-
-    logger.info("TRADING STARTED")
+def symbol_loop(symbol):
 
     equity = 1000
 
@@ -69,82 +66,90 @@ def run_trading():
 
         try:
 
-            if latest_price is None:
+            if symbol not in latest_price:
                 time.sleep(0.2)
                 continue
 
-            price = latest_price
+            price = latest_price[symbol]
 
-            # =================================================
-            # 1) ORDER SYNC (체결 상태)
-            # =================================================
+            # =========================
+            # SYNC
+            # =========================
             order_manager.sync_orders()
+            engine.sync_positions(symbol)
 
-            # =================================================
-            # 2) POSITION SYNC (핵심)
-            # =================================================
-            engine.sync_positions(SYMBOL)
-
-            # =================================================
-            # 3) TP / SL CHECK
-            # =================================================
-            exit_reason = engine.check_exit(SYMBOL, price)
+            # =========================
+            # TP / SL
+            # =========================
+            exit_reason = engine.check_exit(symbol, price)
 
             if exit_reason:
-
-                engine.close_position(SYMBOL, exit_reason)
-
+                engine.close_position(symbol, exit_reason)
                 risk_engine.update(0)
-
-                logger.info(f"TP/SL CLOSED: {exit_reason}")
-
+                logger.info(f"[{symbol}] CLOSED {exit_reason}")
                 time.sleep(0.5)
                 continue
 
-            # =================================================
-            # 4) STRATEGY
-            # =================================================
-            decision = brain.decide("auto", price)
-
+            # =========================
+            # STRATEGY
+            # =========================
+            decision = brain.decide(symbol, price)
             strategy = decision["strategy"]
 
-            # =================================================
-            # 5) EXECUTION
-            # =================================================
+            # =========================
+            # EXECUTION
+            # =========================
             execute_strategy(
                 signal=strategy,
                 price=price,
-                symbol=SYMBOL,
+                symbol=symbol,
                 equity=equity
             )
 
-            # =================================================
-            # 6) REAL PnL (engine 내부 sync 기반)
-            # =================================================
-            pnl = engine.get_real_pnl(SYMBOL) if hasattr(engine, "get_real_pnl") else 0
+            # =========================
+            # PnL
+            # =========================
+            pnl = engine.get_real_pnl(symbol) if hasattr(engine, "get_real_pnl") else 0
 
             risk_engine.update(pnl)
             brain.record(strategy, pnl)
 
-            logger.info(f"PRICE={price} STRATEGY={strategy} PNL={pnl}")
+            logger.info(f"[{symbol}] PRICE={price} STRAT={strategy} PNL={pnl}")
 
             time.sleep(2)
 
         except Exception as e:
-
-            logger.error(f"MAIN ERROR: {str(e)}")
-
-            tg = get_telegram()
-            if tg:
-                tg.error(e)
-
+            logger.error(f"[{symbol}] ERROR: {str(e)}")
             time.sleep(5)
+
+
+# =====================================================
+# MAIN
+# =====================================================
+def run_trading():
+
+    logger.info("TRADING STARTED")
+
+    threads = []
+
+    for symbol in SYMBOLS:
+
+        t = threading.Thread(
+            target=symbol_loop,
+            args=(symbol,),
+            daemon=True
+        )
+
+        t.start()
+        threads.append(t)
+
+    while True:
+        time.sleep(10)
 
 
 # =====================================================
 # ENTRY
 # =====================================================
-
 if __name__ == "__main__":
 
     init_system()
