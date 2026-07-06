@@ -4,6 +4,7 @@ from core.mode import mode
 from risk.risk_engine import risk
 from execution.order_lifecycle import lifecycle
 from database.repository import trade_db
+from execution.pnl_engine import pnl_engine
 
 
 class Execution:
@@ -14,7 +15,7 @@ class Execution:
             return None
 
         # ================================
-        # ORDER 실행
+        # ORDER EXECUTION
         # ================================
         if mode.is_paper():
             res = paper.order(symbol, side, qty, price)
@@ -24,17 +25,22 @@ class Execution:
         oid = res.get("result", {}).get("orderId")
 
         # ================================
-        # PnL (간단 계산)
+        # PnL 계산
         # ================================
-        pnl = 0.0
+        pnl = pnl_engine.get(symbol)
 
         # ================================
-        # DB 저장 (핵심 추가)
+        # DB 저장 (trade)
         # ================================
         trade_db.insert(symbol, side, qty, price, pnl)
 
         # ================================
-        # lifecycle 등록
+        # DB 저장 (PnL history)
+        # ================================
+        trade_db.insert_pnl_history(pnl)
+
+        # ================================
+        # lifecycle
         # ================================
         if oid:
             lifecycle.create(oid, symbol, side, qty, price)
