@@ -1,65 +1,87 @@
-import logging
-
-logger = logging.getLogger(__name__)
+import time
 
 
 class PositionManager:
 
     def __init__(self):
 
-        self.position = None
+        # symbol 기준 포지션 저장
+        self.positions = {}
 
-    # =====================================================
+    # =================================================
     # 포지션 오픈
-    # =====================================================
-    def open_position(self, symbol, side, qty, price):
+    # =================================================
+    def open_position(self, symbol, side, qty, entry_price):
 
-        self.position = {
+        self.positions[symbol] = {
             "symbol": symbol,
             "side": side,
             "qty": qty,
-            "entry_price": price,
-            "unrealized_pnl": 0
+            "entry_price": entry_price,
+            "open_time": time.time(),
+            "unrealized_pnl": 0.0
         }
 
-        logger.info(f"POSITION OPENED: {side} {qty} @ {price}")
+    # =================================================
+    # 포지션 업데이트 (PnL 계산)
+    # =================================================
+    def update_price(self, symbol, current_price):
 
-    # =====================================================
-    # PnL 계산
-    # =====================================================
-    def update_pnl(self, price):
+        if symbol not in self.positions:
+            return None
 
-        if not self.position:
-            return 0
+        pos = self.positions[symbol]
 
-        entry = self.position["entry_price"]
-        qty = self.position["qty"]
-        side = self.position["side"]
+        entry = pos["entry_price"]
+        qty = pos["qty"]
 
-        if side.lower() == "buy":
-            pnl = (price - entry) * qty
+        if pos["side"] == "BUY":
+            pnl = (current_price - entry) * qty
         else:
-            pnl = (entry - price) * qty
+            pnl = (entry - current_price) * qty
 
-        self.position["unrealized_pnl"] = pnl
+        pos["unrealized_pnl"] = pnl
 
         return pnl
 
-    # =====================================================
+    # =================================================
+    # 손절 / 익절 체크
+    # =================================================
+    def check_exit(self, symbol, sl_pct=-0.5, tp_pct=1.0):
+
+        if symbol not in self.positions:
+            return None
+
+        pos = self.positions[symbol]
+
+        entry = pos["entry_price"]
+        pnl_pct = (pos["unrealized_pnl"] / entry) * 100
+
+        # 손절
+        if pnl_pct <= sl_pct:
+            return "STOP_LOSS"
+
+        # 익절
+        if pnl_pct >= tp_pct:
+            return "TAKE_PROFIT"
+
+        return None
+
+    # =================================================
     # 포지션 종료
-    # =====================================================
-    def close_position(self):
+    # =================================================
+    def close_position(self, symbol):
 
-        if not self.position:
-            return 0
+        if symbol in self.positions:
+            del self.positions[symbol]
 
-        pnl = self.position["unrealized_pnl"]
+    # =================================================
+    # 현재 포지션 조회
+    # =================================================
+    def get_position(self, symbol):
 
-        logger.info(f"POSITION CLOSED PNL={pnl}")
-
-        self.position = None
-
-        return pnl
+        return self.positions.get(symbol, None)
 
 
+# 싱글톤
 position_manager = PositionManager()
