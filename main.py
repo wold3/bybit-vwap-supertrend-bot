@@ -11,7 +11,6 @@ from risk.risk_engine import risk_engine
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
@@ -19,20 +18,14 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
-# =========================
-# 상태 저장 (핵심 추가)
-# =========================
-latest_price = None
+latest_price = {"value": None}
 
 
-def on_price(price):
-    global latest_price
-    latest_price = price
-    update_market_state(price, 0)
-
-
+# =====================================================
+# INIT
+# =====================================================
 def init_system():
+
     logger.info("SYSTEM INIT START")
 
     init_telegram(
@@ -45,24 +38,33 @@ def init_system():
     logger.info("SYSTEM READY")
 
 
+# =====================================================
+# WS CALLBACK
+# =====================================================
+def on_price(price):
+
+    latest_price["value"] = price
+    update_market_state(price, 0)
+
+
+# =====================================================
+# TRADING LOOP (FIXED)
+# =====================================================
 def run_trading():
+
     logger.info("TRADING STARTED")
 
     equity = 1000
 
-    global latest_price
-
     while True:
+
         try:
 
-            # =========================
-            # 🔥 WS 가격만 사용
-            # =========================
-            if latest_price is None:
+            price = latest_price["value"]
+
+            if price is None:
                 time.sleep(0.5)
                 continue
-
-            price = latest_price
 
             decision = brain.decide("auto", price)
 
@@ -76,7 +78,6 @@ def run_trading():
             pnl = (price % 10) - 5
 
             risk_engine.update(pnl)
-
             brain.record(decision["strategy"], pnl)
 
             logger.info(
@@ -86,6 +87,7 @@ def run_trading():
             time.sleep(2)
 
         except Exception as e:
+
             logger.error(f"MAIN ERROR: {str(e)}")
 
             tg = get_telegram()
@@ -95,6 +97,9 @@ def run_trading():
             time.sleep(5)
 
 
+# =====================================================
+# ENTRY
+# =====================================================
 if __name__ == "__main__":
 
     init_system()
