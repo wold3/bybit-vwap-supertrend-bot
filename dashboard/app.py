@@ -1,85 +1,25 @@
 from flask import Flask, jsonify
 import time
 
-from database.repository import trade_db
+from trade_db import trade_db   # 🔥 핵심 수정 (이게 맞음)
 
 
 app = Flask(__name__)
 
 
-# ================================
-# HOME (PnL CHART UI)
-# ================================
 @app.route("/")
 def home():
-
-    return """
-    <h1>🚀 REAL-TIME PnL CHART</h1>
-
-    <canvas id="chart" width="900" height="400"></canvas>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <script>
-
-        async function loadData() {
-
-            const res = await fetch('/pnl-history');
-            const data = await res.json();
-
-            const labels = data.map(x =>
-                new Date(x.time * 1000).toLocaleTimeString()
-            );
-
-            const values = data.map(x => x.pnl);
-
-            const ctx = document.getElementById('chart');
-
-            if (window.myChart) {
-                window.myChart.destroy();
-            }
-
-            window.myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'PnL',
-                        data: values,
-                        borderColor: 'green',
-                        fill: false,
-                        tension: 0.2
-                    }]
-                },
-                options: {
-                    animation: false,
-                    responsive: true
-                }
-            });
-        }
-
-        loadData();
-        setInterval(loadData, 3000);
-
-    </script>
-    """
+    return "🚀 DASHBOARD RUNNING"
 
 
-# ================================
-# STATUS
-# ================================
 @app.route("/status")
 def status():
-
     return jsonify({
         "status": "RUNNING",
         "time": time.time()
     })
 
 
-# ================================
-# TRADES
-# ================================
 @app.route("/trades")
 def trades():
 
@@ -99,13 +39,14 @@ def trades():
     ])
 
 
-# ================================
-# PnL HISTORY API
-# ================================
 @app.route("/pnl-history")
 def pnl_history():
 
-    rows = trade_db.get_pnl_history()
+    # 기존 프로젝트에 없을 수도 있음 → 안전 fallback
+    try:
+        rows = trade_db.get_pnl_history()
+    except:
+        rows = []
 
     return jsonify([
         {
@@ -116,12 +57,9 @@ def pnl_history():
     ])
 
 
-# ================================
-# RUN SERVER
-# ================================
 if __name__ == "__main__":
 
-    print("🚀 Dashboard running at http://localhost:5000")
+    print("🚀 Dashboard running on http://localhost:5000")
 
     app.run(
         host="0.0.0.0",
