@@ -1,14 +1,23 @@
-import threading
 import time
+import threading
+import os
+
+from dotenv import load_dotenv
 
 from services.ws_server import start_ws_server
-from execution.execution_engine import engine
 from strategy.strategy_engine import run_strategy
+from execution.execution_engine import engine
 from watchdog import start_watchdog
 
 
 # =====================================================
-# 🔥 WebSocket 서버 실행
+# 🔥 ENV LOAD
+# =====================================================
+load_dotenv()
+
+
+# =====================================================
+# 🔥 WEBSOCKET START
 # =====================================================
 def start_ws():
     print("[WS] Starting WebSocket server...")
@@ -16,11 +25,11 @@ def start_ws():
 
 
 # =====================================================
-# 🔥 전략 루프
+# 🔥 STRATEGY LOOP
 # =====================================================
 def start_strategy():
 
-    print("[STRATEGY] Starting strategy engine...")
+    print("[STRATEGY] Engine started")
 
     while True:
 
@@ -34,28 +43,35 @@ def start_strategy():
 
 
 # =====================================================
-# 🔥 메인 실행
+# 🔥 MAIN SYSTEM
 # =====================================================
 def main():
 
-    print("🚀 SYSTEM INIT START")
+    print("===================================")
+    print("🚀 AUTO TRADING SYSTEM START")
+    print("===================================")
 
     # 1. Watchdog
     start_watchdog()
-    print("Watchdog started")
+    print("[OK] Watchdog running")
 
-    # 2. WebSocket 서버 (백그라운드)
+    # 2. WebSocket server (background)
     ws_thread = threading.Thread(target=start_ws, daemon=True)
     ws_thread.start()
-    print("WebSocket started")
+    print("[OK] WebSocket running")
 
-    # 3. Strategy engine (백그라운드)
+    # 3. Strategy engine (background)
     strategy_thread = threading.Thread(target=start_strategy, daemon=True)
     strategy_thread.start()
-    print("Strategy started")
+    print("[OK] Strategy running")
 
-    # 4. 상태 루프 (메인 유지)
-    print("TRADING SYSTEM RUNNING")
+    # 4. Execution engine ready
+    print("[OK] Execution engine ready")
+
+    # 5. Keep alive loop
+    print("===================================")
+    print("SYSTEM IS LIVE")
+    print("===================================")
 
     while True:
         time.sleep(5)
