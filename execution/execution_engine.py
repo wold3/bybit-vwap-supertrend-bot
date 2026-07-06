@@ -4,7 +4,10 @@ from core.mode import mode
 from risk.risk_engine import risk
 from execution.order_lifecycle import lifecycle
 from database.repository import trade_db
-from execution.pnl_engine import pnl_engine
+
+# 🔥 WebSocket PnL push
+from services.ws_server import broadcast
+import asyncio
 
 
 class Execution:
@@ -25,18 +28,15 @@ class Execution:
         oid = res.get("result", {}).get("orderId")
 
         # ================================
-        # PnL 계산
+        # PnL 계산 (현재 구조 유지)
         # ================================
-        pnl = pnl_engine.get(symbol)
+        pnl = self.calculate_pnl(symbol)
 
         # ================================
-        # DB 저장 (trade)
+        # DB 저장
         # ================================
         trade_db.insert(symbol, side, qty, price, pnl)
 
-        # ================================
-        # DB 저장 (PnL history)
-        # ================================
         trade_db.insert_pnl_history(pnl)
 
         # ================================
@@ -47,7 +47,39 @@ class Execution:
 
         risk.add_trade()
 
+        # ================================
+        # 🔥 WebSocket PUSH (핵심 추가)
+        # ================================
+        self.push_pnl(pnl)
+
         return res
+
+    # ================================
+    # PnL 계산 함수 (기존 엔진 사용)
+    # ================================
+    def calculate_pnl(self, symbol):
+
+        try:
+            from execution.pnl_engine import pnl_engine
+            return pnl_engine.get(symbol)
+        except:
+            return 0.0
+
+    # ================================
+    # 🔥 WS PUSH 함수
+    # ================================
+    def push_pnl(self, pnl):
+
+        try:
+            asyncio.run(
+                broadcast({
+                    "type": "pnl",
+                    "value": pnl
+                })
+            )
+        except Exception:
+            # WS 없어도 거래는 멈추지 않게
+            pass
 
 
 engine = Execution()
