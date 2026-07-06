@@ -8,9 +8,6 @@ logger = logging.getLogger(__name__)
 
 class PositionSync:
 
-    # =====================================================
-    # SYNC ALL POSITIONS
-    # =====================================================
     def sync(self, symbol):
 
         try:
@@ -32,17 +29,15 @@ class PositionSync:
                 total_pnl += pnl
 
                 # =========================
-                # lifecycle 보정 (안전)
+                # order 상태 보정
                 # =========================
                 if size == 0:
-                    # 포지션 없음 → CLOSE 처리
-                    for oid, order in lifecycle.orders.items():
-                        if order["symbol"] == symbol:
-                            order["status"] = "CLOSED"
 
-            # =========================
-            # risk sync
-            # =========================
+                    for oid, o in lifecycle.orders.items():
+
+                        if o["symbol"] == symbol:
+                            o["status"] = "CLOSED"
+
             risk.update_pnl(total_pnl)
 
             return total_pnl
