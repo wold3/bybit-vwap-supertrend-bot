@@ -1,103 +1,74 @@
-import time
-import random
+class StrategyEngine:
 
-from indicators.vwap_supertrend import calculate_vwap, supertrend
-from ml_filter import ml_filter
+    def __init__(self, execution_engine):
 
-from portfolio.position_manager import position_manager
-from risk.risk_engine import risk_engine
-
-
-# =================================================
-# MOCK MARKET DATA (실전에서는 WebSocket으로 교체)
-# =================================================
-def get_market_data():
-
-    prices = [65000 + random.randint(-80, 80) for _ in range(30)]
-    volumes = [random.randint(1, 10) for _ in range(30)]
-
-    return prices, volumes
-
-
-# =================================================
-# BASE SIGNAL (VWAP + Supertrend)
-# =================================================
-def generate_base_signal(prices, volumes):
-
-    vwap = calculate_vwap(prices, volumes)
-    st = supertrend(prices)
-
-    last_price = prices[-1]
-
-    if last_price > vwap and st == "UP":
-        return "BUY"
-
-    if last_price < vwap and st == "DOWN":
-        return "SELL"
-
-    return None
-
-
-# =================================================
-# STRATEGY ENGINE
-# =================================================
-def run_strategy(engine):
-
-    symbol = "BTCUSDT"
-
-    # 🚨 1. GLOBAL RISK GATE
-    if not risk_engine.can_trade():
-        print("[STRATEGY] BLOCKED BY RISK ENGINE")
-        return
+        self.execution = execution_engine
+        self.prices = []
+        self.volumes = []
 
     # =================================================
-    # 2. POSITION CHECK
+    # WS PRICE INPUT
     # =================================================
-    position = position_manager.get_position(symbol)
+    def on_price(self, price):
 
-    if position:
+        self.prices.append(price)
+        self.volumes.append(1)
 
-        # SL / TP 체크 (engine 내부 로직 호출)
-        exit_signal = engine.check_risk(symbol)
+        if len(self.prices) > 50:
+            self.prices.pop(0)
+            self.volumes.pop(0)
 
-        if exit_signal:
-            print(f"[STRATEGY] EXIT SIGNAL: {exit_signal}")
+        # 충분한 데이터 없으면 skip
+        if len(self.prices) < 20:
+            return
 
-        return
-
-    # =================================================
-    # 3. MARKET DATA
-    # =================================================
-    prices, volumes = get_market_data()
+        self.evaluate()
 
     # =================================================
-    # 4. BASE SIGNAL (TECH FILTER)
+    # STRATEGY RUN
     # =================================================
-    base_signal = generate_base_signal(prices, volumes)
+    def evaluate(self):
 
-    if not base_signal:
-        print("[STRATEGY] NO TECH SIGNAL")
-        return
+        from risk.risk_engine import risk_engine
+        from ml_filter import ml_filter
+        from indicators.vwap_supertrend import calculate_vwap, supertrend
+        from portfolio.position_manager import position_manager
 
-    # =================================================
-    # 5. ML FILTER (QUALITY FILTER)
-    # =================================================
-    allow, prob = ml_filter.allow_trade(prices, volumes)
+        symbol = "BTCUSDT"
 
-    if not allow:
-        print(f"[ML FILTER] BLOCKED | prob={prob:.2f}")
-        return
+        # 🚨 RISK GATE
+        if not risk_engine.can_trade():
+            return
 
-    print(f"[ML FILTER] PASS | prob={prob:.2f}")
+        # 포지션 체크
+        if position_manager.get_position(symbol):
+            return
 
-    # =================================================
-    # 6. FINAL EXECUTION
-    # =================================================
-    engine.execute(
-        symbol=symbol,
-        side=base_signal,
-        qty=0.001,
-        price=0
-    )
+        vwap = calculate_vwap(self.prices, self.volumes)
+        st = supertrend(self.prices)
 
-    time.sleep(0.5)
+        last_price = self.prices[-1]
+
+        # TECH SIGNAL
+        if last_price > vwap and st == "UP":
+            base_signal = "BUY"
+        elif last_price < vwap and st == "DOWN":
+            base_signal = "SELL"
+        else:
+            return
+
+        # ML FILTER
+        allow, prob = ml_filter.allow_trade(self.prices, self.volumes)
+
+        if not allow:
+            return
+
+        print(f"[WS STRATEGY] SIGNAL {base_signal} prob={prob:.2f}")
+
+        # EXECUTE REAL TRADE
+        self.execution.execute(
+            symbol=symbol,
+            side=base_signal,
+            qty=0.001,
+            price=last_price
+        )
