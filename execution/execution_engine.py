@@ -10,8 +10,11 @@ class Execution:
     def execute(self, symbol, side, qty, price):
 
         if not risk.allow():
-            return
+            return None
 
+        # =========================
+        # PAPER / LIVE
+        # =========================
         if mode.is_paper():
             res = paper.order(symbol, side, qty, price)
         else:
@@ -19,8 +22,10 @@ class Execution:
 
         oid = res.get("result", {}).get("orderId")
 
-        if oid:
-            lifecycle.create(oid, symbol, side, qty, price)
+        if not oid:
+            return res
+
+        lifecycle.create(oid, symbol, side, qty, price)
 
         risk.add_trade()
 
