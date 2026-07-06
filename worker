@@ -2,7 +2,7 @@ from services.event_bus import event_bus
 from execution.execution_engine import engine
 from execution.position_sync import position_sync
 from risk.risk_engine import risk
-from execution.pnl_tracker import pnl_tracker
+from monitor.monitor import monitor
 
 
 def loop():
@@ -22,7 +22,7 @@ def loop():
         # =====================
         # EXECUTE
         # =====================
-        engine.execute(symbol, signal, 1, price)
+        res = engine.execute(symbol, signal, 1, price)
 
         # =====================
         # SYNC
@@ -32,8 +32,11 @@ def loop():
         risk.update_pnl(pnl)
 
         # =====================
-        # RECORD (핵심 추가)
+        # MONITOR ALERT
         # =====================
-        pnl_tracker.record_trade(symbol, signal, 1, price, pnl)
+        monitor.on_pnl(pnl)
 
-        print(f"[OPS] {symbol} PRICE={price} PNL={pnl}")
+        if res:
+            monitor.on_trade(symbol, signal, price, pnl)
+
+        print(f"[MONITOR] {symbol} PRICE={price} PNL={pnl}")
