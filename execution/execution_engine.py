@@ -5,7 +5,7 @@ from risk.risk_engine import risk
 from execution.order_lifecycle import lifecycle
 
 
-class ExecutionEngine:
+class Execution:
 
     def execute(self, symbol, side, qty, price):
 
@@ -13,7 +13,7 @@ class ExecutionEngine:
             return
 
         if mode.is_paper():
-            res = paper.place_order(symbol, side, qty, price)
+            res = paper.order(symbol, side, qty, price)
         else:
             res = bybit.order(symbol, side, qty)
 
@@ -27,4 +27,4 @@ class ExecutionEngine:
         return res
 
 
-engine = ExecutionEngine()
+engine = Execution()
