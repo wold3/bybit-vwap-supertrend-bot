@@ -1,93 +1,90 @@
 import os
 import time
-import asyncio
-import random
+import json
+import hmac
+import hashlib
+import requests
 
-from database.trade_db import trade_db
-from services.ws_server import broadcast
-
-from portfolio.position_manager import position_manager
 from risk.risk_engine import risk_engine
+from telegram import telegram
 
 
 class BybitExecutionEngine:
 
     def __init__(self):
 
-        self.symbol = os.getenv("SYMBOL", "BTCUSDT")
-
-        # 포트폴리오 equity
-        self.portfolio = {
-            "BTCUSDT": 10000,
-            "ETHUSDT": 10000,
-            "SOLUSDT": 10000
-        }
+        self.api_key = os.getenv("BYBIT_API_KEY")
+        self.api_secret = os.getenv("BYBIT_API_SECRET")
+        self.base_url = "https://api.bybit.com"
 
     # =================================================
-    # EXECUTE ORDER
+    # SIGNATURE (필수)
     # =================================================
-    def execute(self, symbol, side, qty, price):
+    def _sign(self, params: dict):
 
-        # 🚨 RISK GATE
+        ordered = "&".join([f"{k}={params[k]}" for k in sorted(params)])
+
+        return hmac.new(
+            self.api_secret.encode(),
+            ordered.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+    # =================================================
+    # CREATE ORDER (REAL)
+    # =================================================
+    def execute(self, symbol, side, qty, price=None):
+
         if not risk_engine.can_trade():
-            print("[EXECUTION] BLOCKED BY RISK ENGINE")
+            print("[EXECUTION] BLOCKED BY RISK")
             return None
 
-        symbol = symbol or self.symbol
+        endpoint = "/v5/order/create"
+        url = self.base_url + endpoint
 
-        entry_price = self._price()
+        timestamp = str(int(time.time() * 1000))
 
-        position_manager.open_position(symbol, side, qty, entry_price)
+        params = {
+            "category": "linear",
+            "symbol": symbol,
+            "side": side,               # Buy / Sell
+            "orderType": "Market",
+            "qty": str(qty),
+            "timeInForce": "IOC",
+            "api_key": self.api_key,
+            "timestamp": timestamp,
+            "recv_window": "5000"
+        }
 
-        pnl = position_manager.update_price(symbol, entry_price)
+        params["sign"] = self._sign(params)
 
-        # =========================================
-        # SYMBOL EQUITY UPDATE
-        # =========================================
-        self.portfolio[symbol] += pnl
-
-        trade_db.insert_equity(symbol, self.portfolio[symbol])
-        trade_db.insert(symbol, side, qty, entry_price, pnl)
-
-        # =========================================
-        # TOTAL EQUITY → RISK ENGINE
-        # =========================================
-        total_equity = self.get_total_equity()
-        risk_engine.update_equity(total_equity)
-
-        # WS PUSH
-        self._push(pnl)
-
-        return pnl
-
-    # =================================================
-    # PRICE MOCK
-    # =================================================
-    def _price(self):
-        return 65000 + random.randint(-100, 100)
-
-    # =================================================
-    # TOTAL EQUITY
-    # =================================================
-    def get_total_equity(self):
-
-        return sum(self.portfolio.values())
-
-    # =================================================
-    # WS PUSH
-    # =================================================
-    def _push(self, pnl):
+        headers = {
+            "Content-Type": "application/json"
+        }
 
         try:
-            asyncio.run(
-                broadcast({
-                    "type": "pnl",
-                    "value": pnl,
-                    "time": time.time()
-                })
+            res = requests.post(url, json=params, headers=headers, timeout=5)
+            data = res.json()
+
+            print("[BYBIT ORDER]", data)
+
+            # =================================================
+            # TELEGRAM ALERT
+            # =================================================
+            telegram.send(
+                f"📊 ORDER EXECUTED\n"
+                f"Symbol: {symbol}\n"
+                f"Side: {side}\n"
+                f"Qty: {qty}\n"
+                f"Response: {data}"
             )
-        except:
-            pass
 
+            return data
 
-engine = BybitExecutionEngine()
+        except Exception as e:
+
+            print("[ORDER ERROR]", e)
+
+            telegram.send(f"❌ ORDER ERROR: {e}")
+
+            return None
