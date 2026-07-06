@@ -1,94 +1,61 @@
-from feature_engine import get_features
+import numpy as np
 
 
-class MLModel:
-    """
-    간단한 Feature 기반 ML Filter
-    """
+class MLFilter:
 
     def __init__(self):
 
-        self.threshold = 0.60
+        # 기본 임계값 (실전에서는 학습 모델로 교체)
+        self.threshold = 0.55
 
+    # =================================================
+    # FEATURE ENGINEERING
+    # =================================================
+    def build_features(self, prices, volumes):
+
+        prices = np.array(prices)
+        volumes = np.array(volumes)
+
+        returns = np.diff(prices)
+
+        features = {
+            "return_mean": float(np.mean(returns)),
+            "return_std": float(np.std(returns)),
+            "vol_mean": float(np.mean(volumes)),
+            "momentum": float(prices[-1] - prices[0]),
+        }
+
+        return features
+
+    # =================================================
+    # MOCK MODEL PREDICTION
+    # =================================================
     def predict(self, features):
 
-        score = 0.50
+        # 👉 실제 ML 모델 자리 (sklearn / pytorch 교체 가능)
 
-        # -------------------------
-        # Trend
-        # -------------------------
-        trend = features["trend"]
-
-        if trend > 0:
-            score += min(abs(trend) * 2.0, 0.20)
-        else:
-            score -= min(abs(trend) * 2.0, 0.20)
-
-        # -------------------------
-        # Momentum
-        # -------------------------
-        momentum = features["momentum"]
-
-        if momentum > 0:
-            score += 0.10
-        else:
-            score -= 0.10
-
-        # -------------------------
-        # Volatility
-        # -------------------------
-        volatility = features["volatility"]
-
-        if volatility > features["price"] * 0.03:
-            score -= 0.10
-
-        return max(
-            0.0,
-            min(score, 1.0)
+        score = (
+            0.3 * features["return_mean"] +
+            0.2 * features["momentum"] +
+            0.1 * features["vol_mean"] -
+            0.1 * features["return_std"]
         )
 
+        # sigmoid-like scaling
+        prob = 1 / (1 + np.exp(-score))
 
-model = MLModel()
+        return float(prob)
 
+    # =================================================
+    # FILTER
+    # =================================================
+    def allow_trade(self, prices, volumes):
 
-def should_enter_market(price):
-    """
-    진입 여부 판단
+        features = self.build_features(prices, volumes)
+        prob = self.predict(features)
 
-    Returns
-    -------
-    (allow, score)
-    """
-
-    features = get_features(price)
-
-    score = model.predict(features)
-
-    return (
-        score >= model.threshold,
-        round(score, 4),
-    )
+        return prob > self.threshold, prob
 
 
-def get_score(price):
-    """
-    ML Score 반환
-    """
-
-    return should_enter_market(price)[1]
-
-
-def get_threshold():
-    """
-    현재 Threshold
-    """
-
-    return model.threshold
-
-
-def set_threshold(value):
-    """
-    Threshold 변경
-    """
-
-    model.threshold = float(value)
+# SINGLETON
+ml_filter = MLFilter()
