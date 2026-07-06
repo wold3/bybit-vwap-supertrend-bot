@@ -1,0 +1,46 @@
+import logging
+
+from services.event_bus import event_bus
+from execution.execution_engine import engine
+from execution.order_lifecycle import order_lifecycle
+from ai.trading_brain import brain
+
+logger = logging.getLogger(__name__)
+
+
+def worker_loop():
+
+    q = event_bus.subscribe()
+
+    while True:
+
+        event = q.get()
+
+        if event["type"] != "TICK":
+            continue
+
+        symbol = event["symbol"]
+        price = event["price"]
+
+        decision = brain.decide(symbol, price)
+        signal = decision["strategy"]
+
+        # =========================
+        # EXECUTE
+        # =========================
+        engine.execute(
+            signal=signal,
+            symbol=symbol,
+            qty=1,
+            price=price
+        )
+
+        # =========================
+        # REAL PnL UPDATE
+        # =========================
+        pnl = engine.update_pnl(symbol)
+
+        print(
+            f"[v7] {symbol} {price} {signal} "
+            f"PNL={pnl['pnl']:.2f}"
+        )
