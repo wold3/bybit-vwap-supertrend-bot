@@ -1,26 +1,22 @@
 from flask import Flask, jsonify
 import time
 
-from storage.trade_db import trade_db
+from database.repository import trade_db
 from execution.pnl_engine import pnl_engine
 
 
-# =========================================================
-# FLASK APP
-# =========================================================
 app = Flask(__name__)
 
 
-# =========================================================
-# HOME (브라우저 기본 페이지)
-# =========================================================
+# ================================
+# HOME
+# ================================
 @app.route("/")
 def home():
 
     return """
-    <h1>🚀 AUTO TRADING BOT DASHBOARD</h1>
+    <h1>🚀 AUTO TRADING DASHBOARD (DB MODE)</h1>
     <p>Status: RUNNING</p>
-    <p>Endpoints:</p>
     <ul>
         <li>/status</li>
         <li>/pnl</li>
@@ -29,76 +25,65 @@ def home():
     """
 
 
-# =========================================================
-# SYSTEM STATUS
-# =========================================================
+# ================================
+# STATUS
+# ================================
 @app.route("/status")
 def status():
 
     return jsonify({
         "status": "RUNNING",
-        "timestamp": time.time()
+        "time": time.time()
     })
 
 
-# =========================================================
-# TOTAL PNL
-# =========================================================
+# ================================
+# PnL
+# ================================
 @app.route("/pnl")
 def pnl():
 
     try:
-        total = pnl_engine.get("BTCUSDT")
 
         return jsonify({
             "symbol": "BTCUSDT",
-            "pnl": total,
+            "pnl": pnl_engine.get("BTCUSDT"),
             "status": "LIVE"
         })
 
     except Exception as e:
 
-        return jsonify({
-            "error": str(e)
-        })
+        return jsonify({"error": str(e)})
 
 
-# =========================================================
-# TRADE LIST
-# =========================================================
+# ================================
+# TRADE LIST (DB 핵심)
+# ================================
 @app.route("/trades")
 def trades():
 
-    try:
+    rows = trade_db.all()
 
-        rows = trade_db.all()
-
-        return jsonify([
-            {
-                "id": r[0],
-                "symbol": r[1],
-                "side": r[2],
-                "qty": r[3],
-                "price": r[4],
-                "pnl": r[5],
-                "time": r[6]
-            }
-            for r in rows
-        ])
-
-    except Exception as e:
-
-        return jsonify({
-            "error": str(e)
-        })
+    return jsonify([
+        {
+            "id": r[0],
+            "symbol": r[1],
+            "side": r[2],
+            "qty": r[3],
+            "price": r[4],
+            "pnl": r[5],
+            "time": r[6]
+        }
+        for r in rows
+    ])
 
 
-# =========================================================
-# SERVER START
-# =========================================================
+# ================================
+# SERVER RUN
+# ================================
 if __name__ == "__main__":
 
-    print("🚀 Dashboard starting on http://localhost:5000")
+    print("🚀 Dashboard running on http://localhost:5000")
 
     app.run(
         host="0.0.0.0",
