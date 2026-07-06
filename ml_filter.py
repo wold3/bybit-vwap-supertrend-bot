@@ -5,56 +5,56 @@ class MLFilter:
 
     def __init__(self):
 
-        # 기본 임계값 (실전에서는 학습 모델로 교체)
-        self.threshold = 0.55
-
-    # =================================================
-    # FEATURE ENGINEERING
-    # =================================================
-    def build_features(self, prices, volumes):
-
-        prices = np.array(prices)
-        volumes = np.array(volumes)
-
-        returns = np.diff(prices)
-
-        features = {
-            "return_mean": float(np.mean(returns)),
-            "return_std": float(np.std(returns)),
-            "vol_mean": float(np.mean(volumes)),
-            "momentum": float(prices[-1] - prices[0]),
+        # 임시 가중치 (나중에 모델로 교체)
+        self.weights = {
+            "trend": 0.4,
+            "volatility": 0.3,
+            "momentum": 0.3
         }
 
-        return features
+    # =================================================
+    # FEATURE ENGINE
+    # =================================================
+    def extract_features(self, market_data):
+
+        close = market_data["close"]
+        high = market_data["high"]
+        low = market_data["low"]
+
+        trend = (close - low) / (high - low + 1e-6)
+        volatility = (high - low) / close
+        momentum = np.tanh((close - market_data["open"]) / close)
+
+        return {
+            "trend": trend,
+            "volatility": volatility,
+            "momentum": momentum
+        }
 
     # =================================================
-    # MOCK MODEL PREDICTION
+    # SCORE CALC
     # =================================================
-    def predict(self, features):
-
-        # 👉 실제 ML 모델 자리 (sklearn / pytorch 교체 가능)
+    def score(self, features):
 
         score = (
-            0.3 * features["return_mean"] +
-            0.2 * features["momentum"] +
-            0.1 * features["vol_mean"] -
-            0.1 * features["return_std"]
+            features["trend"] * self.weights["trend"] +
+            features["volatility"] * self.weights["volatility"] +
+            features["momentum"] * self.weights["momentum"]
         )
 
-        # sigmoid-like scaling
-        prob = 1 / (1 + np.exp(-score))
-
-        return float(prob)
+        return score
 
     # =================================================
-    # FILTER
+    # DECISION
     # =================================================
-    def allow_trade(self, prices, volumes):
+    def allow_trade(self, market_data):
 
-        features = self.build_features(prices, volumes)
-        prob = self.predict(features)
+        features = self.extract_features(market_data)
+        score = self.score(features)
 
-        return prob > self.threshold, prob
+        print(f"[ML FILTER] SCORE = {score}")
+
+        return score > 0.55
 
 
 # SINGLETON
