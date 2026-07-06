@@ -7,7 +7,9 @@ import hashlib
 
 from database.trade_db import trade_db
 from services.ws_server import broadcast
+
 from portfolio.position_manager import position_manager
+from risk.risk_engine import risk_engine
 
 
 class BybitExecutionEngine:
@@ -27,29 +29,46 @@ class BybitExecutionEngine:
 
         symbol = symbol or self.symbol
 
-        # =========================
-        # ENTRY PRICE MOCK (실제는 체결가 받아야함)
-        # =========================
+        # =================================================
+        # 🚨 GLOBAL RISK GATE (핵심)
+        # =================================================
+        if not risk_engine.can_trade():
+            print("[EXECUTION] BLOCKED BY RISK ENGINE")
+            return None
+
+        # =================================================
+        # ENTRY PRICE (mock or replace with real fill price)
+        # =================================================
         entry_price = self._get_price()
 
-        # =========================
+        # =================================================
         # POSITION OPEN
-        # =========================
+        # =================================================
         position_manager.open_position(symbol, side, qty, entry_price)
 
-        # =========================
-        # PnL 계산
-        # =========================
+        # =================================================
+        # PnL CALC
+        # =================================================
         pnl = position_manager.update_price(symbol, entry_price)
 
-        # =========================
-        # DB 저장
-        # =========================
+        # =================================================
+        # RISK ENGINE UPDATE (핵심 연결)
+        # =================================================
+        risk_engine.update_pnl(pnl)
+
+        # =================================================
+        # DB SAVE
+        # =================================================
         trade_db.insert(symbol, side, qty, entry_price, pnl)
 
-        # =========================
+        try:
+            trade_db.insert_pnl_history(pnl)
+        except:
+            pass
+
+        # =================================================
         # WS PUSH
-        # =========================
+        # =================================================
         self._push(pnl)
 
         return {
@@ -60,7 +79,7 @@ class BybitExecutionEngine:
         }
 
     # =================================================
-    # PRICE MOCK (나중에 WebSocket 가격으로 교체)
+    # PRICE MOCK
     # =================================================
     def _get_price(self):
 
@@ -68,37 +87,21 @@ class BybitExecutionEngine:
         return 65000 + random.randint(-100, 100)
 
     # =================================================
-    # EXIT CHECK (SL / TP)
-    # =================================================
-    def check_risk(self, symbol):
-
-        result = position_manager.check_exit(symbol)
-
-        if result == "STOP_LOSS":
-            print("[EXIT] STOP LOSS")
-
-            position_manager.close_position(symbol)
-
-        elif result == "TAKE_PROFIT":
-            print("[EXIT] TAKE PROFIT")
-
-            position_manager.close_position(symbol)
-
-        return result
-
-    # =================================================
     # WS PUSH
     # =================================================
     def _push(self, pnl):
 
         try:
-            asyncio.run(broadcast({
-                "type": "pnl",
-                "value": pnl,
-                "time": time.time()
-            }))
+            asyncio.run(
+                broadcast({
+                    "type": "pnl",
+                    "value": pnl,
+                    "time": time.time()
+                })
+            )
         except:
             pass
 
 
+# SINGLETON
 engine = BybitExecutionEngine()
