@@ -4,8 +4,8 @@ from datetime import datetime
 from api.bybit_api import (
     close_position,
     get_position,
-    get_last_price,
     get_unrealized_pnl,
+    get_last_price,
 )
 
 from database.repository import (
@@ -25,7 +25,7 @@ class PositionManager:
     # =====================================================
     # Sync Position (Bybit → DB)
     # =====================================================
-    def sync(self, symbol: str):
+    def sync(self, symbol):
 
         logger.info("SYNC POSITION %s", symbol)
 
@@ -39,7 +39,7 @@ class PositionManager:
         size = float(position.get("size", 0))
 
         # 포지션 종료 상태
-        if size == 0:
+        if size <= 0:
             delete_position(symbol)
             return None
 
@@ -47,6 +47,7 @@ class PositionManager:
         entry_price = float(position.get("avgPrice", 0))
         leverage = int(float(position.get("leverage", 1)))
 
+        # DB 저장
         save_position(
             symbol=symbol,
             side=side,
@@ -55,8 +56,9 @@ class PositionManager:
             leverage=leverage,
         )
 
-        mark_price = get_last_price(symbol)
+        # PnL 업데이트
         pnl = get_unrealized_pnl(symbol)
+        mark_price = get_last_price(symbol)
 
         update_position_price(
             symbol=symbol,
@@ -69,78 +71,57 @@ class PositionManager:
         return get_position(symbol)
 
     # =====================================================
-    # Close Position
+    # Close Position (Market Close)
     # =====================================================
-    def close(self, symbol: str):
+    def close(self, symbol):
 
         logger.info("CLOSE POSITION %s", symbol)
-        return close_position(symbol)
+
+        result = close_position(symbol)
+
+        # DB 즉시 삭제
+        delete_position(symbol)
+
+        return result
 
     # =====================================================
-    # Check Position Open
+    # Is Open Check
     # =====================================================
-    def is_open(self, symbol: str) -> bool:
+    def is_open(self, symbol):
 
-        position = get_position(symbol)
+        pos = get_position(symbol)
 
-        if not position:
+        if not pos:
             return False
 
-        return float(position.get("size", 0)) > 0
+        return float(pos.get("size", 0)) > 0
 
     # =====================================================
     # Has Position (alias)
     # =====================================================
-    def has_position(self, symbol: str) -> bool:
+    def has_position(self, symbol):
         return self.is_open(symbol)
 
     # =====================================================
     # Refresh
     # =====================================================
-    def refresh(self, symbol: str):
+    def refresh(self, symbol):
         return self.sync(symbol)
 
     # =====================================================
     # PnL
     # =====================================================
-    def pnl(self, symbol: str) -> float:
-
+    def pnl(self, symbol):
         return get_unrealized_pnl(symbol)
 
     # =====================================================
-    # Close All (DB 기준)
-    # =====================================================
-    def close_all(self):
-
-        logger.info("CLOSE ALL POSITIONS")
-
-        # 실제 Bybit 청산은 개별 포지션 루프 필요
-        # 여기서는 DB 기준 정리
-        from database.repository import get_positions
-
-        positions = get_positions()
-
-        for p in positions:
-            symbol = p.symbol if hasattr(p, "symbol") else None
-
-            if symbol:
-                try:
-                    close_position(symbol)
-                    delete_position(symbol)
-                except Exception as e:
-                    logger.exception(e)
-
-        return True
-
-    # =====================================================
-    # Status
+    # Status (Dashboard)
     # =====================================================
     def status(self):
 
         return {
-            "last_sync": self.last_sync.isoformat()
-            if self.last_sync
-            else None,
+            "last_sync": self.last_sync.isoformat() if self.last_sync else None,
+            "active": True,
         }
 
     # =====================================================
@@ -151,9 +132,7 @@ class PositionManager:
         return {
             "engine": "PositionManager",
             "healthy": True,
-            "last_sync": self.last_sync.isoformat()
-            if self.last_sync
-            else None,
+            "last_sync": self.last_sync.isoformat() if self.last_sync else None,
         }
 
     # =====================================================
@@ -162,18 +141,9 @@ class PositionManager:
     def __repr__(self):
 
         return f"<PositionManager last_sync={self.last_sync}>"
-
+    
 
 # =====================================================
 # Singleton
 # =====================================================
 position_manager = PositionManager()
-
-
-# =====================================================
-# Export
-# =====================================================
-__all__ = [
-    "PositionManager",
-    "position_manager",
-]
