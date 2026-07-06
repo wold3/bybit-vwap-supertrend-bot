@@ -7,8 +7,10 @@ from flask import Flask, request, jsonify
 from strategy.strategy_wrapper import execute_strategy
 from execution.execution_engine import engine
 from risk.risk_engine import risk_engine
+
 from services.logger_service import logger_service
 from services.report_service import send_daily_report
+from services.watchdog_service import start_watchdog
 
 app = Flask(__name__)
 
@@ -73,71 +75,38 @@ def webhook():
 
 
 # =====================================================
-# Engine Monitor
-# =====================================================
-def monitor_engine():
-
-    while True:
-
-        try:
-
-            status = engine.status()
-
-            logger.info(
-                "Engine status: %s",
-                status,
-            )
-
-        except Exception as e:
-
-            logger.exception(e)
-
-        time.sleep(60)
-
-
-# =====================================================
-# Daily Report Scheduler
-# =====================================================
-def report_scheduler():
-
-    last_date = None
-
-    while True:
-
-        try:
-
-            current_date = time.strftime("%Y-%m-%d")
-
-            if current_date != last_date:
-
-                send_daily_report()
-
-                last_date = current_date
-
-        except Exception as e:
-
-            logger.exception(e)
-
-        time.sleep(300)
-
-
-# =====================================================
-# Startup Threads
+# Background Tasks
 # =====================================================
 def start_background_tasks():
 
-    t1 = threading.Thread(
-        target=monitor_engine,
-        daemon=True,
-    )
+    # Watchdog (핵심 추가)
+    start_watchdog()
 
-    t2 = threading.Thread(
-        target=report_scheduler,
-        daemon=True,
-    )
+    # Report Scheduler
+    def report_loop():
 
-    t1.start()
-    t2.start()
+        last_date = None
+
+        while True:
+
+            try:
+
+                current_date = time.strftime("%Y-%m-%d")
+
+                if current_date != last_date:
+
+                    send_daily_report()
+
+                    last_date = current_date
+
+            except Exception as e:
+
+                logger.exception(e)
+
+            time.sleep(300)
+
+    t = threading.Thread(target=report_loop, daemon=True)
+    t.start()
 
 
 # =====================================================
@@ -147,10 +116,26 @@ if __name__ == "__main__":
 
     logger.info("Starting Trading Bot")
 
-    start_background_tasks()
+    # 1. 안전한 초기화 순서
+    try:
 
+        logger.info("Initializing Risk Engine")
+        risk_engine.reset()
+
+        logger.info("Starting Background Tasks")
+        start_background_tasks()
+
+        logger.info("System Ready")
+
+    except Exception as e:
+
+        logger.exception("Startup failed")
+        raise e
+
+    # 2. Flask Start
     app.run(
         host="0.0.0.0",
         port=8000,
         debug=False,
+        use_reloader=False,  # 중요: 중복 실행 방지
     )
