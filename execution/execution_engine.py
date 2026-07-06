@@ -1,36 +1,31 @@
-import uuid
-from datetime import datetime
+import logging
+
+from risk.risk_engine import risk_engine
+from execution.order_manager import order_manager
+
+logger = logging.getLogger(__name__)
 
 
-class PaperEngine:
+class ExecutionEngine:
 
-    def __init__(self):
-        self.positions = {}
-        self.orders = {}
+    def execute(self, signal, symbol, qty, price):
 
-    def place_order(self, symbol, side, qty, price):
+        if not risk_engine.allow_trade():
+            return {"success": False, "reason": "risk_block"}
 
-        order_id = str(uuid.uuid4())
+        resp = order_manager.place_order(
+            symbol=symbol,
+            side=signal,
+            qty=qty,
+            price=price
+        )
 
-        self.orders[order_id] = {
-            "symbol": symbol,
-            "side": side,
-            "qty": qty,
-            "price": price,
-            "status": "FILLED",
-            "time": datetime.utcnow()
+        risk_engine.add_trade()
+
+        return {
+            "success": True,
+            "resp": resp
         }
 
-        self.positions[symbol] = {
-            "side": side,
-            "qty": qty,
-            "entry": price
-        }
 
-        return {"result": {"orderId": order_id}}
-
-    def get_positions(self, symbol):
-        return self.positions.get(symbol)
-
-
-paper_engine = PaperEngine()
+engine = ExecutionEngine()
