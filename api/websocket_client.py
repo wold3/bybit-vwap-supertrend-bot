@@ -1,7 +1,7 @@
 import json
 import logging
-import threading
 import websocket
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -11,98 +11,98 @@ class BybitWebSocket:
     def __init__(self):
         self.ws = None
         self.callback = None
-        self.running = False
 
-    # =========================
-    # callback
-    # =========================
+    # =====================================================
+    # callback 등록
+    # =====================================================
     def set_price_callback(self, callback):
         self.callback = callback
 
-    # =========================
-    # message handler (FIX 핵심)
-    # =========================
+    # =====================================================
+    # message handler (핵심 수정 부분)
+    # =====================================================
     def _on_message(self, ws, message):
 
         try:
-            # 1) JSON 변환 (string 대비)
+            # ----------------------------
+            # 1. 문자열이면 JSON 변환
+            # ----------------------------
             if isinstance(message, str):
                 try:
                     data = json.loads(message)
-                except:
+                except Exception:
+                    logger.warning(f"WS non-json message skipped: {message}")
                     return
             else:
                 data = message
 
-            # 2) dict 아니면 종료
+            # ----------------------------
+            # 2. Bybit 구조 안전 처리
+            # ----------------------------
+            price = None
+            volume = None
+
+            # dict 아닐 경우 방어
             if not isinstance(data, dict):
                 return
 
-            # 3) Bybit wrapper 제거
+            # 여러 포맷 대응
             if "data" in data:
-                data = data["data"]
+                inner = data.get("data")
 
-            # 4) list 대응
-            if isinstance(data, list):
-                if len(data) == 0:
-                    return
-                data = data[0]
+                if isinstance(inner, list) and len(inner) > 0:
+                    item = inner[0]
 
-            if not isinstance(data, dict):
-                return
+                    if isinstance(item, dict):
+                        price = item.get("lastPrice") or item.get("price")
+                        volume = item.get("volume24h")
 
-            # 5) price 추출 (안전)
-            price = data.get("lastPrice") or data.get("price")
+                elif isinstance(inner, dict):
+                    price = inner.get("lastPrice") or inner.get("price")
+
+            # fallback
+            price = price or data.get("price")
 
             if price is None:
                 return
 
-            try:
-                price = float(price)
-            except:
-                return
+            price = float(price)
+            volume = float(volume) if volume else 0
 
-            # 6) callback 실행
+            # callback 실행
             if self.callback:
-                self.callback(price, 0)
+                self.callback(price, volume)
 
         except Exception as e:
             logger.error(f"WS message error: {str(e)}")
 
-    # =========================
-    # lifecycle
-    # =========================
+    # =====================================================
+    # open
+    # =====================================================
     def _on_open(self, ws):
         logger.info("WebSocket connected")
 
-    def _on_close(self, ws, *args):
-        logger.warning("WebSocket closed")
-
-    def _on_error(self, ws, error):
-        logger.error(f"WebSocket error: {error}")
-
-    # =========================
-    # start
-    # =========================
+    # =====================================================
+    # run
+    # =====================================================
     def start(self):
 
-        url = "wss://stream.bybit.com/v5/public/linear"
+        def run():
+            self.ws = websocket.WebSocketApp(
+                "wss://stream.bybit.com/v5/public/linear",
+                on_message=self._on_message,
+                on_open=self._on_open,
+            )
 
-        self.ws = websocket.WebSocketApp(
-            url,
-            on_message=self._on_message,
-            on_open=self._on_open,
-            on_close=self._on_close,
-            on_error=self._on_error
-        )
+            logger.info("WebSocket started")
+            self.ws.run_forever()
 
-        self.running = True
+        threading.Thread(target=run, daemon=True).start()
 
-        t = threading.Thread(target=self.ws.run_forever)
-        t.daemon = True
-        t.start()
-
-        logger.info("WebSocket started")
+    def stop(self):
+        if self.ws:
+            self.ws.close()
+            logger.info("WebSocket stopped")
 
 
 ws_client = BybitWebSocket()
