@@ -1,33 +1,11 @@
-# =====================================================
-# SYMBOL SETTINGS (멀티 심볼)
-# =====================================================
 SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 
+MODE = "PAPER"  # PAPER | LIVE
 
-# =====================================================
-# BACKTEST / LIVE MODE
-# =====================================================
-MODE = "LIVE"   # "BACKTEST" | "LIVE"
+BYBIT_TESTNET = True
 
-
-# =====================================================
-# BYBIT SETTINGS
-# =====================================================
-BYBIT_TESTNET = False
-
-BYBIT_API_KEY = "YOUR_API_KEY"
-BYBIT_API_SECRET = "YOUR_API_SECRET"
-
-
-# =====================================================
-# RISK SETTINGS
-# =====================================================
 MAX_DAILY_LOSS = 50
-MAX_OPEN_POSITIONS = 2
-LEVERAGE = 1
+MAX_TRADE_COUNT = 20
+MAX_POSITION_SIZE = 2
 
-
-# =====================================================
-# STRATEGY SETTINGS
-# =====================================================
-DEFAULT_TIMEFRAME = "1m"
+KILL_SWITCH = True
