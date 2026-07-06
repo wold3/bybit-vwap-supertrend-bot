@@ -17,41 +17,30 @@ class BybitClient:
         self.api_key = BYBIT_API_KEY
         self.api_secret = BYBIT_API_SECRET
 
-        if BYBIT_TESTNET:
-            self.base_url = "https://api-testnet.bybit.com"
-        else:
-            self.base_url = "https://api.bybit.com"
+        self.base_url = (
+            "https://api-testnet.bybit.com"
+            if BYBIT_TESTNET
+            else "https://api.bybit.com"
+        )
 
-    # =====================================================
-    # SIGNATURE (FIXED)
-    # =====================================================
     def _sign(self, params: dict):
 
         timestamp = str(int(time.time() * 1000))
 
-        # 🔥 FIX: sort_keys 중요 (서명 안정화)
-        param_str = (
-            timestamp +
-            self.api_key +
-            json.dumps(params, separators=(',', ':'), sort_keys=True)
-        )
+        param_str = timestamp + self.api_key + json.dumps(params, separators=(',', ':'))
 
         signature = hmac.new(
-            self.api_secret.encode("utf-8"),
-            param_str.encode("utf-8"),
+            self.api_secret.encode(),
+            param_str.encode(),
             hashlib.sha256
         ).hexdigest()
 
         return timestamp, signature
 
-    # =====================================================
-    # REQUEST (SAFE)
-    # =====================================================
     def _request(self, method, endpoint, params=None):
 
         try:
-            if params is None:
-                params = {}
+            params = params or {}
 
             timestamp, signature = self._sign(params)
 
@@ -69,63 +58,37 @@ class BybitClient:
             else:
                 resp = requests.post(url, json=params, headers=headers, timeout=5)
 
-            # 🔥 FIX: JSON 안전 처리
             try:
-                data = resp.json()
-            except Exception:
-                logger.error(f"Invalid JSON response: {resp.text}")
+                return resp.json()
+            except:
+                logger.error(f"Invalid JSON: {resp.text}")
                 return {}
 
-            return data
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"HTTP error: {e}")
-            return {}
-
         except Exception as e:
-            logger.error(f"Request error: {e}")
+            logger.error(f"Request error: {str(e)}")
             return {}
 
-    # =====================================================
-    # PRICE
-    # =====================================================
     def get_price(self, symbol):
+        return self._request("GET", "/v5/market/tickers", {
+            "category": "linear",
+            "symbol": symbol
+        })
 
-        return self._request(
-            "GET",
-            "/v5/market/tickers",
-            {"category": "linear", "symbol": symbol}
-        )
-
-    # =====================================================
-    # BALANCE
-    # =====================================================
     def get_balance(self):
+        return self._request("GET", "/v5/account/wallet-balance", {
+            "accountType": "UNIFIED"
+        })
 
-        return self._request(
-            "GET",
-            "/v5/account/wallet-balance",
-            {"accountType": "UNIFIED"}
-        )
-
-    # =====================================================
-    # ORDER
-    # =====================================================
     def place_order(self, symbol, side, qty, leverage=1):
-
-        return self._request(
-            "POST",
-            "/v5/order/create",
-            {
-                "category": "linear",
-                "symbol": symbol,
-                "side": side,
-                "orderType": "Market",
-                "qty": str(qty),
-                "timeInForce": "GoodTillCancel",
-                "leverage": str(leverage)
-            }
-        )
+        return self._request("POST", "/v5/order/create", {
+            "category": "linear",
+            "symbol": symbol,
+            "side": side,
+            "orderType": "Market",
+            "qty": str(qty),
+            "timeInForce": "GoodTillCancel",
+            "leverage": str(leverage)
+        })
 
 
 bybit_client = BybitClient()
