@@ -12,8 +12,11 @@ from strategy.strategy_wrapper import execute_strategy
 from execution.execution_engine import engine
 from risk.risk_engine import risk_engine
 
+from api.order_manager import order_manager   # ✅ 추가 (SYNC용)
+
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,23 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 # =====================================================
-# GLOBAL PRICE
+# 초기화
 # =====================================================
-latest_price = None
 
-
-# =====================================================
-# WS CALLBACK
-# =====================================================
-def on_price(price):
-    global latest_price
-    latest_price = price
-    update_market_state(price, volume=0)
-
-
-# =====================================================
-# INIT
-# =====================================================
 def init_system():
 
     logger.info("SYSTEM INIT START")
@@ -56,75 +45,67 @@ def init_system():
 
 
 # =====================================================
-# TRADING LOOP (TP/SL 포함)
+# 실시간 가격 처리 (WS callback)
 # =====================================================
+
+def on_price(price):
+    volume = 0
+    update_market_state(price, volume)
+
+
+# =====================================================
+# 트레이딩 루프
+# =====================================================
+
 def run_trading():
 
     logger.info("TRADING STARTED")
 
-    global latest_price
+    equity = 1000
 
     while True:
 
         try:
+            # -------------------------------------------------
+            # 1) 주문 상태 SYNC (중요 추가)
+            # -------------------------------------------------
+            order_manager.sync_orders()
 
-            # =========================
-            # 1. WS 가격 체크
-            # =========================
-            if latest_price is None:
-                time.sleep(0.3)
-                continue
+            # -------------------------------------------------
+            # 2) 가격 처리 (mock or ws fallback)
+            # -------------------------------------------------
+            price, volume = None, None
 
-            price = latest_price
+            import random
+            price = 65000 + random.randint(-50, 50)
 
-            # =========================
-            # 2. TP / SL 체크 (핵심)
-            # =========================
-            exit_reason = engine.check_exit(SYMBOL, price)
+            update_market_state(price, volume)
 
-            if exit_reason:
-                engine.close_position(SYMBOL, exit_reason, price)
-
-                # risk reset (청산 반영)
-                risk_engine.update(0)
-
-                logger.info(f"CLOSE POSITION: {exit_reason} PRICE={price}")
-
-                time.sleep(0.5)
-                continue
-
-            # =========================
-            # 3. 전략 판단
-            # =========================
+            # -------------------------------------------------
+            # 3) 전략 판단
+            # -------------------------------------------------
             decision = brain.decide("auto", price)
-            strategy = decision["strategy"]
 
-            # =========================
-            # 4. 실행
-            # =========================
-            execute_strategy(
-                signal=strategy,
+            # -------------------------------------------------
+            # 4) 전략 실행
+            # -------------------------------------------------
+            result = execute_strategy(
+                signal="auto",
                 price=price,
                 symbol=SYMBOL,
-                equity=1000
+                equity=equity
             )
 
-            # =========================
-            # 5. REAL PnL 계산
-            # =========================
-            pnl = engine.calculate_pnl(SYMBOL, price)
-
-            # =========================
-            # 6. risk / learning
-            # =========================
+            # -------------------------------------------------
+            # 5) 리스크 업데이트
+            # -------------------------------------------------
+            pnl = (price % 10) - 5
             risk_engine.update(pnl)
-            brain.record(strategy, pnl)
 
-            # =========================
-            # 7. log
-            # =========================
+            brain.record(decision["strategy"], pnl)
+
             logger.info(
-                f"PRICE={price} STRATEGY={strategy} PNL={pnl}"
+                f"PRICE={price} STRATEGY={decision['strategy']} PNL={pnl}"
             )
 
             time.sleep(2)
@@ -143,11 +124,14 @@ def run_trading():
 # =====================================================
 # ENTRY POINT
 # =====================================================
+
 if __name__ == "__main__":
 
     init_system()
 
+    # WebSocket 시작
     ws_client.set_price_callback(on_price)
     ws_client.start()
 
+    # 트레이딩 루프
     run_trading()
