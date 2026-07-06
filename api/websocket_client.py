@@ -25,12 +25,12 @@ class WS:
 
         if "topic" in data and "tickers" in data["topic"]:
 
-            for item in data.get("data", []):
+            for i in data.get("data", []):
 
                 event_bus.put({
                     "type": "TICK",
-                    "symbol": item["symbol"],
-                    "price": float(item["lastPrice"])
+                    "symbol": i["symbol"],
+                    "price": float(i["lastPrice"])
                 })
 
 
