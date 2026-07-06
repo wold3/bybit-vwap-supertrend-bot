@@ -1,72 +1,59 @@
-import asyncio
 import json
-import websockets
+import websocket
 
-from strategy.strategy_engine import run_strategy
+from dashboard.app import update_price, update_equity
 
 
 class BybitWSClient:
 
-    def __init__(self, url, engine):
-
+    def __init__(self, url):
         self.url = url
-        self.engine = engine
 
-    # =================================================
-    # MAIN LOOP
-    # =================================================
-    async def connect(self):
+    def on_message(self, ws, message):
 
-        async with websockets.connect(self.url) as ws:
+        data = json.loads(message)
 
-            # 🔥 구독 메시지 (Bybit v5)
-            subscribe_msg = {
-                "op": "subscribe",
-                "args": [
-                    "publicTrade.BTCUSDT"
-                ]
-            }
+        try:
+            if "data" in data:
 
-            await ws.send(json.dumps(subscribe_msg))
+                trades = data["data"]
 
-            print("[WS] CONNECTED")
+                if trades:
 
-            while True:
+                    price = float(trades[-1]["p"])
 
-                try:
-                    msg = await ws.recv()
-                    data = json.loads(msg)
+                    # ============================
+                    # PRICE UPDATE
+                    # ============================
+                    update_price(price)
 
-                    self.handle(data)
+                    # ============================
+                    # MOCK EQUITY UPDATE
+                    # ============================
+                    pnl = price % 1000  # (예시 - 실제는 position pnl)
 
-                except Exception as e:
-                    print("[WS ERROR]", e)
+                    update_equity(pnl)
 
-    # =================================================
-    # HANDLE MESSAGE
-    # =================================================
-    def handle(self, data):
+        except Exception as e:
+            print("[WS ERROR]", e)
 
-        # Bybit trade stream 구조
-        if "data" in data:
+    def on_open(self, ws):
+        print("WS CONNECTED")
 
-            trades = data["data"]
+    def start(self):
 
-            if isinstance(trades, list) and len(trades) > 0:
+        ws = websocket.WebSocketApp(
+            self.url,
+            on_message=self.on_message,
+            on_open=self.on_open
+        )
 
-                last_price = float(trades[-1]["p"])
-
-                # 🔥 전략 엔진 호출 (실시간)
-                self.engine.on_price(last_price)
+        ws.run_forever()
 
 
-# SINGLETON RUNNER
-def start_ws(engine):
+def start_ws():
 
-    import os
+    url = "wss://stream.bybit.com/v5/public/linear"
 
-    url = os.getenv("BYBIT_WS_URL")
-
-    client = BybitWSClient(url, engine)
-
-    asyncio.run(client.connect())
+    client = BybitWSClient(url)
+    client.start()
