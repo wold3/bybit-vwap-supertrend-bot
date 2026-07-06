@@ -25,10 +25,6 @@ class OrderManager:
                 leverage=leverage
             )
 
-            if not isinstance(resp, dict):
-                logger.error(f"Invalid response: {resp}")
-                return None
-
             result = resp.get("result") or {}
             order_id = result.get("orderId")
 
@@ -40,6 +36,7 @@ class OrderManager:
                 "symbol": symbol,
                 "side": side,
                 "qty": qty,
+                "entry_price": None,   # 🔥 추가
                 "status": "PENDING",
                 "created_at": datetime.utcnow()
             }
@@ -53,19 +50,23 @@ class OrderManager:
             return None
 
     # =====================================================
-    # 주문 상태 확인
+    # 상태 체크
     # =====================================================
-    def check_order_status(self, order_id):
+    def check_order_status(self, order_id, current_price=None):
 
         order = self.open_orders.get(order_id)
         if not order:
             return None
 
-        # mock fill logic
+        # mock fill
         if (datetime.utcnow() - order["created_at"]).seconds > 2:
+
             order["status"] = "FILLED"
+            order["entry_price"] = current_price  # 🔥 entry 저장
+
             self.filled_orders[order_id] = order
             del self.open_orders[order_id]
+
             return "FILLED"
 
         return "PENDING"
@@ -73,21 +74,19 @@ class OrderManager:
     # =====================================================
     # sync
     # =====================================================
-    def sync_orders(self):
+    def sync_orders(self, current_price=None):
 
         for order_id in list(self.open_orders.keys()):
-            status = self.check_order_status(order_id)
+            status = self.check_order_status(order_id, current_price)
 
             if status == "FILLED":
                 logger.info(f"ORDER FILLED: {order_id}")
 
     # =====================================================
-    # retry
+    # PnL 계산용 데이터
     # =====================================================
-    def retry_failed_order(self, symbol, side, qty, leverage=1):
-
-        logger.warning("Retrying failed order...")
-        return self.place_market_order(symbol, side, qty, leverage)
+    def get_filled_orders(self):
+        return self.filled_orders
 
     # =====================================================
     # status
