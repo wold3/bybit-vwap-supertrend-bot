@@ -1,149 +1,67 @@
-import logging
-from datetime import datetime
-
-from api.bybit_api import (
-    close_position,
-    get_position,
-    get_unrealized_pnl,
-    get_last_price,
-)
-
-from database.repository import (
-    save_position,
-    delete_position,
-    update_position_price,
-)
-
-logger = logging.getLogger(__name__)
+import numpy as np
 
 
 class PositionManager:
 
-    def __init__(self):
-        self.last_sync = None
+    # =========================
+    # ATR 기반 TP/SL 계산
+    # =========================
+    def calc_atr_levels(self, prices, multiplier=2.0):
 
-    # =====================================================
-    # Sync Position (Bybit → DB)
-    # =====================================================
-    def sync(self, symbol):
+        if len(prices) < 20:
+            return None, None
 
-        logger.info("SYNC POSITION %s", symbol)
+        high = max(prices[-20:])
+        low = min(prices[-20:])
+        atr = (high - low) / 20
 
-        position = get_position(symbol)
+        tp = atr * multiplier
+        sl = atr * multiplier
 
-        # 포지션 없음
-        if not position:
-            delete_position(symbol)
+        return tp, sl
+
+    # =========================
+    # 손절 체크
+    # =========================
+    def should_stop_loss(self, entry_price, current_price, side, sl):
+
+        if side == "Buy":
+            return current_price <= entry_price - sl
+
+        if side == "Sell":
+            return current_price >= entry_price + sl
+
+        return False
+
+    # =========================
+    # 익절 체크
+    # =========================
+    def should_take_profit(self, entry_price, current_price, side, tp):
+
+        if side == "Buy":
+            return current_price >= entry_price + tp
+
+        if side == "Sell":
+            return current_price <= entry_price - tp
+
+        return False
+
+    # =========================
+    # 자동 청산 판단
+    # =========================
+    def evaluate_exit(self, symbol, entry_price, side, prices):
+
+        current_price = prices[-1]
+
+        tp, sl = self.calc_atr_levels(prices)
+
+        if tp is None:
             return None
 
-        size = float(position.get("size", 0))
+        if self.should_stop_loss(entry_price, current_price, side, sl):
+            return "STOP_LOSS"
 
-        # 포지션 종료 상태
-        if size <= 0:
-            delete_position(symbol)
-            return None
+        if self.should_take_profit(entry_price, current_price, side, tp):
+            return "TAKE_PROFIT"
 
-        side = position.get("side", "")
-        entry_price = float(position.get("avgPrice", 0))
-        leverage = int(float(position.get("leverage", 1)))
-
-        # DB 저장
-        save_position(
-            symbol=symbol,
-            side=side,
-            qty=size,
-            entry_price=entry_price,
-            leverage=leverage,
-        )
-
-        # PnL 업데이트
-        pnl = get_unrealized_pnl(symbol)
-        mark_price = get_last_price(symbol)
-
-        update_position_price(
-            symbol=symbol,
-            mark_price=mark_price,
-            unrealized_pnl=pnl,
-        )
-
-        self.last_sync = datetime.utcnow()
-
-        return get_position(symbol)
-
-    # =====================================================
-    # Close Position (Market Close)
-    # =====================================================
-    def close(self, symbol):
-
-        logger.info("CLOSE POSITION %s", symbol)
-
-        result = close_position(symbol)
-
-        # DB 즉시 삭제
-        delete_position(symbol)
-
-        return result
-
-    # =====================================================
-    # Is Open Check
-    # =====================================================
-    def is_open(self, symbol):
-
-        pos = get_position(symbol)
-
-        if not pos:
-            return False
-
-        return float(pos.get("size", 0)) > 0
-
-    # =====================================================
-    # Has Position (alias)
-    # =====================================================
-    def has_position(self, symbol):
-        return self.is_open(symbol)
-
-    # =====================================================
-    # Refresh
-    # =====================================================
-    def refresh(self, symbol):
-        return self.sync(symbol)
-
-    # =====================================================
-    # PnL
-    # =====================================================
-    def pnl(self, symbol):
-        return get_unrealized_pnl(symbol)
-
-    # =====================================================
-    # Status (Dashboard)
-    # =====================================================
-    def status(self):
-
-        return {
-            "last_sync": self.last_sync.isoformat() if self.last_sync else None,
-            "active": True,
-        }
-
-    # =====================================================
-    # Health Check
-    # =====================================================
-    def health(self):
-
-        return {
-            "engine": "PositionManager",
-            "healthy": True,
-            "last_sync": self.last_sync.isoformat() if self.last_sync else None,
-        }
-
-    # =====================================================
-    # Debug
-    # =====================================================
-    def __repr__(self):
-
-        return f"<PositionManager last_sync={self.last_sync}>"
-    
-
-# =====================================================
-# Singleton
-# =====================================================
-position_manager = PositionManager()
+        return None
