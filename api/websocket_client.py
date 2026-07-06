@@ -1,8 +1,7 @@
 import json
 import logging
-import threading
 import websocket
-import time
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -11,96 +10,109 @@ class BybitWebSocket:
 
     def __init__(self):
         self.ws = None
-        self.price_callback = None
-        self.running = False
+        self.url = "wss://stream.bybit.com/v5/public/linear"
+        self.callback = None
 
+    # =====================================================
+    # CALLBACK
+    # =====================================================
     def set_price_callback(self, callback):
-        self.price_callback = callback
+        self.callback = callback
 
     # =====================================================
-    # MESSAGE HANDLER
+    # MESSAGE PARSER (FIX CORE BUG)
     # =====================================================
-    def on_message(self, ws, message):
+    def _handle_message(self, message):
 
         try:
-            if message in ("ping", "pong"):
-                return
-
+            # 1) str → dict 변환
             if isinstance(message, str):
                 try:
-                    data = json.loads(message)
-                except:
+                    message = json.loads(message)
+                except Exception:
+                    logger.warning(f"WS non-json: {message}")
                     return
-            else:
-                data = message
 
-            if not isinstance(data, dict):
+            # 2) 안전 타입 체크
+            if not isinstance(message, dict):
                 return
 
-            raw = data.get("data") or data.get("result")
-
-            if not raw:
+            data = message.get("data")
+            if not data:
                 return
 
-            if isinstance(raw, list):
-                for item in raw:
-                    if not isinstance(item, dict):
-                        continue
+            # 3) list / dict 대응
+            if isinstance(data, list):
+                for item in data:
+                    self._extract(item)
 
-                    price = item.get("lastPrice") or item.get("price")
-
-                    if price and self.price_callback:
-                        self.price_callback(float(price))
-
-            elif isinstance(raw, dict):
-
-                price = raw.get("lastPrice") or raw.get("price")
-
-                if price and self.price_callback:
-                    self.price_callback(float(price))
+            elif isinstance(data, dict):
+                self._extract(data)
 
         except Exception as e:
-            logger.error(f"WS error: {e}")
+            logger.error(f"WS parse error: {e}")
 
-    def on_error(self, ws, error):
+    # =====================================================
+    # PRICE EXTRACTION SAFE
+    # =====================================================
+    def _extract(self, item):
+
+        if not isinstance(item, dict):
+            return
+
+        try:
+            price = item.get("lastPrice") or item.get("price")
+
+            if price is None:
+                return
+
+            price = float(price)
+
+            if self.callback:
+                self.callback(price)
+
+        except Exception as e:
+            logger.error(f"extract error: {e}")
+
+    # =====================================================
+    # WS EVENTS
+    # =====================================================
+    def _on_message(self, ws, message):
+        self._handle_message(message)
+
+    def _on_error(self, ws, error):
         logger.error(f"WS error: {error}")
 
-    def on_close(self, ws, *args):
+    def _on_close(self, ws, close_status_code, close_msg):
         logger.warning("WebSocket closed")
-        self.running = False
 
-        time.sleep(3)
-        if self.running:
-            self.start()
-
-    def on_open(self, ws):
+    def _on_open(self, ws):
         logger.info("WebSocket connected")
+
+        try:
+            sub = {
+                "op": "subscribe",
+                "args": ["tickers.BTCUSDT"]
+            }
+            ws.send(json.dumps(sub))
+        except Exception as e:
+            logger.error(f"subscribe error: {e}")
 
     # =====================================================
     # START
     # =====================================================
     def start(self):
 
-        self.running = True
-
         def run():
-            url = "wss://stream.bybit.com/v5/public/linear"
+            self.ws = websocket.WebSocketApp(
+                self.url,
+                on_message=self._on_message,
+                on_error=self._on_error,
+                on_close=self._on_close,
+                on_open=self._on_open
+            )
 
-            while self.running:
-                try:
-                    self.ws = websocket.WebSocketApp(
-                        url,
-                        on_open=self.on_open,
-                        on_message=self.on_message,
-                        on_error=self.on_error,
-                        on_close=self.on_close,
-                    )
-
-                    self.ws.run_forever(ping_interval=20, ping_timeout=10)
-
-                except Exception as e:
-                    logger.error(f"WS loop error: {e}")
-                    time.sleep(3)
+            self.ws.run_forever()
 
         threading.Thread(target=run, daemon=True).start()
 
