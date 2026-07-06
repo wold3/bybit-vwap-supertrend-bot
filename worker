@@ -3,6 +3,7 @@ from execution.execution_engine import engine
 from execution.pnl_engine import pnl_engine
 from execution.position_sync import position_sync
 from risk.risk_engine import risk
+from risk.kill_switch import kill_switch
 
 
 def loop():
@@ -18,7 +19,7 @@ def loop():
         price = event["price"]
 
         # =========================
-        # STRATEGY (예시)
+        # STRATEGY
         # =========================
         signal = "Buy" if price % 2 == 0 else "Sell"
 
@@ -28,10 +29,17 @@ def loop():
         engine.execute(symbol, signal, 1, price)
 
         # =========================
-        # REAL SYNC (핵심 추가)
+        # SYNC
         # =========================
         pnl = position_sync.sync(symbol)
 
         risk.update_pnl(pnl)
 
-        print(f"[SYNC] {symbol} PRICE={price} PNL={pnl}")
+        # =========================
+        # KILL SWITCH CHECK (핵심)
+        # =========================
+        if not kill_switch.check(pnl):
+            print("[KILL SWITCH] TRADING STOPPED")
+            continue
+
+        print(f"[RUNNING] {symbol} {price} PNL={pnl}")
