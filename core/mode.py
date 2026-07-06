@@ -1,13 +1,10 @@
-from config import MODE
+SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 
+MODE = "PAPER"  # PAPER | LIVE
 
-class ModeManager:
+BYBIT_TESTNET = True
 
-    def is_live(self):
-        return MODE == "LIVE"
+MAX_DAILY_LOSS = -50
+MAX_TRADES = 20
 
-    def is_paper(self):
-        return MODE == "PAPER"
-
-
-mode_manager = ModeManager()
+LEVERAGE = 1
