@@ -20,14 +20,12 @@ class BybitClient:
             self.base_url = "https://api.bybit.com"
 
     # =====================================================
-    # SIGNATURE
+    # SIGNATURE (FIXED - V5 STANDARD)
     # =====================================================
 
-    def _sign(self, params: dict):
+    def _sign(self, timestamp, recv_window, payload):
 
-        timestamp = str(int(time.time() * 1000))
-
-        param_str = timestamp + self.api_key + json.dumps(params, separators=(',', ':'))
+        param_str = timestamp + self.api_key + str(recv_window) + payload
 
         signature = hmac.new(
             self.api_secret.encode("utf-8"),
@@ -35,7 +33,7 @@ class BybitClient:
             hashlib.sha256
         ).hexdigest()
 
-        return timestamp, signature
+        return signature
 
     # =====================================================
     # REQUEST
@@ -46,23 +44,54 @@ class BybitClient:
         if params is None:
             params = {}
 
-        timestamp, signature = self._sign(params)
+        timestamp = str(int(time.time() * 1000))
+        recv_window = "5000"
+
+        payload = json.dumps(params) if method == "POST" else ""
+
+        signature = self._sign(timestamp, recv_window, payload)
 
         headers = {
             "X-BAPI-API-KEY": self.api_key,
             "X-BAPI-TIMESTAMP": timestamp,
             "X-BAPI-SIGN": signature,
+            "X-BAPI-RECV-WINDOW": recv_window,
             "Content-Type": "application/json"
         }
 
         url = self.base_url + endpoint
 
-        if method == "GET":
-            resp = requests.get(url, params=params, headers=headers, timeout=5)
-        else:
-            resp = requests.post(url, json=params, headers=headers, timeout=5)
+        try:
 
-        return resp.json()
+            if method == "GET":
+                resp = requests.get(url, params=params, headers=headers, timeout=5)
+            else:
+                resp = requests.post(url, data=payload, headers=headers, timeout=5)
+
+            data = resp.json()
+
+            # =========================
+            # 🔥 중요: 실패 감지
+            # =========================
+            if data.get("retCode") != 0:
+                return {
+                    "success": False,
+                    "error": data,
+                    "result": {}
+                }
+
+            return {
+                "success": True,
+                "result": data.get("result", {})
+            }
+
+        except Exception as e:
+
+            return {
+                "success": False,
+                "error": str(e),
+                "result": {}
+            }
 
     # =====================================================
     # PRICE
@@ -70,11 +99,11 @@ class BybitClient:
 
     def get_price(self, symbol):
 
-        endpoint = "/v5/market/tickers"
-
-        params = {"category": "linear", "symbol": symbol}
-
-        return self._request("GET", endpoint, params)
+        return self._request(
+            "GET",
+            "/v5/market/tickers",
+            {"category": "linear", "symbol": symbol}
+        )
 
     # =====================================================
     # BALANCE
@@ -82,11 +111,11 @@ class BybitClient:
 
     def get_balance(self):
 
-        endpoint = "/v5/account/wallet-balance"
-
-        params = {"accountType": "UNIFIED"}
-
-        return self._request("GET", endpoint, params)
+        return self._request(
+            "GET",
+            "/v5/account/wallet-balance",
+            {"accountType": "UNIFIED"}
+        )
 
     # =====================================================
     # ORDER
@@ -94,19 +123,20 @@ class BybitClient:
 
     def place_order(self, symbol, side, qty, leverage=1):
 
-        endpoint = "/v5/order/create"
-
         params = {
             "category": "linear",
             "symbol": symbol,
             "side": side,
             "orderType": "Market",
             "qty": str(qty),
-            "timeInForce": "GoodTillCancel",
-            "leverage": str(leverage)
+            "timeInForce": "GoodTillCancel"
         }
 
-        return self._request("POST", endpoint, params)
+        return self._request(
+            "POST",
+            "/v5/order/create",
+            params
+        )
 
 
 # =====================================================
