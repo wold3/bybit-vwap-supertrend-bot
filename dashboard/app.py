@@ -1,14 +1,19 @@
 from flask import Flask, jsonify, render_template
+import time
 
-from database.trade_db import trade_db
-from execution.execution_engine import engine
-from risk.risk_engine import risk_engine
+from trade_db import trade_db
 
 app = Flask(__name__)
 
+# =================================================
+# LIVE DATA STORAGE (WS에서 업데이트)
+# =================================================
+latest_price = {"price": 0, "time": 0}
+equity_curve = []
+
 
 # =================================================
-# DASHBOARD PAGE
+# HOME
 # =================================================
 @app.route("/")
 def home():
@@ -16,9 +21,25 @@ def home():
 
 
 # =================================================
+# PRICE API (REALTIME CHART)
+# =================================================
+@app.route("/api/price")
+def price():
+    return jsonify(latest_price)
+
+
+# =================================================
+# EQUITY API (PnL CHART)
+# =================================================
+@app.route("/api/equity")
+def equity():
+    return jsonify(equity_curve)
+
+
+# =================================================
 # TRADES
 # =================================================
-@app.route("/api/trades")
+@app.route("/trades")
 def trades():
 
     rows = trade_db.all()
@@ -38,34 +59,27 @@ def trades():
 
 
 # =================================================
-# TOTAL EQUITY
+# UPDATE HOOK (WS에서 호출)
 # =================================================
-@app.route("/api/equity-total")
-def equity_total():
+def update_price(price):
 
-    return jsonify({
-        "total_equity": engine.get_total_equity()
+    latest_price["price"] = price
+    latest_price["time"] = time.time()
+
+
+def update_equity(pnl):
+
+    equity_curve.append({
+        "time": int(time.time()),
+        "value": pnl
     })
 
-
-# =================================================
-# 🚨 RISK API (핵심 추가)
-# =================================================
-@app.route("/api/risk")
-def risk():
-
-    return jsonify(risk_engine.status())
+    if len(equity_curve) > 500:
+        equity_curve.pop(0)
 
 
-# =================================================
-# RUN
-# =================================================
 if __name__ == "__main__":
 
-    print("🚀 Dashboard running on http://localhost:5000")
+    print("🚀 DASHBOARD RUNNING")
 
-    app.run(
-        host="0.0.0.0",
-        port=5000,
-        debug=False
-    )
+    app.run(host="0.0.0.0", port=5000, debug=False)
