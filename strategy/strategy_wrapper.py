@@ -1,6 +1,5 @@
 import logging
 
-from strategy.signal_parser import parse_signal
 from strategy.strategy_router import route
 from risk.risk_engine import allow_trade
 from execution.execution_engine import engine
@@ -8,116 +7,159 @@ from execution.execution_engine import engine
 logger = logging.getLogger(__name__)
 
 
-def execute_strategy(data, symbol=None, qty=None, price=None):
-    """
-    TradingView → 최종 실행까지 연결되는 메인 엔트리
-    """
+# =====================================================
+# Strategy Core Executor
+# =====================================================
+def execute_strategy(
+    signal,
+    price,
+    symbol,
+    qty,
+):
 
-    try:
+    # =================================================
+    # 1. Risk Check (1차 필터)
+    # =================================================
+    if not allow_trade():
 
-        # =====================================================
-        # 1. Signal Parse
-        # =====================================================
-        signal = parse_signal(data)
-
-        if not signal:
-            return {
-                "success": False,
-                "reason": "invalid_signal",
-            }
-
-        # =====================================================
-        # 2. Risk Check (1차 필터)
-        # =====================================================
-        if not allow_trade():
-            return {
-                "success": False,
-                "reason": "risk_block",
-            }
-
-        # =====================================================
-        # 3. Market Regime Routing
-        # =====================================================
-        allow, regime = route(signal, price or 0)
-
-        if not allow:
-            return {
-                "success": False,
-                "reason": "filtered",
-                "regime": regime,
-            }
-
-        # =====================================================
-        # 4. Strategy Mapping
-        # =====================================================
-        if regime == "TREND_UP":
-            strategy = "trend"
-
-        elif regime == "TREND_DOWN":
-            strategy = "trend_short"
-
-        elif regime == "RANGE":
-            strategy = "mean_reversion"
-
-        else:
-            strategy = "safe"
-
-        result = {
-            "success": True,
-            "signal": signal,
-            "strategy": strategy,
-            "regime": regime,
-        }
-
-        # =====================================================
-        # 5. Execution Trigger
-        # =====================================================
-        if symbol and qty:
-
-            order = engine.execute(
-                signal=signal,
-                symbol=symbol,
-                qty=qty,
-                strategy=strategy,
-                regime=regime,
-            )
-
-            result["order"] = order
-
-        return result
-
-    except Exception as e:
-        logger.exception(e)
+        logger.warning("Risk engine blocked trade")
 
         return {
             "success": False,
-            "reason": str(e),
+            "reason": "risk_block",
         }
 
+    # =================================================
+    # 2. Strategy Routing (시장 상태 판단)
+    # =================================================
+    allow, regime = route(signal, price)
 
-# =====================================================
-# Helper APIs
-# =====================================================
+    if not allow:
 
-def can_execute(data, price=None):
-    return execute_strategy(data, price=price).get("success", False)
+        logger.info("Strategy filtered signal")
 
+        return {
+            "success": False,
+            "reason": "strategy_filter",
+            "regime": regime,
+        }
 
-def get_strategy(data, price=None):
-    return execute_strategy(data, price=price).get("strategy")
+    # =================================================
+    # 3. Strategy Mapping
+    # =================================================
+    if regime == "TREND_UP":
+        strategy = "trend"
 
+    elif regime == "RANGE":
+        strategy = "range"
 
-def get_regime(data, price=None):
-    return execute_strategy(data, price=price).get("regime")
+    else:
+        strategy = "safe"
 
-
-def execute_signal(data, symbol, qty, price=None):
-    """
-    실제 주문 실행 wrapper
-    """
-    return execute_strategy(
-        data=data,
+    # =================================================
+    # 4. Execution Call (핵심)
+    # =================================================
+    order_result = engine.execute(
+        signal=signal,
         symbol=symbol,
         qty=qty,
-        price=price,
+        strategy=strategy,
+        regime=regime,
     )
+
+    # =================================================
+    # 5. Return Result
+    # =================================================
+    return {
+        "success": order_result.get("success", False),
+        "strategy": strategy,
+        "regime": regime,
+        "signal": signal,
+        "order": order_result,
+    }
+
+
+# =====================================================
+# Webhook Entry Point
+# =====================================================
+def execute_signal(data, symbol, qty, price):
+
+    signal = data.get("signal")
+
+    if not signal:
+        return {
+            "success": False,
+            "reason": "no_signal",
+        }
+
+    return execute_strategy(
+        signal=signal,
+        price=price,
+        symbol=symbol,
+        qty=qty,
+    )
+
+
+# =====================================================
+# Utility Functions
+# =====================================================
+def can_execute(signal, price, symbol, qty):
+
+    result = execute_strategy(
+        signal=signal,
+        price=price,
+        symbol=symbol,
+        qty=qty,
+    )
+
+    return result.get("success", False)
+
+
+def get_strategy(signal, price):
+
+    allow, regime = route(signal, price)
+
+    if not allow:
+        return None
+
+    if regime == "TREND_UP":
+        return "trend"
+
+    if regime == "RANGE":
+        return "range"
+
+    return "safe"
+
+
+def get_regime(signal, price):
+
+    allow, regime = route(signal, price)
+
+    if not allow:
+        return "BLOCKED"
+
+    return regime
+
+
+# =====================================================
+# Health Check
+# =====================================================
+def health():
+
+    return {
+        "engine": "strategy_wrapper",
+        "status": "active",
+    }
+
+
+# =====================================================
+# Export
+# =====================================================
+__all__ = [
+    "execute_strategy",
+    "execute_signal",
+    "can_execute",
+    "get_strategy",
+    "get_regime",
+    "health",
+]
