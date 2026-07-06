@@ -1,5 +1,5 @@
-import logging
 import requests
+import logging
 from datetime import datetime
 
 from risk.risk_engine import risk_engine
@@ -14,7 +14,7 @@ class TelegramService:
         self.token = token
         self.chat_id = chat_id
 
-        self.base_url = f"https://api.telegram.org/bot{token}/sendMessage"
+        self.url = f"https://api.telegram.org/bot{token}/sendMessage"
 
     # =====================================================
     # 기본 전송
@@ -29,18 +29,18 @@ class TelegramService:
         }
 
         try:
-            requests.post(self.base_url, data=payload, timeout=5)
+            requests.post(self.url, data=payload, timeout=5)
         except Exception as e:
-            logger.error(f"Telegram send error: {str(e)}")
+            logger.error(f"Telegram error: {str(e)}")
 
     # =====================================================
     # 거래 알림
     # =====================================================
 
-    def notify_trade(self, symbol, side, qty, price, pnl=None):
+    def trade(self, symbol, side, qty, price, pnl=None):
 
         msg = f"""
-📊 <b>TRADE EXECUTED</b>
+📊 <b>TRADE</b>
 ────────────────
 Symbol: {symbol}
 Side: {side}
@@ -49,37 +49,89 @@ Price: {price}
 """
 
         if pnl is not None:
-            msg += f"PnL: {pnl}\n"
+            msg += f"PnL: {round(pnl, 4)}\n"
 
         msg += f"Time: {datetime.utcnow()}\n"
 
         self.send(msg)
 
     # =====================================================
-    # 리스크 알림
+    # 리스크 상태 알림 (업그레이드)
     # =====================================================
 
-    def notify_risk(self):
+    def risk_update(self):
 
-        status = risk_engine.status()
+        s = risk_engine.status()
+
+        emoji = "🟢"
+
+        if s["risk_score"] < 40:
+            emoji = "🔴"
+        elif s["risk_score"] < 70:
+            emoji = "🟡"
 
         msg = f"""
-⚠️ <b>RISK UPDATE</b>
+{emoji} <b>RISK STATUS</b>
 ────────────────
-Daily PnL: {status['daily_pnl']}
-Win Rate: {status['win_rate']}%
-Risk Score: {status['risk_score']}
-Loss Streak: {status['loss_streak']}
-Allow Trade: {status['allow_trade']}
+PnL: {s['daily_pnl']}
+Win Rate: {s['win_rate']}%
+Loss Streak: {s['loss_streak']}
+Drawdown: {s['drawdown']}
+Risk Score: {s['risk_score']}
+Mode: {s['regime_bias']}
+Allow Trade: {s['allow_trade']}
+Time: {datetime.utcnow()}
 """
 
         self.send(msg)
 
     # =====================================================
+    # 드로우다운 경고 (핵심 추가)
+    # =====================================================
+
+    def drawdown_alert(self):
+
+        s = risk_engine.status()
+
+        if s["drawdown"] > 0.1:
+
+            msg = f"""
+🚨 <b>DRAWDOWN ALERT</b>
+────────────────
+Drawdown: {s['drawdown']}
+Risk Mode: {s['regime_bias']}
+Action: REDUCE RISK
+Time: {datetime.utcnow()}
+"""
+
+            self.send(msg)
+
+    # =====================================================
+    # 수익 폭발 알림
+    # =====================================================
+
+    def profit_spike(self):
+
+        s = risk_engine.status()
+
+        if s["daily_pnl"] > 50:
+
+            msg = f"""
+🚀 <b>PROFIT SPIKE</b>
+────────────────
+PnL: {s['daily_pnl']}
+Mode: {s['regime_bias']}
+Action: SCALE UP POSSIBLE
+Time: {datetime.utcnow()}
+"""
+
+            self.send(msg)
+
+    # =====================================================
     # 에러 알림
     # =====================================================
 
-    def notify_error(self, error):
+    def error(self, error):
 
         msg = f"""
 🚨 <b>ERROR</b>
@@ -91,19 +143,20 @@ Time: {datetime.utcnow()}
         self.send(msg)
 
     # =====================================================
-    # 상태 체크
+    # heartbeat
     # =====================================================
 
     def heartbeat(self):
 
-        status = risk_engine.status()
+        s = risk_engine.status()
 
         msg = f"""
 💓 <b>HEARTBEAT</b>
 ────────────────
-PnL: {status['daily_pnl']}
-Trades: {status['trade_count']}
-Risk: {status['risk_score']}
+PnL: {s['daily_pnl']}
+Trades: {s['trade_count']}
+Risk: {s['risk_score']}
+Drawdown: {s['drawdown']}
 Time: {datetime.utcnow()}
 """
 
