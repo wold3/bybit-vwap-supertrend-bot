@@ -1,121 +1,114 @@
 import logging
-from decimal import Decimal
 
-from api.bybit_api import execute_market
+from api.order_manager import order_manager
 from risk.risk_engine import risk_engine
-
-from database.repository import add_trade
+from database.database import SessionLocal
+from database.repository import add_trade, add_log
 
 logger = logging.getLogger(__name__)
 
 
+class ExecutionEngine:
+
+    def __init__(self):
+
+        self.busy = False
+
+    # =====================================================
+    # 상태 체크
+    # =====================================================
+
+    def is_busy(self):
+
+        return self.busy
+
+    # =====================================================
+    # 메인 실행
+    # =====================================================
+
+    def execute(self, signal, symbol, qty, price, leverage):
+
+        self.busy = True
+
+        db = SessionLocal()
+
+        try:
+
+            # -------------------------
+            # 1. 리스크 체크
+            # -------------------------
+            if not risk_engine.allow_trade():
+                logger.warning("TRADE BLOCKED by risk engine")
+
+                add_log(db, "WARNING", "Trade blocked by risk engine")
+
+                return {
+                    "success": False,
+                    "reason": "risk_block"
+                }
+
+            # -------------------------
+            # 2. 주문 실행
+            # -------------------------
+            order_id = order_manager.place_market_order(
+                symbol=symbol,
+                side=signal,
+                qty=qty,
+                leverage=leverage
+            )
+
+            if not order_id:
+                add_log(db, "ERROR", "Order failed")
+
+                return {
+                    "success": False,
+                    "reason": "order_failed"
+                }
+
+            # -------------------------
+            # 3. DB 저장
+            # -------------------------
+            trade = add_trade(
+                db=db,
+                symbol=symbol,
+                side=signal,
+                qty=qty,
+                price=price,
+                leverage=leverage
+            )
+
+            # -------------------------
+            # 4. 상태 기록
+            # -------------------------
+            add_log(db, "INFO", f"Trade executed {symbol} {signal}")
+
+            logger.info(f"EXECUTED: {symbol} {signal} qty={qty}")
+
+            return {
+                "success": True,
+                "order_id": order_id,
+                "trade_id": trade.id
+            }
+
+        except Exception as e:
+
+            logger.error(f"Execution error: {str(e)}")
+
+            add_log(db, "ERROR", str(e))
+
+            return {
+                "success": False,
+                "reason": "exception",
+                "error": str(e)
+            }
+
+        finally:
+            db.close()
+            self.busy = False
+
+
 # =====================================================
-# 포지션 사이징 (실전용: equity 기반 + 리스크 반영)
+# SINGLETON
 # =====================================================
 
-def position_size(equity, risk_score, win_rate):
-
-    base_risk = 0.02  # 2%
-
-    if risk_score < 40:
-        base_risk = 0.005
-
-    if win_rate > 60:
-        base_risk *= 1.2
-
-    if win_rate < 45:
-        base_risk *= 0.5
-
-    qty = equity * base_risk
-
-    return round(qty, 4)
-
-
-# =====================================================
-# 레버리지 계산 (안정 + 수익 균형)
-# =====================================================
-
-def calc_leverage(risk_score, win_rate):
-
-    if risk_score < 30:
-        return 1
-
-    if win_rate > 60 and risk_score > 70:
-        return 5
-
-    if win_rate > 50:
-        return 3
-
-    if risk_score > 50:
-        return 2
-
-    return 1
-
-
-# =====================================================
-# 실거래 실행
-# =====================================================
-
-def execute_order(signal, symbol, price, equity, win_rate):
-
-    risk_score = risk_engine.risk_score()
-
-    # -------------------------
-    # 리스크 차단
-    # -------------------------
-    if not risk_engine.allow_trade():
-        logger.warning("TRADE BLOCKED by risk engine")
-        return {
-            "success": False,
-            "reason": "risk_block",
-        }
-
-    # -------------------------
-    # sizing & leverage
-    # -------------------------
-    qty = position_size(equity, risk_score, win_rate)
-    leverage = calc_leverage(risk_score, win_rate)
-
-    try:
-
-        # Bybit 주문 실행 (시장가)
-        order = execute_market(
-            side=signal,
-            symbol=symbol,
-            qty=qty,
-            leverage=leverage
-        )
-
-        # -------------------------
-        # DB 저장
-        # -------------------------
-        trade = add_trade(
-            symbol=symbol,
-            side=signal,
-            qty=qty,
-            price=price,
-            leverage=leverage,
-        )
-
-        logger.info(
-            f"[TRADE] {signal} {symbol} qty={qty} lev={leverage}"
-        )
-
-        return {
-            "success": True,
-            "order": order,
-            "trade_id": trade.id,
-            "qty": qty,
-            "leverage": leverage,
-            "risk_score": risk_score,
-        }
-
-    except Exception as e:
-
-        logger.error(f"EXECUTION ERROR: {str(e)}")
-
-        return {
-            "success": False,
-            "reason": "execution_error",
-            "error": str(e),
-        }
+engine = ExecutionEngine()
