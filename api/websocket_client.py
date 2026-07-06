@@ -1,7 +1,7 @@
 import json
 import logging
-import websocket
 import threading
+import websocket
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +14,13 @@ class BybitWebSocket:
         self.running = False
 
     # =====================================================
+    # 콜백 등록
+    # =====================================================
     def set_price_callback(self, cb):
         self.callback = cb
 
+    # =====================================================
+    # 안전 JSON 파서
     # =====================================================
     def safe_parse(self, msg):
         if isinstance(msg, str):
@@ -27,6 +31,8 @@ class BybitWebSocket:
         return msg
 
     # =====================================================
+    # 메시지 처리 (핵심)
+    # =====================================================
     def on_message(self, ws, message):
 
         try:
@@ -35,18 +41,52 @@ class BybitWebSocket:
             if not isinstance(data, dict):
                 return
 
-            # BYBIT 구조 대응
-            if "data" in data:
-                inner = data["data"]
+            # Bybit 구조 대응
+            inner = data.get("data")
 
-                if isinstance(inner, list) and len(inner) > 0:
-                    item = inner[0]
+            if not inner:
+                return
 
-                    if isinstance(item, dict):
-                        price = item.get("lastPrice") or item.get("price")
+            # list 구조 대응
+            if isinstance(inner, list):
 
-                        if price and self.callback:
-                            self.callback(float(price))
+                item = inner[0] if len(inner) > 0 else None
+
+                if not isinstance(item, dict):
+                    return
+
+                # price 추출 (여러 키 대응)
+                price = (
+                    item.get("lastPrice")
+                    or item.get("price")
+                )
+
+                if price is None:
+                    return
+
+                try:
+                    price = float(price)
+                except:
+                    return
+
+                if self.callback:
+                    self.callback(price)
+
+            # dict 구조 대응
+            elif isinstance(inner, dict):
+
+                price = inner.get("lastPrice") or inner.get("price")
+
+                if price is None:
+                    return
+
+                try:
+                    price = float(price)
+                except:
+                    return
+
+                if self.callback:
+                    self.callback(price)
 
         except Exception as e:
             logger.error(f"WS message error: {e}")
@@ -78,18 +118,21 @@ class BybitWebSocket:
             on_error=self.on_error
         )
 
-        t = threading.Thread(
+        thread = threading.Thread(
             target=self.ws.run_forever,
             daemon=True
         )
-        t.start()
+        thread.start()
 
     # =====================================================
     def stop(self):
         self.running = False
+
         if self.ws:
             self.ws.close()
+
         logger.info("WebSocket stopped")
 
 
+# 싱글톤 인스턴스
 ws_client = BybitWebSocket()
