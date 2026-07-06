@@ -112,3 +112,33 @@ class ExecutionEngine:
 # =====================================================
 
 engine = ExecutionEngine()
+
+# =====================================================
+# SINGLETON
+# =====================================================
+
+engine = ExecutionEngine()
+
+
+# =====================================================
+# Compatibility Wrapper
+# =====================================================
+
+def execute_order(signal, symbol, price, equity, win_rate):
+    """
+    strategy_wrapper.py에서 호출하는 호환 함수
+
+    현재 ExecutionEngine.execute()는
+    qty와 leverage를 요구하므로 기본값을 사용한다.
+    """
+
+    qty = 1
+    leverage = 1
+
+    return engine.execute(
+        signal=signal,
+        symbol=symbol,
+        qty=qty,
+        price=price,
+        leverage=leverage,
+    )
