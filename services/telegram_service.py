@@ -1,126 +1,92 @@
-import logging
 import requests
-
-from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 
 class TelegramService:
 
-    def __init__(self):
+    def __init__(self, token, chat_id):
 
-        self.base_url = (
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
-        )
+        self.token = token
+        self.chat_id = chat_id
+        self.base_url = f"https://api.telegram.org/bot{token}"
 
     # =====================================================
     # Send Message
     # =====================================================
-    def send_message(self, text: str):
+    def send_message(self, text):
 
         try:
 
             url = f"{self.base_url}/sendMessage"
 
             payload = {
-                "chat_id": TELEGRAM_CHAT_ID,
+                "chat_id": self.chat_id,
                 "text": text,
-                "parse_mode": "HTML",
+                "parse_mode": "HTML"
             }
 
-            response = requests.post(url, json=payload, timeout=5)
-
-            if not response.ok:
-
-                logger.error(
-                    "Telegram send failed: %s",
-                    response.text,
-                )
-
-                return False
-
-            return True
+            requests.post(url, data=payload, timeout=5)
 
         except Exception as e:
-
-            logger.exception(e)
-
-            return False
+            logger.error("Telegram send failed: %s", e)
 
     # =====================================================
     # Trade Alert
     # =====================================================
     def send_trade(self, signal, symbol, qty, price):
 
-        message = (
-            f"🚀 <b>TRADE EXECUTED</b>\n"
-            f"Signal: {signal}\n"
-            f"Symbol: {symbol}\n"
-            f"Qty: {qty}\n"
-            f"Price: {price}"
-        )
+        msg = f"""
+📊 <b>TRADE EXECUTED</b>
 
-        return self.send_message(message)
+📌 Signal: {signal}
+💱 Symbol: {symbol}
+📦 Qty: {qty}
+💰 Price: {price}
+🕒 Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}
+"""
+
+        self.send_message(msg)
 
     # =====================================================
     # Error Alert
     # =====================================================
-    def send_error(self, error: str):
+    def send_error(self, error):
 
-        message = (
-            f"❌ <b>ERROR</b>\n"
-            f"{error}"
-        )
+        msg = f"""
+🚨 <b>ERROR ALERT</b>
 
-        return self.send_message(message)
+{error}
 
-    # =====================================================
-    # Risk Alert
-    # =====================================================
-    def send_risk(self, reason: str):
+🕒 {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}
+"""
 
-        message = (
-            f"⚠️ <b>RISK BLOCKED</b>\n"
-            f"Reason: {reason}"
-        )
-
-        return self.send_message(message)
+        self.send_message(msg)
 
     # =====================================================
-    # Position Alert
+    # Daily Report
     # =====================================================
-    def send_position(self, symbol, pnl):
+    def send_daily_report(self, pnl, trades, win_rate):
 
-        message = (
-            f"📊 <b>POSITION UPDATE</b>\n"
-            f"Symbol: {symbol}\n"
-            f"PnL: {pnl}"
-        )
+        msg = f"""
+📈 <b>DAILY REPORT</b>
 
-        return self.send_message(message)
+💰 PnL: {pnl}
+📊 Trades: {trades}
+🎯 Win Rate: {win_rate}%
+
+🕒 {datetime.utcnow().strftime('%Y-%m-%d')}
+"""
+
+        self.send_message(msg)
 
 
 # =====================================================
 # Singleton
 # =====================================================
-telegram_service = TelegramService()
-
-
-# =====================================================
-# Compatibility Wrappers (기존 코드 호환)
-# =====================================================
-def send_trade(signal, symbol, qty, price):
-    return telegram_service.send_trade(signal, symbol, qty, price)
-
-
-def send_error(error: str):
-    return telegram_service.send_error(error)
-
-
-def send_risk(reason: str):
-    return telegram_service.send_risk(reason)
-
-
-def send_position(symbol, pnl):
-    return telegram_service.send_position(symbol, pnl)
+telegram_service = TelegramService(
+    token="YOUR_BOT_TOKEN",
+    chat_id="YOUR_CHAT_ID"
+)
