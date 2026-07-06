@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Equity Dashboard</title>
+    <title>Multi Equity Dashboard</title>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
@@ -10,6 +11,7 @@
             color: white;
             font-family: Arial;
         }
+
         .box {
             width: 90%;
             margin: auto;
@@ -21,7 +23,7 @@
 
 <div class="box">
 
-    <h2>📊 Equity Curve</h2>
+    <h2>📊 TOTAL EQUITY CURVE</h2>
 
     <canvas id="chart"></canvas>
 
@@ -36,7 +38,7 @@ let chart = new Chart(ctx, {
     data: {
         labels: [],
         datasets: [{
-            label: "Equity",
+            label: "Total Equity",
             data: [],
             borderColor: "lime",
             fill: false
@@ -47,11 +49,18 @@ let chart = new Chart(ctx, {
 
 async function load() {
 
-    const res = await fetch("/api/equity");
+    const res = await fetch("/api/equity-total");
     const data = await res.json();
 
-    chart.data.labels = data.map(x => x.time);
-    chart.data.datasets[0].data = data.map(x => x.equity);
+    const now = new Date().toLocaleTimeString();
+
+    chart.data.labels.push(now);
+    chart.data.datasets[0].data.push(data.total_equity);
+
+    if (chart.data.labels.length > 100) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+    }
 
     chart.update();
 }
