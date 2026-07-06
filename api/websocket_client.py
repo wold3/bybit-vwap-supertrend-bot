@@ -1,11 +1,8 @@
 import json
 import websocket
 import threading
-import logging
 
 from services.event_bus import event_bus
-
-logger = logging.getLogger(__name__)
 
 
 class BybitWebSocket:
@@ -25,35 +22,17 @@ class BybitWebSocket:
 
     def on_message(self, ws, message):
 
-        try:
+        data = json.loads(message)
 
-            data = json.loads(message)
+        if "topic" in data and "tickers" in data["topic"]:
 
-            topic = data.get("topic", "")
-
-            # ORDERBOOK
-            if "orderbook" in topic:
+            for item in data.get("data", []):
 
                 event_bus.publish({
-                    "type": "ORDERBOOK",
-                    "symbol": data.get("symbol"),
-                    "bids": data.get("data", {}).get("b", []),
-                    "asks": data.get("data", {}).get("a", [])
+                    "type": "TICK",
+                    "symbol": item["symbol"],
+                    "price": float(item["lastPrice"])
                 })
-
-            # TICKER
-            if "tickers" in topic:
-
-                for item in data.get("data", []):
-
-                    event_bus.publish({
-                        "type": "TICK",
-                        "symbol": item.get("symbol"),
-                        "price": float(item.get("lastPrice", 0))
-                    })
-
-        except Exception as e:
-            logger.error(f"WS ERROR: {e}")
 
 
 ws_client = BybitWebSocket()
