@@ -1,8 +1,8 @@
 import logging
 
 from services.event_bus import event_bus
-from execution.orderbook_engine import orderbook_engine
 from execution.execution_engine import engine
+from execution.order_manager import order_manager
 from risk.risk_engine import risk_engine
 from ai.trading_brain import brain
 
@@ -15,46 +15,28 @@ def worker_loop():
 
     while True:
 
-        try:
+        event = q.get()
 
-            event = q.get()
+        if event["type"] != "TICK":
+            continue
 
-            # ORDERBOOK
-            if event["type"] == "ORDERBOOK":
+        symbol = event["symbol"]
+        price = event["price"]
 
-                orderbook_engine.update(
-                    event["symbol"],
-                    event["bids"],
-                    event["asks"]
-                )
-                continue
+        order_manager.sync()
 
-            # TICK
-            if event["type"] != "TICK":
-                continue
+        decision = brain.decide(symbol, price)
+        signal = decision["strategy"]
 
-            symbol = event["symbol"]
-            price = event["price"]
+        engine.execute(
+            signal=signal,
+            symbol=symbol,
+            qty=1,
+            price=price
+        )
 
-            liquidity = orderbook_engine.liquidity_score(symbol)
+        pnl = 0  # real PnL hook 자리
 
-            if liquidity < 100:
-                continue
+        risk_engine.update_pnl(pnl)
 
-            decision = brain.decide(symbol, price)
-            signal = decision["strategy"]
-
-            engine.execute(
-                signal=signal,
-                symbol=symbol,
-                qty=1,
-                price=price
-            )
-
-            pnl = 0
-            risk_engine.update_pnl(pnl)
-
-            print(f"[v5] {symbol} {price} {signal} LQ={liquidity}")
-
-        except Exception as e:
-            logger.error(f"WORKER ERROR: {e}")
+        print(f"[v6] {symbol} {price} {signal} PnL={risk_engine.pnl}")
