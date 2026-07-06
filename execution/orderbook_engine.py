@@ -1,44 +1,53 @@
-class OrderBookEngine:
+import logging
+from datetime import datetime
+
+from core.mode import mode_manager
+from api.bybit_client import bybit_client
+from execution.paper_engine import paper_engine
+
+logger = logging.getLogger(__name__)
+
+
+class OrderManager:
 
     def __init__(self):
-        self.books = {}
+        self.orders = {}
 
-    def update(self, symbol, bids, asks):
+    def place_order(self, symbol, side, qty, price):
 
-        self.books[symbol] = {
-            "bids": bids,
-            "asks": asks
+        # ======================
+        # PAPER MODE
+        # ======================
+        if mode_manager.is_paper():
+
+            return paper_engine.place_order(
+                symbol, side, qty, price
+            )
+
+        # ======================
+        # LIVE MODE
+        # ======================
+        resp = bybit_client.place_order(symbol, side, qty)
+
+        order_id = resp.get("result", {}).get("orderId")
+
+        self.orders[order_id] = {
+            "symbol": symbol,
+            "side": side,
+            "qty": qty,
+            "status": "PENDING",
+            "created_at": datetime.utcnow()
         }
 
-    def mid_price(self, symbol):
+        return resp
 
-        book = self.books.get(symbol)
+    def sync(self):
 
-        if not book:
-            return None
+        if mode_manager.is_paper():
+            return
 
-        try:
-            bid = float(book["bids"][0][0])
-            ask = float(book["asks"][0][0])
-            return (bid + ask) / 2
-
-        except:
-            return None
-
-    def liquidity_score(self, symbol):
-
-        book = self.books.get(symbol)
-
-        if not book:
-            return 0
-
-        try:
-            bid = sum(float(x[1]) for x in book["bids"][:5])
-            ask = sum(float(x[1]) for x in book["asks"][:5])
-            return bid + ask
-
-        except:
-            return 0
+        for oid in list(self.orders.keys()):
+            self.orders[oid]["status"] = "FILLED"
 
 
-orderbook_engine = OrderBookEngine()
+order_manager = OrderManager()
