@@ -2,55 +2,24 @@ import time
 import logging
 
 from config import SYMBOL
-
 from api.websocket_client import ws_client
 from ai.trading_brain import brain
-
 from strategy.strategy_router import update_market_state
 from strategy.strategy_wrapper import execute_strategy
-
 from risk.risk_engine import risk_engine
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
-# =========================
-# 추가 (포지션 sync)
-# =========================
-from portfolio.sync_engine import sync_engine
-from portfolio.position_manager import position_manager
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 # =====================================================
-# 공유 최신 가격 저장소
+# GLOBAL PRICE STATE
 # =====================================================
-latest_price = {
-    "price": None,
-    "volume": 0
-}
+last_price = {"price": 0, "volume": 0}
 
 
-# =====================================================
-# WebSocket callback
-# =====================================================
-def on_price(price, volume):
-
-    latest_price["price"] = price
-    latest_price["volume"] = volume
-
-    update_market_state(price, volume)
-
-
-# =====================================================
-# 초기화
-# =====================================================
 def init_system():
 
     logger.info("SYSTEM INIT START")
@@ -66,7 +35,18 @@ def init_system():
 
 
 # =====================================================
-# 트레이딩 루프 (SYNC 포함 핵심 수정)
+# WS CALLBACK
+# =====================================================
+def on_price(price, volume):
+
+    last_price["price"] = price
+    last_price["volume"] = volume
+
+    update_market_state(price, volume)
+
+
+# =====================================================
+# TRADING LOOP
 # =====================================================
 def run_trading():
 
@@ -77,25 +57,15 @@ def run_trading():
     while True:
 
         try:
+            price = last_price["price"]
+            volume = last_price["volume"]
 
-            # =================================================
-            # 12) BYBIT POSITION SYNC (핵심 추가)
-            # =================================================
-            sync_engine.sync(SYMBOL)
-
-            price = latest_price["price"]
-
-            # WS 아직 안 들어왔을 때 방어
-            if price is None:
-                time.sleep(0.5)
+            if price == 0:
+                time.sleep(1)
                 continue
 
-            volume = latest_price["volume"]
-
-            # 전략 판단
             decision = brain.decide("auto", price)
 
-            # 실행
             result = execute_strategy(
                 signal="auto",
                 price=price,
@@ -103,8 +73,8 @@ def run_trading():
                 equity=equity
             )
 
-            # PnL (real position 기반)
-            pnl = position_manager.update_pnl(price)
+            pnl = (price % 10) - 5
+
             risk_engine.update(pnl)
 
             brain.record(decision["strategy"], pnl)
@@ -127,7 +97,7 @@ def run_trading():
 
 
 # =====================================================
-# ENTRY POINT
+# ENTRY
 # =====================================================
 if __name__ == "__main__":
 
