@@ -2,15 +2,16 @@ import time
 import logging
 
 from config import SYMBOL
-from api.websocket_client import ws_client
 
+from api.websocket_client import ws_client
 from ai.trading_brain import brain
+
 from strategy.strategy_router import update_market_state
 from strategy.strategy_wrapper import execute_strategy
 
 from risk.risk_engine import risk_engine
-from services.watchdog_service import watchdog
 from services.telegram_service import init_telegram, get_telegram
+from services.watchdog_service import watchdog
 
 
 logging.basicConfig(
@@ -20,22 +21,29 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# =====================================================
+# 공유 최신 가격 저장소
+# =====================================================
+latest_price = {
+    "price": None,
+    "volume": 0
+}
 
-latest_price = None
 
-
-# =========================
+# =====================================================
 # WS callback
-# =========================
+# =====================================================
 def on_price(price, volume):
-    global latest_price
-    latest_price = price
+
+    latest_price["price"] = price
+    latest_price["volume"] = volume
+
     update_market_state(price, volume)
 
 
-# =========================
-# init
-# =========================
+# =====================================================
+# 초기화
+# =====================================================
 def init_system():
 
     logger.info("SYSTEM INIT START")
@@ -50,32 +58,34 @@ def init_system():
     logger.info("SYSTEM READY")
 
 
-# =========================
-# trading loop (FIXED)
-# =========================
+# =====================================================
+# 트레이딩 루프 (REAL WS 기반)
+# =====================================================
 def run_trading():
 
     logger.info("TRADING STARTED")
 
     equity = 1000
 
-    global latest_price
-
     while True:
 
         try:
 
-            # ❗ WS price 없으면 skip (중요)
-            if latest_price is None:
+            price = latest_price["price"]
+
+            # -------------------------
+            # WS 아직 안 들어왔을 때 방어
+            # -------------------------
+            if price is None:
                 time.sleep(0.5)
                 continue
 
-            price = latest_price
+            volume = latest_price["volume"]
 
             decision = brain.decide("auto", price)
 
             result = execute_strategy(
-                signal=decision["strategy"],
+                signal="auto",
                 price=price,
                 symbol=SYMBOL,
                 equity=equity
@@ -91,21 +101,22 @@ def run_trading():
                 f"PRICE={price} STRATEGY={decision['strategy']} PNL={pnl}"
             )
 
-            time.sleep(1)
+            time.sleep(2)
 
         except Exception as e:
+
             logger.error(f"MAIN ERROR: {str(e)}")
 
             tg = get_telegram()
             if tg:
                 tg.error(e)
 
-            time.sleep(3)
+            time.sleep(5)
 
 
-# =========================
+# =====================================================
 # ENTRY
-# =========================
+# =====================================================
 if __name__ == "__main__":
 
     init_system()
