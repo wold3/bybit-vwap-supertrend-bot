@@ -1,40 +1,18 @@
-from api.bybit_client import bybit_client
+from api.bybit_client import bybit
 
 
 class PnLEngine:
 
-    def get_position_pnl(self, symbol):
+    def get(self, symbol):
 
-        try:
+        res = bybit.position(symbol)
 
-            res = bybit_client.get_positions(symbol)
+        pnl = 0
 
-            items = res.get("result", {}).get("list", [])
+        for p in res.get("result", {}).get("list", []):
+            pnl += float(p.get("unrealisedPnl", 0))
 
-            total_pnl = 0.0
-            total_size = 0.0
-
-            for p in items:
-
-                if p.get("symbol") != symbol:
-                    continue
-
-                pnl = float(p.get("unrealisedPnl", 0))
-                size = float(p.get("size", 0))
-
-                total_pnl += pnl
-                total_size += size
-
-            return {
-                "pnl": total_pnl,
-                "size": total_size
-            }
-
-        except Exception:
-            return {
-                "pnl": 0,
-                "size": 0
-            }
+        return pnl
 
 
 pnl_engine = PnLEngine()
