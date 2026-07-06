@@ -1,7 +1,7 @@
 import logging
 
 from services.event_bus import event_bus
-from api.order_manager import order_manager
+from execution.orderbook_engine import orderbook_engine
 from execution.execution_engine import engine
 from risk.risk_engine import risk_engine
 from ai.trading_brain import brain
@@ -19,22 +19,26 @@ def worker_loop():
 
             event = q.get()
 
-            if event["type"] != "PRICE":
+            # ORDERBOOK
+            if event["type"] == "ORDERBOOK":
+
+                orderbook_engine.update(
+                    event["symbol"],
+                    event["bids"],
+                    event["asks"]
+                )
+                continue
+
+            # TICK
+            if event["type"] != "TICK":
                 continue
 
             symbol = event["symbol"]
             price = event["price"]
 
-            order_manager.sync_orders()
+            liquidity = orderbook_engine.liquidity_score(symbol)
 
-            exit_reason = engine.check_exit(symbol, price)
-
-            if exit_reason:
-                engine.close_position(symbol, exit_reason)
-
-                pnl = engine.get_real_pnl(symbol)
-                risk_engine.update_pnl(pnl)
-
+            if liquidity < 100:
                 continue
 
             decision = brain.decide(symbol, price)
@@ -47,12 +51,10 @@ def worker_loop():
                 price=price
             )
 
-            pnl = engine.get_real_pnl(symbol)
-
+            pnl = 0
             risk_engine.update_pnl(pnl)
-            brain.record(signal, pnl)
 
-            print(f"[{symbol}] {price} {signal} PnL={pnl}")
+            print(f"[v5] {symbol} {price} {signal} LQ={liquidity}")
 
         except Exception as e:
             logger.error(f"WORKER ERROR: {e}")
