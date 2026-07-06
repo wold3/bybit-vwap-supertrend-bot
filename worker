@@ -4,7 +4,6 @@ from execution.position_sync import position_sync
 from risk.risk_engine import risk
 from monitor.monitor import monitor
 
-
 def loop():
 
     while True:
@@ -19,24 +18,15 @@ def loop():
 
         signal = "Buy" if price % 2 == 0 else "Sell"
 
-        # =====================
-        # EXECUTE
-        # =====================
         res = engine.execute(symbol, signal, 1, price)
 
-        # =====================
-        # SYNC
-        # =====================
         pnl = position_sync.sync(symbol)
 
         risk.update_pnl(pnl)
 
-        # =====================
-        # MONITOR ALERT
-        # =====================
         monitor.on_pnl(pnl)
 
         if res:
             monitor.on_trade(symbol, signal, price, pnl)
 
-        print(f"[MONITOR] {symbol} PRICE={price} PNL={pnl}")
+        print(f"{symbol} {price} PNL={pnl}")
