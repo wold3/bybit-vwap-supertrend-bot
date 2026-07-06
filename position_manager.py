@@ -8,11 +8,12 @@ class PositionManager:
 
     def __init__(self):
 
-        # symbol -> position
         self.positions = {}
+        self.realized_pnl = 0.0
+        self.equity = 1000.0
 
     # =====================================================
-    # 포지션 오픈
+    # OPEN POSITION
     # =====================================================
     def open_position(self, symbol, side, qty, price):
 
@@ -21,13 +22,14 @@ class PositionManager:
             "side": side,
             "qty": qty,
             "entry_price": price,
-            "opened_at": datetime.utcnow()
+            "opened_at": datetime.utcnow(),
+            "unrealized_pnl": 0.0
         }
 
         logger.info(f"POSITION OPENED: {symbol} {side} @ {price}")
 
     # =====================================================
-    # 포지션 종료
+    # CLOSE POSITION (FIXED)
     # =====================================================
     def close_position(self, symbol, price):
 
@@ -38,14 +40,17 @@ class PositionManager:
 
         pnl = self.calculate_pnl(symbol, price)
 
-        logger.info(f"POSITION CLOSED: {symbol} PnL={pnl}")
+        self.realized_pnl += pnl
+        self.equity += pnl
+
+        logger.info(f"POSITION CLOSED: {symbol} PnL={pnl} EQUITY={self.equity}")
 
         del self.positions[symbol]
 
         return pnl
 
     # =====================================================
-    # PnL 계산
+    # PnL CALC
     # =====================================================
     def calculate_pnl(self, symbol, current_price):
 
@@ -58,7 +63,7 @@ class PositionManager:
         qty = pos["qty"]
         side = pos["side"]
 
-        if side.upper() == "BUY":
+        if side.upper() in ["BUY", "LONG"]:
             pnl = (current_price - entry) * qty
         else:
             pnl = (entry - current_price) * qty
@@ -66,15 +71,32 @@ class PositionManager:
         return pnl
 
     # =====================================================
-    # 상태 조회
+    # UPDATE UNREALIZED PNL
+    # =====================================================
+    def update_unrealized(self, symbol, price):
+
+        pos = self.positions.get(symbol)
+
+        if not pos:
+            return 0
+
+        pnl = self.calculate_pnl(symbol, price)
+
+        pos["unrealized_pnl"] = pnl
+
+        return pnl
+
+    # =====================================================
+    # GETTERS
     # =====================================================
     def get_position(self, symbol):
-
         return self.positions.get(symbol)
 
     def has_position(self, symbol):
-
         return symbol in self.positions
+
+    def get_equity(self):
+        return self.equity
 
 
 # singleton
