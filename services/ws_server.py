@@ -1,48 +1,46 @@
 import asyncio
 import websockets
 import json
+import threading
 
 clients = set()
 
 
 # ================================
-# CLIENT REGISTER
-# ================================
-async def register(ws):
-    clients.add(ws)
-
-
-async def unregister(ws):
-    clients.remove(ws)
-
-
-# ================================
-# BROADCAST (PnL push)
-# ================================
-async def broadcast(data):
-
-    if clients:
-
-        msg = json.dumps(data)
-
-        await asyncio.wait([
-            client.send(msg)
-            for client in clients
-        ])
-
-
-# ================================
-# WS HANDLER
+# CLIENT HANDLING
 # ================================
 async def handler(ws):
 
-    await register(ws)
-
+    clients.add(ws)
     try:
-        async for msg in ws:
+        async for _ in ws:
             pass
     finally:
-        await unregister(ws)
+        clients.remove(ws)
+
+
+# ================================
+# BROADCAST (PnL / event push)
+# ================================
+async def _broadcast(data):
+
+    if clients:
+        msg = json.dumps(data)
+
+        await asyncio.gather(
+            *[c.send(msg) for c in clients],
+            return_exceptions=True
+        )
+
+
+def broadcast(data):
+
+    try:
+        loop = asyncio.get_event_loop()
+        loop.create_task(_broadcast(data))
+    except RuntimeError:
+        # fallback (thread safe)
+        asyncio.run(_broadcast(data))
 
 
 # ================================
@@ -50,10 +48,8 @@ async def handler(ws):
 # ================================
 def start_ws_server():
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    async def main():
+        async with websockets.serve(handler, "0.0.0.0", 6789):
+            await asyncio.Future()
 
-    server = websockets.serve(handler, "0.0.0.0", 6789)
-
-    loop.run_until_complete(server)
-    loop.run_forever()
+    asyncio.run(main())
