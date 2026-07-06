@@ -13,6 +13,9 @@ class ExecutionEngine:
     def __init__(self):
         self.busy = False
 
+    # =====================================================
+    # STATUS
+    # =====================================================
     def is_busy(self):
         return self.busy
 
@@ -21,17 +24,24 @@ class ExecutionEngine:
     # =====================================================
     def execute(self, signal, symbol, qty, price, leverage):
 
+        if self.busy:
+            return {"success": False, "reason": "busy"}
+
         self.busy = True
         db = SessionLocal()
 
         try:
 
-            # risk check
+            # -------------------------
+            # RISK CHECK
+            # -------------------------
             if not risk_engine.allow_trade():
-                add_log(db, "WARNING", "blocked by risk engine")
+                add_log(db, "WARNING", "Trade blocked by risk engine")
                 return {"success": False, "reason": "risk_block"}
 
-            # order
+            # -------------------------
+            # ORDER
+            # -------------------------
             order_id = order_manager.place_market_order(
                 symbol=symbol,
                 side=signal,
@@ -40,10 +50,12 @@ class ExecutionEngine:
             )
 
             if not order_id:
-                add_log(db, "ERROR", "order failed")
+                add_log(db, "ERROR", "Order failed")
                 return {"success": False, "reason": "order_failed"}
 
-            # db save
+            # -------------------------
+            # DB SAVE
+            # -------------------------
             trade = add_trade(
                 db=db,
                 symbol=symbol,
@@ -53,23 +65,30 @@ class ExecutionEngine:
                 leverage=leverage
             )
 
-            add_log(db, "INFO", f"executed {symbol} {signal}")
+            add_log(db, "INFO", f"Trade executed {symbol} {signal}")
+
+            logger.info(f"EXECUTED: {symbol} {signal} qty={qty}")
 
             return {
                 "success": True,
                 "order_id": order_id,
-                "trade_id": trade.id
+                "trade_id": trade.id if trade else None
             }
 
         except Exception as e:
-            logger.error(f"Execution error: {str(e)}")
+
+            logger.error(f"Execution error: {e}")
             add_log(db, "ERROR", str(e))
 
-            return {"success": False, "reason": "exception"}
+            return {
+                "success": False,
+                "reason": "exception",
+                "error": str(e)
+            }
 
         finally:
-            db.close()
             self.busy = False
+            db.close()
 
 
 engine = ExecutionEngine()
@@ -77,10 +96,13 @@ engine = ExecutionEngine()
 
 def execute_order(signal, symbol, price, equity, win_rate):
 
+    qty = 1
+    leverage = 1
+
     return engine.execute(
         signal=signal,
         symbol=symbol,
-        qty=1,
+        qty=qty,
         price=price,
-        leverage=1
+        leverage=leverage
     )
