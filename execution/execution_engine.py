@@ -1,7 +1,8 @@
 import logging
 
-from risk.risk_engine import risk_engine
+from api.bybit_client import bybit_client
 from api.order_manager import order_manager
+from risk.risk_engine import risk_engine
 
 logger = logging.getLogger(__name__)
 
@@ -11,34 +12,49 @@ class ExecutionEngine:
     def __init__(self):
         self.busy = False
 
-    # =====================================================
-    # 상태 확인
-    # =====================================================
-    def is_busy(self):
-        return self.busy
+    def get_real_pnl(self, symbol):
 
-    # =====================================================
-    # 메인 실행 (핵심)
-    # =====================================================
+        res = bybit_client.get_positions(symbol)
+
+        items = res.get("result", {}).get("list", [])
+
+        pnl = 0
+
+        for p in items:
+            if p.get("symbol") == symbol:
+                pnl += float(p.get("unrealisedPnl", 0))
+
+        return pnl
+
+    def check_exit(self, symbol, price):
+
+        pnl = self.get_real_pnl(symbol)
+
+        if pnl <= -10:
+            return "STOP_LOSS"
+
+        if pnl >= 20:
+            return "TAKE_PROFIT"
+
+        return None
+
+    def close_position(self, symbol, reason):
+
+        order_manager.place_market_order(
+            symbol=symbol,
+            side="Sell",
+            qty=1
+        )
+
     def execute(self, signal, symbol, qty, price, leverage=1):
 
         self.busy = True
 
         try:
 
-            # =================================================
-            # 1) RISK CHECK (킬스위치)
-            # =================================================
             if not risk_engine.allow_trade():
-                logger.warning("🚨 TRADE BLOCKED (RISK)")
-                return {
-                    "success": False,
-                    "reason": "risk_block"
-                }
+                return {"success": False, "reason": "risk_block"}
 
-            # =================================================
-            # 2) ORDER EXECUTION
-            # =================================================
             order_id = order_manager.place_market_order(
                 symbol=symbol,
                 side=signal,
@@ -47,44 +63,14 @@ class ExecutionEngine:
             )
 
             if not order_id:
-                logger.error("❌ ORDER FAILED")
-                return {
-                    "success": False,
-                    "reason": "order_failed"
-                }
+                return {"success": False, "reason": "order_failed"}
 
-            # =================================================
-            # 3) RISK UPDATE (거래 카운트)
-            # =================================================
             risk_engine.add_trade()
 
-            # =================================================
-            # 4) LOG
-            # =================================================
-            logger.info(
-                f"EXECUTED → {symbol} {signal} qty={qty} order_id={order_id}"
-            )
-
-            return {
-                "success": True,
-                "order_id": order_id
-            }
-
-        except Exception as e:
-
-            logger.error(f"EXECUTION ERROR: {str(e)}")
-
-            return {
-                "success": False,
-                "reason": "exception",
-                "error": str(e)
-            }
+            return {"success": True, "order_id": order_id}
 
         finally:
             self.busy = False
 
 
-# =====================================================
-# SINGLETON
-# =====================================================
 engine = ExecutionEngine()
