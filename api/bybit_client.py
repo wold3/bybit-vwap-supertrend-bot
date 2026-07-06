@@ -1,7 +1,6 @@
 import requests
 from config import BYBIT_TESTNET
 
-
 class Bybit:
 
     def __init__(self):
@@ -26,6 +25,5 @@ class Bybit:
             self.base + "/v5/position/list",
             params={"category": "linear", "symbol": symbol}
         ).json()
-
 
 bybit = Bybit()
