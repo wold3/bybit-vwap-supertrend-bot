@@ -2,6 +2,7 @@ import json
 import logging
 import threading
 import websocket
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -11,38 +12,45 @@ class BybitWebSocket:
     def __init__(self):
         self.ws = None
         self.price_callback = None
+        self.running = False
 
     def set_price_callback(self, callback):
         self.price_callback = callback
 
     # =====================================================
-    # MESSAGE HANDLER (FIXED)
+    # MESSAGE
     # =====================================================
     def on_message(self, ws, message):
 
         try:
-            # 1. JSON 파싱
+            # ping/pong 필터
+            if message == "ping" or message == "pong":
+                return
+
+            # JSON parse
             if isinstance(message, str):
                 try:
                     data = json.loads(message)
-                except json.JSONDecodeError:
-                    logger.warning(f"Non-JSON message ignored: {message}")
+                except:
                     return
             else:
                 data = message
 
-            # 2. dict 체크
             if not isinstance(data, dict):
                 return
 
-            # 3. Bybit v5 구조 대응
-            raw = data.get("data") or data.get("result")
-
-            if raw is None:
+            # heartbeat / event filter
+            if "data" not in data and "result" not in data:
                 return
 
-            # 4. list 구조
+            raw = data.get("data") or data.get("result")
+
+            if not raw:
+                return
+
+            # list format
             if isinstance(raw, list):
+
                 for item in raw:
                     if not isinstance(item, dict):
                         continue
@@ -50,9 +58,12 @@ class BybitWebSocket:
                     price = item.get("lastPrice") or item.get("price")
 
                     if price and self.price_callback:
-                        self.price_callback(float(price))
+                        try:
+                            self.price_callback(float(price))
+                        except Exception as e:
+                            logger.error(f"callback error: {e}")
 
-            # 5. dict 구조
+            # dict format
             elif isinstance(raw, dict):
 
                 price = raw.get("lastPrice") or raw.get("price")
@@ -66,8 +77,14 @@ class BybitWebSocket:
     def on_error(self, ws, error):
         logger.error(f"WS error: {error}")
 
-    def on_close(self, ws, close_status_code, close_msg):
+    def on_close(self, ws, *args):
         logger.warning("WebSocket closed")
+        self.running = False
+
+        # auto reconnect
+        time.sleep(3)
+        if self.running:
+            self.start()
 
     def on_open(self, ws):
         logger.info("WebSocket connected")
@@ -77,18 +94,27 @@ class BybitWebSocket:
     # =====================================================
     def start(self):
 
+        self.running = True
+
         def run():
             url = "wss://stream.bybit.com/v5/public/linear"
 
-            self.ws = websocket.WebSocketApp(
-                url,
-                on_open=self.on_open,
-                on_message=self.on_message,
-                on_error=self.on_error,
-                on_close=self.on_close,
-            )
+            while self.running:
 
-            self.ws.run_forever()
+                try:
+                    self.ws = websocket.WebSocketApp(
+                        url,
+                        on_open=self.on_open,
+                        on_message=self.on_message,
+                        on_error=self.on_error,
+                        on_close=self.on_close,
+                    )
+
+                    self.ws.run_forever(ping_interval=20, ping_timeout=10)
+
+                except Exception as e:
+                    logger.error(f"WS loop error: {e}")
+                    time.sleep(3)
 
         t = threading.Thread(target=run, daemon=True)
         t.start()
