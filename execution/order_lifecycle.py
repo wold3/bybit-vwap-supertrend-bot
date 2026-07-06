@@ -10,15 +10,26 @@ class OrderLifecycle:
             "side": side,
             "qty": qty,
             "price": price,
-            "status": "PENDING"
+            "status": "PENDING",
+            "filled_qty": 0
         }
 
-    def fill(self, oid):
-        if oid in self.orders:
-            self.orders[oid]["status"] = "FILLED"
+    def fill(self, oid, qty, price):
 
-    def get(self, oid):
-        return self.orders.get(oid)
+        o = self.orders.get(oid)
+        if not o:
+            return
+
+        o["filled_qty"] += qty
+
+        if o["filled_qty"] >= o["qty"]:
+            o["status"] = "FILLED"
+        else:
+            o["status"] = "PARTIAL"
+
+    def close(self, oid):
+        if oid in self.orders:
+            self.orders[oid]["status"] = "CLOSED"
 
 
 lifecycle = OrderLifecycle()
