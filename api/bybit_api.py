@@ -627,3 +627,155 @@ def get_position_margin(symbol):
             0,
         )
     )
+
+# =====================================================
+# Orderbook
+# =====================================================
+
+@retry()
+def get_orderbook(
+    symbol,
+    limit=50,
+):
+
+    result = session.get_orderbook(
+        category="linear",
+        symbol=symbol,
+        limit=limit,
+    )
+
+    return (
+        result.get("result", {})
+        .get("list", [])
+    )
+
+
+# =====================================================
+# Server Time
+# =====================================================
+
+@retry()
+def get_server_time():
+
+    return session.get_server_time()
+
+
+# =====================================================
+# Ping
+# =====================================================
+
+def ping():
+
+    try:
+
+        session.get_server_time()
+
+        return True
+
+    except Exception as e:
+
+        logger.error(
+            "Bybit Ping Failed : %s",
+            e,
+        )
+
+        return False
+
+
+# =====================================================
+# Position Status
+# =====================================================
+
+def is_position_open(symbol):
+
+    position = get_position(symbol)
+
+    if position is None:
+        return False
+
+    size = float(
+        position.get(
+            "size",
+            0,
+        )
+    )
+
+    return size > 0
+
+
+def get_position_side(symbol):
+
+    position = get_position(symbol)
+
+    if position is None:
+        return None
+
+    return position.get("side")
+
+
+def get_position_size(symbol):
+
+    position = get_position(symbol)
+
+    if position is None:
+        return 0.0
+
+    return float(
+        position.get(
+            "size",
+            0,
+        )
+    )
+
+
+# =====================================================
+# Exchange Info
+# =====================================================
+
+@retry()
+def get_instruments(symbol=None):
+
+    params = {
+        "category": "linear",
+    }
+
+    if symbol:
+        params["symbol"] = symbol
+
+    result = session.get_instruments_info(
+        **params,
+    )
+
+    return (
+        result.get("result", {})
+        .get("list", [])
+    )
+
+
+# =====================================================
+# Health Check
+# =====================================================
+
+def health():
+
+    try:
+
+        balance = get_balance()
+
+        return {
+            "success": True,
+            "exchange": "Bybit",
+            "connected": True,
+            "balance": balance,
+        }
+
+    except Exception as e:
+
+        logger.exception(e)
+
+        return {
+            "success": False,
+            "exchange": "Bybit",
+            "connected": False,
+            "error": str(e),
+        }
