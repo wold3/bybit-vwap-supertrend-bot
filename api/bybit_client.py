@@ -3,8 +3,11 @@ import hmac
 import hashlib
 import requests
 import json
+import logging
 
 from config import BYBIT_API_KEY, BYBIT_API_SECRET, BYBIT_TESTNET
+
+logger = logging.getLogger(__name__)
 
 
 class BybitClient:
@@ -20,12 +23,18 @@ class BybitClient:
             self.base_url = "https://api.bybit.com"
 
     # =====================================================
-    # SIGNATURE (FIXED - V5 STANDARD)
+    # SIGNATURE (FIXED)
     # =====================================================
+    def _sign(self, params: dict):
 
-    def _sign(self, timestamp, recv_window, payload):
+        timestamp = str(int(time.time() * 1000))
 
-        param_str = timestamp + self.api_key + str(recv_window) + payload
+        # 🔥 FIX: sort_keys 중요 (서명 안정화)
+        param_str = (
+            timestamp +
+            self.api_key +
+            json.dumps(params, separators=(',', ':'), sort_keys=True)
+        )
 
         signature = hmac.new(
             self.api_secret.encode("utf-8"),
@@ -33,70 +42,53 @@ class BybitClient:
             hashlib.sha256
         ).hexdigest()
 
-        return signature
+        return timestamp, signature
 
     # =====================================================
-    # REQUEST
+    # REQUEST (SAFE)
     # =====================================================
-
     def _request(self, method, endpoint, params=None):
 
-        if params is None:
-            params = {}
-
-        timestamp = str(int(time.time() * 1000))
-        recv_window = "5000"
-
-        payload = json.dumps(params) if method == "POST" else ""
-
-        signature = self._sign(timestamp, recv_window, payload)
-
-        headers = {
-            "X-BAPI-API-KEY": self.api_key,
-            "X-BAPI-TIMESTAMP": timestamp,
-            "X-BAPI-SIGN": signature,
-            "X-BAPI-RECV-WINDOW": recv_window,
-            "Content-Type": "application/json"
-        }
-
-        url = self.base_url + endpoint
-
         try:
+            if params is None:
+                params = {}
+
+            timestamp, signature = self._sign(params)
+
+            headers = {
+                "X-BAPI-API-KEY": self.api_key,
+                "X-BAPI-TIMESTAMP": timestamp,
+                "X-BAPI-SIGN": signature,
+                "Content-Type": "application/json"
+            }
+
+            url = self.base_url + endpoint
 
             if method == "GET":
                 resp = requests.get(url, params=params, headers=headers, timeout=5)
             else:
-                resp = requests.post(url, data=payload, headers=headers, timeout=5)
+                resp = requests.post(url, json=params, headers=headers, timeout=5)
 
-            data = resp.json()
+            # 🔥 FIX: JSON 안전 처리
+            try:
+                data = resp.json()
+            except Exception:
+                logger.error(f"Invalid JSON response: {resp.text}")
+                return {}
 
-            # =========================
-            # 🔥 중요: 실패 감지
-            # =========================
-            if data.get("retCode") != 0:
-                return {
-                    "success": False,
-                    "error": data,
-                    "result": {}
-                }
+            return data
 
-            return {
-                "success": True,
-                "result": data.get("result", {})
-            }
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP error: {e}")
+            return {}
 
         except Exception as e:
-
-            return {
-                "success": False,
-                "error": str(e),
-                "result": {}
-            }
+            logger.error(f"Request error: {e}")
+            return {}
 
     # =====================================================
     # PRICE
     # =====================================================
-
     def get_price(self, symbol):
 
         return self._request(
@@ -108,7 +100,6 @@ class BybitClient:
     # =====================================================
     # BALANCE
     # =====================================================
-
     def get_balance(self):
 
         return self._request(
@@ -120,27 +111,21 @@ class BybitClient:
     # =====================================================
     # ORDER
     # =====================================================
-
     def place_order(self, symbol, side, qty, leverage=1):
-
-        params = {
-            "category": "linear",
-            "symbol": symbol,
-            "side": side,
-            "orderType": "Market",
-            "qty": str(qty),
-            "timeInForce": "GoodTillCancel"
-        }
 
         return self._request(
             "POST",
             "/v5/order/create",
-            params
+            {
+                "category": "linear",
+                "symbol": symbol,
+                "side": side,
+                "orderType": "Market",
+                "qty": str(qty),
+                "timeInForce": "GoodTillCancel",
+                "leverage": str(leverage)
+            }
         )
 
-
-# =====================================================
-# SINGLETON
-# =====================================================
 
 bybit_client = BybitClient()
