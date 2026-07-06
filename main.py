@@ -2,16 +2,12 @@ import time
 import logging
 
 from config import SYMBOL
-
 from api.websocket_client import ws_client
-from ai.trading_brain import brain
 
+from ai.trading_brain import brain
 from strategy.strategy_router import update_market_state
 from strategy.strategy_wrapper import execute_strategy
-
-from execution.execution_engine import engine
 from risk.risk_engine import risk_engine
-
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
@@ -24,12 +20,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# =====================================================
-# 초기화
-# =====================================================
+# =========================
+# 상태 저장 (핵심 추가)
+# =========================
+latest_price = None
+
+
+def on_price(price):
+    global latest_price
+    latest_price = price
+    update_market_state(price, 0)
+
 
 def init_system():
-
     logger.info("SYSTEM INIT START")
 
     init_telegram(
@@ -42,38 +45,24 @@ def init_system():
     logger.info("SYSTEM READY")
 
 
-# =====================================================
-# 실시간 가격 처리
-# =====================================================
-
-def on_price(price):
-
-    volume = 0  # 현재 구조에서는 optional
-
-    update_market_state(price, volume)
-
-
-# =====================================================
-# 트레이딩 루프
-# =====================================================
-
 def run_trading():
-
     logger.info("TRADING STARTED")
 
     equity = 1000
 
-    while True:
+    global latest_price
 
+    while True:
         try:
 
-            price, volume = None, None  # WebSocket 기반이면 callback으로 대체
+            # =========================
+            # 🔥 WS 가격만 사용
+            # =========================
+            if latest_price is None:
+                time.sleep(0.5)
+                continue
 
-            # mock price (실전에서는 ws callback 사용)
-            import random
-            price = 65000 + random.randint(-50, 50)
-
-            update_market_state(price, volume)
+            price = latest_price
 
             decision = brain.decide("auto", price)
 
@@ -97,7 +86,6 @@ def run_trading():
             time.sleep(2)
 
         except Exception as e:
-
             logger.error(f"MAIN ERROR: {str(e)}")
 
             tg = get_telegram()
@@ -107,17 +95,11 @@ def run_trading():
             time.sleep(5)
 
 
-# =====================================================
-# ENTRY POINT
-# =====================================================
-
 if __name__ == "__main__":
 
     init_system()
 
-    # WebSocket 시작 (실전 데이터)
     ws_client.set_price_callback(on_price)
     ws_client.start()
 
-    # 트레이딩 루프 시작
     run_trading()
