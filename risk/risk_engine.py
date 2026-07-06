@@ -1,4 +1,4 @@
-class RiskEngine:
+class Risk:
 
     def __init__(self):
         self.pnl = 0
@@ -22,4 +22,4 @@ class RiskEngine:
         self.trades += 1
 
 
-risk = RiskEngine()
+risk = Risk()
