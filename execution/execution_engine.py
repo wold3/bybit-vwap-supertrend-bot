@@ -1,55 +1,30 @@
-import logging
-
-from risk.risk_engine import risk_engine
-from api.bybit_client import bybit_client
-from execution.order_lifecycle import order_lifecycle
-from execution.pnl_engine import pnl_engine
-
-logger = logging.getLogger(__name__)
+from api.bybit_client import bybit
+from execution.paper_engine import paper
+from core.mode import mode
+from risk.risk_engine import risk
+from execution.order_lifecycle import lifecycle
 
 
 class ExecutionEngine:
 
-    def execute(self, signal, symbol, qty, price):
+    def execute(self, symbol, side, qty, price):
 
-        if not risk_engine.allow_trade():
-            return {"success": False, "reason": "risk_block"}
+        if not risk.allow():
+            return
 
-        resp = bybit_client.place_order(
-            symbol=symbol,
-            side=signal,
-            qty=qty
-        )
+        if mode.is_paper():
+            res = paper.place_order(symbol, side, qty, price)
+        else:
+            res = bybit.order(symbol, side, qty)
 
-        order_id = resp.get("result", {}).get("orderId")
+        oid = res.get("result", {}).get("orderId")
 
-        if order_id:
+        if oid:
+            lifecycle.create(oid, symbol, side, qty, price)
 
-            order_lifecycle.create(
-                order_id,
-                symbol,
-                signal,
-                qty,
-                price
-            )
+        risk.add_trade()
 
-        risk_engine.add_trade()
-
-        return {
-            "success": True,
-            "order_id": order_id
-        }
-
-    # =====================================================
-    # REAL PnL UPDATE
-    # =====================================================
-    def update_pnl(self, symbol):
-
-        pnl_data = pnl_engine.get_position_pnl(symbol)
-
-        risk_engine.update_pnl(pnl_data["pnl"])
-
-        return pnl_data
+        return res
 
 
 engine = ExecutionEngine()
