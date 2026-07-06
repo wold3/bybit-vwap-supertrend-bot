@@ -1,35 +1,104 @@
 from flask import Flask, jsonify
-from storage.trade_db import trade_db
-from execution.pnl_tracker import pnl_tracker
+import time
 
+from storage.trade_db import trade_db
+from execution.pnl_engine import pnl_engine
+
+
+# =========================================================
+# FLASK APP
+# =========================================================
 app = Flask(__name__)
 
 
-@app.route("/trades")
-def trades():
+# =========================================================
+# HOME (브라우저 기본 페이지)
+# =========================================================
+@app.route("/")
+def home():
 
-    return jsonify(trade_db.all())
+    return """
+    <h1>🚀 AUTO TRADING BOT DASHBOARD</h1>
+    <p>Status: RUNNING</p>
+    <p>Endpoints:</p>
+    <ul>
+        <li>/status</li>
+        <li>/pnl</li>
+        <li>/trades</li>
+    </ul>
+    """
 
 
+# =========================================================
+# SYSTEM STATUS
+# =========================================================
+@app.route("/status")
+def status():
+
+    return jsonify({
+        "status": "RUNNING",
+        "timestamp": time.time()
+    })
+
+
+# =========================================================
+# TOTAL PNL
+# =========================================================
 @app.route("/pnl")
 def pnl():
 
-    return jsonify({
-        "total_pnl": pnl_tracker.total_pnl(),
-        "status": "LIVE"
-    })
+    try:
+        total = pnl_engine.get("BTCUSDT")
+
+        return jsonify({
+            "symbol": "BTCUSDT",
+            "pnl": total,
+            "status": "LIVE"
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        })
 
 
-@app.route("/health")
-def health():
+# =========================================================
+# TRADE LIST
+# =========================================================
+@app.route("/trades")
+def trades():
 
-    return jsonify({
-        "system": "OK",
-        "bot": "RUNNING"
-    })
+    try:
+
+        rows = trade_db.all()
+
+        return jsonify([
+            {
+                "id": r[0],
+                "symbol": r[1],
+                "side": r[2],
+                "qty": r[3],
+                "price": r[4],
+                "pnl": r[5],
+                "time": r[6]
+            }
+            for r in rows
+        ])
+
+    except Exception as e:
+
+        return jsonify({
+            "error": str(e)
+        })
 
 
+# =========================================================
+# SERVER START
+# =========================================================
 if __name__ == "__main__":
+
+    print("🚀 Dashboard starting on http://localhost:5000")
 
     app.run(
         host="0.0.0.0",
