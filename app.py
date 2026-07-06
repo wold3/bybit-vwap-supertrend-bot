@@ -1,17 +1,18 @@
 import logging
+import time
+import threading
+
 from flask import Flask, request, jsonify
 
-from strategy.strategy_wrapper import execute_signal
-from services.logger_service import setup_logger
-
-from database.repository import get_summary
-from risk.risk_engine import get_risk_status
-from execution.position_manager import position_manager
-
-setup_logger()
-logger = logging.getLogger(__name__)
+from strategy.strategy_wrapper import execute_strategy
+from execution.execution_engine import engine
+from risk.risk_engine import risk_engine
+from services.logger_service import logger_service
+from services.report_service import send_daily_report
 
 app = Flask(__name__)
+
+logger = logger_service
 
 
 # =====================================================
@@ -19,105 +20,124 @@ app = Flask(__name__)
 # =====================================================
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+
+    return jsonify(
+        {
+            "status": "ok",
+            "engine": engine.health(),
+            "risk": risk_engine.health(),
+        }
+    )
 
 
 # =====================================================
-# TradingView Webhook
+# Webhook (TradingView)
 # =====================================================
 @app.route("/webhook", methods=["POST"])
 def webhook():
 
     try:
-        data = request.json
 
-        logger.info("WEBHOOK RECEIVED: %s", data)
+        data = request.get_json()
 
+        signal = data.get("signal")
         symbol = data.get("symbol")
-        qty = data.get("qty")
         price = data.get("price")
+        qty = data.get("qty")
 
-        result = execute_signal(
-            data=data,
+        logger.info(
+            "Webhook received %s %s",
+            signal,
+            symbol,
+        )
+
+        result = execute_strategy(
+            signal=signal,
+            price=price,
             symbol=symbol,
             qty=qty,
-            price=price,
         )
 
         return jsonify(result)
 
     except Exception as e:
-        logger.exception(e)
 
-        return jsonify({
-            "success": False,
-            "error": str(e),
-        }), 500
+        logger.exception("Webhook error")
 
-
-# =====================================================
-# Bot Status
-# =====================================================
-@app.route("/status", methods=["GET"])
-def status():
-
-    return jsonify({
-        "service": "bybit-trading-bot",
-        "status": "running",
-    })
+        return jsonify(
+            {
+                "success": False,
+                "error": str(e),
+            }
+        ), 500
 
 
 # =====================================================
-# Dashboard Summary API (FIXED)
+# Engine Monitor
 # =====================================================
-@app.route("/api/summary", methods=["GET"])
-def summary():
+def monitor_engine():
 
-    try:
+    while True:
 
-        summary_data = get_summary()
-        risk_data = get_risk_status()
-        position_data = position_manager.status()
+        try:
 
-        return jsonify({
-            "summary": summary_data,
-            "risk": risk_data,
-            "position": position_data,
-        })
+            status = engine.status()
 
-    except Exception as e:
-        logger.exception(e)
+            logger.info(
+                "Engine status: %s",
+                status,
+            )
 
-        return jsonify({
-            "success": False,
-            "error": str(e),
-        }), 500
+        except Exception as e:
+
+            logger.exception(e)
+
+        time.sleep(60)
 
 
 # =====================================================
-# Risk API
+# Daily Report Scheduler
 # =====================================================
-@app.route("/api/risk", methods=["GET"])
-def risk():
+def report_scheduler():
 
-    try:
-        return jsonify(get_risk_status())
-    except Exception as e:
-        logger.exception(e)
-        return jsonify({"error": str(e)}), 500
+    last_date = None
+
+    while True:
+
+        try:
+
+            current_date = time.strftime("%Y-%m-%d")
+
+            if current_date != last_date:
+
+                send_daily_report()
+
+                last_date = current_date
+
+        except Exception as e:
+
+            logger.exception(e)
+
+        time.sleep(300)
 
 
 # =====================================================
-# Position API
+# Startup Threads
 # =====================================================
-@app.route("/api/position", methods=["GET"])
-def position():
+def start_background_tasks():
 
-    try:
-        return jsonify(position_manager.status())
-    except Exception as e:
-        logger.exception(e)
-        return jsonify({"error": str(e)}), 500
+    t1 = threading.Thread(
+        target=monitor_engine,
+        daemon=True,
+    )
+
+    t2 = threading.Thread(
+        target=report_scheduler,
+        daemon=True,
+    )
+
+    t1.start()
+    t2.start()
 
 
 # =====================================================
@@ -125,7 +145,9 @@ def position():
 # =====================================================
 if __name__ == "__main__":
 
-    logger.info("Starting Bybit Trading Bot...")
+    logger.info("Starting Trading Bot")
+
+    start_background_tasks()
 
     app.run(
         host="0.0.0.0",
