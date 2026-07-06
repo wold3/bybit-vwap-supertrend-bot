@@ -1,7 +1,7 @@
 import json
 import logging
-import websocket
 import threading
+import websocket
 
 logger = logging.getLogger(__name__)
 
@@ -15,46 +15,50 @@ class BybitWebSocket:
     def set_price_callback(self, callback):
         self.price_callback = callback
 
-    # =========================
-    # MESSAGE HANDLER
-    # =========================
+    # =====================================================
+    # MESSAGE HANDLER (FIXED)
+    # =====================================================
     def on_message(self, ws, message):
 
         try:
-            # ✅ 1. 문자열이면 JSON 변환
+            # 1. JSON 파싱
             if isinstance(message, str):
                 try:
                     data = json.loads(message)
-                except Exception:
-                    logger.error(f"WS raw message (not json): {message}")
+                except json.JSONDecodeError:
+                    logger.warning(f"Non-JSON message ignored: {message}")
                     return
             else:
                 data = message
 
-            # =========================
-            # Bybit 구조 대응
-            # =========================
-            if isinstance(data, dict):
+            # 2. dict 체크
+            if not isinstance(data, dict):
+                return
 
-                # Bybit v5 ticker format 대응
-                result = data.get("data") or data.get("result")
+            # 3. Bybit v5 구조 대응
+            raw = data.get("data") or data.get("result")
 
-                if isinstance(result, list) and len(result) > 0:
-                    item = result[0]
+            if raw is None:
+                return
+
+            # 4. list 구조
+            if isinstance(raw, list):
+                for item in raw:
+                    if not isinstance(item, dict):
+                        continue
 
                     price = item.get("lastPrice") or item.get("price")
 
                     if price and self.price_callback:
                         self.price_callback(float(price))
 
-                elif isinstance(result, dict):
-                    price = result.get("lastPrice") or result.get("price")
+            # 5. dict 구조
+            elif isinstance(raw, dict):
 
-                    if price and self.price_callback:
-                        self.price_callback(float(price))
+                price = raw.get("lastPrice") or raw.get("price")
 
-            else:
-                logger.error(f"WS unknown format: {type(data)}")
+                if price and self.price_callback:
+                    self.price_callback(float(price))
 
         except Exception as e:
             logger.error(f"WS message error: {str(e)}")
@@ -68,6 +72,9 @@ class BybitWebSocket:
     def on_open(self, ws):
         logger.info("WebSocket connected")
 
+    # =====================================================
+    # START
+    # =====================================================
     def start(self):
 
         def run():
