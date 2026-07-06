@@ -1,6 +1,5 @@
 from api.bybit_client import bybit
 
-
 class PnL:
 
     def get(self, symbol):
@@ -13,6 +12,5 @@ class PnL:
             pnl += float(p.get("unrealisedPnl", 0))
 
         return pnl
-
 
 pnl_engine = PnL()
