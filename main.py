@@ -8,22 +8,17 @@ from ai.trading_brain import brain
 from strategy.strategy_router import update_market_state
 from strategy.strategy_wrapper import execute_strategy
 from risk.risk_engine import risk_engine
+
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
-latest_price = {"value": None}
+latest_price = {"value": None, "ts": 0}
 
 
-# =====================================================
-# INIT
-# =====================================================
 def init_system():
 
     logger.info("SYSTEM INIT START")
@@ -38,18 +33,14 @@ def init_system():
     logger.info("SYSTEM READY")
 
 
-# =====================================================
-# WS CALLBACK
-# =====================================================
 def on_price(price):
 
     latest_price["value"] = price
+    latest_price["ts"] = time.time()
+
     update_market_state(price, 0)
 
 
-# =====================================================
-# TRADING LOOP (FIXED)
-# =====================================================
 def run_trading():
 
     logger.info("TRADING STARTED")
@@ -61,8 +52,10 @@ def run_trading():
         try:
 
             price = latest_price["value"]
+            ts = latest_price["ts"]
 
-            if price is None:
+            # price 없거나 stale이면 skip
+            if price is None or time.time() - ts > 5:
                 time.sleep(0.5)
                 continue
 
@@ -80,26 +73,15 @@ def run_trading():
             risk_engine.update(pnl)
             brain.record(decision["strategy"], pnl)
 
-            logger.info(
-                f"PRICE={price} STRATEGY={decision['strategy']} PNL={pnl}"
-            )
+            logger.info(f"PRICE={price} STRATEGY={decision['strategy']} PNL={pnl}")
 
             time.sleep(2)
 
         except Exception as e:
-
-            logger.error(f"MAIN ERROR: {str(e)}")
-
-            tg = get_telegram()
-            if tg:
-                tg.error(e)
-
+            logger.error(f"MAIN ERROR: {e}")
             time.sleep(5)
 
 
-# =====================================================
-# ENTRY
-# =====================================================
 if __name__ == "__main__":
 
     init_system()
