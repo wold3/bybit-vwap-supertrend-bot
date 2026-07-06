@@ -1,7 +1,6 @@
 import json
 import logging
 import websocket
-import threading
 
 logger = logging.getLogger(__name__)
 
@@ -15,95 +14,90 @@ class BybitWebSocket:
     def set_price_callback(self, callback):
         self.price_callback = callback
 
-    # =====================================================
-    # ON MESSAGE (FIX 핵심)
-    # =====================================================
-    def on_message(self, ws, message):
+    # =========================
+    # 메시지 처리 핵심 FIX
+    # =========================
+    def _on_message(self, ws, message):
 
         try:
-            # 1) string → dict 변환
+            # ✅ 1) string이면 JSON 파싱
             if isinstance(message, str):
-                data = json.loads(message)
+                try:
+                    data = json.loads(message)
+                except Exception:
+                    logger.warning(f"WS non-json message skipped: {message}")
+                    return
             else:
                 data = message
 
-            # 2) Bybit v5 대응
+            # ✅ 2) dict 아니면 종료
             if not isinstance(data, dict):
+                logger.warning(f"WS invalid type skipped: {type(data)}")
                 return
 
-            # Bybit WS 구조: data / result / topic 혼재
-            payload = None
+            # =========================
+            # Bybit 구조 방어 처리
+            # =========================
 
             if "data" in data:
-                payload = data["data"]
-            elif "result" in data:
-                payload = data["result"]
-            elif "price" in data:
-                payload = data
+                data = data["data"]
 
-            if payload is None:
-                return
-
-            # list 구조
-            if isinstance(payload, list):
-                for item in payload:
-                    self._handle_item(item)
-
-            # dict 구조
-            elif isinstance(payload, dict):
-                self._handle_item(payload)
-
-        except json.JSONDecodeError:
-            logger.error(f"WS JSON decode failed: {message}")
+            # list 형태 방어
+            if isinstance(data, list):
+                for item in data:
+                    self._process_item(item)
+            else:
+                self._process_item(data)
 
         except Exception as e:
             logger.error(f"WS message error: {str(e)}")
 
-    # =====================================================
-    # ITEM HANDLER
-    # =====================================================
-    def _handle_item(self, item):
+    # =========================
+    # 실제 처리
+    # =========================
+    def _process_item(self, item):
 
         try:
             if not isinstance(item, dict):
                 return
 
             price = None
-            volume = None
 
+            # 여러 Bybit 포맷 대응
             if "lastPrice" in item:
                 price = float(item.get("lastPrice", 0))
-                volume = float(item.get("volume24h", 0))
-
             elif "price" in item:
                 price = float(item.get("price", 0))
+            elif "p" in item:
+                price = float(item.get("p", 0))
 
-            if price is not None and self.price_callback:
-                self.price_callback(price, volume or 0)
+            if price and self.price_callback:
+                self.price_callback(price)
 
         except Exception as e:
-            logger.error(f"Item parse error: {e}")
+            logger.error(f"WS item error: {str(e)}")
 
-    # =====================================================
-    # START
-    # =====================================================
+    def _on_open(self, ws):
+        logger.info("WebSocket connected")
+
+    def _on_close(self, ws, close_status_code, close_msg):
+        logger.warning("WebSocket closed")
+
     def start(self):
-
-        def run():
-            self.ws = websocket.WebSocketApp(
-                "wss://stream.bybit.com/v5/public/linear",
-                on_message=self.on_message,
-                on_open=lambda ws: logger.info("WebSocket connected"),
-                on_error=lambda ws, e: logger.error(f"WS error: {e}"),
-                on_close=lambda ws, c, m: logger.warning("WebSocket closed")
-            )
-            self.ws.run_forever()
-
-        t = threading.Thread(target=run)
-        t.daemon = True
-        t.start()
+        self.ws = websocket.WebSocketApp(
+            "wss://stream.bybit.com/v5/public/linear",
+            on_message=self._on_message,
+            on_open=self._on_open,
+            on_close=self._on_close
+        )
 
         logger.info("WebSocket started")
+        self.ws.run_forever()
+
+    def stop(self):
+        if self.ws:
+            self.ws.close()
+            logger.info("WebSocket stopped")
 
 
 ws_client = BybitWebSocket()
