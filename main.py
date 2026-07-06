@@ -8,12 +8,12 @@ from ai.trading_brain import brain
 from strategy.strategy_router import update_market_state
 from strategy.strategy_wrapper import execute_strategy
 from risk.risk_engine import risk_engine
+from market.candle_builder import candle_builder
 
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
 logging.basicConfig(level=logging.INFO)
-
 logger = logging.getLogger(__name__)
 
 latest_price = {"value": None, "ts": 0}
@@ -23,10 +23,7 @@ def init_system():
 
     logger.info("SYSTEM INIT START")
 
-    init_telegram(
-        token="YOUR_TELEGRAM_TOKEN",
-        chat_id="YOUR_CHAT_ID"
-    )
+    init_telegram("YOUR_TOKEN", "YOUR_CHAT_ID")
 
     watchdog.start()
 
@@ -37,6 +34,8 @@ def on_price(price):
 
     latest_price["value"] = price
     latest_price["ts"] = time.time()
+
+    candle_builder.update(price)
 
     update_market_state(price, 0)
 
@@ -54,7 +53,6 @@ def run_trading():
             price = latest_price["value"]
             ts = latest_price["ts"]
 
-            # price 없거나 stale이면 skip
             if price is None or time.time() - ts > 5:
                 time.sleep(0.5)
                 continue
