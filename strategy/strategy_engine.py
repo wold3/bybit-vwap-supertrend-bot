@@ -1,4 +1,6 @@
+
 from ml_filter import ml_filter
+from position_sizer import position_sizer
 
 
 class StrategyEngine:
@@ -11,25 +13,46 @@ class StrategyEngine:
         self.be_moved = {}
 
     # =================================================
-    # SIGNAL ENTRY (WITH ML FILTER)
+    # SIGNAL ENTRY (ML + SIZING + EXECUTION)
     # =================================================
-    def on_signal(self, symbol, side, price, qty, market_data=None):
+    def on_signal(self, symbol, side, price, market_data=None):
 
         # ============================================
         # 1. ML FILTER GATE
         # ============================================
         if market_data:
 
-            allow = ml_filter.allow_trade(market_data)
-
-            if not allow:
+            if not ml_filter.allow_trade(market_data):
 
                 print(f"[STRATEGY] BLOCKED BY ML FILTER: {symbol}")
 
                 return
 
         # ============================================
-        # 2. EXECUTE TRADE
+        # 2. STOP LOSS 기준 설정
+        # ============================================
+        stop_loss_price = price * 0.995  # -0.5% 고정 예시
+
+        # ============================================
+        # 3. ACCOUNT BALANCE (임시 or API 연결 가능)
+        # ============================================
+        balance = 10000  # TODO: Bybit wallet balance API 연결
+
+        # ============================================
+        # 4. POSITION SIZE 계산 (핵심)
+        # ============================================
+        qty = position_sizer.calculate(
+            balance=balance,
+            entry_price=price,
+            stop_loss_price=stop_loss_price
+        )
+
+        if qty <= 0:
+            print("[STRATEGY] INVALID QTY")
+            return
+
+        # ============================================
+        # 5. EXECUTE TRADE
         # ============================================
         self.execution.execute(symbol, side, qty)
 
@@ -38,7 +61,7 @@ class StrategyEngine:
         self.be_moved[symbol] = False
 
     # =================================================
-    # PRICE UPDATE LOOP (SL / TP MANAGEMENT)
+    # PRICE UPDATE LOOP (TP / SL / BE MANAGEMENT)
     # =================================================
     def on_price(self, symbol, price, position):
 
@@ -55,7 +78,7 @@ class StrategyEngine:
         # ============================================
         if pnl_pct >= 0.5 and not self.tp1_hit.get(symbol):
 
-            print(f"[TP1 HIT] {symbol}")
+            print(f"[TP1] {symbol}")
 
             self.tp1_hit[symbol] = True
 
@@ -66,7 +89,7 @@ class StrategyEngine:
         # ============================================
         if pnl_pct >= 0.3 and not self.be_moved.get(symbol):
 
-            print(f"[MOVE SL TO BE] {symbol}")
+            print(f"[BE MOVE] {symbol}")
 
             self.be_moved[symbol] = True
 
@@ -77,7 +100,7 @@ class StrategyEngine:
         # ============================================
         if pnl_pct >= 1.0:
 
-            print(f"[FINAL TP] {symbol}")
+            print(f"[TP2 EXIT] {symbol}")
 
             self.execution.close_position(symbol)
 
@@ -91,7 +114,7 @@ class StrategyEngine:
             self.execution.close_position(symbol)
 
     # =================================================
-    # PNL CALC
+    # PNL CALCULATION
     # =================================================
     def _calc_pnl(self, entry, price, side):
 
