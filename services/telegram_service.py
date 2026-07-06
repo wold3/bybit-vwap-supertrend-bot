@@ -31,7 +31,7 @@ class TelegramService:
         try:
             requests.post(self.url, data=payload, timeout=5)
         except Exception as e:
-            logger.error(f"Telegram error: {str(e)}")
+            logger.error(f"Telegram send error: {str(e)}")
 
     # =====================================================
     # 거래 알림
@@ -40,7 +40,7 @@ class TelegramService:
     def trade(self, symbol, side, qty, price, pnl=None):
 
         msg = f"""
-📊 <b>TRADE</b>
+📊 <b>TRADE EXECUTED</b>
 ────────────────
 Symbol: {symbol}
 Side: {side}
@@ -56,22 +56,22 @@ Price: {price}
         self.send(msg)
 
     # =====================================================
-    # 리스크 상태 알림 (업그레이드)
+    # 리스크 상태
     # =====================================================
 
     def risk_update(self):
 
         s = risk_engine.status()
 
-        emoji = "🟢"
+        color = "🟢"
 
         if s["risk_score"] < 40:
-            emoji = "🔴"
+            color = "🔴"
         elif s["risk_score"] < 70:
-            emoji = "🟡"
+            color = "🟡"
 
         msg = f"""
-{emoji} <b>RISK STATUS</b>
+{color} <b>RISK STATUS</b>
 ────────────────
 PnL: {s['daily_pnl']}
 Win Rate: {s['win_rate']}%
@@ -86,7 +86,7 @@ Time: {datetime.utcnow()}
         self.send(msg)
 
     # =====================================================
-    # 드로우다운 경고 (핵심 추가)
+    # 드로우다운 경고
     # =====================================================
 
     def drawdown_alert(self):
@@ -99,7 +99,7 @@ Time: {datetime.utcnow()}
 🚨 <b>DRAWDOWN ALERT</b>
 ────────────────
 Drawdown: {s['drawdown']}
-Risk Mode: {s['regime_bias']}
+Mode: {s['regime_bias']}
 Action: REDUCE RISK
 Time: {datetime.utcnow()}
 """
@@ -107,7 +107,7 @@ Time: {datetime.utcnow()}
             self.send(msg)
 
     # =====================================================
-    # 수익 폭발 알림
+    # 수익 급등 알림
     # =====================================================
 
     def profit_spike(self):
@@ -164,7 +164,7 @@ Time: {datetime.utcnow()}
 
 
 # =====================================================
-# Singleton
+# SINGLETON
 # =====================================================
 
 telegram_service = None
