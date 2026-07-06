@@ -1,22 +1,96 @@
-import threading
 import time
 import os
+import subprocess
+import psutil
+from telegram import telegram
 
 
-# ================================
-# SIMPLE WATCHDOG
-# ================================
-def monitor():
+class Watchdog:
 
-    while True:
+    def __init__(self):
 
-        # 여기에 상태 체크 로직 추가 가능
-        print("[WATCHDOG] SYSTEM ALIVE")
+        self.process_name = "main.py"
+        self.restart_cmd = ["python", "main.py"]
 
-        time.sleep(10)
+        self.max_cpu = 90
+        self.max_memory = 90
+
+    # =================================================
+    # PROCESS CHECK
+    # =================================================
+    def is_running(self):
+
+        for proc in psutil.process_iter(['cmdline']):
+
+            try:
+                cmd = proc.info['cmdline']
+
+                if cmd and "main.py" in " ".join(cmd):
+                    return True
+
+            except:
+                continue
+
+        return False
+
+    # =================================================
+    # RESOURCE CHECK
+    # =================================================
+    def system_ok(self):
+
+        cpu = psutil.cpu_percent(interval=1)
+        mem = psutil.virtual_memory().percent
+
+        print(f"[WATCHDOG] CPU={cpu}% MEM={mem}%")
+
+        if cpu > self.max_cpu or mem > self.max_memory:
+            return False
+
+        return True
+
+    # =================================================
+    # RESTART SYSTEM
+    # =================================================
+    def restart(self):
+
+        telegram.send("⚠️ SYSTEM RESTARTING (WATCHDOG)")
+
+        print("[WATCHDOG] RESTARTING SYSTEM...")
+
+        subprocess.Popen(self.restart_cmd)
 
 
-def start_watchdog():
+    # =================================================
+    # MAIN LOOP
+    # =================================================
+    def run(self):
 
-    t = threading.Thread(target=monitor, daemon=True)
-    t.start()
+        while True:
+
+            try:
+
+                time.sleep(10)
+
+                # 1. process check
+                if not self.is_running():
+                    print("[WATCHDOG] MAIN NOT RUNNING")
+                    self.restart()
+                    continue
+
+                # 2. system health
+                if not self.system_ok():
+                    print("[WATCHDOG] HIGH LOAD DETECTED")
+                    self.restart()
+                    continue
+
+            except Exception as e:
+
+                print("[WATCHDOG ERROR]", e)
+                telegram.send(f"❌ WATCHDOG ERROR: {e}")
+
+
+# RUN
+if __name__ == "__main__":
+
+    w = Watchdog()
+    w.run()
