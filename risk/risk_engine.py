@@ -1,10 +1,7 @@
 import numpy as np
-import logging
 from datetime import datetime
 
 from config import MAX_DAILY_LOSS, MAX_LOSS_STREAK
-
-logger = logging.getLogger(__name__)
 
 
 class RiskEngine:
@@ -17,41 +14,47 @@ class RiskEngine:
         self.trade_count = 0
         self.loss_streak = 0
 
-        self.fee_rate = 0.0006  # Bybit 실수수료 기준 (taker)
-        self.slippage_buffer = 0.0003  # 슬리피지 보정
-        self.win_rate_filter = 45.0  # 최소 승률 기준(%)
+        self.equity_curve = []
+
+        self.max_drawdown = 0.0
+        self.peak_equity = 0.0
+
+        self.base_risk = 0.02
 
         self.last_reset = datetime.utcnow().date()
 
     # =====================================================
-    # 핵심 PnL 보정 (실전용)
+    # Equity 업데이트 (핵심)
     # =====================================================
 
-    def apply_cost(self, pnl, price=None, qty=None):
+    def update_equity(self, pnl):
 
-        fee = 0.0
+        self.equity_curve.append(pnl)
 
-        if price and qty:
-            fee = price * qty * self.fee_rate * 2  # 진입+청산
+        equity = sum(self.equity_curve)
 
-        slippage = abs(pnl) * self.slippage_buffer
+        if equity > self.peak_equity:
+            self.peak_equity = equity
 
-        adjusted_pnl = pnl - fee - slippage
+        drawdown = self.peak_equity - equity
 
-        return adjusted_pnl
+        if drawdown > self.max_drawdown:
+            self.max_drawdown = drawdown
 
     # =====================================================
-    # Update
+    # PnL 업데이트
     # =====================================================
 
     def update(self, pnl, price=None, qty=None):
 
-        pnl = self.apply_cost(pnl, price, qty)
+        pnl = float(pnl)
 
-        self.pnl_history.append(float(pnl))
+        self.pnl_history.append(pnl)
 
         self.daily_pnl += pnl
         self.trade_count += 1
+
+        self.update_equity(pnl)
 
         if pnl < 0:
             self.loss_streak += 1
@@ -62,7 +65,34 @@ class RiskEngine:
             self.pnl_history.pop(0)
 
     # =====================================================
-    # CVaR
+    # Dynamic Risk Scaling (핵심 수익 엔진)
+    # =====================================================
+
+    def dynamic_risk(self):
+
+        if self.peak_equity <= 0:
+            return self.base_risk
+
+        drawdown_ratio = self.max_drawdown / (self.peak_equity + 1e-9)
+
+        risk = self.base_risk
+
+        # 드로우다운 심하면 축소
+        if drawdown_ratio > 0.2:
+            risk *= 0.3
+        elif drawdown_ratio > 0.1:
+            risk *= 0.6
+        elif drawdown_ratio > 0.05:
+            risk *= 0.8
+
+        # 회복 구간에서는 공격 증가
+        if self.daily_pnl > 0:
+            risk *= 1.2
+
+        return round(min(risk, 0.05), 4)
+
+    # =====================================================
+    # CVaR (tail risk)
     # =====================================================
 
     def cvar(self):
@@ -78,24 +108,20 @@ class RiskEngine:
         return float(tail.mean()) if len(tail) else 0.0
 
     # =====================================================
-    # 승률 필터
+    # Win Rate
     # =====================================================
 
     def win_rate(self):
 
-        if self.trade_count < 10:
+        if len(self.pnl_history) < 10:
             return 0.0
 
         wins = len([x for x in self.pnl_history if x > 0])
 
         return round((wins / len(self.pnl_history)) * 100, 2)
 
-    def pass_win_rate_filter(self):
-
-        return self.win_rate() >= self.win_rate_filter
-
     # =====================================================
-    # Daily Loss
+    # Daily Loss 제한
     # =====================================================
 
     def exceeded_daily_loss(self):
@@ -103,7 +129,7 @@ class RiskEngine:
         return self.daily_pnl <= -abs(MAX_DAILY_LOSS)
 
     # =====================================================
-    # Loss Streak
+    # Loss Streak 제한
     # =====================================================
 
     def exceeded_loss_streak(self):
@@ -111,7 +137,7 @@ class RiskEngine:
         return self.loss_streak >= MAX_LOSS_STREAK
 
     # =====================================================
-    # 최종 허용 판단 (핵심)
+    # 핵심 판단
     # =====================================================
 
     def allow_trade(self):
@@ -122,7 +148,8 @@ class RiskEngine:
         if self.exceeded_loss_streak():
             return False
 
-        if not self.pass_win_rate_filter():
+        # drawdown 보호
+        if self.max_drawdown > self.peak_equity * 0.25:
             return False
 
         return True
@@ -135,16 +162,34 @@ class RiskEngine:
 
         score = 100.0
 
-        score -= min(abs(self.daily_pnl), 50)
-        score -= self.loss_streak * 8
+        score -= min(abs(self.daily_pnl), 40)
+        score -= self.loss_streak * 7
 
-        if not self.pass_win_rate_filter():
-            score -= 30
+        # drawdown penalty
+        if self.max_drawdown > 0:
+            score -= self.max_drawdown * 2
 
         return max(round(score, 2), 0.0)
 
     # =====================================================
-    # Status
+    # 전략 추천 신호 (핵심 추가)
+    # =====================================================
+
+    def regime_bias(self):
+
+        if self.win_rate() < 40:
+            return "SAFE"
+
+        if self.max_drawdown > 0.1:
+            return "CONSERVATIVE"
+
+        if self.daily_pnl > 0:
+            return "AGGRESSIVE"
+
+        return "NORMAL"
+
+    # =====================================================
+    # 상태
     # =====================================================
 
     def status(self):
@@ -157,6 +202,9 @@ class RiskEngine:
             "risk_score": self.risk_score(),
             "allow_trade": self.allow_trade(),
             "cvar": round(self.cvar(), 6),
+            "drawdown": round(self.max_drawdown, 4),
+            "risk": round(self.dynamic_risk(), 4),
+            "regime_bias": self.regime_bias(),
         }
 
 
