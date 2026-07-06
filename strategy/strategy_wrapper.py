@@ -2,7 +2,7 @@ import logging
 
 from risk.risk_engine import risk_engine
 from execution.execution_engine import execute_order
-from strategy_router import route
+from .strategy_router import route
 
 logger = logging.getLogger(__name__)
 
