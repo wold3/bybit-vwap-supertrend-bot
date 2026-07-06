@@ -1,103 +1,56 @@
-import logging
-from datetime import datetime
-
-logger = logging.getLogger(__name__)
-
-
 class PositionManager:
 
     def __init__(self):
 
         self.positions = {}
-        self.realized_pnl = 0.0
-        self.equity = 1000.0
 
-    # =====================================================
+    # =================================================
     # OPEN POSITION
-    # =====================================================
+    # =================================================
     def open_position(self, symbol, side, qty, price):
 
         self.positions[symbol] = {
-            "symbol": symbol,
             "side": side,
             "qty": qty,
             "entry_price": price,
-            "opened_at": datetime.utcnow(),
-            "unrealized_pnl": 0.0
+            "realized_pnl": 0
         }
 
-        logger.info(f"POSITION OPENED: {symbol} {side} @ {price}")
+    # =================================================
+    # FILL UPDATE (핵심)
+    # =================================================
+    def update_fill(self, symbol, side, qty, price):
 
-    # =====================================================
-    # CLOSE POSITION (FIXED)
-    # =====================================================
-    def close_position(self, symbol, price):
+        if symbol not in self.positions:
+            self.open_position(symbol, side, qty, price)
+            return
 
-        pos = self.positions.get(symbol)
+        pos = self.positions[symbol]
 
-        if not pos:
-            return None
+        # 평균가 계산 (단순화)
+        old_qty = pos["qty"]
+        old_price = pos["entry_price"]
 
-        pnl = self.calculate_pnl(symbol, price)
+        new_qty = old_qty + qty
 
-        self.realized_pnl += pnl
-        self.equity += pnl
+        if new_qty == 0:
+            return
 
-        logger.info(f"POSITION CLOSED: {symbol} PnL={pnl} EQUITY={self.equity}")
+        new_price = (
+            (old_qty * old_price + qty * price)
+            / new_qty
+        )
 
-        del self.positions[symbol]
+        pos["qty"] = new_qty
+        pos["entry_price"] = new_price
 
-        return pnl
-
-    # =====================================================
-    # PnL CALC
-    # =====================================================
-    def calculate_pnl(self, symbol, current_price):
-
-        pos = self.positions.get(symbol)
-
-        if not pos:
-            return 0
-
-        entry = pos["entry_price"]
-        qty = pos["qty"]
-        side = pos["side"]
-
-        if side.upper() in ["BUY", "LONG"]:
-            pnl = (current_price - entry) * qty
-        else:
-            pnl = (entry - current_price) * qty
-
-        return pnl
-
-    # =====================================================
-    # UPDATE UNREALIZED PNL
-    # =====================================================
-    def update_unrealized(self, symbol, price):
-
-        pos = self.positions.get(symbol)
-
-        if not pos:
-            return 0
-
-        pnl = self.calculate_pnl(symbol, price)
-
-        pos["unrealized_pnl"] = pnl
-
-        return pnl
-
-    # =====================================================
-    # GETTERS
-    # =====================================================
+    # =================================================
+    # CURRENT POSITION
+    # =================================================
     def get_position(self, symbol):
+
         return self.positions.get(symbol)
 
-    def has_position(self, symbol):
-        return symbol in self.positions
 
-    def get_equity(self):
-        return self.equity
-
-
-# singleton
+# SINGLETON
 position_manager = PositionManager()
