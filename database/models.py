@@ -1,212 +1,62 @@
+from sqlalchemy import Column, Integer, String, Float, DateTime
 from datetime import datetime
 
-from sqlalchemy import (
-    Boolean,
-    DateTime,
-    Float,
-    Integer,
-    String,
-)
-
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
+from database.database import Base
 
 
 # =====================================================
-# Base
-# =====================================================
-
-class Base(DeclarativeBase):
-    pass
-
-
-# =====================================================
-# Trade History
+# TRADE TABLE
 # =====================================================
 
 class Trade(Base):
     __tablename__ = "trades"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    symbol: Mapped[str] = mapped_column(
-        String(30),
-        index=True,
-    )
+    symbol = Column(String, index=True)
+    side = Column(String)  # BUY / SELL
 
-    side: Mapped[str] = mapped_column(
-        String(10),
-    )
+    qty = Column(Float)
+    price = Column(Float)
 
-    qty: Mapped[float] = mapped_column(
-        Float,
-    )
+    leverage = Column(Integer, default=1)
 
-    price: Mapped[float] = mapped_column(
-        Float,
-    )
+    pnl = Column(Float, default=0.0)
 
-    pnl: Mapped[float] = mapped_column(
-        Float,
-        default=0.0,
-    )
+    status = Column(String, default="OPEN")  # OPEN / CLOSED
 
-    strategy: Mapped[str] = mapped_column(
-        String(50),
-        default="",
-    )
-
-    regime: Mapped[str] = mapped_column(
-        String(30),
-        default="",
-    )
-
-    order_id: Mapped[str] = mapped_column(
-        String(100),
-        default="",
-    )
-
-    status: Mapped[str] = mapped_column(
-        String(20),
-        default="OPEN",
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # =====================================================
-# Position
+# PNL HISTORY
 # =====================================================
 
-class Position(Base):
-    __tablename__ = "positions"
+class PnL(Base):
+    __tablename__ = "pnl_history"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    symbol: Mapped[str] = mapped_column(
-        String(30),
-        unique=True,
-    )
+    trade_id = Column(Integer)
 
-    side: Mapped[str] = mapped_column(
-        String(10),
-    )
+    pnl = Column(Float)
 
-    qty: Mapped[float] = mapped_column(
-        Float,
-    )
+    balance = Column(Float)
 
-    entry_price: Mapped[float] = mapped_column(
-        Float,
-    )
-
-    mark_price: Mapped[float] = mapped_column(
-        Float,
-        default=0.0,
-    )
-
-    unrealized_pnl: Mapped[float] = mapped_column(
-        Float,
-        default=0.0,
-    )
-
-    leverage: Mapped[int] = mapped_column(
-        Integer,
-        default=1,
-    )
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # =====================================================
-# Daily Statistics
+# SYSTEM LOGS
 # =====================================================
 
-class DailyStat(Base):
-    __tablename__ = "daily_stats"
+class SystemLog(Base):
+    __tablename__ = "system_logs"
 
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    date: Mapped[str] = mapped_column(
-        String(20),
-        unique=True,
-    )
+    level = Column(String)  # INFO / ERROR / WARNING
 
-    trades: Mapped[int] = mapped_column(
-        Integer,
-        default=0,
-    )
+    message = Column(String)
 
-    wins: Mapped[int] = mapped_column(
-        Integer,
-        default=0,
-    )
-
-    losses: Mapped[int] = mapped_column(
-        Integer,
-        default=0,
-    )
-
-    pnl: Mapped[float] = mapped_column(
-        Float,
-        default=0.0,
-    )
-
-    max_drawdown: Mapped[float] = mapped_column(
-        Float,
-        default=0.0,
-    )
-
-
-# =====================================================
-# Bot State
-# =====================================================
-
-class BotState(Base):
-    __tablename__ = "bot_state"
-
-    id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-    )
-
-    running: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True,
-    )
-
-    last_signal: Mapped[str] = mapped_column(
-        String(20),
-        default="",
-    )
-
-    last_price: Mapped[float] = mapped_column(
-        Float,
-        default=0.0,
-    )
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-    )
+    created_at = Column(DateTime, default=datetime.utcnow)
