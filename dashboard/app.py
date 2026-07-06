@@ -1,7 +1,8 @@
 from flask import Flask, jsonify
 import time
 
-from trade_db import trade_db   # 🔥 핵심 수정 (이게 맞음)
+# 🔥 핵심: 프로젝트 실제 구조
+from trade_db import trade_db
 
 
 app = Flask(__name__)
@@ -42,7 +43,7 @@ def trades():
 @app.route("/pnl-history")
 def pnl_history():
 
-    # 기존 프로젝트에 없을 수도 있음 → 안전 fallback
+    # 안전 처리 (없어도 서버 안 죽게)
     try:
         rows = trade_db.get_pnl_history()
     except:
