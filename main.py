@@ -3,23 +3,38 @@ import logging
 
 from config import SYMBOL
 from api.websocket_client import ws_client
+from api.order_manager import order_manager
+
 from ai.trading_brain import brain
 from strategy.strategy_router import update_market_state
 from strategy.strategy_wrapper import execute_strategy
+
 from risk.risk_engine import risk_engine
+
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
 logger = logging.getLogger(__name__)
 
 
 # =====================================================
 # GLOBAL PRICE STATE
 # =====================================================
-last_price = {"price": 0, "volume": 0}
+last_price = {
+    "price": 0,
+    "volume": 0
+}
 
 
+# =====================================================
+# INIT
+# =====================================================
 def init_system():
 
     logger.info("SYSTEM INIT START")
@@ -57,6 +72,10 @@ def run_trading():
     while True:
 
         try:
+
+            # =================================================
+            # 1. PRICE FETCH (WS 기반)
+            # =================================================
             price = last_price["price"]
             volume = last_price["volume"]
 
@@ -64,8 +83,19 @@ def run_trading():
                 time.sleep(1)
                 continue
 
+            # =================================================
+            # 2. ORDER SYNC (핵심)
+            # =================================================
+            order_manager.sync_orders()
+
+            # =================================================
+            # 3. STRATEGY DECISION
+            # =================================================
             decision = brain.decide("auto", price)
 
+            # =================================================
+            # 4. EXECUTION
+            # =================================================
             result = execute_strategy(
                 signal="auto",
                 price=price,
@@ -73,14 +103,22 @@ def run_trading():
                 equity=equity
             )
 
+            # =================================================
+            # 5. RISK UPDATE (mock pnl)
+            # =================================================
             pnl = (price % 10) - 5
-
             risk_engine.update(pnl)
 
             brain.record(decision["strategy"], pnl)
 
+            # =================================================
+            # 6. LOGGING
+            # =================================================
             logger.info(
-                f"PRICE={price} STRATEGY={decision['strategy']} PNL={pnl}"
+                f"PRICE={price} "
+                f"STRATEGY={decision['strategy']} "
+                f"PNL={pnl} "
+                f"OPEN_ORDERS={len(order_manager.open_orders)}"
             )
 
             time.sleep(2)
@@ -97,13 +135,15 @@ def run_trading():
 
 
 # =====================================================
-# ENTRY
+# ENTRY POINT
 # =====================================================
 if __name__ == "__main__":
 
     init_system()
 
+    # WebSocket start
     ws_client.set_price_callback(on_price)
     ws_client.start()
 
+    # trading loop
     run_trading()
