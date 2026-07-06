@@ -1,81 +1,161 @@
-from strategy.indicators import indicators
-from strategy.filters import allow_trade_by_filter
-
-
-class StrategyRouter:
-
-    # =====================================================
-    # Main Decision
-    # =====================================================
-    def route(self, signal, prices, volumes=None):
-
-        # -----------------------------
-        # 1. 기본 필터 체크
-        # -----------------------------
-        if not allow_trade_by_filter(prices):
-            return False, "FILTERED"
-
-        # -----------------------------
-        # 2. 지표 계산
-        # -----------------------------
-        vwap = None
-        if volumes:
-            vwap = indicators.vwap(prices, volumes)
-
-        trend = indicators.supertrend(prices)
-        strength = indicators.trend_strength(prices)
-
-        # -----------------------------
-        # 3. 약한 시장 제거
-        # -----------------------------
-        if strength < 0.0005:
-            return False, "WEAK_MARKET"
-
-        # -----------------------------
-        # 4. SuperTrend 기반 방향 필터
-        # -----------------------------
-        if trend == "UP" and signal != "BUY":
-            return False, "TREND_CONFLICT"
-
-        if trend == "DOWN" and signal != "SELL":
-            return False, "TREND_CONFLICT"
-
-        # -----------------------------
-        # 5. VWAP 필터 (기관 기준)
-        # -----------------------------
-        if vwap:
-
-            last_price = prices[-1]
-
-            if signal == "BUY" and last_price < vwap:
-                return False, "VWAP_BEARISH"
-
-            if signal == "SELL" and last_price > vwap:
-                return False, "VWAP_BULLISH"
-
-        # -----------------------------
-        # 6. 통과
-        # -----------------------------
-        if trend == "UP":
-            regime = "TREND_UP"
-
-        elif trend == "DOWN":
-            regime = "TREND_DOWN"
-
-        else:
-            regime = "RANGE"
-
-        return True, regime
+import numpy as np
+from collections import deque
 
 
 # =====================================================
-# Singleton
+# 시장 상태 저장 (간단 ML 대체 레이어)
 # =====================================================
-router = StrategyRouter()
+
+price_window = deque(maxlen=50)
+volume_window = deque(maxlen=50)
 
 
 # =====================================================
-# Public API
+# 입력 업데이트
 # =====================================================
-def route(signal, prices, volumes=None):
-    return router.route(signal, prices, volumes)
+
+def update_market_state(price, volume=None):
+
+    price_window.append(price)
+
+    if volume is not None:
+        volume_window.append(volume)
+
+
+# =====================================================
+# 변동성 계산
+# =====================================================
+
+def volatility():
+
+    if len(price_window) < 10:
+        return 0.0
+
+    arr = np.array(price_window)
+
+    return float(np.std(arr) / np.mean(arr))
+
+
+# =====================================================
+# 트렌드 판단
+# =====================================================
+
+def trend_direction():
+
+    if len(price_window) < 10:
+        return "UNKNOWN"
+
+    arr = np.array(price_window)
+
+    short = np.mean(arr[-10:])
+    long = np.mean(arr)
+
+    if short > long * 1.002:
+        return "TREND_UP"
+
+    if short < long * 0.998:
+        return "TREND_DOWN"
+
+    return "RANGE"
+
+
+# =====================================================
+# Fake breakout 필터
+# =====================================================
+
+def fake_breakout_filter(price):
+
+    if len(price_window) < 20:
+        return True
+
+    arr = np.array(price_window)
+
+    resistance = np.max(arr[-20:])
+    support = np.min(arr[-20:])
+
+    # breakout인데 volume 없으면 fake 가능성
+    if price > resistance and volatility() < 0.001:
+        return False
+
+    if price < support and volatility() < 0.001:
+        return False
+
+    return True
+
+
+# =====================================================
+# 신호 신뢰도 점수
+# =====================================================
+
+def signal_confidence(price):
+
+    if len(price_window) < 20:
+        return 50
+
+    vol = volatility()
+
+    trend = trend_direction()
+
+    confidence = 50
+
+    # 트렌드 가중치
+    if trend == "TREND_UP":
+        confidence += 20
+    elif trend == "TREND_DOWN":
+        confidence += 20
+
+    # 변동성 패널티
+    if vol > 0.02:
+        confidence -= 20
+
+    if vol < 0.005:
+        confidence -= 10
+
+    return max(min(confidence, 100), 0)
+
+
+# =====================================================
+# 메인 라우팅
+# =====================================================
+
+def route(signal, price):
+
+    update_market_state(price)
+
+    trend = trend_direction()
+
+    confidence = signal_confidence(price)
+
+    # -------------------------
+    # fake breakout 차단
+    # -------------------------
+    if not fake_breakout_filter(price):
+        return False, "FAKE_BREAKOUT"
+
+    # -------------------------
+    # 신뢰도 필터
+    # -------------------------
+    if confidence < 40:
+        return False, "LOW_CONFIDENCE"
+
+    # -------------------------
+    # 기본 필터
+    # -------------------------
+    if trend == "UNKNOWN":
+        return False, "NO_TREND"
+
+    return True, trend
+
+
+# =====================================================
+# Helper
+# =====================================================
+
+def get_state():
+
+    return {
+        "trend": trend_direction(),
+        "volatility": volatility(),
+        "confidence": signal_confidence(price_window[-1] if price_window else 0),
+        "last_price": price_window[-1] if price_window else None,
+    }
