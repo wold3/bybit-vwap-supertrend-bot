@@ -11,12 +11,8 @@ logger = logging.getLogger(__name__)
 class BybitWebSocket:
 
     def __init__(self):
-
         self.ws = None
 
-    # =====================================================
-    # START
-    # =====================================================
     def start(self):
 
         def run():
@@ -34,32 +30,19 @@ class BybitWebSocket:
 
         threading.Thread(target=run, daemon=True).start()
 
-    # =====================================================
-    # MESSAGE HANDLER (핵심 수정)
-    # =====================================================
     def on_message(self, ws, message):
 
         try:
 
-            # -------------------------
-            # 1) 안전 파싱 (핵심)
-            # -------------------------
             if isinstance(message, bytes):
                 message = message.decode("utf-8")
 
-            if not message:
-                return
-
             data = json.loads(message)
 
-            # -------------------------
-            # 2) PRICE EVENT
-            # -------------------------
             if "topic" in data and "tickers" in data.get("topic", ""):
 
                 items = data.get("data", [])
 
-                # 👉 str 방지 핵심
                 if isinstance(items, list):
 
                     for item in items:
@@ -79,25 +62,16 @@ class BybitWebSocket:
                         })
 
         except Exception as e:
-            logger.error(f"WS message error: {str(e)}")
+            logger.error(f"WS error: {str(e)}")
 
-    # =====================================================
-    # OPEN
-    # =====================================================
     def on_open(self, ws):
         logger.info("WebSocket connected")
 
-    # =====================================================
-    # CLOSE
-    # =====================================================
     def on_close(self, ws, *args):
         logger.warning("WebSocket closed")
 
-    # =====================================================
-    # ERROR
-    # =====================================================
     def on_error(self, ws, error):
-        logger.error(f"WebSocket error: {error}")
+        logger.error(f"WS error: {error}")
 
 
 ws_client = BybitWebSocket()
