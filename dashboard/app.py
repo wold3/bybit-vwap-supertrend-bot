@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, render_template
 
 from database.trade_db import trade_db
+from execution.execution_engine import engine
 
 app = Flask(__name__)
 
@@ -36,26 +37,20 @@ def trades():
 
 
 # =================================================
-# EQUITY CURVE
+# TOTAL EQUITY (핵심)
 # =================================================
-@app.route("/api/equity")
-def equity():
+@app.route("/api/equity-total")
+def equity_total():
 
-    rows = trade_db.get_equity_history()
-
-    return jsonify([
-        {
-            "equity": r[0],
-            "time": r[1]
-        }
-        for r in rows
-    ])
+    return jsonify({
+        "total_equity": engine.get_total_equity()
+    })
 
 
 # RUN
 if __name__ == "__main__":
 
-    print("🚀 Dashboard running on http://localhost:5000")
+    print("🚀 Dashboard running")
 
     app.run(
         host="0.0.0.0",
