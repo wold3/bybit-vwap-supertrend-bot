@@ -1,50 +1,63 @@
 import time
 import threading
-from services.logger_service import logger
 
 
 class ExecutionGuard:
 
-    def __init__(self):
+    def __init__(self, cooldown_sec: int = 3):
+
+        self.cooldown_sec = cooldown_sec
+
+        self.last_execution_time = {}
 
         self.lock = threading.Lock()
-        self.last_order_time = 0
-        self.min_interval = 2
-        self.recent_symbols = set()
 
-    def acquire(self):
+    # =====================================================
+    # Check Allow Execution
+    # =====================================================
+    def allow(self, symbol: str) -> bool:
 
-        return self.lock.acquire(blocking=False)
+        with self.lock:
 
-    def release(self):
+            now = time.time()
 
-        if self.lock.locked():
-            self.lock.release()
+            last_time = self.last_execution_time.get(symbol)
 
-    def rate_limit(self):
+            if last_time is None:
+                self.last_execution_time[symbol] = now
+                return True
 
-        now = time.time()
+            if now - last_time < self.cooldown_sec:
+                return False
 
-        if now - self.last_order_time < self.min_interval:
-            logger.warning("Rate limit blocked")
-            return False
+            self.last_execution_time[symbol] = now
 
-        self.last_order_time = now
-        return True
+            return True
 
-    def allow_symbol(self, symbol):
+    # =====================================================
+    # Force Reset
+    # =====================================================
+    def reset(self, symbol: str = None):
 
-        if symbol in self.recent_symbols:
-            logger.warning("Duplicate symbol blocked: %s", symbol)
-            return False
+        with self.lock:
 
-        self.recent_symbols.add(symbol)
-        return True
+            if symbol:
+                self.last_execution_time.pop(symbol, None)
+            else:
+                self.last_execution_time.clear()
 
-    def clear_symbol(self, symbol):
+    # =====================================================
+    # Status
+    # =====================================================
+    def status(self):
 
-        if symbol in self.recent_symbols:
-            self.recent_symbols.remove(symbol)
+        return {
+            "tracked_symbols": len(self.last_execution_time),
+            "cooldown_sec": self.cooldown_sec,
+        }
 
 
+# =====================================================
+# Singleton
+# =====================================================
 execution_guard = ExecutionGuard()
