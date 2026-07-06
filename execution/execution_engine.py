@@ -16,7 +16,12 @@ class BybitExecutionEngine:
 
         self.symbol = os.getenv("SYMBOL", "BTCUSDT")
 
-        self.equity = 10000
+        # 포트폴리오 equity
+        self.portfolio = {
+            "BTCUSDT": 10000,
+            "ETHUSDT": 10000,
+            "SOLUSDT": 10000
+        }
 
     # =================================================
     # EXECUTE
@@ -34,9 +39,12 @@ class BybitExecutionEngine:
 
         pnl = position_manager.update_price(symbol, entry_price)
 
-        # equity update
-        self.equity += pnl
-        trade_db.insert_equity(self.equity)
+        # =========================================
+        # SYMBOL별 EQUITY 업데이트
+        # =========================================
+        self.portfolio[symbol] += pnl
+
+        trade_db.insert_equity(symbol, self.portfolio[symbol])
 
         trade_db.insert(symbol, side, qty, entry_price, pnl)
 
@@ -48,10 +56,18 @@ class BybitExecutionEngine:
     # PRICE MOCK
     # =================================================
     def _price(self):
+
         return 65000 + random.randint(-100, 100)
 
     # =================================================
-    # WS
+    # TOTAL EQUITY
+    # =================================================
+    def get_total_equity(self):
+
+        return sum(self.portfolio.values())
+
+    # =================================================
+    # WS PUSH
     # =================================================
     def _push(self, pnl):
 
