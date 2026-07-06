@@ -1,6 +1,8 @@
-import requests
 import logging
+import requests
 from datetime import datetime
+
+from risk.risk_engine import risk_engine
 
 logger = logging.getLogger(__name__)
 
@@ -11,82 +13,115 @@ class TelegramService:
 
         self.token = token
         self.chat_id = chat_id
-        self.base_url = f"https://api.telegram.org/bot{token}"
+
+        self.base_url = f"https://api.telegram.org/bot{token}/sendMessage"
 
     # =====================================================
-    # Send Message
+    # 기본 전송
     # =====================================================
-    def send_message(self, text):
+
+    def send(self, message):
+
+        payload = {
+            "chat_id": self.chat_id,
+            "text": message,
+            "parse_mode": "HTML"
+        }
 
         try:
-
-            url = f"{self.base_url}/sendMessage"
-
-            payload = {
-                "chat_id": self.chat_id,
-                "text": text,
-                "parse_mode": "HTML"
-            }
-
-            requests.post(url, data=payload, timeout=5)
-
+            requests.post(self.base_url, data=payload, timeout=5)
         except Exception as e:
-            logger.error("Telegram send failed: %s", e)
+            logger.error(f"Telegram send error: {str(e)}")
 
     # =====================================================
-    # Trade Alert
+    # 거래 알림
     # =====================================================
-    def send_trade(self, signal, symbol, qty, price):
+
+    def notify_trade(self, symbol, side, qty, price, pnl=None):
 
         msg = f"""
 📊 <b>TRADE EXECUTED</b>
-
-📌 Signal: {signal}
-💱 Symbol: {symbol}
-📦 Qty: {qty}
-💰 Price: {price}
-🕒 Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}
+────────────────
+Symbol: {symbol}
+Side: {side}
+Qty: {qty}
+Price: {price}
 """
 
-        self.send_message(msg)
+        if pnl is not None:
+            msg += f"PnL: {pnl}\n"
+
+        msg += f"Time: {datetime.utcnow()}\n"
+
+        self.send(msg)
 
     # =====================================================
-    # Error Alert
+    # 리스크 알림
     # =====================================================
-    def send_error(self, error):
+
+    def notify_risk(self):
+
+        status = risk_engine.status()
 
         msg = f"""
-🚨 <b>ERROR ALERT</b>
-
-{error}
-
-🕒 {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}
+⚠️ <b>RISK UPDATE</b>
+────────────────
+Daily PnL: {status['daily_pnl']}
+Win Rate: {status['win_rate']}%
+Risk Score: {status['risk_score']}
+Loss Streak: {status['loss_streak']}
+Allow Trade: {status['allow_trade']}
 """
 
-        self.send_message(msg)
+        self.send(msg)
 
     # =====================================================
-    # Daily Report
+    # 에러 알림
     # =====================================================
-    def send_daily_report(self, pnl, trades, win_rate):
+
+    def notify_error(self, error):
 
         msg = f"""
-📈 <b>DAILY REPORT</b>
-
-💰 PnL: {pnl}
-📊 Trades: {trades}
-🎯 Win Rate: {win_rate}%
-
-🕒 {datetime.utcnow().strftime('%Y-%m-%d')}
+🚨 <b>ERROR</b>
+────────────────
+{str(error)}
+Time: {datetime.utcnow()}
 """
 
-        self.send_message(msg)
+        self.send(msg)
+
+    # =====================================================
+    # 상태 체크
+    # =====================================================
+
+    def heartbeat(self):
+
+        status = risk_engine.status()
+
+        msg = f"""
+💓 <b>HEARTBEAT</b>
+────────────────
+PnL: {status['daily_pnl']}
+Trades: {status['trade_count']}
+Risk: {status['risk_score']}
+Time: {datetime.utcnow()}
+"""
+
+        self.send(msg)
 
 
 # =====================================================
 # Singleton
 # =====================================================
-telegram_service = TelegramService(
-    token="YOUR_BOT_TOKEN",
-    chat_id="YOUR_CHAT_ID"
-)
+
+telegram_service = None
+
+
+def init_telegram(token, chat_id):
+    global telegram_service
+    telegram_service = TelegramService(token, chat_id)
+    return telegram_service
+
+
+def get_telegram():
+    return telegram_service
