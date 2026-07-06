@@ -1,295 +1,137 @@
-import logging
 from datetime import datetime
 
 from api.bybit_api import (
     close_position,
-    get_last_price,
     get_position,
     get_unrealized_pnl,
+    get_last_price,
 )
 
 from database.repository import (
-    delete_position,
     save_position,
+    delete_position,
     update_position_price,
+    get_positions,
 )
 
-logger = logging.getLogger(__name__)
+from execution.execution_guard import execution_guard
+
+from services.logger_service import logger
+from services.telegram_service import send_error, send_message
 
 
 class PositionManager:
 
     def __init__(self):
-
         self.last_sync = None
-
-    # =====================================================
-    # Sync Position
-    # =====================================================
 
     def sync(self, symbol):
 
-        logger.info(
-            "Sync Position : %s",
-            symbol,
-        )
+        try:
 
-        position = get_position(symbol)
+            logger.info("Sync %s", symbol)
 
-        if position is None:
+            position = get_position(symbol)
 
-            delete_position(symbol)
+            if not position:
+                delete_position(symbol)
+                return None
 
-            return None
+            size = float(position.get("size", 0))
 
-        size = float(
-            position.get("size", 0)
-        )
+            if size == 0:
+                delete_position(symbol)
+                return None
 
-        if size == 0:
-
-            delete_position(symbol)
-
-            return None
-
-        side = position.get("side")
-
-        entry_price = float(
-            position.get(
-                "avgPrice",
-                0,
+            save_position(
+                symbol=symbol,
+                side=position.get("side"),
+                qty=size,
+                entry_price=float(position.get("avgPrice", 0)),
+                leverage=int(float(position.get("leverage", 1))),
             )
-        )
 
-        leverage = int(
-            float(
-                position.get(
-                    "leverage",
-                    1,
-                )
+            update_position_price(
+                symbol=symbol,
+                mark_price=get_last_price(symbol),
+                unrealized_pnl=get_unrealized_pnl(symbol),
             )
-        )
 
-        save_position(
-            symbol=symbol,
-            side=side,
-            qty=size,
-            entry_price=entry_price,
-            leverage=leverage,
-        )
+            self.last_sync = datetime.utcnow()
 
-        pnl = get_unrealized_pnl(symbol)
+            return get_position(symbol)
 
-        price = get_last_price(symbol)
-
-        update_position_price(
-            symbol=symbol,
-            mark_price=price,
-            unrealized_pnl=pnl,
-        )
-
-        self.last_sync = datetime.utcnow()
-
-        logger.info(
-            "Position synced."
-        )
-
-        return get_position(symbol)
-
-    # =====================================================
-    # Close Position
-    # =====================================================
+        except Exception as e:
+            logger.exception(e)
+            send_error(str(e))
+            return None
 
     def close(self, symbol):
 
-        logger.info(
-            "Close Position : %s",
-            symbol,
-        )
+        try:
 
-        return close_position(symbol)
+            result = close_position(symbol)
 
-    # =====================================================
-    # Is Open
-    # =====================================================
+            send_message(f"CLOSE | {symbol}")
 
-    def is_open(self, symbol):
+            execution_guard.clear_symbol(symbol)
 
-        position = get_position(symbol)
+            return result
 
-        if position is None:
-
+        except Exception as e:
+            logger.exception(e)
+            send_error(str(e))
             return False
 
-        return float(
-            position.get(
-                "size",
-                0,
-            )
-        ) > 0
+    def close_all(self):
 
-    # =====================================================
-    # Has Position
-    # =====================================================
+        try:
 
-    def has_position(self, symbol):
+            positions = get_positions()
 
-        return self.is_open(symbol)
+            results = []
 
-    # =====================================================
-    # Refresh
-    # =====================================================
+            for p in positions:
 
-    def refresh(self, symbol):
+                symbol = p.get("symbol")
+                results.append(close_position(symbol))
+                execution_guard.clear_symbol(symbol)
 
-        return self.sync(symbol)
+            send_message("ALL POSITIONS CLOSED")
 
-    # =====================================================
-    # PnL
-    # =====================================================
+            return results
 
-    def pnl(self, symbol):
-
-        return get_unrealized_pnl(symbol)
-
-    # =====================================================
-    # Summary
-    # =====================================================
+        except Exception as e:
+            logger.exception(e)
+            send_error(str(e))
+            return []
 
     def summary(self, symbol):
 
-        position = get_position(symbol)
+        pos = get_position(symbol)
 
-        if position is None:
-
-            return {
-                "open": False,
-            }
+        if not pos:
+            return {"symbol": symbol, "open": False}
 
         return {
-
+            "symbol": symbol,
             "open": True,
-
-            "side": position.get(
-                "side"
-            ),
-
-            "size": float(
-                position.get(
-                    "size",
-                    0,
-                )
-            ),
-
-            "entry_price": float(
-                position.get(
-                    "avgPrice",
-                    0,
-                )
-            ),
-
-            "mark_price": get_last_price(
-                symbol
-            ),
-
-            "unrealized_pnl": get_unrealized_pnl(
-                symbol
-            ),
-
-            "last_sync": (
-                self.last_sync.isoformat()
-                if self.last_sync
-                else None
-            ),
+            "side": pos.get("side"),
+            "size": pos.get("size"),
+            "entry": pos.get("avgPrice"),
+            "pnl": get_unrealized_pnl(symbol),
         }
-
-    # =====================================================
-    # Close Multiple Positions
-    # =====================================================
-
-    def close_all(self, symbols):
-
-        results = []
-
-        for symbol in symbols:
-
-            try:
-
-                result = self.close(symbol)
-
-                results.append(
-                    {
-                        "symbol": symbol,
-                        "success": True,
-                        "result": result,
-                    }
-                )
-
-            except Exception as e:
-
-                logger.exception(e)
-
-                results.append(
-                    {
-                        "symbol": symbol,
-                        "success": False,
-                        "error": str(e),
-                    }
-                )
-
-        return results
-
-    # =====================================================
-    # Status
-    # =====================================================
-
-    def status(self):
-
-        return {
-
-            "engine": "PositionManager",
-
-            "healthy": True,
-
-            "last_sync": (
-                self.last_sync.isoformat()
-                if self.last_sync
-                else None
-            ),
-        }
-
-    # =====================================================
-    # Health
-    # =====================================================
 
     def health(self):
 
-        return self.status()
+        return {
+            "engine": "PositionManager",
+            "last_sync": (
+                self.last_sync.isoformat()
+                if self.last_sync
+                else None
+            ),
+        }
 
-    # =====================================================
-    # __repr__
-    # =====================================================
-
-    def __repr__(self):
-
-        return (
-            f"<PositionManager "
-            f"last_sync={self.last_sync}>"
-        )
-
-
-# =====================================================
-# Singleton
-# =====================================================
 
 position_manager = PositionManager()
-
-
-# =====================================================
-# Module Export
-# =====================================================
-
-__all__ = [
-    "PositionManager",
-    "position_manager",
-]
