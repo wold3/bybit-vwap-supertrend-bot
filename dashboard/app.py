@@ -2,26 +2,66 @@ from flask import Flask, jsonify
 import time
 
 from database.repository import trade_db
-from execution.pnl_engine import pnl_engine
 
 
 app = Flask(__name__)
 
 
 # ================================
-# HOME
+# HOME (PnL CHART UI)
 # ================================
 @app.route("/")
 def home():
 
     return """
-    <h1>🚀 AUTO TRADING DASHBOARD (DB MODE)</h1>
-    <p>Status: RUNNING</p>
-    <ul>
-        <li>/status</li>
-        <li>/pnl</li>
-        <li>/trades</li>
-    </ul>
+    <h1>🚀 REAL-TIME PnL CHART</h1>
+
+    <canvas id="chart" width="900" height="400"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+
+        async function loadData() {
+
+            const res = await fetch('/pnl-history');
+            const data = await res.json();
+
+            const labels = data.map(x =>
+                new Date(x.time * 1000).toLocaleTimeString()
+            );
+
+            const values = data.map(x => x.pnl);
+
+            const ctx = document.getElementById('chart');
+
+            if (window.myChart) {
+                window.myChart.destroy();
+            }
+
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'PnL',
+                        data: values,
+                        borderColor: 'green',
+                        fill: false,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    animation: false,
+                    responsive: true
+                }
+            });
+        }
+
+        loadData();
+        setInterval(loadData, 3000);
+
+    </script>
     """
 
 
@@ -38,26 +78,7 @@ def status():
 
 
 # ================================
-# PnL
-# ================================
-@app.route("/pnl")
-def pnl():
-
-    try:
-
-        return jsonify({
-            "symbol": "BTCUSDT",
-            "pnl": pnl_engine.get("BTCUSDT"),
-            "status": "LIVE"
-        })
-
-    except Exception as e:
-
-        return jsonify({"error": str(e)})
-
-
-# ================================
-# TRADE LIST (DB 핵심)
+# TRADES
 # ================================
 @app.route("/trades")
 def trades():
@@ -79,11 +100,28 @@ def trades():
 
 
 # ================================
-# SERVER RUN
+# PnL HISTORY API
+# ================================
+@app.route("/pnl-history")
+def pnl_history():
+
+    rows = trade_db.get_pnl_history()
+
+    return jsonify([
+        {
+            "pnl": r[0],
+            "time": r[1]
+        }
+        for r in rows
+    ])
+
+
+# ================================
+# RUN SERVER
 # ================================
 if __name__ == "__main__":
 
-    print("🚀 Dashboard running on http://localhost:5000")
+    print("🚀 Dashboard running at http://localhost:5000")
 
     app.run(
         host="0.0.0.0",
