@@ -15,6 +15,7 @@ class TradeDB:
 
         c = self.conn.cursor()
 
+        # trades
         c.execute("""
             CREATE TABLE IF NOT EXISTS trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,9 +28,11 @@ class TradeDB:
             )
         """)
 
+        # equity (멀티코인)
         c.execute("""
             CREATE TABLE IF NOT EXISTS equity (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT,
                 equity REAL,
                 time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -52,21 +55,21 @@ class TradeDB:
         self.conn.commit()
 
     # =================================================
-    # EQUITY INSERT
+    # EQUITY INSERT (멀티코인)
     # =================================================
-    def insert_equity(self, equity):
+    def insert_equity(self, symbol, equity):
 
         c = self.conn.cursor()
 
         c.execute("""
-            INSERT INTO equity (equity)
-            VALUES (?)
-        """, (equity,))
+            INSERT INTO equity (symbol, equity)
+            VALUES (?, ?)
+        """, (symbol, equity))
 
         self.conn.commit()
 
     # =================================================
-    # GET TRADES
+    # TRADES FETCH
     # =================================================
     def all(self):
 
@@ -75,12 +78,18 @@ class TradeDB:
         return c.fetchall()
 
     # =================================================
-    # EQUITY HISTORY
+    # EQUITY FETCH
     # =================================================
     def get_equity_history(self):
 
         c = self.conn.cursor()
-        c.execute("SELECT equity, time FROM equity ORDER BY id ASC")
+
+        c.execute("""
+            SELECT symbol, equity, time
+            FROM equity
+            ORDER BY id ASC
+        """)
+
         return c.fetchall()
 
 
