@@ -11,45 +11,27 @@ logger = logging.getLogger(__name__)
 class ExecutionEngine:
 
     def __init__(self):
-
         self.busy = False
 
-    # =====================================================
-    # 상태 체크
-    # =====================================================
-
     def is_busy(self):
-
         return self.busy
 
     # =====================================================
-    # 메인 실행
+    # EXECUTE
     # =====================================================
-
     def execute(self, signal, symbol, qty, price, leverage):
 
         self.busy = True
-
         db = SessionLocal()
 
         try:
 
-            # -------------------------
-            # 1. 리스크 체크
-            # -------------------------
+            # risk check
             if not risk_engine.allow_trade():
-                logger.warning("TRADE BLOCKED by risk engine")
+                add_log(db, "WARNING", "blocked by risk engine")
+                return {"success": False, "reason": "risk_block"}
 
-                add_log(db, "WARNING", "Trade blocked by risk engine")
-
-                return {
-                    "success": False,
-                    "reason": "risk_block"
-                }
-
-            # -------------------------
-            # 2. 주문 실행
-            # -------------------------
+            # order
             order_id = order_manager.place_market_order(
                 symbol=symbol,
                 side=signal,
@@ -58,16 +40,10 @@ class ExecutionEngine:
             )
 
             if not order_id:
-                add_log(db, "ERROR", "Order failed")
+                add_log(db, "ERROR", "order failed")
+                return {"success": False, "reason": "order_failed"}
 
-                return {
-                    "success": False,
-                    "reason": "order_failed"
-                }
-
-            # -------------------------
-            # 3. DB 저장
-            # -------------------------
+            # db save
             trade = add_trade(
                 db=db,
                 symbol=symbol,
@@ -77,12 +53,7 @@ class ExecutionEngine:
                 leverage=leverage
             )
 
-            # -------------------------
-            # 4. 상태 기록
-            # -------------------------
-            add_log(db, "INFO", f"Trade executed {symbol} {signal}")
-
-            logger.info(f"EXECUTED: {symbol} {signal} qty={qty}")
+            add_log(db, "INFO", f"executed {symbol} {signal}")
 
             return {
                 "success": True,
@@ -91,54 +62,25 @@ class ExecutionEngine:
             }
 
         except Exception as e:
-
             logger.error(f"Execution error: {str(e)}")
-
             add_log(db, "ERROR", str(e))
 
-            return {
-                "success": False,
-                "reason": "exception",
-                "error": str(e)
-            }
+            return {"success": False, "reason": "exception"}
 
         finally:
             db.close()
             self.busy = False
 
 
-# =====================================================
-# SINGLETON
-# =====================================================
-
 engine = ExecutionEngine()
 
-# =====================================================
-# SINGLETON
-# =====================================================
-
-engine = ExecutionEngine()
-
-
-# =====================================================
-# Compatibility Wrapper
-# =====================================================
 
 def execute_order(signal, symbol, price, equity, win_rate):
-    """
-    strategy_wrapper.py에서 호출하는 호환 함수
-
-    현재 ExecutionEngine.execute()는
-    qty와 leverage를 요구하므로 기본값을 사용한다.
-    """
-
-    qty = 1
-    leverage = 1
 
     return engine.execute(
         signal=signal,
         symbol=symbol,
-        qty=qty,
+        qty=1,
         price=price,
-        leverage=leverage,
+        leverage=1
     )
