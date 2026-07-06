@@ -232,3 +232,10 @@ def should_stop():
 
 def reset_risk():
     risk_engine.__init__()
+
+def should_stop():
+    """
+    호환용 함수.
+    거래를 중단해야 하면 True를 반환한다.
+    """
+    return not risk_engine.allow_trade()
