@@ -25,7 +25,6 @@ class BybitWebSocket:
                 on_error=self.on_error
             )
 
-            logger.info("WebSocket started")
             self.ws.run_forever()
 
         threading.Thread(target=run, daemon=True).start()
@@ -35,7 +34,7 @@ class BybitWebSocket:
         try:
 
             if isinstance(message, bytes):
-                message = message.decode("utf-8")
+                message = message.decode()
 
             data = json.loads(message)
 
@@ -62,16 +61,16 @@ class BybitWebSocket:
                         })
 
         except Exception as e:
-            logger.error(f"WS error: {str(e)}")
+            logger.error(f"WS ERROR: {e}")
 
     def on_open(self, ws):
-        logger.info("WebSocket connected")
+        print("WS CONNECTED")
 
     def on_close(self, ws, *args):
-        logger.warning("WebSocket closed")
+        print("WS CLOSED")
 
     def on_error(self, ws, error):
-        logger.error(f"WS error: {error}")
+        print(f"WS ERROR {error}")
 
 
 ws_client = BybitWebSocket()
