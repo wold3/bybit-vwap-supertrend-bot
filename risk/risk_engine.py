@@ -1,49 +1,43 @@
-import logging
-
-logger = logging.getLogger(__name__)
-
+import datetime
 
 class RiskEngine:
 
     def __init__(self):
 
-        self.max_drawdown = -50
         self.daily_pnl = 0
         self.trade_count = 0
-        self.max_trades_per_day = 200
+        self.enabled = True
+        self.last_reset = datetime.date.today()
 
-    # =====================================================
-    # 거래 허용 여부
-    # =====================================================
+    def reset_if_new_day(self):
+
+        if datetime.date.today() != self.last_reset:
+            self.daily_pnl = 0
+            self.trade_count = 0
+            self.last_reset = datetime.date.today()
+            self.enabled = True
+
     def allow_trade(self):
 
-        if self.daily_pnl <= self.max_drawdown:
-            logger.warning("RISK BLOCK: max drawdown reached")
+        self.reset_if_new_day()
+
+        if not self.enabled:
             return False
 
-        if self.trade_count >= self.max_trades_per_day:
-            logger.warning("RISK BLOCK: max trade count reached")
+        if self.daily_pnl < -50:
+            self.enabled = False
+            return False
+
+        if self.trade_count >= 20:
             return False
 
         return True
 
-    # =====================================================
-    # pnl 업데이트
-    # =====================================================
     def update(self, pnl):
-
         self.daily_pnl += pnl
+
+    def add_trade(self):
         self.trade_count += 1
-
-    # =====================================================
-    # 상태
-    # =====================================================
-    def status(self):
-
-        return {
-            "daily_pnl": self.daily_pnl,
-            "trade_count": self.trade_count
-        }
 
 
 risk_engine = RiskEngine()
