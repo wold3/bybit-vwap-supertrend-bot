@@ -1,11 +1,10 @@
 import json
 import websocket
 import threading
-
 from services.event_bus import event_bus
 
 
-class BybitWebSocket:
+class WS:
 
     def start(self):
 
@@ -20,19 +19,19 @@ class BybitWebSocket:
 
         threading.Thread(target=run, daemon=True).start()
 
-    def on_message(self, ws, message):
+    def on_message(self, ws, msg):
 
-        data = json.loads(message)
+        data = json.loads(msg)
 
         if "topic" in data and "tickers" in data["topic"]:
 
             for item in data.get("data", []):
 
-                event_bus.publish({
+                event_bus.put({
                     "type": "TICK",
                     "symbol": item["symbol"],
                     "price": float(item["lastPrice"])
                 })
 
 
-ws_client = BybitWebSocket()
+ws_client = WS()
