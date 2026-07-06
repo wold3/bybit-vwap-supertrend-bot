@@ -10,9 +10,6 @@ class Risk:
         if self.pnl <= -50:
             self.enabled = False
 
-        if self.trades >= 20:
-            return False
-
         return self.enabled
 
     def update_pnl(self, pnl):
@@ -20,6 +17,5 @@ class Risk:
 
     def add_trade(self):
         self.trades += 1
-
 
 risk = Risk()
