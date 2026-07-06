@@ -5,65 +5,82 @@ class RiskEngine:
 
     def __init__(self):
 
-        # 하루 기준 초기화
-        self.start_balance = 10000
-        self.current_balance = 10000
+        self.start_equity = 10000
+        self.current_equity = 10000
+        self.peak_equity = 10000
 
-        self.daily_loss_limit = -5.0   # %
-        self.max_drawdown = -10.0      # %
+        self.max_drawdown = 10.0   # %
+        self.daily_loss_limit = 5.0
 
         self.trading_halted = False
 
     # =================================================
-    # PnL 업데이트
+    # EQUITY UPDATE
     # =================================================
-    def update_pnl(self, pnl):
+    def update_equity(self, equity):
 
-        self.current_balance += pnl
+        self.current_equity = equity
+
+        if equity > self.peak_equity:
+            self.peak_equity = equity
 
     # =================================================
-    # 리스크 체크
+    # DRAW DOWN CALC
     # =================================================
-    def check_risk(self):
+    def get_drawdown(self):
 
-        pnl_pct = (
-            (self.current_balance - self.start_balance)
-            / self.start_balance
+        if self.peak_equity == 0:
+            return 0
+
+        dd = (
+            (self.peak_equity - self.current_equity)
+            / self.peak_equity
         ) * 100
 
-        # ============================================
-        # 1. Daily Loss
-        # ============================================
-        if pnl_pct <= self.daily_loss_limit:
+        return dd
+
+    # =================================================
+    # RISK CHECK
+    # =================================================
+    def can_trade(self):
+
+        dd = self.get_drawdown()
+
+        # ================================
+        # MAX DRAWDOWN STOP
+        # ================================
+        if dd >= self.max_drawdown:
             self.trading_halted = True
-            print("[RISK] DAILY LOSS LIMIT HIT → TRADING STOP")
+            print("[RISK] MAX DRAWDOWN HIT → STOP")
             return False
 
-        # ============================================
-        # 2. Max Drawdown
-        # ============================================
-        if pnl_pct <= self.max_drawdown:
+        # ================================
+        # DAILY LOSS STOP
+        # ================================
+        pnl_pct = (
+            (self.current_equity - self.start_equity)
+            / self.start_equity
+        ) * 100
+
+        if pnl_pct <= -self.daily_loss_limit:
             self.trading_halted = True
-            print("[RISK] MAX DRAWDOWN HIT → TRADING STOP")
+            print("[RISK] DAILY LOSS HIT → STOP")
             return False
 
         return True
 
     # =================================================
-    # 트레이딩 가능 여부
+    # STATUS
     # =================================================
-    def can_trade(self):
+    def status(self):
 
-        return not self.trading_halted
-
-    # =================================================
-    # 리셋 (새날 시작)
-    # =================================================
-    def reset(self):
-
-        self.start_balance = self.current_balance
-        self.trading_halted = False
+        return {
+            "equity": self.current_equity,
+            "peak": self.peak_equity,
+            "drawdown": self.get_drawdown(),
+            "halted": self.trading_halted
+        }
 
 
-# 싱글톤
+# SINGLETON
 risk_engine = RiskEngine()
