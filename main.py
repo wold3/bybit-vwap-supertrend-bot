@@ -1,12 +1,12 @@
 import threading
 import time
 import logging
-import atexit
 import os
-import sys
+import webbrowser
 
 from worker import loop
 from websocket_client import ws_client
+from utils.singleton import singleton
 
 
 # =========================================================
@@ -21,32 +21,23 @@ logger = logging.getLogger("BOT")
 
 
 # =========================================================
-# SINGLETON LOCK (중복 실행 방지)
+# DASHBOARD URL
 # =========================================================
-LOCK_FILE = "bot.lock"
-
-
-def check_single_instance():
-
-    if os.path.exists(LOCK_FILE):
-
-        print("❌ BOT already running (lock file exists)")
-        sys.exit(0)
-
-    with open(LOCK_FILE, "w") as f:
-        f.write(str(os.getpid()))
-
-
-def release_lock():
-
-    if os.path.exists(LOCK_FILE):
-        os.remove(LOCK_FILE)
+DASHBOARD_URL = "http://localhost:5000"
 
 
 # =========================================================
-# CLEAN EXIT REGISTER
+# CHROME AUTO OPEN
 # =========================================================
-atexit.register(release_lock)
+def open_chrome():
+
+    time.sleep(3)
+
+    try:
+        os.system(f'start chrome "{DASHBOARD_URL}"')
+        logger.info("Chrome opened")
+    except Exception as e:
+        logger.error(f"Chrome open failed: {e}")
 
 
 # =========================================================
@@ -54,12 +45,10 @@ atexit.register(release_lock)
 # =========================================================
 def start_worker():
 
-    t = threading.Thread(
+    threading.Thread(
         target=loop,
         daemon=True
-    )
-
-    t.start()
+    ).start()
 
     logger.info("Worker started")
 
@@ -80,39 +69,37 @@ def start_ws():
 def init_system():
 
     logger.info("====================================")
-    logger.info("     AUTO TRADING BOT START         ")
+    logger.info("     AUTO TRADING START SYSTEM      ")
     logger.info("====================================")
 
 
 # =========================================================
-# MAIN ENTRY
+# MAIN
 # =========================================================
 if __name__ == "__main__":
 
     try:
 
-        # 🔥 핵심: 중복 실행 방지
-        check_single_instance()
+        # 🔥 싱글 인스턴스 보호
+        singleton.acquire()
 
         init_system()
 
+        # CORE ENGINE
         start_worker()
         start_ws()
 
-        logger.info("SYSTEM RUNNING (SINGLE INSTANCE MODE)")
+        logger.info("SYSTEM RUNNING")
 
-        # KEEP ALIVE LOOP
+        # 🔥 크롬 자동 실행
+        threading.Thread(target=open_chrome, daemon=True).start()
+
+        # KEEP ALIVE
         while True:
             time.sleep(10)
 
     except KeyboardInterrupt:
-
-        logger.warning("SYSTEM STOPPED BY USER")
+        logger.warning("STOPPED BY USER")
 
     except Exception as e:
-
         logger.error(f"FATAL ERROR: {e}")
-
-    finally:
-
-        release_lock()
