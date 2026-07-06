@@ -4,6 +4,7 @@ import logging
 from flask import Flask, jsonify, render_template
 
 from config import DEBUG, HOST, PORT, validate
+from database.session import init_db
 from persistence import load, save
 from world import World
 
@@ -12,6 +13,12 @@ from world import World
 # =====================================================
 
 validate()
+
+# =====================================================
+# Database
+# =====================================================
+
+init_db()
 
 # =====================================================
 # Logging
@@ -197,7 +204,26 @@ def health():
     return jsonify(
         {
             "status": "ok",
+            "database": True,
             "population": len(world.agents),
+            "mode": "simulation",
+        }
+    )
+
+
+# =====================================================
+# Version
+# =====================================================
+
+
+@app.route("/version")
+def version():
+
+    return jsonify(
+        {
+            "name": "Bybit VWAP SuperTrend Bot",
+            "version": "3.0",
+            "mode": "simulation",
         }
     )
 
