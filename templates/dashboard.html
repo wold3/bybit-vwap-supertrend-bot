@@ -1,70 +1,59 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Bybit Trading Bot Dashboard</title>
+    <title>Auto Trading Dashboard</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body {
             font-family: Arial, sans-serif;
             background: #0f172a;
-            color: #e2e8f0;
+            color: white;
             margin: 0;
             padding: 0;
         }
 
-        header {
-            background: #1e293b;
-            padding: 20px;
+        .header {
+            padding: 15px;
+            background: #111827;
             text-align: center;
             font-size: 20px;
             font-weight: bold;
         }
 
         .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             padding: 20px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
         }
 
         .card {
-            background: #1e293b;
+            width: 90%;
+            background: #1f2937;
             padding: 15px;
+            margin-bottom: 15px;
             border-radius: 10px;
         }
 
-        .title {
-            font-size: 14px;
-            color: #94a3b8;
-        }
-
-        .value {
-            font-size: 22px;
-            margin-top: 5px;
-        }
-
-        table {
-            width: 100%;
-            margin-top: 20px;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 8px;
-            border-bottom: 1px solid #334155;
-            font-size: 13px;
-        }
-
-        th {
-            color: #94a3b8;
+        canvas {
+            background: #0b1220;
+            border-radius: 10px;
+            padding: 10px;
         }
 
         .status {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .green {
             color: #22c55e;
         }
 
-        .danger {
+        .red {
             color: #ef4444;
         }
     </style>
@@ -72,90 +61,107 @@
 
 <body>
 
-<header>
-    🚀 Bybit Auto Trading Dashboard
-</header>
+<div class="header">
+    🚀 AUTO TRADING SYSTEM DASHBOARD
+</div>
 
 <div class="container">
 
-    <div class="card">
-        <div class="title">Bot Status</div>
-        <div class="value status" id="status">RUNNING</div>
+    <!-- STATUS -->
+    <div class="card status">
+        <div>System: <span class="green">RUNNING</span></div>
+        <div id="pnl">PnL: 0</div>
     </div>
 
+    <!-- CHART -->
     <div class="card">
-        <div class="title">Total PnL</div>
-        <div class="value" id="pnl">0</div>
-    </div>
-
-    <div class="card">
-        <div class="title">Win Rate</div>
-        <div class="value" id="winrate">0%</div>
-    </div>
-
-    <div class="card">
-        <div class="title">Trades</div>
-        <div class="value" id="trades">0</div>
-    </div>
-
-    <div class="card">
-        <div class="title">Open Positions</div>
-        <div class="value" id="positions">0</div>
-    </div>
-
-    <div class="card">
-        <div class="title">Risk Status</div>
-        <div class="value danger" id="risk">OK</div>
-    </div>
-
-</div>
-
-<div class="container" style="grid-template-columns: 1fr;">
-
-    <div class="card">
-        <div class="title">Recent Trades</div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Side</th>
-                    <th>Qty</th>
-                    <th>Price</th>
-                    <th>PnL</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="tradesTable">
-                <tr><td colspan="6">Loading...</td></tr>
-            </tbody>
-        </table>
-
+        <canvas id="pnlChart"></canvas>
     </div>
 
 </div>
 
 <script>
 
-async function fetchData() {
+let pnlData = [];
+let labels = [];
 
-    try {
+// ============================
+// CHART INIT
+// ============================
+const ctx = document.getElementById("pnlChart").getContext("2d");
 
-        const res = await fetch("/api/summary");
-        const data = await res.json();
-
-        document.getElementById("pnl").innerText = data.total_pnl;
-        document.getElementById("trades").innerText = data.trade_count;
-        document.getElementById("positions").innerText = data.open_positions;
-        document.getElementById("winrate").innerText = data.win_rate + "%";
-
-    } catch (e) {
-        console.log(e);
+const chart = new Chart(ctx, {
+    type: "line",
+    data: {
+        labels: labels,
+        datasets: [{
+            label: "PnL",
+            data: pnlData,
+            borderColor: "#22c55e",
+            borderWidth: 2,
+            fill: false,
+            tension: 0.2
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                labels: {
+                    color: "white"
+                }
+            }
+        },
+        scales: {
+            x: {
+                ticks: { color: "white" }
+            },
+            y: {
+                ticks: { color: "white" }
+            }
+        }
     }
-}
+});
 
-setInterval(fetchData, 3000);
-fetchData();
+
+// ============================
+// WEBSOCKET CONNECT
+// ============================
+const ws = new WebSocket("ws://localhost:6789");
+
+ws.onopen = function () {
+    console.log("WebSocket connected");
+};
+
+ws.onmessage = function (event) {
+
+    const msg = JSON.parse(event.data);
+
+    if (msg.type === "pnl") {
+
+        const pnl = msg.value;
+        const now = new Date().toLocaleTimeString();
+
+        // UI update
+        document.getElementById("pnl").innerText = "PnL: " + pnl;
+
+        // chart update
+        pnlData.push(pnl);
+        labels.push(now);
+
+        // max 50 points 유지
+        if (pnlData.length > 50) {
+            pnlData.shift();
+            labels.shift();
+        }
+
+        chart.update();
+    }
+};
+
+ws.onerror = function (err) {
+    console.log("WebSocket error", err);
+};
 
 </script>
 
