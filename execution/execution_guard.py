@@ -9,12 +9,8 @@ class ExecutionGuard:
 
         self.lock = threading.Lock()
         self.last_order_time = 0
-        self.min_interval = 2  # seconds
+        self.min_interval = 2
         self.recent_symbols = set()
-
-    # -----------------------------------
-    # 1. Global Lock
-    # -----------------------------------
 
     def acquire(self):
 
@@ -24,10 +20,6 @@ class ExecutionGuard:
 
         if self.lock.locked():
             self.lock.release()
-
-    # -----------------------------------
-    # 2. Rate Limit
-    # -----------------------------------
 
     def rate_limit(self):
 
@@ -39,10 +31,6 @@ class ExecutionGuard:
 
         self.last_order_time = now
         return True
-
-    # -----------------------------------
-    # 3. Duplicate Symbol Block
-    # -----------------------------------
 
     def allow_symbol(self, symbol):
 
@@ -59,5 +47,4 @@ class ExecutionGuard:
             self.recent_symbols.remove(symbol)
 
 
-# Singleton
 execution_guard = ExecutionGuard()
