@@ -24,11 +24,13 @@ class BybitExecutionEngine:
         }
 
     # =================================================
-    # EXECUTE
+    # EXECUTE ORDER
     # =================================================
     def execute(self, symbol, side, qty, price):
 
+        # 🚨 RISK GATE
         if not risk_engine.can_trade():
+            print("[EXECUTION] BLOCKED BY RISK ENGINE")
             return None
 
         symbol = symbol or self.symbol
@@ -40,14 +42,20 @@ class BybitExecutionEngine:
         pnl = position_manager.update_price(symbol, entry_price)
 
         # =========================================
-        # SYMBOL별 EQUITY 업데이트
+        # SYMBOL EQUITY UPDATE
         # =========================================
         self.portfolio[symbol] += pnl
 
         trade_db.insert_equity(symbol, self.portfolio[symbol])
-
         trade_db.insert(symbol, side, qty, entry_price, pnl)
 
+        # =========================================
+        # TOTAL EQUITY → RISK ENGINE
+        # =========================================
+        total_equity = self.get_total_equity()
+        risk_engine.update_equity(total_equity)
+
+        # WS PUSH
         self._push(pnl)
 
         return pnl
@@ -56,7 +64,6 @@ class BybitExecutionEngine:
     # PRICE MOCK
     # =================================================
     def _price(self):
-
         return 65000 + random.randint(-100, 100)
 
     # =================================================
@@ -75,7 +82,8 @@ class BybitExecutionEngine:
             asyncio.run(
                 broadcast({
                     "type": "pnl",
-                    "value": pnl
+                    "value": pnl,
+                    "time": time.time()
                 })
             )
         except:
