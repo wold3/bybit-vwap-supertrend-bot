@@ -1,21 +1,23 @@
 import datetime
 
-
 class RiskEngine:
 
     def __init__(self):
+
         self.daily_pnl = 0
         self.trade_count = 0
         self.enabled = True
         self.last_reset = datetime.date.today()
 
     def reset(self):
+
         self.daily_pnl = 0
         self.trade_count = 0
         self.enabled = True
         self.last_reset = datetime.date.today()
 
     def check_reset(self):
+
         if datetime.date.today() != self.last_reset:
             self.reset()
 
