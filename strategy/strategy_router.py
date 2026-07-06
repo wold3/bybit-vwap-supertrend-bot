@@ -1,25 +1,52 @@
-import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def route(signal, price):
+def route(signal: str, price: float):
     """
-    시장 상태 판단 (regime detection)
+    시장 상태 기반 전략 라우팅
     """
 
-    # 매우 단순한 실전용 placeholder 구조
-    # (추후 indicators.py에서 확장)
+    try:
+        if price is None:
+            return False, "UNKNOWN"
 
-    if signal is None:
-        return False, "NONE"
+        # =========================
+        # 간단한 regime 판단 로직
+        # (실전에서는 indicator로 교체 가능)
+        # =========================
 
-    # fake volatility proxy
-    volatility = np.random.random()
+        if signal in ["BUY", "LONG"]:
+            regime = "TREND_UP"
+            allow = True
 
-    if volatility > 0.7:
-        return True, "TREND_UP"
+        elif signal in ["SELL", "SHORT"]:
+            regime = "TREND_DOWN"
+            allow = True
 
-    elif volatility > 0.3:
-        return True, "RANGE"
+        else:
+            regime = "RANGE"
+            allow = False
 
-    else:
-        return False, "LOW_VOL"
+        return allow, regime
+
+    except Exception as e:
+        logger.exception(e)
+        return False, "ERROR"
+
+
+# =====================================================
+# 추가 유틸
+# =====================================================
+
+def is_trend(regime: str) -> bool:
+    return regime in ["TREND_UP", "TREND_DOWN"]
+
+
+def is_range(regime: str) -> bool:
+    return regime == "RANGE"
+
+
+def is_safe(regime: str) -> bool:
+    return regime != "ERROR"
