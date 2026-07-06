@@ -15,16 +15,12 @@ from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 # =====================================================
-# GLOBAL PRICE STATE
+# STATE
 # =====================================================
 last_price = {
     "price": 0,
@@ -61,6 +57,24 @@ def on_price(price, volume):
 
 
 # =====================================================
+# PnL CALC (REAL)
+# =====================================================
+def calculate_pnl():
+
+    pnl = 0.0
+
+    for order in order_manager.get_filled_orders().values():
+
+        entry = order.get("entry_price") or 0
+        qty = order.get("qty", 1)
+
+        if entry > 0:
+            pnl += (last_price["price"] - entry) * qty
+
+    return pnl
+
+
+# =====================================================
 # TRADING LOOP
 # =====================================================
 def run_trading():
@@ -73,9 +87,6 @@ def run_trading():
 
         try:
 
-            # =================================================
-            # 1. PRICE FETCH (WS 기반)
-            # =================================================
             price = last_price["price"]
             volume = last_price["volume"]
 
@@ -84,18 +95,15 @@ def run_trading():
                 continue
 
             # =================================================
-            # 2. ORDER SYNC (핵심)
+            # ORDER SYNC (real price 전달)
             # =================================================
-            order_manager.sync_orders()
+            order_manager.sync_orders(price)
 
             # =================================================
-            # 3. STRATEGY DECISION
+            # STRATEGY
             # =================================================
             decision = brain.decide("auto", price)
 
-            # =================================================
-            # 4. EXECUTION
-            # =================================================
             result = execute_strategy(
                 signal="auto",
                 price=price,
@@ -104,21 +112,19 @@ def run_trading():
             )
 
             # =================================================
-            # 5. RISK UPDATE (mock pnl)
+            # REAL PnL
             # =================================================
-            pnl = (price % 10) - 5
+            pnl = calculate_pnl()
             risk_engine.update(pnl)
 
             brain.record(decision["strategy"], pnl)
 
-            # =================================================
-            # 6. LOGGING
-            # =================================================
             logger.info(
                 f"PRICE={price} "
                 f"STRATEGY={decision['strategy']} "
-                f"PNL={pnl} "
-                f"OPEN_ORDERS={len(order_manager.open_orders)}"
+                f"PNL={pnl:.2f} "
+                f"OPEN={len(order_manager.open_orders)} "
+                f"FILLED={len(order_manager.filled_orders)}"
             )
 
             time.sleep(2)
@@ -135,15 +141,13 @@ def run_trading():
 
 
 # =====================================================
-# ENTRY POINT
+# ENTRY
 # =====================================================
 if __name__ == "__main__":
 
     init_system()
 
-    # WebSocket start
     ws_client.set_price_callback(on_price)
     ws_client.start()
 
-    # trading loop
     run_trading()
