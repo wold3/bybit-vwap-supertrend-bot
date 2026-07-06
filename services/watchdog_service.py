@@ -1,115 +1,97 @@
+import logging
 import time
 import threading
-import logging
-import requests
-import os
-import subprocess
+
+from execution.execution_engine import engine
+from risk.risk_engine import get_risk_status
+from telegram import send_error
 
 logger = logging.getLogger(__name__)
 
 
-class WatchdogService:
+class Watchdog:
 
     def __init__(self):
 
-        self.health_url = "http://127.0.0.1:8000/health"
-        self.check_interval = 30
-        self.restart_command = ["python", "app.py"]
-
-        self.last_ok = time.time()
+        self.last_check = time.time()
+        self.interval = 10  # 10초마다 체크
+        self.running = False
 
     # =====================================================
     # Health Check
     # =====================================================
-    def check_health(self):
+    def check_system(self):
 
         try:
 
-            res = requests.get(
-                self.health_url,
-                timeout=5,
-            )
+            # 1. Execution Engine 상태
+            engine_status = engine.status()
 
-            if res.status_code == 200:
+            if not engine_status.get("running", True):
+                raise Exception("Execution engine stopped")
 
-                self.last_ok = time.time()
-                return True
+            # 2. Risk Engine 상태
+            risk = get_risk_status()
 
-        except Exception:
+            if risk.get("daily_limit", False):
+                logger.warning("Daily loss limit reached")
 
-            return False
+            # 3. 거래 멈춤 감지
+            last_exec = engine_status.get("last_execution")
 
-        return False
+            if last_exec is None:
+                raise Exception("No execution detected")
 
-    # =====================================================
-    # Restart System
-    # =====================================================
-    def restart(self):
+            logger.info("System OK")
 
-        logger.warning("System restart triggered")
-
-        try:
-
-            os.system("pkill -f app.py")
-
-            time.sleep(2)
-
-            subprocess.Popen(
-                self.restart_command,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            return True
 
         except Exception as e:
 
-            logger.exception(e)
+            logger.error("WATCHDOG ERROR: %s", str(e))
+
+            send_error(f"Watchdog alert: {str(e)}")
+
+            return False
 
     # =====================================================
-    # Monitor Loop
+    # Loop
     # =====================================================
     def run(self):
 
+        self.running = True
+
         logger.info("Watchdog started")
 
-        while True:
+        while self.running:
 
-            try:
+            self.check_system()
 
-                healthy = self.check_health()
+            time.sleep(self.interval)
 
-                if not healthy:
+    # =====================================================
+    # Stop
+    # =====================================================
+    def stop(self):
 
-                    # 60초 이상 죽어있으면 재시작
-                    if time.time() - self.last_ok > 60:
+        self.running = False
 
-                        self.restart()
-
-                        self.last_ok = time.time()
-
-                time.sleep(self.check_interval)
-
-            except Exception as e:
-
-                logger.exception(e)
-                time.sleep(10)
+        logger.info("Watchdog stopped")
 
 
 # =====================================================
 # Singleton
 # =====================================================
-watchdog = WatchdogService()
+watchdog = Watchdog()
 
 
-# =====================================================
-# Background Thread Starter
-# =====================================================
 def start_watchdog():
 
-    t = threading.Thread(
+    thread = threading.Thread(
         target=watchdog.run,
-        daemon=True,
+        daemon=True
     )
 
-    t.start()
+    thread.start()
 
-    logger.info("Watchdog thread started")
+    return thread
