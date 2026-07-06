@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Multi Equity Dashboard</title>
+    <title>Trading Dashboard</title>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -16,6 +16,16 @@
             width: 90%;
             margin: auto;
         }
+
+        #dd {
+            font-size: 20px;
+            color: orange;
+        }
+
+        #equity {
+            font-size: 18px;
+            color: lime;
+        }
     </style>
 </head>
 
@@ -23,7 +33,11 @@
 
 <div class="box">
 
-    <h2>📊 TOTAL EQUITY CURVE</h2>
+    <h2>📊 TOTAL EQUITY</h2>
+    <h3 id="equity">Loading...</h3>
+
+    <h2>📉 RISK STATUS</h2>
+    <h3 id="dd">Drawdown: 0%</h3>
 
     <canvas id="chart"></canvas>
 
@@ -38,7 +52,7 @@ let chart = new Chart(ctx, {
     data: {
         labels: [],
         datasets: [{
-            label: "Total Equity",
+            label: "Equity",
             data: [],
             borderColor: "lime",
             fill: false
@@ -47,12 +61,18 @@ let chart = new Chart(ctx, {
 });
 
 
-async function load() {
+// =================================================
+// EQUITY LOAD
+// =================================================
+async function loadEquity() {
 
     const res = await fetch("/api/equity-total");
     const data = await res.json();
 
     const now = new Date().toLocaleTimeString();
+
+    document.getElementById("equity").innerText =
+        "Total Equity: " + data.total_equity.toFixed(2);
 
     chart.data.labels.push(now);
     chart.data.datasets[0].data.push(data.total_equity);
@@ -65,9 +85,28 @@ async function load() {
     chart.update();
 }
 
-setInterval(load, 2000);
 
-load();
+// =================================================
+// RISK LOAD (DRAW DOWN)
+// =================================================
+async function loadRisk() {
+
+    const res = await fetch("/api/risk");
+    const data = await res.json();
+
+    document.getElementById("dd").innerText =
+        "Drawdown: " + data.drawdown.toFixed(2) + "%";
+}
+
+
+// =================================================
+// LOOP
+// =================================================
+setInterval(loadEquity, 2000);
+setInterval(loadRisk, 2000);
+
+loadEquity();
+loadRisk();
 
 </script>
 
