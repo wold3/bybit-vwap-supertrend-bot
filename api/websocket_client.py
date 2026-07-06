@@ -1,8 +1,7 @@
 import json
-import logging
 import websocket
 import threading
-import time
+import logging
 
 from services.event_bus import event_bus
 
@@ -11,84 +10,50 @@ logger = logging.getLogger(__name__)
 
 class BybitWebSocket:
 
-    def __init__(self):
-        self.ws = None
-        self.running = True
-
-    # =====================================================
-    # START (AUTO RECONNECT)
-    # =====================================================
     def start(self):
 
         def run():
 
-            while self.running:
+            ws = websocket.WebSocketApp(
+                "wss://stream.bybit.com/v5/public/linear",
+                on_message=self.on_message
+            )
 
-                try:
-
-                    self.ws = websocket.WebSocketApp(
-                        "wss://stream.bybit.com/v5/public/linear",
-                        on_message=self.on_message,
-                        on_open=self.on_open,
-                        on_close=self.on_close,
-                        on_error=self.on_error
-                    )
-
-                    self.ws.run_forever()
-
-                except Exception as e:
-                    logger.error(f"WS CRASH: {e}")
-
-                logger.warning("WS reconnect in 3s...")
-                time.sleep(3)
+            ws.run_forever()
 
         threading.Thread(target=run, daemon=True).start()
 
-    # =====================================================
-    # MESSAGE
-    # =====================================================
     def on_message(self, ws, message):
 
         try:
 
-            if isinstance(message, bytes):
-                message = message.decode()
-
             data = json.loads(message)
 
-            if "topic" in data and "tickers" in data.get("topic", ""):
+            topic = data.get("topic", "")
 
-                items = data.get("data", [])
+            # ORDERBOOK
+            if "orderbook" in topic:
 
-                if isinstance(items, list):
+                event_bus.publish({
+                    "type": "ORDERBOOK",
+                    "symbol": data.get("symbol"),
+                    "bids": data.get("data", {}).get("b", []),
+                    "asks": data.get("data", {}).get("a", [])
+                })
 
-                    for item in items:
+            # TICKER
+            if "tickers" in topic:
 
-                        if not isinstance(item, dict):
-                            continue
+                for item in data.get("data", []):
 
-                        price = item.get("lastPrice")
-
-                        if price is None:
-                            continue
-
-                        event_bus.publish({
-                            "type": "PRICE",
-                            "symbol": item.get("symbol"),
-                            "price": float(price)
-                        })
+                    event_bus.publish({
+                        "type": "TICK",
+                        "symbol": item.get("symbol"),
+                        "price": float(item.get("lastPrice", 0))
+                    })
 
         except Exception as e:
             logger.error(f"WS ERROR: {e}")
-
-    def on_open(self, ws):
-        logger.info("WS CONNECTED")
-
-    def on_close(self, ws, *args):
-        logger.warning("WS CLOSED")
-
-    def on_error(self, ws, error):
-        logger.error(f"WS ERROR: {error}")
 
 
 ws_client = BybitWebSocket()
