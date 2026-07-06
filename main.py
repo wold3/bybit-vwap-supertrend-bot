@@ -4,9 +4,11 @@ import logging
 
 from worker import loop
 from websocket_client import ws_client
+from monitor.monitor import monitor
+
 
 # ================================
-# LOGGER
+# LOGGER SETUP
 # ================================
 logging.basicConfig(
     level=logging.INFO,
@@ -17,29 +19,75 @@ logger = logging.getLogger("BOT")
 
 
 # ================================
-# BOT START
+# SYSTEM INIT
 # ================================
-def start_bot():
+def init_system():
 
-    logger.info("STARTING AUTO TRADING BOT")
+    logger.info("====================================")
+    logger.info("     AUTO TRADING SYSTEM START      ")
+    logger.info("====================================")
 
-    # worker thread
-    threading.Thread(target=loop, daemon=True).start()
 
-    # websocket thread
+# ================================
+# START WORKER
+# ================================
+def start_worker():
+
+    t = threading.Thread(
+        target=loop,
+        daemon=True
+    )
+
+    t.start()
+
+    logger.info("Worker started")
+
+
+# ================================
+# START WEBSOCKET
+# ================================
+def start_ws():
+
     ws_client.start()
 
-    logger.info("BOT ENGINE RUNNING")
+    logger.info("WebSocket started")
 
 
 # ================================
-# MAIN
+# MONITOR INIT
+# ================================
+def start_monitor():
+
+    logger.info("Monitor system ready")
+
+
+# ================================
+# MAIN ENTRY
 # ================================
 if __name__ == "__main__":
 
-    start_bot()
+    try:
 
-    logger.info("SYSTEM FULLY RUNNING")
+        # INIT
+        init_system()
 
-    while True:
-        time.sleep(10)
+        # MONITOR
+        start_monitor()
+
+        # CORE ENGINE
+        start_worker()
+        start_ws()
+
+        logger.info("SYSTEM FULLY RUNNING")
+
+        # KEEP ALIVE LOOP
+        while True:
+            time.sleep(10)
+
+    except KeyboardInterrupt:
+
+        logger.warning("SYSTEM STOPPED (KeyboardInterrupt)")
+
+    except Exception as e:
+
+        logger.error(f"FATAL ERROR: {e}")
