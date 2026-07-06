@@ -18,16 +18,14 @@ class BybitWebSocket:
         self.price_callback = callback
 
     # =====================================================
-    # MESSAGE
+    # MESSAGE HANDLER
     # =====================================================
     def on_message(self, ws, message):
 
         try:
-            # ping/pong 필터
-            if message == "ping" or message == "pong":
+            if message in ("ping", "pong"):
                 return
 
-            # JSON parse
             if isinstance(message, str):
                 try:
                     data = json.loads(message)
@@ -39,18 +37,12 @@ class BybitWebSocket:
             if not isinstance(data, dict):
                 return
 
-            # heartbeat / event filter
-            if "data" not in data and "result" not in data:
-                return
-
             raw = data.get("data") or data.get("result")
 
             if not raw:
                 return
 
-            # list format
             if isinstance(raw, list):
-
                 for item in raw:
                     if not isinstance(item, dict):
                         continue
@@ -58,12 +50,8 @@ class BybitWebSocket:
                     price = item.get("lastPrice") or item.get("price")
 
                     if price and self.price_callback:
-                        try:
-                            self.price_callback(float(price))
-                        except Exception as e:
-                            logger.error(f"callback error: {e}")
+                        self.price_callback(float(price))
 
-            # dict format
             elif isinstance(raw, dict):
 
                 price = raw.get("lastPrice") or raw.get("price")
@@ -72,7 +60,7 @@ class BybitWebSocket:
                     self.price_callback(float(price))
 
         except Exception as e:
-            logger.error(f"WS message error: {str(e)}")
+            logger.error(f"WS error: {e}")
 
     def on_error(self, ws, error):
         logger.error(f"WS error: {error}")
@@ -81,7 +69,6 @@ class BybitWebSocket:
         logger.warning("WebSocket closed")
         self.running = False
 
-        # auto reconnect
         time.sleep(3)
         if self.running:
             self.start()
@@ -100,7 +87,6 @@ class BybitWebSocket:
             url = "wss://stream.bybit.com/v5/public/linear"
 
             while self.running:
-
                 try:
                     self.ws = websocket.WebSocketApp(
                         url,
@@ -116,8 +102,7 @@ class BybitWebSocket:
                     logger.error(f"WS loop error: {e}")
                     time.sleep(3)
 
-        t = threading.Thread(target=run, daemon=True)
-        t.start()
+        threading.Thread(target=run, daemon=True).start()
 
         logger.info("WebSocket started")
 
