@@ -1,144 +1,126 @@
 import logging
-import threading
-import time
-from datetime import datetime
+import requests
 
-from api.bybit_api import (
-    execute_market,
-    get_last_price,
-    is_position_open,
-)
-
-from database.repository import (
-    add_trade,
-    update_bot_state,
-)
-
-from risk.risk_engine import allow_trade
-
-from services.telegram_service import (
-    send_error,
-    send_trade,
-)
+from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 logger = logging.getLogger(__name__)
 
 
-class ExecutionEngine:
+class TelegramService:
 
     def __init__(self):
-        self.lock = threading.Lock()
-        self.last_execution = None
-        self.execution_count = 0
-        self.execution_window = time.time()
+
+        self.base_url = (
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+        )
 
     # =====================================================
-    # Rate Limit
+    # Send Message
     # =====================================================
-    def _rate_limit(self):
+    def send_message(self, text: str):
 
-        now = time.time()
+        try:
 
-        if now - self.execution_window > 60:
-            self.execution_window = now
-            self.execution_count = 0
+            url = f"{self.base_url}/sendMessage"
 
-        self.execution_count += 1
+            payload = {
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": text,
+                "parse_mode": "HTML",
+            }
 
-        if self.execution_count > 3:
-            raise RuntimeError("Trade rate limit exceeded")
+            response = requests.post(url, json=payload, timeout=5)
 
-    # =====================================================
-    # Duplicate Position
-    # =====================================================
-    def _position_check(self, symbol, signal):
+            if not response.ok:
 
-        if not is_position_open(symbol):
-            return
-
-        raise RuntimeError("Position already exists.")
-
-    # =====================================================
-    # Execute
-    # =====================================================
-    def execute(self, signal, symbol, qty, strategy="", regime=""):
-
-        with self.lock:
-
-            logger.info("EXECUTE %s %s qty=%s", signal, symbol, qty)
-
-            self._rate_limit()
-            self._position_check(symbol, signal)
-
-            if not allow_trade():
-                return {
-                    "success": False,
-                    "error": "Risk rejected",
-                }
-
-            try:
-
-                price = get_last_price(symbol)
-
-                if price is None:
-                    return {
-                        "success": False,
-                        "error": "Price unavailable",
-                    }
-
-                order = execute_market(signal, symbol, qty)
-
-                if not order.get("success", False):
-                    return order
-
-                order_id = ""
-
-                try:
-                    order_id = (
-                        order["response"]
-                        .get("result", {})
-                        .get("orderId", "")
-                    )
-                except Exception:
-                    logger.exception("order id parse failed")
-
-                trade = add_trade(
-                    symbol=symbol,
-                    side=signal,
-                    qty=qty,
-                    price=price,
-                    strategy=strategy,
-                    regime=regime,
-                    order_id=order_id,
+                logger.error(
+                    "Telegram send failed: %s",
+                    response.text,
                 )
 
-                update_bot_state(
-                    running=True,
-                    signal=signal,
-                    price=price,
-                )
+                return False
 
-                send_trade(signal, symbol, qty, price)
+            return True
 
-                self.last_execution = datetime.utcnow()
+        except Exception as e:
 
-                logger.info("TRADE SAVED id=%s", trade.id)
+            logger.exception(e)
 
-                return {
-                    "success": True,
-                    "trade_id": trade.id,
-                    "order_id": order_id,
-                    "price": price,
-                }
+            return False
 
-            except Exception as e:
-                logger.exception(e)
-                send_error(str(e))
+    # =====================================================
+    # Trade Alert
+    # =====================================================
+    def send_trade(self, signal, symbol, qty, price):
 
-                return {
-                    "success": False,
-                    "error": str(e),
-                }
+        message = (
+            f"🚀 <b>TRADE EXECUTED</b>\n"
+            f"Signal: {signal}\n"
+            f"Symbol: {symbol}\n"
+            f"Qty: {qty}\n"
+            f"Price: {price}"
+        )
+
+        return self.send_message(message)
+
+    # =====================================================
+    # Error Alert
+    # =====================================================
+    def send_error(self, error: str):
+
+        message = (
+            f"❌ <b>ERROR</b>\n"
+            f"{error}"
+        )
+
+        return self.send_message(message)
+
+    # =====================================================
+    # Risk Alert
+    # =====================================================
+    def send_risk(self, reason: str):
+
+        message = (
+            f"⚠️ <b>RISK BLOCKED</b>\n"
+            f"Reason: {reason}"
+        )
+
+        return self.send_message(message)
+
+    # =====================================================
+    # Position Alert
+    # =====================================================
+    def send_position(self, symbol, pnl):
+
+        message = (
+            f"📊 <b>POSITION UPDATE</b>\n"
+            f"Symbol: {symbol}\n"
+            f"PnL: {pnl}"
+        )
+
+        return self.send_message(message)
 
 
-engine = ExecutionEngine()
+# =====================================================
+# Singleton
+# =====================================================
+telegram_service = TelegramService()
+
+
+# =====================================================
+# Compatibility Wrappers (기존 코드 호환)
+# =====================================================
+def send_trade(signal, symbol, qty, price):
+    return telegram_service.send_trade(signal, symbol, qty, price)
+
+
+def send_error(error: str):
+    return telegram_service.send_error(error)
+
+
+def send_risk(reason: str):
+    return telegram_service.send_risk(reason)
+
+
+def send_position(symbol, pnl):
+    return telegram_service.send_position(symbol, pnl)
