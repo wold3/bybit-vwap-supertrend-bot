@@ -13,6 +13,12 @@ from risk.risk_engine import risk_engine
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
+# =========================
+# 추가 (포지션 sync)
+# =========================
+from portfolio.sync_engine import sync_engine
+from portfolio.position_manager import position_manager
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +26,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
 
 # =====================================================
 # 공유 최신 가격 저장소
@@ -31,7 +38,7 @@ latest_price = {
 
 
 # =====================================================
-# WS callback
+# WebSocket callback
 # =====================================================
 def on_price(price, volume):
 
@@ -59,7 +66,7 @@ def init_system():
 
 
 # =====================================================
-# 트레이딩 루프 (REAL WS 기반)
+# 트레이딩 루프 (SYNC 포함 핵심 수정)
 # =====================================================
 def run_trading():
 
@@ -71,19 +78,24 @@ def run_trading():
 
         try:
 
+            # =================================================
+            # 12) BYBIT POSITION SYNC (핵심 추가)
+            # =================================================
+            sync_engine.sync(SYMBOL)
+
             price = latest_price["price"]
 
-            # -------------------------
             # WS 아직 안 들어왔을 때 방어
-            # -------------------------
             if price is None:
                 time.sleep(0.5)
                 continue
 
             volume = latest_price["volume"]
 
+            # 전략 판단
             decision = brain.decide("auto", price)
 
+            # 실행
             result = execute_strategy(
                 signal="auto",
                 price=price,
@@ -91,8 +103,8 @@ def run_trading():
                 equity=equity
             )
 
-            pnl = (price % 10) - 5
-
+            # PnL (real position 기반)
+            pnl = position_manager.update_pnl(price)
             risk_engine.update(pnl)
 
             brain.record(decision["strategy"], pnl)
@@ -115,7 +127,7 @@ def run_trading():
 
 
 # =====================================================
-# ENTRY
+# ENTRY POINT
 # =====================================================
 if __name__ == "__main__":
 
