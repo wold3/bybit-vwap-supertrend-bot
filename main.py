@@ -12,6 +12,8 @@ from services.fill_ws import start_fill_ws
 from watchdog import Watchdog
 from telegram import telegram
 
+from portfolio.position_sync import position_sync
+
 
 # =================================================
 # ENV LOAD
@@ -61,7 +63,6 @@ def heartbeat():
 
         try:
             time.sleep(30)
-
             print("[HEARTBEAT] SYSTEM OK")
 
         except Exception as e:
@@ -84,54 +85,64 @@ def run_watchdog():
 
 
 # =================================================
+# POSITION SYNC (BYBIT ↔ LOCAL)
+# =================================================
+def run_sync():
+
+    while True:
+
+        try:
+            position_sync.sync()
+            time.sleep(10)
+
+        except Exception as e:
+            print("[SYNC ERROR]", e)
+            telegram.send(f"❌ SYNC ERROR: {e}")
+
+
+# =================================================
 # MAIN
 # =================================================
 if __name__ == "__main__":
 
     print("🚀 ====================================")
-    print("🚀  TRADING SYSTEM STARTING")
+    print("🚀  FULL TRADING SYSTEM START")
     print("🚀 ====================================")
 
-    telegram.send("🚀 TRADING SYSTEM STARTED")
+    telegram.send("🚀 FULL TRADING SYSTEM STARTED")
 
     # ============================
     # THREAD 1 - MARKET WS
     # ============================
-    t1 = threading.Thread(
-        target=run_market_ws,
-        daemon=True
-    )
+    t1 = threading.Thread(target=run_market_ws, daemon=True)
 
     # ============================
     # THREAD 2 - FILL WS
     # ============================
-    t2 = threading.Thread(
-        target=run_fill_ws,
-        daemon=True
-    )
+    t2 = threading.Thread(target=run_fill_ws, daemon=True)
 
     # ============================
     # THREAD 3 - HEARTBEAT
     # ============================
-    t3 = threading.Thread(
-        target=heartbeat,
-        daemon=True
-    )
+    t3 = threading.Thread(target=heartbeat, daemon=True)
 
     # ============================
     # THREAD 4 - WATCHDOG
     # ============================
-    t4 = threading.Thread(
-        target=run_watchdog,
-        daemon=True
-    )
+    t4 = threading.Thread(target=run_watchdog, daemon=True)
+
+    # ============================
+    # THREAD 5 - POSITION SYNC
+    # ============================
+    t5 = threading.Thread(target=run_sync, daemon=True)
 
     # START ALL
     t1.start()
     t2.start()
     t3.start()
     t4.start()
+    t5.start()
 
-    # KEEP MAIN ALIVE
+    # KEEP ALIVE
     while True:
         time.sleep(1)
