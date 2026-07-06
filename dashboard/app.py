@@ -1,41 +1,21 @@
 from flask import Flask, jsonify, render_template
-import time
 
-# ✅ 실제 존재하는 DB 모듈로 통일
-from trade_db import trade_db
-
-from risk.risk_engine import get_risk_status
-from analytics.performance_analyzer import performance_analyzer
-
+from database.trade_db import trade_db
 
 app = Flask(__name__)
 
 
-# =====================================================
-# HOME DASHBOARD
-# =====================================================
+# =================================================
+# DASHBOARD PAGE
+# =================================================
 @app.route("/")
 def home():
     return render_template("dashboard.html")
 
 
-# =====================================================
-# SUMMARY
-# =====================================================
-@app.route("/api/summary")
-def summary():
-
-    trades = trade_db.all()
-
-    return jsonify({
-        "total_trades": len(trades),
-        "status": "RUNNING"
-    })
-
-
-# =====================================================
+# =================================================
 # TRADES
-# =====================================================
+# =================================================
 @app.route("/api/trades")
 def trades():
 
@@ -55,74 +35,24 @@ def trades():
     ])
 
 
-# =====================================================
-# POSITIONS (임시 유지)
-# =====================================================
-@app.route("/api/positions")
-def positions():
+# =================================================
+# EQUITY CURVE
+# =================================================
+@app.route("/api/equity")
+def equity():
 
-    return jsonify([])
-
-
-# =====================================================
-# RISK
-# =====================================================
-@app.route("/api/risk")
-def risk():
-
-    try:
-        return jsonify(get_risk_status())
-    except:
-        return jsonify({"status": "OK"})
-
-
-# =====================================================
-# PERFORMANCE
-# =====================================================
-@app.route("/api/performance")
-def performance():
-
-    try:
-        return jsonify(performance_analyzer.total_performance())
-    except:
-        return jsonify({"pnl": 0})
-
-
-# =====================================================
-# BOT STATUS
-# =====================================================
-@app.route("/api/bot")
-def bot():
-
-    return jsonify({
-        "status": "RUNNING",
-        "time": time.time()
-    })
-
-
-# =====================================================
-# PnL HISTORY (차트용 핵심)
-# =====================================================
-@app.route("/api/pnl-history")
-def pnl_history():
-
-    try:
-        rows = trade_db.get_pnl_history()
-    except:
-        rows = []
+    rows = trade_db.get_equity_history()
 
     return jsonify([
         {
-            "pnl": r[0],
+            "equity": r[0],
             "time": r[1]
         }
         for r in rows
     ])
 
 
-# =====================================================
-# RUN SERVER
-# =====================================================
+# RUN
 if __name__ == "__main__":
 
     print("🚀 Dashboard running on http://localhost:5000")
