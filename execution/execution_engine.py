@@ -1,8 +1,8 @@
 import logging
 
 from api.bybit_client import bybit_client
-from api.order_manager import order_manager
 from risk.risk_engine import risk_engine
+from api.order_manager import order_manager
 
 logger = logging.getLogger(__name__)
 
@@ -12,20 +12,34 @@ class ExecutionEngine:
     def __init__(self):
         self.busy = False
 
+    # =====================================================
+    # REAL PnL (핵심 개선)
+    # =====================================================
     def get_real_pnl(self, symbol):
 
-        res = bybit_client.get_positions(symbol)
+        try:
 
-        items = res.get("result", {}).get("list", [])
+            res = bybit_client.get_positions(symbol)
 
-        pnl = 0
+            items = res.get("result", {}).get("list", [])
 
-        for p in items:
-            if p.get("symbol") == symbol:
-                pnl += float(p.get("unrealisedPnl", 0))
+            total_pnl = 0.0
 
-        return pnl
+            for p in items:
 
+                if p.get("symbol") == symbol:
+
+                    total_pnl += float(p.get("unrealisedPnl", 0))
+
+            return total_pnl
+
+        except Exception as e:
+            logger.error(f"PnL ERROR: {e}")
+            return 0
+
+    # =====================================================
+    # EXIT LOGIC (SL/TP)
+    # =====================================================
     def check_exit(self, symbol, price):
 
         pnl = self.get_real_pnl(symbol)
@@ -38,7 +52,12 @@ class ExecutionEngine:
 
         return None
 
+    # =====================================================
+    # CLOSE POSITION
+    # =====================================================
     def close_position(self, symbol, reason):
+
+        logger.warning(f"CLOSE {symbol} ({reason})")
 
         order_manager.place_market_order(
             symbol=symbol,
@@ -46,6 +65,9 @@ class ExecutionEngine:
             qty=1
         )
 
+    # =====================================================
+    # EXECUTE
+    # =====================================================
     def execute(self, signal, symbol, qty, price, leverage=1):
 
         self.busy = True
@@ -66,6 +88,8 @@ class ExecutionEngine:
                 return {"success": False, "reason": "order_failed"}
 
             risk_engine.add_trade()
+
+            logger.info(f"EXECUTED {symbol} {signal}")
 
             return {"success": True, "order_id": order_id}
 
