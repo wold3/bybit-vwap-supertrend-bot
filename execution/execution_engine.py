@@ -5,6 +5,8 @@ from risk.risk_engine import risk_engine
 from database.database import SessionLocal
 from database.repository import add_trade, add_log
 
+from position_manager import position_manager
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,7 +19,7 @@ class ExecutionEngine:
         return self.busy
 
     # =====================================================
-    # EXECUTE (FIXED)
+    # EXECUTE (POSITION CONNECTED)
     # =====================================================
     def execute(self, signal, symbol, qty, price, leverage):
 
@@ -59,7 +61,17 @@ class ExecutionEngine:
                 }
 
             # -------------------------
-            # 3. db trade log
+            # 3. POSITION CREATE (NEW CORE PART)
+            # -------------------------
+            position_manager.open_position(
+                symbol=symbol,
+                side=signal,
+                qty=qty,
+                price=price
+            )
+
+            # -------------------------
+            # 4. DB LOG
             # -------------------------
             trade = add_trade(
                 db=db,
@@ -100,11 +112,11 @@ engine = ExecutionEngine()
 
 
 # =====================================================
-# wrapper FIX
+# WRAPPER (SAFE SIZING)
 # =====================================================
 def execute_order(signal, symbol, price, equity, win_rate):
 
-    qty = max(1, int(equity * 0.01))  # 1% risk sizing
+    qty = max(1, int(equity * 0.01))
     leverage = 1
 
     return engine.execute(
