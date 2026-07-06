@@ -16,7 +16,6 @@ def loop():
         symbol = event["symbol"]
         price = event["price"]
 
-        # simple strategy
         signal = "Buy" if price % 2 == 0 else "Sell"
 
         engine.execute(symbol, signal, 1, price)
