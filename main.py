@@ -20,6 +20,11 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# =====================================================
+# GLOBAL PRICE STATE
+# =====================================================
+latest_price = None
+
 
 # =====================================================
 # INIT
@@ -43,10 +48,13 @@ def init_system():
 # =====================================================
 def on_price(price):
 
+    global latest_price
+
     try:
         if price is None:
             return
 
+        latest_price = price
         update_market_state(price, 0)
 
     except Exception as e:
@@ -54,9 +62,11 @@ def on_price(price):
 
 
 # =====================================================
-# MAIN LOOP
+# TRADING LOOP
 # =====================================================
 def run_trading():
+
+    global latest_price
 
     logger.info("TRADING STARTED")
 
@@ -65,30 +75,46 @@ def run_trading():
     while True:
 
         try:
-            import random
-            price = 65000 + random.randint(-50, 50)
+
+            # 🚨 WAIT FOR REAL DATA
+            if latest_price is None:
+                time.sleep(0.5)
+                continue
+
+            price = latest_price
 
             update_market_state(price, 0)
 
+            # =========================
+            # STRATEGY
+            # =========================
             decision = brain.decide("auto", price)
+            signal = decision["strategy"]
 
+            # =========================
+            # EXECUTION
+            # =========================
             execute_strategy(
-                signal="auto",
+                signal=signal,
                 price=price,
                 symbol=SYMBOL,
                 equity=equity
             )
 
+            # =========================
+            # RISK
+            # =========================
             pnl = (price % 10) - 5
             risk_engine.update(pnl)
 
-            brain.record(decision["strategy"], pnl)
+            brain.record(signal, pnl)
 
-            logger.info(f"PRICE={price} STRATEGY={decision['strategy']} PNL={pnl}")
+            logger.info(f"PRICE={price} STRATEGY={signal} PNL={pnl}")
 
-            time.sleep(2)
+            time.sleep(1)
 
         except Exception as e:
+
             logger.error(f"MAIN ERROR: {e}")
 
             tg = get_telegram()
@@ -99,7 +125,7 @@ def run_trading():
 
 
 # =====================================================
-# ENTRY
+# ENTRY POINT
 # =====================================================
 if __name__ == "__main__":
 
