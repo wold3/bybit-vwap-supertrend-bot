@@ -1,7 +1,6 @@
 from config import MODE
 
 class Mode:
-
     def is_paper(self):
         return MODE == "PAPER"
 
