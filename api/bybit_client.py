@@ -13,42 +13,28 @@ class BybitClient:
             "https://api.bybit.com"
         )
 
-    def _request(self, method, endpoint, params=None):
+    def place_order(self, symbol, side, qty):
 
-        url = self.base_url + endpoint
-
-        if method == "GET":
-            resp = requests.get(url, params=params, timeout=5)
-        else:
-            resp = requests.post(url, json=params, timeout=5)
-
-        return resp.json()
-
-    def place_order(self, symbol, side, qty, leverage=1):
-
-        endpoint = "/v5/order/create"
-
-        params = {
-            "category": "linear",
-            "symbol": symbol,
-            "side": side,
-            "orderType": "Market",
-            "qty": str(qty),
-            "timeInForce": "GoodTillCancel"
-        }
-
-        return self._request("POST", endpoint, params)
+        return requests.post(
+            self.base_url + "/v5/order/create",
+            json={
+                "category": "linear",
+                "symbol": symbol,
+                "side": side,
+                "orderType": "Market",
+                "qty": str(qty)
+            }
+        ).json()
 
     def get_positions(self, symbol):
 
-        endpoint = "/v5/position/list"
-
-        params = {
-            "category": "linear",
-            "symbol": symbol
-        }
-
-        return self._request("GET", endpoint, params)
+        return requests.get(
+            self.base_url + "/v5/position/list",
+            params={
+                "category": "linear",
+                "symbol": symbol
+            }
+        ).json()
 
 
 bybit_client = BybitClient()
