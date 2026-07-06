@@ -1,3 +1,4 @@
+
 import os
 import time
 import hmac
@@ -5,6 +6,7 @@ import hashlib
 import requests
 
 from risk.risk_engine import risk_engine
+from risk.drawdown_guard import drawdown_guard
 from execution.retry_engine import retry_engine
 from telegram import telegram
 
@@ -18,7 +20,7 @@ class BybitExecutionEngine:
         self.base_url = os.getenv("BYBIT_BASE_URL", "https://api.bybit.com")
 
     # =================================================
-    # ENTRY (WITH RETRY)
+    # ENTRY WRAPPER
     # =================================================
     def execute(self, symbol, side, qty):
 
@@ -34,65 +36,48 @@ class BybitExecutionEngine:
     # =================================================
     def _execute_order(self, symbol, side, qty):
 
+        # ============================================
+        # 1. RISK CHECK
+        # ============================================
         if not risk_engine.can_trade():
-            telegram.send(f"🛑 BLOCKED BY RISK: {symbol}")
+
+            print("[BLOCK] RISK ENGINE")
+
+            telegram.send("🛑 BLOCKED BY RISK ENGINE")
+
             return None
 
+        # ============================================
+        # 2. DRAWDOWN CHECK (핵심 추가)
+        # ============================================
+        if not drawdown_guard.can_trade():
+
+            print("[BLOCK] DRAWDOWN LIMIT HIT")
+
+            telegram.send("🚨 BLOCKED BY DRAWDOWN LIMIT")
+
+            return None
+
+        # ============================================
+        # 3. ORDER SEND
+        # ============================================
         result = self._send_bybit_order(symbol, side, qty)
 
+        # ============================================
+        # 4. RESPONSE LOG
+        # ============================================
         if result and result.get("retCode") == 0:
 
-            telegram.send(
-                f"📥 ORDER FILLED\n"
-                f"{symbol} {side} {qty}"
-            )
+            telegram.send(f"📥 ORDER FILLED {symbol} {side} {qty}")
+
         else:
 
-            telegram.send(
-                f"❌ ORDER FAILED\n{result}"
-            )
+            telegram.send(f"❌ ORDER FAILED {result}")
 
         return result
 
     # =================================================
-    # SL / TP FUNCTIONS
-    # =================================================
-
-    # 1️⃣ 부분 익절
-    def partial_close(self, symbol, qty_ratio=0.5):
-
-        telegram.send(f"📉 PARTIAL CLOSE {symbol}")
-
-        self._send_bybit_order(
-            symbol=symbol,
-            side="Sell",
-            qty=qty_ratio,
-            reduce_only=True
-        )
-
-    # 2️⃣ 본전 이동 (Stop Loss 수정)
-    def move_sl_to_be(self, symbol):
-
-        telegram.send(f"🟡 MOVE SL TO BREAKEVEN {symbol}")
-
-        # 실제 API: stop order modify 필요
-        # 여기선 구조만
-        return True
-
-    # 3️⃣ 전체 청산
-    def close_position(self, symbol):
-
-        telegram.send(f"🚨 CLOSE POSITION {symbol}")
-
-        self._send_bybit_order(
-            symbol=symbol,
-            side="Sell",
-            qty="ALL",
-            reduce_only=True
-        )
-
-    # =================================================
-    # BYBIT API CALL
+    # BYBIT ORDER API
     # =================================================
     def _send_bybit_order(self, symbol, side, qty, reduce_only=False):
 
@@ -116,7 +101,6 @@ class BybitExecutionEngine:
         if reduce_only:
             params["reduceOnly"] = True
 
-        # SIGNATURE
         query = "&".join([f"{k}={params[k]}" for k in sorted(params)])
 
         signature = hmac.new(
@@ -131,13 +115,13 @@ class BybitExecutionEngine:
             res = requests.post(url, json=params, timeout=5)
             data = res.json()
 
-            print("[BYBIT RESPONSE]", data)
+            print("[BYBIT]", data)
 
             return data
 
         except Exception as e:
 
-            print("[BYBIT ERROR]", e)
+            print("[ERROR]", e)
             telegram.send(f"❌ API ERROR: {e}")
 
             return None
