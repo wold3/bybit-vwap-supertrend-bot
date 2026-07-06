@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, select
 
 from database.models import (
     BotState,
@@ -10,10 +10,10 @@ from database.models import (
 )
 from database.session import get_session
 
-
 # =====================================================
 # Trade
 # =====================================================
+
 
 def add_trade(
     symbol: str,
@@ -40,11 +40,68 @@ def add_trade(
     )
 
     with get_session() as db:
+
         db.add(trade)
+
         db.flush()
+
         db.refresh(trade)
 
-    return trade
+        return trade
+
+
+def get_trade(
+    trade_id: int,
+):
+
+    with get_session() as db:
+
+        return db.get(
+            Trade,
+            trade_id,
+        )
+
+
+def get_recent_trades(
+    limit: int = 100,
+):
+
+    with get_session() as db:
+
+        stmt = (
+            select(Trade)
+            .order_by(
+                desc(
+                    Trade.created_at
+                )
+            )
+            .limit(limit)
+        )
+
+        return list(
+            db.scalars(stmt)
+        )
+
+
+def get_open_trades():
+
+    with get_session() as db:
+
+        stmt = (
+            select(Trade)
+            .where(
+                Trade.status == "OPEN"
+            )
+            .order_by(
+                desc(
+                    Trade.created_at
+                )
+            )
+        )
+
+        return list(
+            db.scalars(stmt)
+        )
 
 
 def update_trade_pnl(
@@ -55,12 +112,16 @@ def update_trade_pnl(
 
     with get_session() as db:
 
-        trade = db.get(Trade, trade_id)
+        trade = db.get(
+            Trade,
+            trade_id,
+        )
 
         if trade is None:
             return None
 
         trade.pnl = pnl
+
         trade.status = status
 
         db.add(trade)
@@ -68,28 +129,22 @@ def update_trade_pnl(
         return trade
 
 
-def get_trade(trade_id: int):
+def close_trade(
+    trade_id: int,
+    pnl: float,
+):
 
-    with get_session() as db:
-        return db.get(Trade, trade_id)
-
-
-def get_recent_trades(limit: int = 100):
-
-    with get_session() as db:
-
-        stmt = (
-            select(Trade)
-            .order_by(desc(Trade.created_at))
-            .limit(limit)
-        )
-
-        return list(db.scalars(stmt))
+    return update_trade_pnl(
+        trade_id,
+        pnl,
+        "CLOSED",
+    )
 
 
 # =====================================================
 # Position
 # =====================================================
+
 
 def save_position(
     symbol: str,
@@ -101,8 +156,11 @@ def save_position(
 
     with get_session() as db:
 
-        stmt = select(Position).where(
-            Position.symbol == symbol
+        stmt = (
+            select(Position)
+            .where(
+                Position.symbol == symbol
+            )
         )
 
         position = db.scalar(stmt)
@@ -120,10 +178,16 @@ def save_position(
         else:
 
             position.side = side
+
             position.qty = qty
+
             position.entry_price = entry_price
+
             position.leverage = leverage
-            position.updated_at = datetime.utcnow()
+
+            position.updated_at = (
+                datetime.utcnow()
+            )
 
         db.add(position)
 
@@ -138,8 +202,11 @@ def update_position_price(
 
     with get_session() as db:
 
-        stmt = select(Position).where(
-            Position.symbol == symbol
+        stmt = (
+            select(Position)
+            .where(
+                Position.symbol == symbol
+            )
         )
 
         position = db.scalar(stmt)
@@ -148,20 +215,29 @@ def update_position_price(
             return None
 
         position.mark_price = mark_price
+
         position.unrealized_pnl = unrealized_pnl
-        position.updated_at = datetime.utcnow()
+
+        position.updated_at = (
+            datetime.utcnow()
+        )
 
         db.add(position)
 
         return position
 
 
-def get_position(symbol: str):
+def get_position(
+    symbol: str,
+):
 
     with get_session() as db:
 
-        stmt = select(Position).where(
-            Position.symbol == symbol
+        stmt = (
+            select(Position)
+            .where(
+                Position.symbol == symbol
+            )
         )
 
         return db.scalar(stmt)
@@ -173,15 +249,37 @@ def get_positions():
 
         stmt = select(Position)
 
-        return list(db.scalars(stmt))
+        return list(
+            db.scalars(stmt)
+        )
 
 
-def delete_position(symbol: str):
+def has_position(
+    symbol: str,
+):
 
     with get_session() as db:
 
-        stmt = select(Position).where(
-            Position.symbol == symbol
+        stmt = (
+            select(Position)
+            .where(
+                Position.symbol == symbol
+            )
+        )
+
+        return db.scalar(stmt) is not None
+
+def delete_position(
+    symbol: str,
+):
+
+    with get_session() as db:
+
+        stmt = (
+            select(Position)
+            .where(
+                Position.symbol == symbol
+            )
         )
 
         position = db.scalar(stmt)
@@ -198,23 +296,31 @@ def delete_position(symbol: str):
 # Daily Statistics
 # =====================================================
 
-def get_or_create_daily_stat(date: str):
+def get_or_create_daily_stat(
+    date: str,
+):
 
     with get_session() as db:
 
-        stmt = select(DailyStat).where(
-            DailyStat.date == date
+        stmt = (
+            select(DailyStat)
+            .where(
+                DailyStat.date == date
+            )
         )
 
         stat = db.scalar(stmt)
 
         if stat is None:
 
-            stat = DailyStat(date=date)
+            stat = DailyStat(
+                date=date,
+            )
 
             db.add(stat)
 
             db.flush()
+
             db.refresh(stat)
 
         return stat
@@ -228,17 +334,23 @@ def update_daily_stat(
 
     with get_session() as db:
 
-        stmt = select(DailyStat).where(
-            DailyStat.date == date
+        stmt = (
+            select(DailyStat)
+            .where(
+                DailyStat.date == date
+            )
         )
 
         stat = db.scalar(stmt)
 
         if stat is None:
 
-            stat = DailyStat(date=date)
+            stat = DailyStat(
+                date=date,
+            )
 
         stat.trades += 1
+
         stat.pnl += pnl
 
         if win:
@@ -249,6 +361,27 @@ def update_daily_stat(
         db.add(stat)
 
         return stat
+
+
+def get_today_pnl(
+    date: str,
+):
+
+    with get_session() as db:
+
+        stmt = (
+            select(DailyStat)
+            .where(
+                DailyStat.date == date
+            )
+        )
+
+        stat = db.scalar(stmt)
+
+        if stat is None:
+            return 0.0
+
+        return stat.pnl
 
 
 # =====================================================
@@ -263,15 +396,21 @@ def update_bot_state(
 
     with get_session() as db:
 
-        state = db.get(BotState, 1)
+        state = db.get(
+            BotState,
+            1,
+        )
 
         if state is None:
 
-            state = BotState(id=1)
+            state = BotState(
+                id=1,
+            )
 
         state.running = running
         state.last_signal = signal
         state.last_price = price
+        state.updated_at = datetime.utcnow()
 
         db.add(state)
 
@@ -282,7 +421,76 @@ def get_bot_state():
 
     with get_session() as db:
 
-        return db.get(BotState, 1)
+        return db.get(
+            BotState,
+            1,
+        )
+
+
+# =====================================================
+# Statistics
+# =====================================================
+
+def get_trade_count():
+
+    with get_session() as db:
+
+        return db.scalar(
+            select(func.count())
+            .select_from(Trade)
+        )
+
+
+def get_total_pnl():
+
+    with get_session() as db:
+
+        return (
+            db.scalar(
+                select(
+                    func.sum(
+                        Trade.pnl
+                    )
+                )
+            )
+            or 0.0
+        )
+
+
+def get_win_rate():
+
+    with get_session() as db:
+
+        total = db.scalar(
+            select(func.count())
+            .select_from(Trade)
+        )
+
+        if not total:
+            return 0.0
+
+        wins = db.scalar(
+            select(func.count())
+            .select_from(Trade)
+            .where(
+                Trade.pnl > 0
+            )
+        )
+
+        return round(
+            wins / total * 100,
+            2,
+        )
+
+
+def get_open_position_count():
+
+    with get_session() as db:
+
+        return db.scalar(
+            select(func.count())
+            .select_from(Position)
+        )
 
 
 # =====================================================
@@ -293,34 +501,42 @@ def get_summary():
 
     with get_session() as db:
 
-        trade_count = db.scalar(
-            select(func.count()).select_from(Trade)
-        )
+        trade_count = get_trade_count()
 
-        total_pnl = db.scalar(
-            select(func.sum(Trade.pnl))
-        ) or 0.0
+        total_pnl = get_total_pnl()
 
-        open_positions = db.scalar(
-            select(func.count()).select_from(Position)
-        )
+        open_positions = get_open_position_count()
 
         wins = db.scalar(
             select(func.count())
             .select_from(Trade)
-            .where(Trade.pnl > 0)
+            .where(
+                Trade.pnl > 0
+            )
         )
 
         losses = db.scalar(
             select(func.count())
             .select_from(Trade)
-            .where(Trade.pnl < 0)
+            .where(
+                Trade.pnl < 0
+            )
         )
 
         return {
+
             "trade_count": trade_count,
+
             "open_positions": open_positions,
-            "total_pnl": round(total_pnl, 2),
+
+            "total_pnl": round(
+                total_pnl,
+                2,
+            ),
+
             "wins": wins,
+
             "losses": losses,
+
+            "win_rate": get_win_rate(),
         }
