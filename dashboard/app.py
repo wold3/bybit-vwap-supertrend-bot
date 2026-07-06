@@ -2,6 +2,7 @@ from flask import Flask, jsonify, render_template
 
 from database.trade_db import trade_db
 from execution.execution_engine import engine
+from risk.risk_engine import risk_engine
 
 app = Flask(__name__)
 
@@ -37,7 +38,7 @@ def trades():
 
 
 # =================================================
-# TOTAL EQUITY (핵심)
+# TOTAL EQUITY
 # =================================================
 @app.route("/api/equity-total")
 def equity_total():
@@ -47,10 +48,21 @@ def equity_total():
     })
 
 
+# =================================================
+# 🚨 RISK API (핵심 추가)
+# =================================================
+@app.route("/api/risk")
+def risk():
+
+    return jsonify(risk_engine.status())
+
+
+# =================================================
 # RUN
+# =================================================
 if __name__ == "__main__":
 
-    print("🚀 Dashboard running")
+    print("🚀 Dashboard running on http://localhost:5000")
 
     app.run(
         host="0.0.0.0",
