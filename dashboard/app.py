@@ -5,54 +5,30 @@ from execution.pnl_tracker import pnl_tracker
 app = Flask(__name__)
 
 
-# ================================
-# 전체 거래 조회
-# ================================
 @app.route("/trades")
 def trades():
 
-    rows = trade_db.all()
-
-    return jsonify([
-        {
-            "id": r[0],
-            "symbol": r[1],
-            "side": r[2],
-            "qty": r[3],
-            "price": r[4],
-            "pnl": r[5],
-            "time": r[6]
-        }
-        for r in rows
-    ])
+    return jsonify(trade_db.all())
 
 
-# ================================
-# 전체 PnL
-# ================================
 @app.route("/pnl")
 def pnl():
 
     return jsonify({
-        "total_pnl": pnl_tracker.total_pnl()
+        "total_pnl": pnl_tracker.total_pnl(),
+        "status": "LIVE"
     })
 
 
-# ================================
-# 시스템 상태
-# ================================
-@app.route("/status")
-def status():
+@app.route("/health")
+def health():
 
     return jsonify({
-        "status": "RUNNING",
-        "service": "AUTO_TRADING_BOT"
+        "system": "OK",
+        "bot": "RUNNING"
     })
 
 
-# ================================
-# 서버 실행
-# ================================
 if __name__ == "__main__":
 
     app.run(
