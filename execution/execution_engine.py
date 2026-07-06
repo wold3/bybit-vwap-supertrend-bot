@@ -1,5 +1,4 @@
 import logging
-from threading import Lock
 
 from api.order_manager import order_manager
 from risk.risk_engine import risk_engine
@@ -13,45 +12,46 @@ class ExecutionEngine:
 
     def __init__(self):
         self.busy = False
-        self.lock = Lock()
+        self.positions = {}   # ✅ 포지션 저장 추가
 
-    # =====================================================
-    # 상태 체크
-    # =====================================================
     def is_busy(self):
         return self.busy
 
     # =====================================================
-    # 메인 실행
+    # 포지션 PnL 계산 (핵심 추가)
+    # =====================================================
+    def calculate_pnl(self, symbol, current_price):
+
+        pos = self.positions.get(symbol)
+
+        if not pos:
+            return 0
+
+        entry = pos["entry_price"]
+        qty = pos["qty"]
+
+        if pos["side"] == "Buy":
+            return (current_price - entry) * qty
+        else:
+            return (entry - current_price) * qty
+
+    # =====================================================
+    # 실행
     # =====================================================
     def execute(self, signal, symbol, qty, price, leverage):
 
-        with self.lock:
-            if self.busy:
-                logger.warning("Execution skipped (busy)")
-                return {"success": False, "reason": "busy"}
-
-            self.busy = True
-
+        self.busy = True
         db = SessionLocal()
 
         try:
 
-            # -------------------------
-            # 1. risk check
-            # -------------------------
             if not risk_engine.allow_trade():
-                logger.warning("TRADE BLOCKED by risk engine")
-                add_log(db, "WARNING", "Trade blocked by risk engine")
+                add_log(db, "WARNING", "Risk blocked")
+                return {"success": False, "reason": "risk_block"}
 
-                return {
-                    "success": False,
-                    "reason": "risk_block"
-                }
-
-            # -------------------------
-            # 2. order execution
-            # -------------------------
+            # =========================
+            # ORDER
+            # =========================
             order_id = order_manager.place_market_order(
                 symbol=symbol,
                 side=signal,
@@ -61,15 +61,17 @@ class ExecutionEngine:
 
             if not order_id:
                 add_log(db, "ERROR", "Order failed")
+                return {"success": False, "reason": "order_failed"}
 
-                return {
-                    "success": False,
-                    "reason": "order_failed"
-                }
+            # =========================
+            # POSITION 저장 (핵심)
+            # =========================
+            self.positions[symbol] = {
+                "side": signal,
+                "entry_price": price,
+                "qty": qty
+            }
 
-            # -------------------------
-            # 3. trade DB
-            # -------------------------
             trade = add_trade(
                 db=db,
                 symbol=symbol,
@@ -79,19 +81,14 @@ class ExecutionEngine:
                 leverage=leverage
             )
 
-            # -------------------------
-            # 4. REALISTIC PNL INIT
-            # -------------------------
-            risk_engine.update(0)  # init hook
-
             add_log(db, "INFO", f"Trade executed {symbol} {signal}")
 
-            logger.info(f"EXECUTED: {symbol} {signal} qty={qty}")
+            logger.info(f"EXECUTED: {symbol} {signal}")
 
             return {
                 "success": True,
                 "order_id": order_id,
-                "trade_id": getattr(trade, "id", None)
+                "trade_id": trade.id
             }
 
         except Exception as e:
@@ -99,35 +96,11 @@ class ExecutionEngine:
             logger.error(f"Execution error: {str(e)}")
             add_log(db, "ERROR", str(e))
 
-            return {
-                "success": False,
-                "reason": "exception",
-                "error": str(e)
-            }
+            return {"success": False, "reason": "exception"}
 
         finally:
             db.close()
             self.busy = False
 
 
-# =====================================================
-# SINGLETON
-# =====================================================
 engine = ExecutionEngine()
-
-
-# =====================================================
-# WRAPPER (strategy compatibility)
-# =====================================================
-def execute_order(signal, symbol, price, equity, win_rate):
-
-    qty = 1
-    leverage = 1
-
-    return engine.execute(
-        signal=signal,
-        symbol=symbol,
-        qty=qty,
-        price=price,
-        leverage=leverage
-    )
