@@ -4,22 +4,26 @@ import asyncio
 import requests
 import hmac
 import hashlib
-import json
 
 from database.trade_db import trade_db
 from services.ws_server import broadcast
 
 
-# =====================================================
-# 🔥 BYBIT REAL EXECUTION ENGINE
-# =====================================================
 class BybitExecutionEngine:
 
     def __init__(self):
 
-        self.api_key = os.getenv("BYBIT_API_KEY", "")
-        self.api_secret = os.getenv("BYBIT_API_SECRET", "")
+        # =========================
+        # 🔥 ENV ONLY CONFIG
+        # =========================
+        self.api_key = os.getenv("BYBIT_API_KEY")
+        self.api_secret = os.getenv("BYBIT_API_SECRET")
         self.base_url = "https://api.bybit.com"
+
+        self.symbol = os.getenv("SYMBOL", "BTCUSDT")
+
+        if not self.api_key or not self.api_secret:
+            raise Exception("❌ BYBIT API KEY NOT SET IN ENV")
 
     # =================================================
     # SIGNATURE
@@ -35,18 +39,16 @@ class BybitExecutionEngine:
         ).hexdigest()
 
     # =================================================
-    # MARKET ORDER
+    # EXECUTE ORDER
     # =================================================
     def execute(self, symbol, side, qty, price=None):
 
         timestamp = int(time.time() * 1000)
 
-        endpoint = "/v5/order/create"
-
         params = {
             "category": "linear",
-            "symbol": symbol,
-            "side": side.capitalize(),  # Buy / Sell
+            "symbol": symbol or self.symbol,
+            "side": side.capitalize(),
             "orderType": "Market",
             "qty": str(qty),
             "timeInForce": "IOC",
@@ -56,30 +58,19 @@ class BybitExecutionEngine:
 
         params["sign"] = self._sign(params)
 
-        url = self.base_url + endpoint
-
         try:
-            res = requests.post(url, json=params, timeout=5)
+            res = requests.post(
+                self.base_url + "/v5/order/create",
+                json=params,
+                timeout=5
+            )
+
             data = res.json()
 
-            # =========================================
-            # ORDER ID
-            # =========================================
-            order_id = None
+            order_id = data.get("result", {}).get("orderId")
 
-            try:
-                order_id = data["result"]["orderId"]
-            except:
-                pass
+            pnl = self._calc_pnl()
 
-            # =========================================
-            # PnL CALC (실전에서는 포지션 기반으로 교체)
-            # =========================================
-            pnl = self._calc_pnl(symbol)
-
-            # =========================================
-            # DB SAVE
-            # =========================================
             trade_db.insert(symbol, side, qty, price or 0, pnl)
 
             try:
@@ -87,9 +78,6 @@ class BybitExecutionEngine:
             except:
                 pass
 
-            # =========================================
-            # WS PUSH
-            # =========================================
             self._push_pnl(pnl)
 
             return {
@@ -106,17 +94,12 @@ class BybitExecutionEngine:
             }
 
     # =================================================
-    # PnL CALC (TEMP)
+    # MOCK PnL (later replace with real position PnL)
     # =================================================
-    def _calc_pnl(self, symbol):
+    def _calc_pnl(self):
 
-        try:
-            # TODO: 실제 position 기반으로 변경
-            import random
-            return round((random.random() - 0.5) * 10, 2)
-
-        except:
-            return 0.0
+        import random
+        return round((random.random() - 0.5) * 10, 2)
 
     # =================================================
     # WS PUSH
@@ -135,7 +118,7 @@ class BybitExecutionEngine:
             pass
 
 
-# =====================================================
+# =========================
 # SINGLETON
-# =====================================================
+# =========================
 engine = BybitExecutionEngine()
