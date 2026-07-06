@@ -1,6 +1,5 @@
 import uuid
 
-
 class PaperEngine:
 
     def __init__(self):
