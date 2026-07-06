@@ -1,67 +1,65 @@
 import numpy as np
 from collections import deque
 
-from risk.risk_engine import risk_engine
 from strategy.strategy_router import trend_direction, volatility
+from risk.risk_engine import risk_engine
 
-
-# =====================================================
-# Memory (시장 학습)
-# =====================================================
 
 class TradingBrain:
 
     def __init__(self):
 
-        self.win_memory = deque(maxlen=200)
-        self.strategy_memory = deque(maxlen=200)
         self.pnl_memory = deque(maxlen=200)
+        self.strategy_memory = deque(maxlen=200)
+        self.win_memory = deque(maxlen=200)
 
     # =====================================================
-    # 전략 기록
+    # 기록
     # =====================================================
 
     def record(self, strategy, pnl):
 
         self.strategy_memory.append(strategy)
         self.pnl_memory.append(pnl)
-
         self.win_memory.append(1 if pnl > 0 else 0)
 
     # =====================================================
-    # 전략별 성능 계산
+    # 승률
+    # =====================================================
+
+    def win_rate(self):
+
+        if len(self.win_memory) < 10:
+            return 50.0
+
+        return round(
+            sum(self.win_memory) / len(self.win_memory) * 100,
+            2
+        )
+
+    # =====================================================
+    # 전략 점수
     # =====================================================
 
     def strategy_score(self, strategy):
 
-        if len(self.strategy_memory) < 20:
-            return 50
-
-        idx = [i for i, s in enumerate(self.strategy_memory) if s == strategy]
+        idx = [
+            i for i, s in enumerate(self.strategy_memory)
+            if s == strategy
+        ]
 
         if not idx:
             return 50
 
         pnl = [self.pnl_memory[i] for i in idx if i < len(self.pnl_memory)]
 
-        if len(pnl) == 0:
+        if not pnl:
             return 50
 
-        return np.mean(pnl)
+        return float(np.mean(pnl))
 
     # =====================================================
-    # 전체 승률
-    # =====================================================
-
-    def win_rate(self):
-
-        if len(self.win_memory) < 10:
-            return 50
-
-        return round(sum(self.win_memory) / len(self.win_memory) * 100, 2)
-
-    # =====================================================
-    # 최적 전략 선택 (핵심)
+    # 전략 선택 (핵심 AI)
     # =====================================================
 
     def select_strategy(self):
@@ -78,7 +76,7 @@ class TradingBrain:
         # -------------------------
         # trend bias
         # -------------------------
-        if trend == "TREND_UP" or trend == "TREND_DOWN":
+        if trend in ["TREND_UP", "TREND_DOWN"]:
             scores["trend"] += 30
         else:
             scores["range"] += 30
@@ -92,17 +90,17 @@ class TradingBrain:
             scores["trend"] += 10
 
         # -------------------------
-        # performance memory bias
+        # learning bias
         # -------------------------
-        for s in scores:
-            scores[s] += self.strategy_score(s) * 0.1
+        for k in scores.keys():
+            scores[k] += self.strategy_score(k) * 0.1
 
         best = max(scores, key=scores.get)
 
         return best, scores
 
     # =====================================================
-    # drawdown recovery mode
+    # 회복 모드
     # =====================================================
 
     def recovery_mode(self):
@@ -115,10 +113,13 @@ class TradingBrain:
         if status["win_rate"] < 40:
             return True
 
+        if status["risk_score"] < 30:
+            return True
+
         return False
 
     # =====================================================
-    # dynamic risk override
+    # 리스크 보정
     # =====================================================
 
     def adjusted_risk(self):
@@ -126,34 +127,32 @@ class TradingBrain:
         base = risk_engine.dynamic_risk()
 
         if self.recovery_mode():
-            return base * 0.5  # 보수 모드
+            return base * 0.5
 
-        if risk_engine.win_rate() > 60:
-            return base * 1.2  # 공격 모드
+        if self.win_rate() > 60:
+            return base * 1.2
 
         return base
 
     # =====================================================
-    # decision engine
+    # 의사결정
     # =====================================================
 
     def decide(self, signal, price):
 
         strategy, scores = self.select_strategy()
 
-        recovery = self.recovery_mode()
-
         return {
             "strategy": strategy,
             "scores": scores,
-            "recovery_mode": recovery,
-            "risk": self.adjusted_risk(),
             "win_rate": self.win_rate(),
+            "recovery": self.recovery_mode(),
+            "risk": self.adjusted_risk()
         }
 
 
 # =====================================================
-# Singleton
+# SINGLETON
 # =====================================================
 
 brain = TradingBrain()
