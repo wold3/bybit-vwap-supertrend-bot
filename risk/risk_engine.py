@@ -226,6 +226,9 @@ def update_risk(pnl, price=None, qty=None):
 def get_risk_status():
     return risk_engine.status()
 
+def should_stop():
+    return not risk_engine.allow_trade()
+
 
 def reset_risk():
     risk_engine.__init__()
