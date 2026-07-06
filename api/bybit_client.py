@@ -2,15 +2,10 @@ import requests
 from config import BYBIT_TESTNET
 
 
-class BybitClient:
+class Bybit:
 
     def __init__(self):
-
-        self.base = (
-            "https://api-testnet.bybit.com"
-            if BYBIT_TESTNET else
-            "https://api.bybit.com"
-        )
+        self.base = "https://api-testnet.bybit.com" if BYBIT_TESTNET else "https://api.bybit.com"
 
     def order(self, symbol, side, qty):
 
@@ -29,11 +24,8 @@ class BybitClient:
 
         return requests.get(
             self.base + "/v5/position/list",
-            params={
-                "category": "linear",
-                "symbol": symbol
-            }
+            params={"category": "linear", "symbol": symbol}
         ).json()
 
 
-bybit = BybitClient()
+bybit = Bybit()
