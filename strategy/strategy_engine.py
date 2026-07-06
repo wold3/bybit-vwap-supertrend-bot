@@ -3,72 +3,71 @@ class StrategyEngine:
     def __init__(self, execution_engine):
 
         self.execution = execution_engine
-        self.prices = []
-        self.volumes = []
+
+        self.tp1_hit = {}
+        self.be_moved = {}
 
     # =================================================
-    # WS PRICE INPUT
+    # SIGNAL ENTRY
     # =================================================
-    def on_price(self, price):
+    def on_signal(self, symbol, side, price, qty):
 
-        self.prices.append(price)
-        self.volumes.append(1)
+        self.execution.execute(symbol, side, qty)
 
-        if len(self.prices) > 50:
-            self.prices.pop(0)
-            self.volumes.pop(0)
+        self.tp1_hit[symbol] = False
+        self.be_moved[symbol] = False
 
-        # 충분한 데이터 없으면 skip
-        if len(self.prices) < 20:
+    # =================================================
+    # PRICE UPDATE LOOP
+    # =================================================
+    def on_price(self, symbol, price, position):
+
+        if not position:
             return
 
-        self.evaluate()
+        entry = position["entry_price"]
+        side = position["side"]
+
+        pnl_pct = self._calc_pnl(entry, price, side)
+
+        # ============================
+        # TP1 (부분 익절)
+        # ============================
+        if pnl_pct >= 0.5 and not self.tp1_hit.get(symbol):
+
+            self.tp1_hit[symbol] = True
+
+            self.execution.partial_close(symbol, 0.5)
+
+        # ============================
+        # BREAKEVEN MOVE
+        # ============================
+        if pnl_pct >= 0.3 and not self.be_moved.get(symbol):
+
+            self.be_moved[symbol] = True
+
+            self.execution.move_sl_to_be(symbol)
+
+        # ============================
+        # FINAL TP / TRAILING EXIT
+        # ============================
+        if pnl_pct >= 1.0:
+
+            self.execution.close_position(symbol)
+
+        # ============================
+        # STOP LOSS
+        # ============================
+        if pnl_pct <= -0.5:
+
+            self.execution.close_position(symbol)
 
     # =================================================
-    # STRATEGY RUN
+    # PNL CALC
     # =================================================
-    def evaluate(self):
+    def _calc_pnl(self, entry, price, side):
 
-        from risk.risk_engine import risk_engine
-        from ml_filter import ml_filter
-        from indicators.vwap_supertrend import calculate_vwap, supertrend
-        from portfolio.position_manager import position_manager
-
-        symbol = "BTCUSDT"
-
-        # 🚨 RISK GATE
-        if not risk_engine.can_trade():
-            return
-
-        # 포지션 체크
-        if position_manager.get_position(symbol):
-            return
-
-        vwap = calculate_vwap(self.prices, self.volumes)
-        st = supertrend(self.prices)
-
-        last_price = self.prices[-1]
-
-        # TECH SIGNAL
-        if last_price > vwap and st == "UP":
-            base_signal = "BUY"
-        elif last_price < vwap and st == "DOWN":
-            base_signal = "SELL"
+        if side == "Buy":
+            return (price - entry) / entry * 100
         else:
-            return
-
-        # ML FILTER
-        allow, prob = ml_filter.allow_trade(self.prices, self.volumes)
-
-        if not allow:
-            return
-
-        print(f"[WS STRATEGY] SIGNAL {base_signal} prob={prob:.2f}")
-
-        # EXECUTE REAL TRADE
-        self.execution.execute(
-            symbol=symbol,
-            side=base_signal,
-            qty=0.001,
-            price=last_price
-        )
+            return (entry - price) / entry * 100
