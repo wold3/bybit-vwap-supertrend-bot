@@ -7,10 +7,33 @@ from api.bybit_client import bybit_client
 logger = logging.getLogger(__name__)
 
 
+# =====================================================
+# Side 변환 (핵심 수정)
+# =====================================================
+
+def normalize_side(signal: str):
+
+    if not signal:
+        return None
+
+    signal = signal.lower()
+
+    if signal in ["buy", "long", "up", "bull", "bullish"]:
+        return "Buy"
+
+    if signal in ["sell", "short", "down", "bear", "bearish"]:
+        return "Sell"
+
+    return None
+
+
+# =====================================================
+# Order Manager
+# =====================================================
+
 class OrderManager:
 
     def __init__(self):
-
         self.open_orders = {}
         self.filled_orders = {}
 
@@ -21,6 +44,11 @@ class OrderManager:
     def place_market_order(self, symbol, side, qty, leverage=1):
 
         try:
+            side = normalize_side(side)
+
+            if side is None:
+                logger.error(f"INVALID SIDE SIGNAL: {side}")
+                return None
 
             resp = bybit_client.place_order(
                 symbol=symbol,
@@ -29,10 +57,17 @@ class OrderManager:
                 leverage=leverage
             )
 
-            order_id = resp.get("result", {}).get("orderId")
+            logger.info(f"BYBIT RESPONSE: {resp}")
+
+            if not isinstance(resp, dict):
+                logger.error(f"Invalid response type: {type(resp)}")
+                return None
+
+            result = resp.get("result", {})
+            order_id = result.get("orderId")
 
             if not order_id:
-                logger.error(f"Order failed: {resp}")
+                logger.error(f"Order failed (no orderId): {resp}")
                 return None
 
             self.open_orders[order_id] = {
@@ -48,7 +83,6 @@ class OrderManager:
             return order_id
 
         except Exception as e:
-
             logger.error(f"Place order error: {str(e)}")
             return None
 
@@ -58,13 +92,11 @@ class OrderManager:
 
     def check_order_status(self, order_id):
 
-        # 실제로는 Bybit execution API 필요 (간단 mock)
         order = self.open_orders.get(order_id)
 
         if not order:
             return None
 
-        # mock fill logic
         if (datetime.utcnow() - order["created_at"]).seconds > 2:
 
             order["status"] = "FILLED"
