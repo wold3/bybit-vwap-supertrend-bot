@@ -3,43 +3,59 @@ import logging
 
 from config import SYMBOL
 from api.websocket_client import ws_client
-
 from ai.trading_brain import brain
+
 from strategy.strategy_router import update_market_state
 from strategy.strategy_wrapper import execute_strategy
-from risk.risk_engine import risk_engine
-from market.candle_builder import candle_builder
 
+from risk.risk_engine import risk_engine
 from services.telegram_service import init_telegram, get_telegram
 from services.watchdog_service import watchdog
 
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
 logger = logging.getLogger(__name__)
 
-latest_price = {"value": None, "ts": 0}
 
-
+# =====================================================
+# INIT
+# =====================================================
 def init_system():
 
     logger.info("SYSTEM INIT START")
 
-    init_telegram("YOUR_TOKEN", "YOUR_CHAT_ID")
+    init_telegram(
+        token="YOUR_TELEGRAM_TOKEN",
+        chat_id="YOUR_CHAT_ID"
+    )
 
     watchdog.start()
 
     logger.info("SYSTEM READY")
 
 
+# =====================================================
+# WS CALLBACK
+# =====================================================
 def on_price(price):
 
-    latest_price["value"] = price
-    latest_price["ts"] = time.time()
+    try:
+        if price is None:
+            return
 
-    candle_builder.update(price)
+        update_market_state(price, 0)
 
-    update_market_state(price, 0)
+    except Exception as e:
+        logger.error(f"on_price error: {e}")
 
 
+# =====================================================
+# MAIN LOOP
+# =====================================================
 def run_trading():
 
     logger.info("TRADING STARTED")
@@ -49,17 +65,14 @@ def run_trading():
     while True:
 
         try:
+            import random
+            price = 65000 + random.randint(-50, 50)
 
-            price = latest_price["value"]
-            ts = latest_price["ts"]
-
-            if price is None or time.time() - ts > 5:
-                time.sleep(0.5)
-                continue
+            update_market_state(price, 0)
 
             decision = brain.decide("auto", price)
 
-            result = execute_strategy(
+            execute_strategy(
                 signal="auto",
                 price=price,
                 symbol=SYMBOL,
@@ -67,8 +80,8 @@ def run_trading():
             )
 
             pnl = (price % 10) - 5
-
             risk_engine.update(pnl)
+
             brain.record(decision["strategy"], pnl)
 
             logger.info(f"PRICE={price} STRATEGY={decision['strategy']} PNL={pnl}")
@@ -77,9 +90,17 @@ def run_trading():
 
         except Exception as e:
             logger.error(f"MAIN ERROR: {e}")
+
+            tg = get_telegram()
+            if tg:
+                tg.error(e)
+
             time.sleep(5)
 
 
+# =====================================================
+# ENTRY
+# =====================================================
 if __name__ == "__main__":
 
     init_system()
