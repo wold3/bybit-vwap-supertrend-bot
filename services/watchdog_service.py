@@ -1,10 +1,10 @@
 import time
-import logging
 import threading
+import logging
 from datetime import datetime
 
-from execution.execution_engine import engine
 from risk.risk_engine import risk_engine
+from execution.execution_engine import engine
 from services.telegram_service import get_telegram
 
 logger = logging.getLogger(__name__)
@@ -15,18 +15,20 @@ class WatchdogService:
     def __init__(self):
 
         self.running = False
+        self.interval = 10
         self.last_heartbeat = datetime.utcnow()
-        self.interval = 10  # 10초 체크
 
     # =====================================================
-    # 시스템 상태 체크
+    # 시스템 체크
     # =====================================================
 
     def check_system(self):
 
         status = risk_engine.status()
 
-        # 1. 위험 상태 체크
+        # -------------------------
+        # 1. 위험 상태
+        # -------------------------
         if status["risk_score"] < 20:
             logger.warning("CRITICAL RISK STATE")
 
@@ -34,7 +36,9 @@ class WatchdogService:
             if tg:
                 tg.risk_update()
 
-        # 2. 드로우다운 체크
+        # -------------------------
+        # 2. 드로우다운
+        # -------------------------
         if status["drawdown"] > 0.15:
             logger.warning("DRAWDOWN ALERT")
 
@@ -42,14 +46,16 @@ class WatchdogService:
             if tg:
                 tg.drawdown_alert()
 
-        # 3. 엔진 상태 체크
+        # -------------------------
+        # 3. 실행 엔진 상태
+        # -------------------------
         if engine.is_busy():
-            logger.warning("Execution engine busy")
+            logger.warning("Engine busy")
 
         return True
 
     # =====================================================
-    # heartbeat 업데이트
+    # heartbeat
     # =====================================================
 
     def heartbeat(self):
@@ -61,7 +67,7 @@ class WatchdogService:
             tg.heartbeat()
 
     # =====================================================
-    # 메인 루프
+    # main loop
     # =====================================================
 
     def run(self):
@@ -76,7 +82,7 @@ class WatchdogService:
 
                 self.check_system()
 
-                # 1분마다 heartbeat
+                # 60초마다 heartbeat
                 if (datetime.utcnow() - self.last_heartbeat).seconds > 60:
                     self.heartbeat()
 
@@ -105,17 +111,16 @@ class WatchdogService:
 
         thread.start()
 
-        logger.info("Watchdog thread started")
+        logger.info("Watchdog started in background")
 
     def stop(self):
 
         self.running = False
-
         logger.info("Watchdog stopped")
 
 
 # =====================================================
-# Singleton
+# SINGLETON
 # =====================================================
 
 watchdog = WatchdogService()
