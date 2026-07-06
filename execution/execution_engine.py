@@ -11,14 +11,18 @@ logger = logging.getLogger(__name__)
 class ExecutionEngine:
 
     def __init__(self):
-        self.busy = False
-        self.positions = {}   # ✅ 포지션 저장 추가
 
-    def is_busy(self):
-        return self.busy
+        self.busy = False
+
+        # 포지션 저장
+        self.positions = {}
+
+        # TP / SL 설정
+        self.tp_ratio = 0.02   # +2%
+        self.sl_ratio = 0.01   # -1%
 
     # =====================================================
-    # 포지션 PnL 계산 (핵심 추가)
+    # PnL 계산
     # =====================================================
     def calculate_pnl(self, symbol, current_price):
 
@@ -36,6 +40,59 @@ class ExecutionEngine:
             return (entry - current_price) * qty
 
     # =====================================================
+    # TP / SL 체크 (핵심 추가)
+    # =====================================================
+    def check_exit(self, symbol, current_price):
+
+        pos = self.positions.get(symbol)
+
+        if not pos:
+            return None
+
+        entry = pos["entry_price"]
+        side = pos["side"]
+
+        # 상승 기준
+        if side == "Buy":
+
+            tp = entry * (1 + self.tp_ratio)
+            sl = entry * (1 - self.sl_ratio)
+
+            if current_price >= tp:
+                return "TP"
+            if current_price <= sl:
+                return "SL"
+
+        # 하락 기준
+        else:
+
+            tp = entry * (1 - self.tp_ratio)
+            sl = entry * (1 + self.sl_ratio)
+
+            if current_price <= tp:
+                return "TP"
+            if current_price >= sl:
+                return "SL"
+
+        return None
+
+    # =====================================================
+    # 포지션 종료
+    # =====================================================
+    def close_position(self, symbol, reason, price):
+
+        pos = self.positions.get(symbol)
+
+        if not pos:
+            return
+
+        pnl = self.calculate_pnl(symbol, price)
+
+        logger.info(f"CLOSE {symbol} reason={reason} pnl={pnl}")
+
+        del self.positions[symbol]
+
+    # =====================================================
     # 실행
     # =====================================================
     def execute(self, signal, symbol, qty, price, leverage):
@@ -47,11 +104,8 @@ class ExecutionEngine:
 
             if not risk_engine.allow_trade():
                 add_log(db, "WARNING", "Risk blocked")
-                return {"success": False, "reason": "risk_block"}
+                return {"success": False}
 
-            # =========================
-            # ORDER
-            # =========================
             order_id = order_manager.place_market_order(
                 symbol=symbol,
                 side=signal,
@@ -60,19 +114,16 @@ class ExecutionEngine:
             )
 
             if not order_id:
-                add_log(db, "ERROR", "Order failed")
-                return {"success": False, "reason": "order_failed"}
+                return {"success": False}
 
-            # =========================
-            # POSITION 저장 (핵심)
-            # =========================
+            # 포지션 생성
             self.positions[symbol] = {
                 "side": signal,
                 "entry_price": price,
                 "qty": qty
             }
 
-            trade = add_trade(
+            add_trade(
                 db=db,
                 symbol=symbol,
                 side=signal,
@@ -81,22 +132,16 @@ class ExecutionEngine:
                 leverage=leverage
             )
 
-            add_log(db, "INFO", f"Trade executed {symbol} {signal}")
+            add_log(db, "INFO", f"OPEN {symbol} {signal}")
 
-            logger.info(f"EXECUTED: {symbol} {signal}")
-
-            return {
-                "success": True,
-                "order_id": order_id,
-                "trade_id": trade.id
-            }
+            return {"success": True, "order_id": order_id}
 
         except Exception as e:
 
-            logger.error(f"Execution error: {str(e)}")
             add_log(db, "ERROR", str(e))
+            logger.error(str(e))
 
-            return {"success": False, "reason": "exception"}
+            return {"success": False}
 
         finally:
             db.close()
