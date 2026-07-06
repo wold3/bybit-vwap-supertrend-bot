@@ -3,9 +3,6 @@ class OrderLifecycle:
     def __init__(self):
         self.orders = {}
 
-    # =====================================================
-    # CREATE
-    # =====================================================
     def create(self, oid, symbol, side, qty, price):
 
         self.orders[oid] = {
@@ -13,61 +10,30 @@ class OrderLifecycle:
             "side": side,
             "qty": qty,
             "price": price,
-
             "status": "PENDING",
-
             "filled_qty": 0,
             "avg_price": 0.0
         }
 
-    # =====================================================
-    # PARTIAL / FILL UPDATE
-    # =====================================================
-    def update_fill(self, oid, fill_qty, fill_price):
+    def update_fill(self, oid, qty, price):
 
-        order = self.orders.get(oid)
-        if not order:
+        o = self.orders.get(oid)
+        if not o:
             return
 
-        prev_qty = order["filled_qty"]
+        prev = o["filled_qty"]
+        new = prev + qty
 
-        new_qty = prev_qty + fill_qty
-
-        # avg price 계산
-        order["avg_price"] = (
-            (order["avg_price"] * prev_qty +
-             fill_price * fill_qty)
-            / new_qty
+        o["avg_price"] = (
+            (o["avg_price"] * prev + price * qty) / new
         )
 
-        order["filled_qty"] = new_qty
+        o["filled_qty"] = new
 
-        if new_qty >= order["qty"]:
-            order["status"] = "FILLED"
-        else:
-            order["status"] = "PARTIAL"
+        o["status"] = "FILLED" if new >= o["qty"] else "PARTIAL"
 
-    # =====================================================
-    # CANCEL
-    # =====================================================
-    def cancel(self, oid):
-
+    def close(self, oid):
         if oid in self.orders:
-            self.orders[oid]["status"] = "CANCELED"
-
-    # =====================================================
-    # REJECT
-    # =====================================================
-    def reject(self, oid):
-
-        if oid in self.orders:
-            self.orders[oid]["status"] = "REJECTED"
-
-    # =====================================================
-    # GET
-    # =====================================================
-    def get(self, oid):
-        return self.orders.get(oid)
-
+            self.orders[oid]["status"] = "CLOSED"
 
 lifecycle = OrderLifecycle()
