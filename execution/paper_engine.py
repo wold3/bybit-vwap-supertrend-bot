@@ -6,7 +6,7 @@ class PaperEngine:
     def __init__(self):
         self.positions = {}
 
-    def place_order(self, symbol, side, qty, price):
+    def order(self, symbol, side, qty, price):
 
         oid = str(uuid.uuid4())
 
@@ -17,6 +17,5 @@ class PaperEngine:
         }
 
         return {"result": {"orderId": oid}}
-
 
 paper = PaperEngine()
