@@ -1,62 +1,69 @@
-import logging
 import time
+import logging
 import threading
+from datetime import datetime
 
 from execution.execution_engine import engine
-from risk.risk_engine import get_risk_status
-from telegram import send_error
+from risk.risk_engine import risk_engine
+from services.telegram_service import get_telegram
 
 logger = logging.getLogger(__name__)
 
 
-class Watchdog:
+class WatchdogService:
 
     def __init__(self):
 
-        self.last_check = time.time()
-        self.interval = 10  # 10초마다 체크
         self.running = False
+        self.last_heartbeat = datetime.utcnow()
+        self.interval = 10  # 10초 체크
 
     # =====================================================
-    # Health Check
+    # 시스템 상태 체크
     # =====================================================
+
     def check_system(self):
 
-        try:
+        status = risk_engine.status()
 
-            # 1. Execution Engine 상태
-            engine_status = engine.status()
+        # 1. 위험 상태 체크
+        if status["risk_score"] < 20:
+            logger.warning("CRITICAL RISK STATE")
 
-            if not engine_status.get("running", True):
-                raise Exception("Execution engine stopped")
+            tg = get_telegram()
+            if tg:
+                tg.risk_update()
 
-            # 2. Risk Engine 상태
-            risk = get_risk_status()
+        # 2. 드로우다운 체크
+        if status["drawdown"] > 0.15:
+            logger.warning("DRAWDOWN ALERT")
 
-            if risk.get("daily_limit", False):
-                logger.warning("Daily loss limit reached")
+            tg = get_telegram()
+            if tg:
+                tg.drawdown_alert()
 
-            # 3. 거래 멈춤 감지
-            last_exec = engine_status.get("last_execution")
+        # 3. 엔진 상태 체크
+        if engine.is_busy():
+            logger.warning("Execution engine busy")
 
-            if last_exec is None:
-                raise Exception("No execution detected")
-
-            logger.info("System OK")
-
-            return True
-
-        except Exception as e:
-
-            logger.error("WATCHDOG ERROR: %s", str(e))
-
-            send_error(f"Watchdog alert: {str(e)}")
-
-            return False
+        return True
 
     # =====================================================
-    # Loop
+    # heartbeat 업데이트
     # =====================================================
+
+    def heartbeat(self):
+
+        self.last_heartbeat = datetime.utcnow()
+
+        tg = get_telegram()
+        if tg:
+            tg.heartbeat()
+
+    # =====================================================
+    # 메인 루프
+    # =====================================================
+
     def run(self):
 
         self.running = True
@@ -65,13 +72,41 @@ class Watchdog:
 
         while self.running:
 
-            self.check_system()
+            try:
 
-            time.sleep(self.interval)
+                self.check_system()
+
+                # 1분마다 heartbeat
+                if (datetime.utcnow() - self.last_heartbeat).seconds > 60:
+                    self.heartbeat()
+
+                time.sleep(self.interval)
+
+            except Exception as e:
+
+                logger.error(f"Watchdog error: {str(e)}")
+
+                tg = get_telegram()
+                if tg:
+                    tg.error(e)
+
+                time.sleep(5)
 
     # =====================================================
-    # Stop
+    # start / stop
     # =====================================================
+
+    def start(self):
+
+        thread = threading.Thread(
+            target=self.run,
+            daemon=True
+        )
+
+        thread.start()
+
+        logger.info("Watchdog thread started")
+
     def stop(self):
 
         self.running = False
@@ -82,16 +117,5 @@ class Watchdog:
 # =====================================================
 # Singleton
 # =====================================================
-watchdog = Watchdog()
 
-
-def start_watchdog():
-
-    thread = threading.Thread(
-        target=watchdog.run,
-        daemon=True
-    )
-
-    thread.start()
-
-    return thread
+watchdog = WatchdogService()
