@@ -1,47 +1,36 @@
-import logging
-
-from api.bybit_client import bybit_client
-from risk.risk_engine import risk_engine
-from execution.orderbook_engine import orderbook_engine
-
-logger = logging.getLogger(__name__)
+import uuid
+from datetime import datetime
 
 
-class ExecutionEngine:
+class PaperEngine:
 
     def __init__(self):
-        self.busy = False
+        self.positions = {}
+        self.orders = {}
 
-    def execute(self, signal, symbol, qty, price):
+    def place_order(self, symbol, side, qty, price):
 
-        self.busy = True
+        order_id = str(uuid.uuid4())
 
-        try:
+        self.orders[order_id] = {
+            "symbol": symbol,
+            "side": side,
+            "qty": qty,
+            "price": price,
+            "status": "FILLED",
+            "time": datetime.utcnow()
+        }
 
-            if not risk_engine.allow_trade():
-                return {"success": False, "reason": "risk_block"}
+        self.positions[symbol] = {
+            "side": side,
+            "qty": qty,
+            "entry": price
+        }
 
-            mid = orderbook_engine.mid_price(symbol)
+        return {"result": {"orderId": order_id}}
 
-            if mid:
-
-                slippage = abs(price - mid) / mid
-
-                if slippage > 0.005:
-                    return {"success": False, "reason": "high_slippage"}
-
-            resp = bybit_client.place_order(
-                symbol=symbol,
-                side=signal,
-                qty=qty
-            )
-
-            risk_engine.add_trade()
-
-            return {"success": True, "resp": resp}
-
-        finally:
-            self.busy = False
+    def get_positions(self, symbol):
+        return self.positions.get(symbol)
 
 
-engine = ExecutionEngine()
+paper_engine = PaperEngine()
