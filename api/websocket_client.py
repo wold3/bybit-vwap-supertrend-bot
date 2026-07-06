@@ -3,7 +3,7 @@ import logging
 import websocket
 import threading
 
-from api.order_manager import order_manager
+from services.event_bus import event_bus
 
 logger = logging.getLogger(__name__)
 
@@ -13,94 +13,6 @@ class BybitWebSocket:
     def __init__(self):
 
         self.ws = None
-        self.price_callback = None
-
-    # =====================================================
-    # PRICE CALLBACK
-    # =====================================================
-    def set_price_callback(self, callback):
-        self.price_callback = callback
-
-    # =====================================================
-    # MESSAGE HANDLER
-    # =====================================================
-    def on_message(self, ws, message):
-
-        try:
-
-            if isinstance(message, bytes):
-                message = message.decode("utf-8")
-
-            data = json.loads(message)
-
-            # =================================================
-            # 1) PRICE STREAM
-            # =================================================
-            if "topic" in data and "tickers" in data.get("topic", ""):
-
-                items = data.get("data", [])
-
-                for item in items:
-
-                    price = item.get("lastPrice")
-
-                    if price and self.price_callback:
-                        self.price_callback(float(price))
-
-            # =================================================
-            # 2) 🔥 EXECUTION STREAM (핵심 추가)
-            # =================================================
-            if "topic" in data and "execution" in data.get("topic", ""):
-
-                executions = data.get("data", [])
-
-                for exe in executions:
-                    self._handle_fill(exe)
-
-        except Exception as e:
-            logger.error(f"WS error: {str(e)}")
-
-    # =====================================================
-    # 🔥 FILL HANDLER
-    # =====================================================
-    def _handle_fill(self, exe):
-
-        try:
-
-            order_id = exe.get("orderId")
-            status = exe.get("execType")
-
-            if not order_id:
-                return
-
-            # fill 확인
-            if status in ["Trade", "BustTrade"]:
-
-                if order_id in order_manager.open_orders:
-
-                    order = order_manager.open_orders[order_id]
-
-                    order["status"] = "FILLED"
-
-                    order_manager.filled_orders[order_id] = order
-                    del order_manager.open_orders[order_id]
-
-                    logger.info(f"🔥 ORDER FILLED (WS): {order_id}")
-
-        except Exception as e:
-            logger.error(f"FILL ERROR: {str(e)}")
-
-    # =====================================================
-    # CONNECTION
-    # =====================================================
-    def on_open(self, ws):
-        logger.info("WebSocket connected")
-
-    def on_close(self, ws, *args):
-        logger.warning("WebSocket closed")
-
-    def on_error(self, ws, error):
-        logger.error(f"WebSocket error: {error}")
 
     # =====================================================
     # START
@@ -120,8 +32,72 @@ class BybitWebSocket:
             logger.info("WebSocket started")
             self.ws.run_forever()
 
-        t = threading.Thread(target=run, daemon=True)
-        t.start()
+        threading.Thread(target=run, daemon=True).start()
+
+    # =====================================================
+    # MESSAGE HANDLER (핵심 수정)
+    # =====================================================
+    def on_message(self, ws, message):
+
+        try:
+
+            # -------------------------
+            # 1) 안전 파싱 (핵심)
+            # -------------------------
+            if isinstance(message, bytes):
+                message = message.decode("utf-8")
+
+            if not message:
+                return
+
+            data = json.loads(message)
+
+            # -------------------------
+            # 2) PRICE EVENT
+            # -------------------------
+            if "topic" in data and "tickers" in data.get("topic", ""):
+
+                items = data.get("data", [])
+
+                # 👉 str 방지 핵심
+                if isinstance(items, list):
+
+                    for item in items:
+
+                        if not isinstance(item, dict):
+                            continue
+
+                        price = item.get("lastPrice")
+
+                        if price is None:
+                            continue
+
+                        event_bus.publish({
+                            "type": "PRICE",
+                            "symbol": item.get("symbol"),
+                            "price": float(price)
+                        })
+
+        except Exception as e:
+            logger.error(f"WS message error: {str(e)}")
+
+    # =====================================================
+    # OPEN
+    # =====================================================
+    def on_open(self, ws):
+        logger.info("WebSocket connected")
+
+    # =====================================================
+    # CLOSE
+    # =====================================================
+    def on_close(self, ws, *args):
+        logger.warning("WebSocket closed")
+
+    # =====================================================
+    # ERROR
+    # =====================================================
+    def on_error(self, ws, error):
+        logger.error(f"WebSocket error: {error}")
 
 
 ws_client = BybitWebSocket()
