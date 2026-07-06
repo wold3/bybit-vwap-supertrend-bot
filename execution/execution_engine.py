@@ -18,63 +18,83 @@ class BybitExecutionEngine:
         self.base_url = os.getenv("BYBIT_BASE_URL", "https://api.bybit.com")
 
     # =================================================
-    # PUBLIC ENTRY (RETRY WRAPPED)
+    # ENTRY (WITH RETRY)
     # =================================================
-    def execute(self, symbol, side, qty, price=None):
+    def execute(self, symbol, side, qty):
 
         return retry_engine.execute_with_retry(
             self._execute_order,
             symbol,
             side,
-            qty,
-            price
+            qty
         )
 
     # =================================================
-    # INTERNAL ORDER LOGIC
+    # CORE ORDER
     # =================================================
-    def _execute_order(self, symbol, side, qty, price=None):
+    def _execute_order(self, symbol, side, qty):
 
-        # 🚨 RISK CHECK FIRST
         if not risk_engine.can_trade():
-            print("[EXECUTION] BLOCKED BY RISK ENGINE")
-
-            telegram.send(
-                f"🛑 TRADE BLOCKED (RISK)\n"
-                f"Symbol: {symbol}\nSide: {side}"
-            )
-
+            telegram.send(f"🛑 BLOCKED BY RISK: {symbol}")
             return None
 
-        # 실제 주문 실행
         result = self._send_bybit_order(symbol, side, qty)
 
-        # 결과 처리
         if result and result.get("retCode") == 0:
 
             telegram.send(
-                f"📥 ORDER SUCCESS\n"
-                f"Symbol: {symbol}\n"
-                f"Side: {side}\n"
-                f"Qty: {qty}\n"
-                f"OrderId: {result.get('result', {}).get('orderId')}"
+                f"📥 ORDER FILLED\n"
+                f"{symbol} {side} {qty}"
             )
-
         else:
 
             telegram.send(
-                f"❌ ORDER FAILED\n"
-                f"Symbol: {symbol}\n"
-                f"Side: {side}\n"
-                f"Response: {result}"
+                f"❌ ORDER FAILED\n{result}"
             )
 
         return result
 
     # =================================================
-    # BYBIT REST API CALL
+    # SL / TP FUNCTIONS
     # =================================================
-    def _send_bybit_order(self, symbol, side, qty):
+
+    # 1️⃣ 부분 익절
+    def partial_close(self, symbol, qty_ratio=0.5):
+
+        telegram.send(f"📉 PARTIAL CLOSE {symbol}")
+
+        self._send_bybit_order(
+            symbol=symbol,
+            side="Sell",
+            qty=qty_ratio,
+            reduce_only=True
+        )
+
+    # 2️⃣ 본전 이동 (Stop Loss 수정)
+    def move_sl_to_be(self, symbol):
+
+        telegram.send(f"🟡 MOVE SL TO BREAKEVEN {symbol}")
+
+        # 실제 API: stop order modify 필요
+        # 여기선 구조만
+        return True
+
+    # 3️⃣ 전체 청산
+    def close_position(self, symbol):
+
+        telegram.send(f"🚨 CLOSE POSITION {symbol}")
+
+        self._send_bybit_order(
+            symbol=symbol,
+            side="Sell",
+            qty="ALL",
+            reduce_only=True
+        )
+
+    # =================================================
+    # BYBIT API CALL
+    # =================================================
+    def _send_bybit_order(self, symbol, side, qty, reduce_only=False):
 
         endpoint = "/v5/order/create"
         url = self.base_url + endpoint
@@ -84,7 +104,7 @@ class BybitExecutionEngine:
         params = {
             "category": "linear",
             "symbol": symbol,
-            "side": side,               # Buy / Sell
+            "side": side,
             "orderType": "Market",
             "qty": str(qty),
             "timeInForce": "IOC",
@@ -93,27 +113,23 @@ class BybitExecutionEngine:
             "recv_window": "5000"
         }
 
-        # =================================================
+        if reduce_only:
+            params["reduceOnly"] = True
+
         # SIGNATURE
-        # =================================================
-        query_string = "&".join([f"{k}={params[k]}" for k in sorted(params)])
+        query = "&".join([f"{k}={params[k]}" for k in sorted(params)])
 
         signature = hmac.new(
             self.api_secret.encode(),
-            query_string.encode(),
+            query.encode(),
             hashlib.sha256
         ).hexdigest()
 
         params["sign"] = signature
 
-        headers = {
-            "Content-Type": "application/json"
-        }
-
         try:
-            response = requests.post(url, json=params, headers=headers, timeout=5)
-
-            data = response.json()
+            res = requests.post(url, json=params, timeout=5)
+            data = res.json()
 
             print("[BYBIT RESPONSE]", data)
 
@@ -122,7 +138,6 @@ class BybitExecutionEngine:
         except Exception as e:
 
             print("[BYBIT ERROR]", e)
-
-            telegram.send(f"❌ BYBIT API ERROR: {e}")
+            telegram.send(f"❌ API ERROR: {e}")
 
             return None
