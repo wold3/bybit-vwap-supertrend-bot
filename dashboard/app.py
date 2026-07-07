@@ -1,14 +1,21 @@
 from flask import Flask, jsonify, render_template
 
+
 from trade_db import trade_db
+
+
+from position.position_manager import position_manager
+
 
 
 app = Flask(__name__)
 
 
 
+
+
 # ======================================
-# DASHBOARD
+# HOME
 # ======================================
 
 @app.route("/")
@@ -20,17 +27,22 @@ def home():
 
 
 
+
+
 # ======================================
-# TRADES API
+# TRADES
 # ======================================
 
 @app.route("/api/trades")
 def trades():
 
+
     rows = trade_db.all()
 
 
+
     return jsonify([
+
 
         {
 
@@ -50,18 +62,90 @@ def trades():
 
         }
 
+
         for r in rows
+
 
     ])
 
 
 
 
+
+
+# ======================================
+# POSITIONS
+# ======================================
+
+@app.route("/api/positions")
+def positions():
+
+
+    return jsonify(
+
+        position_manager.get_positions()
+
+    )
+
+
+
+
+
+# ======================================
+# SUMMARY
+# ======================================
+
+@app.route("/api/summary")
+def summary():
+
+
+    positions = (
+
+        position_manager
+        .get_positions()
+
+    )
+
+
+    total_pnl = sum(
+
+        p.get(
+            "unrealized_pnl",
+            0
+        )
+
+        for p in positions
+
+    )
+
+
+    return jsonify({
+
+        "positions":
+
+            len(positions),
+
+
+        "unrealized_pnl":
+
+            total_pnl
+
+
+    })
+
+
+
+
+
+# ======================================
+# RUN
+# ======================================
+
 if __name__ == "__main__":
 
 
     print(
-        "🚀 Dashboard : http://localhost:5000"
+        "🚀 Dashboard running"
     )
 
 
@@ -69,6 +153,8 @@ if __name__ == "__main__":
 
         host="0.0.0.0",
 
-        port=5000
+        port=5000,
+
+        debug=False
 
     )
