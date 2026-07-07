@@ -1,20 +1,17 @@
 import os
 import json
 import time
-import websocket
 import threading
-
+import websocket
 
 from dotenv import load_dotenv
 
-
 from watchdog.watchdog import watchdog
 
+from indicators.indicator_engine import indicator_engine
 
 
 load_dotenv()
-
-
 
 
 
@@ -23,7 +20,6 @@ class BybitPublicWS:
 
     def __init__(self):
 
-
         self.url = os.getenv(
 
             "PUBLIC_WS_URL",
@@ -31,7 +27,6 @@ class BybitPublicWS:
             "wss://stream.bybit.com/v5/public/linear"
 
         )
-
 
 
         self.symbol = os.getenv(
@@ -43,13 +38,16 @@ class BybitPublicWS:
         )
 
 
+        self.interval = os.getenv(
 
-        self.interval = "1"
+            "KLINE_INTERVAL",
 
+            "1"
+
+        )
 
 
         self.latest_data = {}
-
 
 
         self.lock = threading.Lock()
@@ -59,7 +57,7 @@ class BybitPublicWS:
 
 
     # =====================================
-    # OPEN
+    # CONNECT
     # =====================================
 
     def on_open(
@@ -69,14 +67,13 @@ class BybitPublicWS:
 
 
         print(
-
             "📡 PUBLIC WS CONNECTED"
-
         )
 
 
 
-        ws.send(json.dumps({
+        subscribe = {
+
 
             "op":
 
@@ -87,29 +84,30 @@ class BybitPublicWS:
 
                 [
 
-                    "kline."
-
-                    +
-
-                    self.interval
-
-                    +
-
-                    "."
-
-                    +
-
-                    self.symbol
+                    f"kline.{self.interval}.{self.symbol}"
 
                 ]
 
-        }))
+        }
 
+
+
+        ws.send(
+
+            json.dumps(
+
+                subscribe
+
+            )
+
+        )
 
 
         print(
 
-            "PUBLIC CHANNEL SUBSCRIBED"
+            "PUBLIC SUBSCRIBED",
+
+            self.symbol
 
         )
 
@@ -138,7 +136,6 @@ class BybitPublicWS:
             )
 
 
-
             topic = data.get(
 
                 "topic"
@@ -147,17 +144,15 @@ class BybitPublicWS:
 
 
 
-            if (
+            if not topic:
 
-                topic
+                return
 
-                and
 
-                topic.startswith(
 
-                    "kline"
+            if topic.startswith(
 
-                )
+                "kline"
 
             ):
 
@@ -169,7 +164,6 @@ class BybitPublicWS:
                 )
 
 
-
                 watchdog.update_public_ws()
 
 
@@ -179,7 +173,7 @@ class BybitPublicWS:
 
             print(
 
-                "PUBLIC WS ERROR",
+                "WS MESSAGE ERROR",
 
                 e
 
@@ -190,7 +184,7 @@ class BybitPublicWS:
 
 
     # =====================================
-    # KLINE
+    # KLINE 처리
     # =====================================
 
     def handle_kline(
@@ -219,73 +213,119 @@ class BybitPublicWS:
 
 
 
+        # Bybit kline
+
+        formatted = {
+
+
+            "symbol":
+
+                self.symbol,
+
+
+            "open":
+
+                float(
+
+                    candle["open"]
+
+                ),
+
+
+            "high":
+
+                float(
+
+                    candle["high"]
+
+                ),
+
+
+            "low":
+
+                float(
+
+                    candle["low"]
+
+                ),
+
+
+            "close":
+
+                float(
+
+                    candle["close"]
+
+                ),
+
+
+            "volume":
+
+                float(
+
+                    candle["volume"]
+
+                ),
+
+
+            "timestamp":
+
+                candle["start"]
+
+        }
+
+
+
+
+
+        # =================================
+        # Indicator Engine 연결
+        # =================================
+
+        indicator_engine.update(
+
+            formatted
+
+        )
+
+
+
+
+
+        # =================================
+        # 최신 데이터 저장
+        # =================================
+
         with self.lock:
 
 
-            self.latest_data = {
+            self.latest_data = formatted.copy()
 
 
-                "symbol":
-
-                    self.symbol,
 
 
-                "open":
 
-                    float(
+            indicators = (
 
-                        candle["open"]
+                indicator_engine
+                .calculate()
 
-                    ),
-
-
-                "high":
-
-                    float(
-
-                        candle["high"]
-
-                    ),
+            )
 
 
-                "low":
 
-                    float(
+            self.latest_data.update(
 
-                        candle["low"]
+                indicators
 
-                    ),
-
-
-                "close":
-
-                    float(
-
-                        candle["close"]
-
-                    ),
+            )
 
 
-                "volume":
-
-                    float(
-
-                        candle["volume"]
-
-                    ),
-
-
-                "timestamp":
-
-                    candle["start"]
-
-
-            }
 
 
 
     # =====================================
-    # GET DATA
+    # STRATEGY DATA
     # =====================================
 
     def get_latest_data(
@@ -339,7 +379,11 @@ class BybitPublicWS:
 
         print(
 
-            "PUBLIC WS CLOSED"
+            "PUBLIC WS CLOSED",
+
+            code,
+
+            msg
 
         )
 
@@ -351,7 +395,9 @@ class BybitPublicWS:
     # START
     # =====================================
 
-    def start(self):
+    def start(
+        self
+    ):
 
 
         while True:
@@ -364,15 +410,11 @@ class BybitPublicWS:
 
                     self.url,
 
-
                     on_open=self.on_open,
-
 
                     on_message=self.on_message,
 
-
                     on_error=self.on_error,
-
 
                     on_close=self.on_close
 
@@ -380,7 +422,13 @@ class BybitPublicWS:
 
 
 
-                ws.run_forever()
+                ws.run_forever(
+
+                    ping_interval=20,
+
+                    ping_timeout=10
+
+                )
 
 
 
@@ -389,7 +437,7 @@ class BybitPublicWS:
 
                 print(
 
-                    "PUBLIC RECONNECT",
+                    "PUBLIC WS RECONNECT ERROR",
 
                     e
 
