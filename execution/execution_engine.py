@@ -1,20 +1,53 @@
 # =====================================
-# ACCOUNT EQUITY API
+# CLOSE POSITION
 # =====================================
 
-def get_account_equity(
-    self
+def close_position(
+    self,
+    symbol,
+    side,
+    qty
 ):
 
+
+    """
+    현재 포지션 강제 종료
+
+    Buy 포지션 → Sell reduceOnly
+    Sell 포지션 → Buy reduceOnly
+    """
+
+
+
+    if side.lower() == "buy":
+
+
+        close_side = "Sell"
+
+
+    else:
+
+
+        close_side = "Buy"
+
+
+
+
     endpoint = (
-        "/v5/account/wallet-balance"
+
+        "/v5/order/create"
+
     )
 
 
     url = (
+
         self.base_url
+
         +
+
         endpoint
+
     )
 
 
@@ -22,56 +55,54 @@ def get_account_equity(
     timestamp = str(
 
         int(
+
             time.time()
+
             *
+
             1000
+
         )
 
     )
 
 
 
-    params = {
+    body = {
 
-        "accountType":
 
-            "UNIFIED"
+        "category":
+
+            "linear",
+
+
+        "symbol":
+
+            symbol,
+
+
+        "side":
+
+            close_side,
+
+
+        "orderType":
+
+            "Market",
+
+
+        "qty":
+
+            str(qty),
+
+
+        "reduceOnly":
+
+            True
 
     }
 
 
-
-    # GET 요청용 sign
-
-    sign_payload = (
-
-        timestamp
-
-        +
-
-        self.api_key
-
-        +
-
-        "5000"
-
-        +
-
-        ""
-
-    )
-
-
-
-    signature = hmac.new(
-
-        self.api_secret.encode(),
-
-        sign_payload.encode(),
-
-        hashlib.sha256
-
-    ).hexdigest()
 
 
 
@@ -85,7 +116,13 @@ def get_account_equity(
 
         "X-BAPI-SIGN":
 
-            signature,
+            self._sign(
+
+                timestamp,
+
+                body
+
+            ),
 
 
         "X-BAPI-TIMESTAMP":
@@ -101,14 +138,15 @@ def get_account_equity(
 
 
 
+
     try:
 
 
-        response = requests.get(
+        response = requests.post(
 
             url,
 
-            params=params,
+            json=body,
 
             headers=headers,
 
@@ -122,60 +160,17 @@ def get_account_equity(
 
 
 
-        if result.get("retCode") != 0:
+        print(
 
-
-            print(
-
-                "EQUITY API ERROR",
-
-                result
-
-            )
-
-
-            return 0
-
-
-
-
-
-        account_list = (
+            "CLOSE POSITION RESULT",
 
             result
 
-            .get("result", {})
-
-            .get("list", [])
-
         )
 
 
 
-        if not account_list:
-
-
-            return 0
-
-
-
-        equity = (
-
-            account_list[0]
-
-            .get(
-
-                "totalEquity",
-
-                "0"
-
-            )
-
-        )
-
-
-
-        return float(equity)
+        return result
 
 
 
@@ -185,11 +180,11 @@ def get_account_equity(
 
         print(
 
-            "GET EQUITY ERROR",
+            "CLOSE POSITION ERROR",
 
             e
 
         )
 
 
-        return 0
+        return None
