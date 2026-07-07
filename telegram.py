@@ -1,29 +1,55 @@
+import os
+import requests
+
+from config import (
+    TELEGRAM_TOKEN,
+    TELEGRAM_CHAT_ID
+)
+
+
+def send_message(message):
+    """
+    Telegram 메시지 전송
+    """
+
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("[Telegram disabled]", message)
+        return False
+
+    try:
+        url = (
+            f"https://api.telegram.org/"
+            f"bot{TELEGRAM_TOKEN}/sendMessage"
+        )
+
+        data = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message
+        }
+
+        response = requests.post(
+            url,
+            data=data,
+            timeout=10
+        )
+
+        return response.ok
+
+    except Exception as e:
+        print("[Telegram Error]", e)
+        return False
+
+
+
 # ==========================================
-# Telegram compatibility wrapper
-# watchdog.py / services/ws_client.py 호환용
+# watchdog.py 호환 객체
 # ==========================================
 
-class TelegramService:
+class Telegram:
 
     def send(self, message):
-        try:
-            # 기존 전송 함수가 존재하면 사용
-            if "send_message" in globals():
-                return send_message(message)
-
-            # 전송 함수가 없을 경우 로그만 출력
-            print("[Telegram]", message)
-            return True
-
-        except Exception as e:
-            print("[Telegram Error]", e)
-            return False
+        return send_message(message)
 
 
-# 기존 코드에서
-# from telegram import telegram
-# 형태로 가져갈 객체 생성
 
-telegram = TelegramService()
-
-telegram.py 맨 아래에 추가하세요.
+telegram = Telegram()
