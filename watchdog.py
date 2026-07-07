@@ -1,101 +1,63 @@
-import time
 import threading
-
-try:
-    import psutil
-except ImportError:
-    psutil = None
+import time
 
 
-try:
-    from telegram import telegram
-except ImportError:
-    telegram = None
+from watchdog import watchdog
 
 
 
-class Watchdog:
-    """
-    Bot Watchdog Service
-
-    기능:
-    - 실행 상태 관리
-    - heartbeat 감시
-    - 시스템 상태 확인
-    - Telegram 알림 연동
-    """
-
+class WSClient:
 
     def __init__(self):
 
-        self.running = True
-        self.start_time = time.time()
-        self.last_heartbeat = time.time()
-        self.lock = threading.Lock()
-
-
-
-    def heartbeat(self):
-
-        with self.lock:
-            self.last_heartbeat = time.time()
-
-        return True
-
-
-
-    def is_alive(self, timeout=60):
-
-        with self.lock:
-            diff = time.time() - self.last_heartbeat
-
-        return diff <= timeout
-
-
-
-    def status(self):
-
-        with self.lock:
-
-            uptime = int(
-                time.time() - self.start_time
-            )
-
-            heartbeat_age = (
-                time.time()
-                -
-                self.last_heartbeat
-            )
-
-
-        data = {
-            "running": self.running,
-            "uptime": uptime,
-            "alive": heartbeat_age < 60,
-            "heartbeat_age": heartbeat_age
-        }
-
-
-        if psutil:
-
-            data.update({
-                "cpu": psutil.cpu_percent(),
-                "memory": psutil.virtual_memory().percent
-            })
-
-
-        return data
+        self.running = False
+        self.thread = None
 
 
 
     def start(self):
 
+        if self.running:
+            return
+
         self.running = True
-        self.heartbeat()
 
-        print("[Watchdog] started")
+        self.thread = threading.Thread(
+            target=self.run,
+            daemon=True
+        )
 
-        return True
+        self.thread.start()
+
+        print("[WSClient] started")
+
+
+
+    def run(self):
+
+        while self.running:
+
+            try:
+
+                # watchdog heartbeat
+                watchdog.heartbeat()
+
+
+                # TODO:
+                # 여기에 Bybit WebSocket 연결 코드 추가
+
+
+                time.sleep(5)
+
+
+            except Exception as e:
+
+                print(
+                    "[WSClient ERROR]",
+                    e
+                )
+
+                time.sleep(5)
 
 
 
@@ -103,23 +65,18 @@ class Watchdog:
 
         self.running = False
 
-        print("[Watchdog] stopped")
-
-        return True
+        print("[WSClient] stopped")
 
 
 
-    def notify(self, message):
+    def status(self):
 
-        if telegram:
-
-            try:
-                telegram.send(message)
-
-            except Exception:
-                pass
+        return {
+            "running": self.running
+        }
 
 
 
-# 외부 import용 객체
-watchdog = Watchdog()
+# singleton
+
+ws_client = WSClient()
