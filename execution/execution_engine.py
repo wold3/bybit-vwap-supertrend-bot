@@ -4,28 +4,38 @@ import hmac
 import hashlib
 import requests
 
+
 from dotenv import load_dotenv
 
 
 from risk.risk_engine import risk_engine
+
 from risk.drawdown_guard import drawdown_guard
+
+from risk.sltp_manager import sltp_manager
 
 
 from trade_db import trade_db
+
 
 
 load_dotenv()
 
 
 
+
+
 class BybitExecutionEngine:
+
 
 
     def __init__(self):
 
+
         self.api_key = os.getenv(
             "BYBIT_API_KEY"
         )
+
 
         self.api_secret = os.getenv(
             "BYBIT_API_SECRET"
@@ -33,15 +43,20 @@ class BybitExecutionEngine:
 
 
         self.base_url = os.getenv(
+
             "BYBIT_BASE_URL",
+
             "https://api.bybit.com"
+
         )
 
 
 
-    # =================================================
-    # PUBLIC EXECUTE
-    # =================================================
+
+
+    # =====================================
+    # ORDER
+    # =====================================
 
     def execute(
         self,
@@ -51,63 +66,27 @@ class BybitExecutionEngine:
     ):
 
 
-        return self._execute_order(
-
-            symbol,
-
-            side,
-
-            qty
-
-        )
-
-
-
-    # =================================================
-    # ORDER CHECK + SEND
-    # =================================================
-
-    def _execute_order(
-        self,
-        symbol,
-        side,
-        qty
-    ):
-
-
-        # -----------------------------
-        # Risk Check
-        # -----------------------------
-
         if not risk_engine.can_trade():
 
             print(
-                "[BLOCK] RISK ENGINE"
+                "BLOCK RISK"
             )
 
             return None
 
 
-
-        # -----------------------------
-        # Drawdown Check
-        # -----------------------------
 
         if not drawdown_guard.can_trade():
 
             print(
-                "[BLOCK] DRAWDOWN"
+                "BLOCK DRAWDOWN"
             )
 
             return None
 
 
 
-        # -----------------------------
-        # SEND ORDER
-        # -----------------------------
-
-        result = self.send_order(
+        return self.send_order(
 
             symbol,
 
@@ -118,21 +97,12 @@ class BybitExecutionEngine:
         )
 
 
-        print(
-            "[ORDER RESULT]",
-            result
-        )
-
-
-        return result
 
 
 
-
-
-    # =================================================
-    # BYBIT V5 ORDER
-    # =================================================
+    # =====================================
+    # MARKET ORDER
+    # =====================================
 
     def send_order(
         self,
@@ -148,10 +118,15 @@ class BybitExecutionEngine:
 
 
         url = (
+
             self.base_url
+
             +
+
             endpoint
+
         )
+
 
 
         timestamp = str(
@@ -170,63 +145,59 @@ class BybitExecutionEngine:
 
 
             "category":
-            "linear",
+
+                "linear",
 
 
             "symbol":
-            symbol,
+
+                symbol,
 
 
             "side":
-            side,
+
+                side,
 
 
             "orderType":
-            "Market",
+
+                "Market",
 
 
             "qty":
-            str(qty),
 
+                str(qty)
 
-            "timeInForce":
-            "IOC"
 
         }
 
 
 
-        body_str = (
-            str(body)
-        )
+        body_text = str(body)
 
 
 
-        sign_string = (
-
-            timestamp
-
-            +
-
-            self.api_key
-
-            +
-
-            "5000"
-
-            +
-
-            body_str
-
-        )
-
-
-
-        signature = hmac.new(
+        sign = hmac.new(
 
             self.api_secret.encode(),
 
-            sign_string.encode(),
+            (
+
+                timestamp
+
+                +
+
+                self.api_key
+
+                +
+
+                "5000"
+
+                +
+
+                body_text
+
+            ).encode(),
 
             hashlib.sha256
 
@@ -234,71 +205,55 @@ class BybitExecutionEngine:
 
 
 
+
         headers = {
 
 
             "X-BAPI-API-KEY":
-            self.api_key,
+
+                self.api_key,
 
 
             "X-BAPI-SIGN":
-            signature,
+
+                sign,
 
 
             "X-BAPI-TIMESTAMP":
-            timestamp,
+
+                timestamp,
 
 
             "X-BAPI-RECV-WINDOW":
-            "5000"
+
+                "5000"
 
 
         }
 
 
 
-        try:
+        response = requests.post(
 
+            url,
 
-            res = requests.post(
+            json=body,
 
-                url,
+            headers=headers
 
-                json=body,
-
-                headers=headers,
-
-                timeout=5
-
-            )
-
-
-            return res.json()
+        )
 
 
 
-        except Exception as e:
-
-
-            print(
-
-                "[ORDER ERROR]",
-
-                e
-
-            )
-
-
-            return None
+        return response.json()
 
 
 
 
 
-    # =================================================
-    # REAL FILL CALLBACK
-    # Private WebSocket → 호출
-    # =================================================
+    # =====================================
+    # REAL FILL
+    # =====================================
 
     def on_fill(
         self,
@@ -310,111 +265,74 @@ class BybitExecutionEngine:
 
 
         print(
-            """
-========================
-REAL EXECUTION FILL
-========================
-Symbol :
-{}
-Side :
-{}
-Qty :
-{}
-Price :
-{}
-========================
-""".format(
 
-                symbol,
-
-                side,
-
-                qty,
-
-                price
-
-            )
-        )
-
-
-
-        # -----------------------------
-        # DB 저장
-        # -----------------------------
-
-        trade_db.insert(
-
-            symbol=symbol,
-
-            side=side,
-
-            qty=qty,
-
-            price=price
-
-        )
-
-
-
-    # =================================================
-    # POSITION CLOSE
-    # =================================================
-
-    def close_position(
-        self,
-        symbol
-    ):
-
-
-        print(
-            "[CLOSE POSITION]",
-            symbol
-        )
-
-
-        # Private position 조회 후
-        # reduceOnly 주문 연결 자리
-
-
-
-    # =================================================
-    # PARTIAL CLOSE
-    # =================================================
-
-    def partial_close(
-        self,
-        symbol,
-        percent
-    ):
-
-
-        print(
-
-            "[PARTIAL CLOSE]",
+            "REAL FILL",
 
             symbol,
 
-            percent
+            side,
+
+            qty,
+
+            price
 
         )
 
 
 
-    # =================================================
-    # MOVE STOP LOSS TO BE
-    # =================================================
+        # 거래 저장
 
-    def move_sl_to_be(
-        self,
-        symbol
-    ):
+        trade_db.insert(
+
+            symbol,
+
+            side,
+
+            qty,
+
+            price
+
+        )
+
+
+
+
+        # ============================
+        # AUTO SL TP
+        # ============================
+
+
+        levels = sltp_manager.calculate(
+
+            side,
+
+            price
+
+        )
+
 
 
         print(
 
-            "[MOVE SL TO BE]",
+            "AUTO SL TP",
 
-            symbol
+            levels
+
+        )
+
+
+
+        self.set_sl_tp(
+
+            symbol,
+
+            side,
+
+            qty,
+
+            levels["stop_loss"],
+
+            levels["take_profit"]
 
         )
 
@@ -422,8 +340,162 @@ Price :
 
 
 
-# =================================================
-# SINGLETON
-# =================================================
+    # =====================================
+    # BYBIT TRADING STOP
+    # =====================================
+
+    def set_sl_tp(
+        self,
+        symbol,
+        side,
+        qty,
+        sl,
+        tp
+    ):
+
+
+        endpoint = (
+
+            "/v5/position/trading-stop"
+
+        )
+
+
+        url = (
+
+            self.base_url
+
+            +
+
+            endpoint
+
+        )
+
+
+
+        timestamp = str(
+
+            int(
+                time.time()
+                *
+                1000
+            )
+
+        )
+
+
+
+        body = {
+
+
+            "category":
+
+                "linear",
+
+
+            "symbol":
+
+                symbol,
+
+
+            "stopLoss":
+
+                str(sl),
+
+
+            "takeProfit":
+
+                str(tp),
+
+
+            "slTriggerBy":
+
+                "MarkPrice",
+
+
+            "tpTriggerBy":
+
+                "MarkPrice"
+
+        }
+
+
+
+        sign = hmac.new(
+
+            self.api_secret.encode(),
+
+            (
+
+                timestamp
+
+                +
+
+                self.api_key
+
+                +
+
+                "5000"
+
+                +
+
+                str(body)
+
+            ).encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+
+        headers = {
+
+
+            "X-BAPI-API-KEY":
+
+                self.api_key,
+
+
+            "X-BAPI-SIGN":
+
+                sign,
+
+
+            "X-BAPI-TIMESTAMP":
+
+                timestamp,
+
+
+            "X-BAPI-RECV-WINDOW":
+
+                "5000"
+
+        }
+
+
+
+        r = requests.post(
+
+            url,
+
+            json=body,
+
+            headers=headers
+
+        )
+
+
+        print(
+
+            "SL TP RESULT",
+
+            r.json()
+
+        )
+
+
+
+
 
 execution_engine = BybitExecutionEngine()
