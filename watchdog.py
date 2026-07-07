@@ -1,96 +1,125 @@
 import time
-import os
-import subprocess
-import psutil
-from telegram import telegram
+import threading
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+
+try:
+    from telegram import telegram
+except ImportError:
+    telegram = None
+
 
 
 class Watchdog:
+    """
+    Bot Watchdog Service
+
+    기능:
+    - 실행 상태 관리
+    - heartbeat 감시
+    - 시스템 상태 확인
+    - Telegram 알림 연동
+    """
+
 
     def __init__(self):
 
-        self.process_name = "main.py"
-        self.restart_cmd = ["python", "main.py"]
+        self.running = True
+        self.start_time = time.time()
+        self.last_heartbeat = time.time()
+        self.lock = threading.Lock()
 
-        self.max_cpu = 90
-        self.max_memory = 90
 
-    # =================================================
-    # PROCESS CHECK
-    # =================================================
-    def is_running(self):
 
-        for proc in psutil.process_iter(['cmdline']):
+    def heartbeat(self):
 
-            try:
-                cmd = proc.info['cmdline']
-
-                if cmd and "main.py" in " ".join(cmd):
-                    return True
-
-            except:
-                continue
-
-        return False
-
-    # =================================================
-    # RESOURCE CHECK
-    # =================================================
-    def system_ok(self):
-
-        cpu = psutil.cpu_percent(interval=1)
-        mem = psutil.virtual_memory().percent
-
-        print(f"[WATCHDOG] CPU={cpu}% MEM={mem}%")
-
-        if cpu > self.max_cpu or mem > self.max_memory:
-            return False
+        with self.lock:
+            self.last_heartbeat = time.time()
 
         return True
 
-    # =================================================
-    # RESTART SYSTEM
-    # =================================================
-    def restart(self):
-
-        telegram.send("⚠️ SYSTEM RESTARTING (WATCHDOG)")
-
-        print("[WATCHDOG] RESTARTING SYSTEM...")
-
-        subprocess.Popen(self.restart_cmd)
 
 
-    # =================================================
-    # MAIN LOOP
-    # =================================================
-    def run(self):
+    def is_alive(self, timeout=60):
 
-        while True:
+        with self.lock:
+            diff = time.time() - self.last_heartbeat
+
+        return diff <= timeout
+
+
+
+    def status(self):
+
+        with self.lock:
+
+            uptime = int(
+                time.time() - self.start_time
+            )
+
+            heartbeat_age = (
+                time.time()
+                -
+                self.last_heartbeat
+            )
+
+
+        data = {
+            "running": self.running,
+            "uptime": uptime,
+            "alive": heartbeat_age < 60,
+            "heartbeat_age": heartbeat_age
+        }
+
+
+        if psutil:
+
+            data.update({
+                "cpu": psutil.cpu_percent(),
+                "memory": psutil.virtual_memory().percent
+            })
+
+
+        return data
+
+
+
+    def start(self):
+
+        self.running = True
+        self.heartbeat()
+
+        print("[Watchdog] started")
+
+        return True
+
+
+
+    def stop(self):
+
+        self.running = False
+
+        print("[Watchdog] stopped")
+
+        return True
+
+
+
+    def notify(self, message):
+
+        if telegram:
 
             try:
+                telegram.send(message)
 
-                time.sleep(10)
-
-                # 1. process check
-                if not self.is_running():
-                    print("[WATCHDOG] MAIN NOT RUNNING")
-                    self.restart()
-                    continue
-
-                # 2. system health
-                if not self.system_ok():
-                    print("[WATCHDOG] HIGH LOAD DETECTED")
-                    self.restart()
-                    continue
-
-            except Exception as e:
-
-                print("[WATCHDOG ERROR]", e)
-                telegram.send(f"❌ WATCHDOG ERROR: {e}")
+            except Exception:
+                pass
 
 
-# RUN
-if __name__ == "__main__":
 
-    w = Watchdog()
-    w.run()
+# 외부 import용 객체
+watchdog = Watchdog()
