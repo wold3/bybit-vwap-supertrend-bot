@@ -5,7 +5,7 @@
 <head>
 
 <title>
-Bybit Trading Dashboard
+Bybit AI Trading Dashboard
 </title>
 
 
@@ -16,54 +16,54 @@ Bybit Trading Dashboard
 
 body{
 
-    background:#111;
+background:#111;
 
-    color:white;
+color:white;
 
-    font-family:Arial;
+font-family:Arial;
 
 }
 
 
 .card{
 
-    background:#1d1d1d;
+background:#1e1e1e;
 
-    padding:20px;
+padding:20px;
 
-    margin:10px;
+margin:10px;
 
-    border-radius:10px;
-
-}
-
-
-table{
-
-    width:100%;
-
-}
-
-
-th,td{
-
-    padding:8px;
-
-    text-align:center;
+border-radius:10px;
 
 }
 
 
 .green{
 
-    color:#00ff88;
+color:#00ff88;
 
 }
 
 
 .red{
 
-    color:#ff4444;
+color:#ff4444;
+
+}
+
+
+table{
+
+width:100%;
+
+}
+
+
+td,th{
+
+padding:8px;
+
+text-align:center;
 
 }
 
@@ -74,21 +74,25 @@ th,td{
 </head>
 
 
-
 <body>
 
 
-
 <h1>
-🚀 BYBIT AI TRADING DASHBOARD
+🚀 BYBIT AI TRADING SYSTEM
 </h1>
 
 
 
+<!-- ======================
+SUMMARY
+======================= -->
+
+
 <div class="card">
 
+
 <h2>
-Account
+Account Summary
 </h2>
 
 
@@ -103,6 +107,38 @@ Loading...
 
 
 
+
+
+<!-- ======================
+RISK
+======================= -->
+
+
+<div class="card">
+
+
+<h2>
+🛡 Risk Monitor
+</h2>
+
+
+<div id="risk">
+
+Loading...
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+<!-- ======================
+POSITIONS
+======================= -->
 
 
 <div class="card">
@@ -124,12 +160,11 @@ Open Positions
 
 <th>Side</th>
 
-<th>Qty</th>
+<th>Size</th>
 
 <th>Entry</th>
 
 <th>PnL</th>
-
 
 </tr>
 
@@ -137,7 +172,6 @@ Open Positions
 
 
 <tbody id="positions">
-
 
 </tbody>
 
@@ -153,11 +187,16 @@ Open Positions
 
 
 
+<!-- ======================
+TRADES
+======================= -->
+
+
 <div class="card">
 
 
 <h2>
-Trades
+Recent Trades
 </h2>
 
 
@@ -165,7 +204,6 @@ Trades
 
 
 <thead>
-
 
 <tr>
 
@@ -177,15 +215,12 @@ Trades
 
 <th>Price</th>
 
-
 </tr>
-
 
 </thead>
 
 
 <tbody id="trades">
-
 
 </tbody>
 
@@ -201,18 +236,43 @@ Trades
 
 
 
+<!-- ======================
+EQUITY
+======================= -->
+
+
 <div class="card">
 
 
 <h2>
-Equity Curve
+📈 Equity Curve
 </h2>
 
 
-<canvas id="equityChart">
+<canvas id="equityChart"></canvas>
 
 
-</canvas>
+</div>
+
+
+
+
+
+
+<!-- ======================
+DRAWDOWN
+======================= -->
+
+
+<div class="card">
+
+
+<h2>
+📉 Drawdown
+</h2>
+
+
+<canvas id="drawdownChart"></canvas>
 
 
 </div>
@@ -226,26 +286,30 @@ Equity Curve
 <script>
 
 
-let chart;
+let equityChart;
+
+let drawdownChart;
 
 
 
-// =====================================
+
+
+// =================================
 // SUMMARY
-// =====================================
+// =================================
 
 
 async function loadSummary(){
 
 
-let res =
+let r =
 await fetch(
 "/api/summary"
 );
 
 
-let data =
-await res.json();
+let d =
+await r.json();
 
 
 
@@ -257,14 +321,16 @@ document.getElementById(
 `
 
 Positions :
-${data.positions}
+${d.positions}
 
 <br>
 
 Unrealized PnL :
-${data.unrealized_pnl}
+${d.unrealized_pnl}
 
 `;
+
+
 
 }
 
@@ -272,22 +338,94 @@ ${data.unrealized_pnl}
 
 
 
-// =====================================
-// POSITION
-// =====================================
+
+
+// =================================
+// RISK
+// =================================
+
+
+async function loadRisk(){
+
+
+let r =
+await fetch(
+"/api/risk"
+);
+
+
+let d =
+await r.json();
+
+
+
+let status =
+d.can_trade
+?
+"<span class='green'>TRADING ON</span>"
+:
+"<span class='red'>STOPPED</span>";
+
+
+
+document.getElementById(
+"risk"
+).innerHTML =
+
+
+`
+
+Equity :
+${d.current_equity}
+
+<br>
+
+Peak :
+${d.peak_equity}
+
+<br>
+
+Drawdown :
+${d.drawdown} %
+
+<br>
+
+Max DD :
+${d.max_drawdown} %
+
+<br><br>
+
+${status}
+
+`;
+
+
+
+}
+
+
+
+
+
+
+
+
+// =================================
+// POSITIONS
+// =================================
 
 
 async function loadPositions(){
 
 
-let res =
+let r =
 await fetch(
 "/api/positions"
 );
 
 
 let data =
-await res.json();
+await r.json();
 
 
 
@@ -298,7 +436,7 @@ let html="";
 data.forEach(p=>{
 
 
-let cls =
+let c =
 p.unrealized_pnl >=0
 ?
 "green"
@@ -308,6 +446,7 @@ p.unrealized_pnl >=0
 
 
 html +=
+
 
 `
 
@@ -321,12 +460,13 @@ html +=
 
 <td>${p.entry_price}</td>
 
-<td class="${cls}">
+<td class="${c}">
 ${p.unrealized_pnl}
 </td>
 
 
 </tr>
+
 
 `;
 
@@ -338,8 +478,8 @@ ${p.unrealized_pnl}
 
 document.getElementById(
 "positions"
-).innerHTML=html;
-
+).innerHTML =
+html;
 
 
 }
@@ -348,22 +488,24 @@ document.getElementById(
 
 
 
-// =====================================
+
+
+// =================================
 // TRADES
-// =====================================
+// =================================
 
 
 async function loadTrades(){
 
 
-let res =
+let r =
 await fetch(
 "/api/trades"
 );
 
 
 let data =
-await res.json();
+await r.json();
 
 
 
@@ -376,6 +518,7 @@ data.forEach(t=>{
 
 html +=
 
+
 `
 
 <tr>
@@ -387,7 +530,6 @@ html +=
 <td>${t.qty}</td>
 
 <td>${t.price}</td>
-
 
 </tr>
 
@@ -402,8 +544,8 @@ html +=
 
 document.getElementById(
 "trades"
-).innerHTML=html;
-
+).innerHTML =
+html;
 
 
 }
@@ -414,25 +556,23 @@ document.getElementById(
 
 
 
-// =====================================
-// EQUITY CHART
-// =====================================
+
+// =================================
+// CHART INIT
+// =================================
 
 
 function initChart(){
 
 
-let ctx =
+equityChart =
+new Chart(
+
 document
 .getElementById(
 "equityChart"
-);
+),
 
-
-
-chart =
-new Chart(
-ctx,
 {
 
 type:"line",
@@ -456,41 +596,106 @@ data:[]
 );
 
 
+
+
+drawdownChart =
+new Chart(
+
+document
+.getElementById(
+"drawdownChart"
+),
+
+{
+
+type:"line",
+
+data:{
+
+labels:[],
+
+datasets:[{
+
+label:"Drawdown %",
+
+data:[]
+
+}]
+
+}
+
+}
+
+);
+
+
+
 }
 
 
 
 
 
-async function updateChart(){
 
 
-let res =
+// =================================
+// CHART UPDATE
+// =================================
+
+
+async function updateCharts(){
+
+
+let r =
 await fetch(
 "/api/equity"
 );
 
 
 let data =
-await res.json();
+await r.json();
 
 
 
-chart.data.labels =
+let labels =
 data.map(
 x=>x.time
 );
 
 
 
-chart.data.datasets[0].data =
+equityChart.data.labels =
+labels;
+
+
+equityChart.data.datasets[0].data =
+
 data.map(
 x=>x.equity
 );
 
 
 
-chart.update();
+equityChart.update();
+
+
+
+
+
+drawdownChart.data.labels =
+labels;
+
+
+drawdownChart.data.datasets[0].data =
+
+data.map(
+x=>x.drawdown
+);
+
+
+
+drawdownChart.update();
+
 
 
 }
@@ -500,13 +705,10 @@ chart.update();
 
 
 
-// =====================================
+
+// =================================
 // LOOP
-// =====================================
-
-
-initChart();
-
+// =================================
 
 
 function refresh(){
@@ -514,23 +716,32 @@ function refresh(){
 
 loadSummary();
 
+loadRisk();
+
 loadPositions();
 
 loadTrades();
 
-updateChart();
+updateCharts();
 
 
 }
 
 
 
+initChart();
+
+
 refresh();
 
 
+
 setInterval(
+
 refresh,
+
 3000
+
 );
 
 
@@ -539,5 +750,6 @@ refresh,
 
 
 </body>
+
 
 </html>
