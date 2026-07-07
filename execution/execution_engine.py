@@ -4,58 +4,87 @@ import hmac
 import hashlib
 import requests
 
-
 from dotenv import load_dotenv
 
 
 from risk.risk_engine import risk_engine
-
 from risk.drawdown_guard import drawdown_guard
-
 from risk.sltp_manager import sltp_manager
-
+from risk.trailing_stop_manager import trailing_stop_manager
 
 from trade_db import trade_db
-
 
 
 load_dotenv()
 
 
 
-
-
 class BybitExecutionEngine:
 
 
-
     def __init__(self):
-
 
         self.api_key = os.getenv(
             "BYBIT_API_KEY"
         )
 
-
         self.api_secret = os.getenv(
             "BYBIT_API_SECRET"
         )
 
-
         self.base_url = os.getenv(
-
             "BYBIT_BASE_URL",
-
             "https://api.bybit.com"
+        )
+
+
+
+    # =====================================
+    # PRIVATE SIGN
+    # =====================================
+
+    def _sign(
+        self,
+        timestamp,
+        body
+    ):
+
+
+        raw = (
+
+            timestamp
+
+            +
+
+            self.api_key
+
+            +
+
+            "5000"
+
+            +
+
+            str(body)
 
         )
+
+
+        return hmac.new(
+
+            self.api_secret.encode(),
+
+            raw.encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
 
 
 
 
 
     # =====================================
-    # ORDER
+    # ORDER EXECUTE
     # =====================================
 
     def execute(
@@ -112,20 +141,10 @@ class BybitExecutionEngine:
     ):
 
 
-        endpoint = (
-            "/v5/order/create"
-        )
+        endpoint = "/v5/order/create"
 
 
-        url = (
-
-            self.base_url
-
-            +
-
-            endpoint
-
-        )
+        url = self.base_url + endpoint
 
 
 
@@ -168,41 +187,7 @@ class BybitExecutionEngine:
 
                 str(qty)
 
-
         }
-
-
-
-        body_text = str(body)
-
-
-
-        sign = hmac.new(
-
-            self.api_secret.encode(),
-
-            (
-
-                timestamp
-
-                +
-
-                self.api_key
-
-                +
-
-                "5000"
-
-                +
-
-                body_text
-
-            ).encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
 
 
 
@@ -216,7 +201,10 @@ class BybitExecutionEngine:
 
             "X-BAPI-SIGN":
 
-                sign,
+                self._sign(
+                    timestamp,
+                    body
+                ),
 
 
             "X-BAPI-TIMESTAMP":
@@ -228,24 +216,24 @@ class BybitExecutionEngine:
 
                 "5000"
 
-
         }
 
 
 
-        response = requests.post(
+        r = requests.post(
 
             url,
 
             json=body,
 
-            headers=headers
+            headers=headers,
+
+            timeout=5
 
         )
 
 
-
-        return response.json()
+        return r.json()
 
 
 
@@ -279,9 +267,6 @@ class BybitExecutionEngine:
         )
 
 
-
-        # 거래 저장
-
         trade_db.insert(
 
             symbol,
@@ -296,12 +281,6 @@ class BybitExecutionEngine:
 
 
 
-
-        # ============================
-        # AUTO SL TP
-        # ============================
-
-
         levels = sltp_manager.calculate(
 
             side,
@@ -312,23 +291,9 @@ class BybitExecutionEngine:
 
 
 
-        print(
-
-            "AUTO SL TP",
-
-            levels
-
-        )
-
-
-
         self.set_sl_tp(
 
             symbol,
-
-            side,
-
-            qty,
 
             levels["stop_loss"],
 
@@ -341,16 +306,115 @@ class BybitExecutionEngine:
 
 
     # =====================================
-    # BYBIT TRADING STOP
+    # INITIAL SL TP
     # =====================================
 
     def set_sl_tp(
         self,
         symbol,
-        side,
-        qty,
         sl,
         tp
+    ):
+
+
+        self._trading_stop(
+
+            symbol,
+
+            stop_loss=sl,
+
+            take_profit=tp
+
+        )
+
+
+
+
+
+    # =====================================
+    # TRAILING STOP UPDATE
+    # =====================================
+
+    def update_trailing_stop(
+        self,
+        symbol,
+        side,
+        price
+    ):
+
+
+        new_sl = trailing_stop_manager.update(
+
+            symbol,
+
+            side,
+
+            price
+
+        )
+
+
+        if not new_sl:
+
+            return
+
+
+
+        print(
+
+            "TRAILING MOVE",
+
+            symbol,
+
+            new_sl
+
+        )
+
+
+        self.move_stop_loss(
+
+            symbol,
+
+            new_sl
+
+        )
+
+
+
+
+
+    # =====================================
+    # MOVE SL
+    # =====================================
+
+    def move_stop_loss(
+        self,
+        symbol,
+        stop_loss
+    ):
+
+
+        self._trading_stop(
+
+            symbol,
+
+            stop_loss=stop_loss
+
+        )
+
+
+
+
+
+    # =====================================
+    # BYBIT TRADING STOP API
+    # =====================================
+
+    def _trading_stop(
+        self,
+        symbol,
+        stop_loss=None,
+        take_profit=None
     ):
 
 
@@ -395,57 +459,35 @@ class BybitExecutionEngine:
 
             "symbol":
 
-                symbol,
-
-
-            "stopLoss":
-
-                str(sl),
-
-
-            "takeProfit":
-
-                str(tp),
-
-
-            "slTriggerBy":
-
-                "MarkPrice",
-
-
-            "tpTriggerBy":
-
-                "MarkPrice"
+                symbol
 
         }
 
 
 
-        sign = hmac.new(
+        if stop_loss:
 
-            self.api_secret.encode(),
+            body["stopLoss"] = str(
+                stop_loss
+            )
 
-            (
 
-                timestamp
+            body["slTriggerBy"] = (
+                "MarkPrice"
+            )
 
-                +
 
-                self.api_key
 
-                +
+        if take_profit:
 
-                "5000"
+            body["takeProfit"] = str(
+                take_profit
+            )
 
-                +
 
-                str(body)
-
-            ).encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
+            body["tpTriggerBy"] = (
+                "MarkPrice"
+            )
 
 
 
@@ -459,7 +501,10 @@ class BybitExecutionEngine:
 
             "X-BAPI-SIGN":
 
-                sign,
+                self._sign(
+                    timestamp,
+                    body
+                ),
 
 
             "X-BAPI-TIMESTAMP":
@@ -475,24 +520,41 @@ class BybitExecutionEngine:
 
 
 
-        r = requests.post(
-
-            url,
-
-            json=body,
-
-            headers=headers
-
-        )
+        try:
 
 
-        print(
+            r = requests.post(
 
-            "SL TP RESULT",
+                url,
 
-            r.json()
+                json=body,
 
-        )
+                headers=headers,
+
+                timeout=5
+
+            )
+
+
+            print(
+
+                "TRADING STOP",
+
+                r.json()
+
+            )
+
+
+        except Exception as e:
+
+
+            print(
+
+                "TRADING STOP ERROR",
+
+                e
+
+            )
 
 
 
