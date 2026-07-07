@@ -1,59 +1,543 @@
 <!DOCTYPE html>
+
 <html>
+
 <head>
-    <title>Trading Bot Dashboard</title>
 
-    <style>
-        body {
-            font-family: Arial;
-            background: #111;
-            color: #eee;
-            padding: 20px;
-        }
+<title>
+Bybit Trading Dashboard
+</title>
 
-        .box {
-            padding: 10px;
-            margin: 10px;
-            background: #222;
-            border-radius: 8px;
-        }
 
-        h2 {
-            color: #00ffcc;
-        }
-    </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+<style>
+
+body{
+
+    background:#111;
+
+    color:white;
+
+    font-family:Arial;
+
+}
+
+
+.card{
+
+    background:#1d1d1d;
+
+    padding:20px;
+
+    margin:10px;
+
+    border-radius:10px;
+
+}
+
+
+table{
+
+    width:100%;
+
+}
+
+
+th,td{
+
+    padding:8px;
+
+    text-align:center;
+
+}
+
+
+.green{
+
+    color:#00ff88;
+
+}
+
+
+.red{
+
+    color:#ff4444;
+
+}
+
+
+</style>
+
+
 </head>
+
+
 
 <body>
 
-<h2>📊 Trading Bot Dashboard</h2>
 
-<div class="box" id="summary"></div>
-<div class="box" id="risk"></div>
-<div class="box" id="performance"></div>
+
+<h1>
+🚀 BYBIT AI TRADING DASHBOARD
+</h1>
+
+
+
+<div class="card">
+
+<h2>
+Account
+</h2>
+
+
+<div id="summary">
+
+Loading...
+
+</div>
+
+
+</div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+Open Positions
+</h2>
+
+
+<table>
+
+
+<thead>
+
+<tr>
+
+<th>Symbol</th>
+
+<th>Side</th>
+
+<th>Qty</th>
+
+<th>Entry</th>
+
+<th>PnL</th>
+
+
+</tr>
+
+</thead>
+
+
+<tbody id="positions">
+
+
+</tbody>
+
+
+</table>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+Trades
+</h2>
+
+
+<table>
+
+
+<thead>
+
+
+<tr>
+
+<th>Symbol</th>
+
+<th>Side</th>
+
+<th>Qty</th>
+
+<th>Price</th>
+
+
+</tr>
+
+
+</thead>
+
+
+<tbody id="trades">
+
+
+</tbody>
+
+
+</table>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+Equity Curve
+</h2>
+
+
+<canvas id="equityChart">
+
+
+</canvas>
+
+
+</div>
+
+
+
+
+
+
 
 <script>
 
-async function loadData() {
 
-    let summary = await fetch('/api/summary').then(r => r.json());
-    let risk = await fetch('/api/risk').then(r => r.json());
-    let perf = await fetch('/api/performance').then(r => r.json());
+let chart;
 
-    document.getElementById("summary").innerHTML =
-        "<b>Summary</b><br>" + JSON.stringify(summary, null, 2);
 
-    document.getElementById("risk").innerHTML =
-        "<b>Risk</b><br>" + JSON.stringify(risk, null, 2);
 
-    document.getElementById("performance").innerHTML =
-        "<b>Performance</b><br>" + JSON.stringify(perf, null, 2);
+// =====================================
+// SUMMARY
+// =====================================
+
+
+async function loadSummary(){
+
+
+let res =
+await fetch(
+"/api/summary"
+);
+
+
+let data =
+await res.json();
+
+
+
+document.getElementById(
+"summary"
+).innerHTML =
+
+
+`
+
+Positions :
+${data.positions}
+
+<br>
+
+Unrealized PnL :
+${data.unrealized_pnl}
+
+`;
+
 }
 
-setInterval(loadData, 3000);
-loadData();
+
+
+
+
+// =====================================
+// POSITION
+// =====================================
+
+
+async function loadPositions(){
+
+
+let res =
+await fetch(
+"/api/positions"
+);
+
+
+let data =
+await res.json();
+
+
+
+let html="";
+
+
+
+data.forEach(p=>{
+
+
+let cls =
+p.unrealized_pnl >=0
+?
+"green"
+:
+"red";
+
+
+
+html +=
+
+`
+
+<tr>
+
+<td>${p.symbol}</td>
+
+<td>${p.side}</td>
+
+<td>${p.size}</td>
+
+<td>${p.entry_price}</td>
+
+<td class="${cls}">
+${p.unrealized_pnl}
+</td>
+
+
+</tr>
+
+`;
+
+
+
+});
+
+
+
+document.getElementById(
+"positions"
+).innerHTML=html;
+
+
+
+}
+
+
+
+
+
+// =====================================
+// TRADES
+// =====================================
+
+
+async function loadTrades(){
+
+
+let res =
+await fetch(
+"/api/trades"
+);
+
+
+let data =
+await res.json();
+
+
+
+let html="";
+
+
+
+data.forEach(t=>{
+
+
+html +=
+
+`
+
+<tr>
+
+<td>${t.symbol}</td>
+
+<td>${t.side}</td>
+
+<td>${t.qty}</td>
+
+<td>${t.price}</td>
+
+
+</tr>
+
+
+`;
+
+
+
+});
+
+
+
+document.getElementById(
+"trades"
+).innerHTML=html;
+
+
+
+}
+
+
+
+
+
+
+
+// =====================================
+// EQUITY CHART
+// =====================================
+
+
+function initChart(){
+
+
+let ctx =
+document
+.getElementById(
+"equityChart"
+);
+
+
+
+chart =
+new Chart(
+ctx,
+{
+
+type:"line",
+
+data:{
+
+labels:[],
+
+datasets:[{
+
+label:"Equity",
+
+data:[]
+
+}]
+
+}
+
+}
+
+);
+
+
+}
+
+
+
+
+
+async function updateChart(){
+
+
+let res =
+await fetch(
+"/api/equity"
+);
+
+
+let data =
+await res.json();
+
+
+
+chart.data.labels =
+data.map(
+x=>x.time
+);
+
+
+
+chart.data.datasets[0].data =
+data.map(
+x=>x.equity
+);
+
+
+
+chart.update();
+
+
+}
+
+
+
+
+
+
+// =====================================
+// LOOP
+// =====================================
+
+
+initChart();
+
+
+
+function refresh(){
+
+
+loadSummary();
+
+loadPositions();
+
+loadTrades();
+
+updateChart();
+
+
+}
+
+
+
+refresh();
+
+
+setInterval(
+refresh,
+3000
+);
+
+
 
 </script>
 
+
 </body>
+
 </html>
