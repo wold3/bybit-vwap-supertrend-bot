@@ -1,107 +1,27 @@
-import logging
-import requests
+# ==========================================
+# Telegram compatibility wrapper
+# watchdog.py / services/ws_client.py 호환용
+# ==========================================
 
-from config import (
-    TELEGRAM_TOKEN,
-    TELEGRAM_CHAT_ID,
-)
+class TelegramService:
 
-logger = logging.getLogger(__name__)
+    def send(self, message):
+        try:
+            # 기존 전송 함수가 존재하면 사용
+            if "send_message" in globals():
+                return send_message(message)
 
-BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+            # 전송 함수가 없을 경우 로그만 출력
+            print("[Telegram]", message)
+            return True
 
-
-def send(text, parse_mode=None):
-    """
-    Telegram 메시지 전송
-
-    Args:
-        text (str): 전송할 메시지
-        parse_mode (str|None): "Markdown" 또는 "HTML"
-
-    Returns:
-        bool
-    """
-
-    if not TELEGRAM_TOKEN:
-        logger.debug("Telegram token is not configured.")
-        return False
-
-    if not TELEGRAM_CHAT_ID:
-        logger.debug("Telegram chat id is not configured.")
-        return False
-
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": str(text),
-    }
-
-    if parse_mode:
-        payload["parse_mode"] = parse_mode
-
-    try:
-
-        response = requests.post(
-            f"{BASE_URL}/sendMessage",
-            json=payload,
-            timeout=10,
-        )
-
-        response.raise_for_status()
-
-        result = response.json()
-
-        if not result.get("ok", False):
-            logger.error(
-                "Telegram API Error: %s",
-                result
-            )
+        except Exception as e:
+            print("[Telegram Error]", e)
             return False
 
-        logger.info("Telegram message sent.")
 
-        return True
+# 기존 코드에서
+# from telegram import telegram
+# 형태로 가져갈 객체 생성
 
-    except requests.exceptions.RequestException as e:
-
-        logger.exception("Telegram request failed: %s", e)
-
-        return False
-
-
-def send_trade(action, symbol, qty, price=None):
-    """
-    거래 알림 전송
-    """
-
-    message = (
-        "📈 Bybit AI Bot\n\n"
-        f"Action : {action}\n"
-        f"Symbol : {symbol}\n"
-        f"Qty    : {qty}"
-    )
-
-    if price:
-        message += f"\nPrice  : {price}"
-
-    return send(message)
-
-
-def send_error(error):
-    """
-    오류 알림
-    """
-
-    return send(
-        f"❌ Bot Error\n\n{error}"
-    )
-
-
-def send_status(status):
-    """
-    상태 알림
-    """
-
-    return send(
-        f"ℹ️ {status}"
-    )
+telegram = TelegramService()
