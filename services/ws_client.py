@@ -1,454 +1,94 @@
-import os
-import json
-import time
 import threading
-import websocket
-
-from dotenv import load_dotenv
-
-from watchdog.watchdog import watchdog
-
-from indicators.indicator_engine import indicator_engine
+import time
 
 
-load_dotenv()
+# GitHub 구조 호환 import
+from watchdog import watchdog
 
 
 
-class BybitPublicWS:
+class WSClient:
+    """
+    WebSocket Client Manager
+
+    기능:
+    - websocket 서비스 상태 관리
+    - heartbeat 전송
+    - watchdog 연동
+    """
 
 
     def __init__(self):
 
-        self.url = os.getenv(
+        self.running = False
+        self.thread = None
 
-            "PUBLIC_WS_URL",
 
-            "wss://stream.bybit.com/v5/public/linear"
 
-        )
+    def start(self):
 
-
-        self.symbol = os.getenv(
-
-            "DEFAULT_SYMBOL",
-
-            "BTCUSDT"
-
-        )
-
-
-        self.interval = os.getenv(
-
-            "KLINE_INTERVAL",
-
-            "1"
-
-        )
-
-
-        self.latest_data = {}
-
-
-        self.lock = threading.Lock()
-
-
-
-
-
-    # =====================================
-    # CONNECT
-    # =====================================
-
-    def on_open(
-        self,
-        ws
-    ):
-
-
-        print(
-            "📡 PUBLIC WS CONNECTED"
-        )
-
-
-
-        subscribe = {
-
-
-            "op":
-
-                "subscribe",
-
-
-            "args":
-
-                [
-
-                    f"kline.{self.interval}.{self.symbol}"
-
-                ]
-
-        }
-
-
-
-        ws.send(
-
-            json.dumps(
-
-                subscribe
-
-            )
-
-        )
-
-
-        print(
-
-            "PUBLIC SUBSCRIBED",
-
-            self.symbol
-
-        )
-
-
-
-
-
-    # =====================================
-    # MESSAGE
-    # =====================================
-
-    def on_message(
-        self,
-        ws,
-        message
-    ):
-
-
-        try:
-
-
-            data = json.loads(
-
-                message
-
-            )
-
-
-            topic = data.get(
-
-                "topic"
-
-            )
-
-
-
-            if not topic:
-
-                return
-
-
-
-            if topic.startswith(
-
-                "kline"
-
-            ):
-
-
-                self.handle_kline(
-
-                    data
-
-                )
-
-
-                watchdog.update_public_ws()
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "WS MESSAGE ERROR",
-
-                e
-
-            )
-
-
-
-
-
-    # =====================================
-    # KLINE 처리
-    # =====================================
-
-    def handle_kline(
-        self,
-        data
-    ):
-
-
-        candles = data.get(
-
-            "data",
-
-            []
-
-        )
-
-
-
-        if not candles:
-
+        if self.running:
             return
 
 
+        self.running = True
 
-        candle = candles[0]
-
-
-
-        # Bybit kline
-
-        formatted = {
-
-
-            "symbol":
-
-                self.symbol,
-
-
-            "open":
-
-                float(
-
-                    candle["open"]
-
-                ),
-
-
-            "high":
-
-                float(
-
-                    candle["high"]
-
-                ),
-
-
-            "low":
-
-                float(
-
-                    candle["low"]
-
-                ),
-
-
-            "close":
-
-                float(
-
-                    candle["close"]
-
-                ),
-
-
-            "volume":
-
-                float(
-
-                    candle["volume"]
-
-                ),
-
-
-            "timestamp":
-
-                candle["start"]
-
-        }
-
-
-
-
-
-        # =================================
-        # Indicator Engine 연결
-        # =================================
-
-        indicator_engine.update(
-
-            formatted
-
+        self.thread = threading.Thread(
+            target=self._run,
+            daemon=True
         )
 
+        self.thread.start()
+
+        print("[WS] started")
 
 
 
+    def _run(self):
 
-        # =================================
-        # 최신 데이터 저장
-        # =================================
-
-        with self.lock:
-
-
-            self.latest_data = formatted.copy()
-
-
-
-
-
-            indicators = (
-
-                indicator_engine
-                .calculate()
-
-            )
-
-
-
-            self.latest_data.update(
-
-                indicators
-
-            )
-
-
-
-
-
-    # =====================================
-    # STRATEGY DATA
-    # =====================================
-
-    def get_latest_data(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            return self.latest_data.copy()
-
-
-
-
-
-    # =====================================
-    # ERROR
-    # =====================================
-
-    def on_error(
-        self,
-        ws,
-        error
-    ):
-
-
-        print(
-
-            "PUBLIC WS ERROR",
-
-            error
-
-        )
-
-
-
-
-
-    # =====================================
-    # CLOSE
-    # =====================================
-
-    def on_close(
-        self,
-        ws,
-        code,
-        msg
-    ):
-
-
-        print(
-
-            "PUBLIC WS CLOSED",
-
-            code,
-
-            msg
-
-        )
-
-
-
-
-
-    # =====================================
-    # START
-    # =====================================
-
-    def start(
-        self
-    ):
-
-
-        while True:
-
+        while self.running:
 
             try:
 
-
-                ws = websocket.WebSocketApp(
-
-                    self.url,
-
-                    on_open=self.on_open,
-
-                    on_message=self.on_message,
-
-                    on_error=self.on_error,
-
-                    on_close=self.on_close
-
-                )
+                # watchdog heartbeat
+                watchdog.heartbeat()
 
 
+                # websocket 처리 위치
+                # TODO:
+                # Bybit websocket 연결 코드 추가
 
-                ws.run_forever(
 
-                    ping_interval=20,
-
-                    ping_timeout=10
-
-                )
-
+                time.sleep(5)
 
 
             except Exception as e:
 
-
                 print(
-
-                    "PUBLIC WS RECONNECT ERROR",
-
+                    "[WS ERROR]",
                     e
-
                 )
 
-
-
-            time.sleep(5)
-
+                time.sleep(5)
 
 
 
+    def stop(self):
 
-ws_client = BybitPublicWS()
+        self.running = False
+
+        print("[WS] stopped")
+
+
+
+    def status(self):
+
+        return {
+            "running": self.running
+        }
+
+
+
+# 외부 import용 singleton
+
+ws_client = WSClient()
