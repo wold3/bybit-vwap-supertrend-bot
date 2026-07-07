@@ -1,26 +1,74 @@
-from flask import Flask, jsonify, render_template
+import os
+import sys
+import time
 
 
-from position.position_manager import position_manager
+# =====================================
+# PROJECT ROOT PATH
+# =====================================
+
+BASE_DIR = os.path.dirname(
+
+    os.path.dirname(
+
+        os.path.abspath(__file__)
+
+    )
+
+)
 
 
-from execution.execution_engine import execution_engine
+sys.path.append(
+
+    BASE_DIR
+
+)
 
 
-from risk.drawdown_guard import drawdown_guard
 
+from flask import (
+    Flask,
+    jsonify,
+    render_template
+)
+
+
+
+# =====================================
+# CORE MODULES
+# =====================================
 
 from trade_db import trade_db
 
 
+from position.position_manager import (
+    position_manager
+)
 
-import time
+
+from execution.execution_engine import (
+    execution_engine
+)
 
 
+from risk.drawdown_guard import (
+    drawdown_guard
+)
+
+
+
+
+
+# =====================================
+# APP
+# =====================================
 
 app = Flask(
+
     __name__,
+
     template_folder="templates"
+
 )
 
 
@@ -49,10 +97,7 @@ def dashboard():
 # SUMMARY
 # =====================================
 
-@app.route(
-    "/api/summary"
-)
-
+@app.route("/api/summary")
 def summary():
 
 
@@ -64,14 +109,16 @@ def summary():
     )
 
 
-
     pnl = sum(
 
         [
 
             p.get(
+
                 "unrealized_pnl",
+
                 0
+
             )
 
             for p in positions
@@ -79,7 +126,6 @@ def summary():
         ]
 
     )
-
 
 
     return jsonify({
@@ -105,10 +151,7 @@ def summary():
 # POSITIONS
 # =====================================
 
-@app.route(
-    "/api/positions"
-)
-
+@app.route("/api/positions")
 def positions():
 
 
@@ -124,27 +167,17 @@ def positions():
 
 
 # =====================================
-# EQUITY CURVE
+# EQUITY
 # =====================================
 
-@app.route(
-    "/api/equity"
-)
-
+@app.route("/api/equity")
 def equity():
-
-
-    history = (
-
-        drawdown_guard
-        .get_history()
-
-    )
 
 
     return jsonify(
 
-        history
+        drawdown_guard
+        .get_history()
 
     )
 
@@ -156,24 +189,14 @@ def equity():
 # RISK
 # =====================================
 
-@app.route(
-    "/api/risk"
-)
-
+@app.route("/api/risk")
 def risk():
-
-
-    data = (
-
-        drawdown_guard
-        .status()
-
-    )
 
 
     return jsonify(
 
-        data
+        drawdown_guard
+        .status()
 
     )
 
@@ -185,24 +208,14 @@ def risk():
 # TRADES
 # =====================================
 
-@app.route(
-    "/api/trades"
-)
-
+@app.route("/api/trades")
 def trades():
-
-
-    data = (
-
-        trade_db
-        .get_recent()
-
-    )
 
 
     return jsonify(
 
-        data
+        trade_db
+        .get_recent()
 
     )
 
@@ -214,10 +227,7 @@ def trades():
 # BOT STATUS
 # =====================================
 
-@app.route(
-    "/api/status"
-)
-
+@app.route("/api/status")
 def status():
 
 
@@ -244,11 +254,8 @@ def status():
 # MANUAL CLOSE
 # =====================================
 
-@app.route(
-    "/api/close/<symbol>"
-)
-
-def close(symbol):
+@app.route("/api/close/<symbol>")
+def close_position(symbol):
 
 
     position = (
@@ -287,7 +294,6 @@ def close(symbol):
     )
 
 
-
     return jsonify(
 
         result
@@ -298,6 +304,10 @@ def close(symbol):
 
 
 
+# =====================================
+# RUN
+# =====================================
+
 if __name__ == "__main__":
 
 
@@ -305,6 +315,8 @@ if __name__ == "__main__":
 
         host="0.0.0.0",
 
-        port=5000
+        port=5000,
+
+        debug=False
 
     )
