@@ -2,232 +2,87 @@ import time
 import threading
 
 
-class WatchDog:
+class Watchdog:
+    """
+    시스템 상태 감시 모듈
 
+    - heartbeat 기록
+    - 실행 상태 확인
+    - 서비스 생존 확인
+    """
 
     def __init__(self):
-
-
-        self.last_private_ws = time.time()
-
-
-        self.last_public_ws = time.time()
-
-
         self.running = True
-
-
-
-        self.timeout = 30
-
-
-
+        self.last_heartbeat = time.time()
         self.lock = threading.Lock()
 
 
-
-
-
-    # =====================================
-    # PRIVATE WS UPDATE
-    # =====================================
-
-    def update_private_ws(self):
-
+    def heartbeat(self):
+        """
+        heartbeat 갱신
+        """
 
         with self.lock:
+            self.last_heartbeat = time.time()
+
+        return True
 
 
-            self.last_private_ws = time.time()
-
-
-
-
-
-    # =====================================
-    # PUBLIC WS UPDATE
-    # =====================================
-
-    def update_public_ws(self):
-
+    def is_alive(self, timeout=60):
+        """
+        마지막 heartbeat 이후
+        timeout 초 이내인지 확인
+        """
 
         with self.lock:
+            elapsed = time.time() - self.last_heartbeat
+
+        return elapsed < timeout
 
 
-            self.last_public_ws = time.time()
-
-
-
-
-
-    # =====================================
-    # CHECK
-    # =====================================
-
-    def check(self):
-
+    def status(self):
+        """
+        현재 상태 반환
+        """
 
         with self.lock:
+            elapsed = time.time() - self.last_heartbeat
+
+        return {
+            "running": self.running,
+            "alive": self.is_alive(),
+            "last_heartbeat": self.last_heartbeat,
+            "elapsed": elapsed
+        }
 
-
-            now = time.time()
-
-
-
-            private_gap = (
-
-                now
-
-                -
-
-                self.last_private_ws
-
-            )
-
-
-            public_gap = (
-
-                now
-
-                -
-
-                self.last_public_ws
-
-            )
-
-
-
-        if private_gap > self.timeout:
-
-
-            print(
-
-                "⚠️ PRIVATE WS TIMEOUT",
-
-                private_gap
-
-            )
-
-
-            self.restart_private_ws()
-
-
-
-
-
-        if public_gap > self.timeout:
-
-
-            print(
-
-                "⚠️ PUBLIC WS TIMEOUT",
-
-                public_gap
-
-            )
-
-
-            self.restart_public_ws()
-
-
-
-
-
-    # =====================================
-    # PRIVATE WS RESTART
-    # =====================================
-
-    def restart_private_ws(self):
-
-
-        print(
-
-            "RESTART PRIVATE WS"
-
-        )
-
-
-        # 실제 restart 연결 위치
-
-        # private_ws.start()
-
-
-
-
-    # =====================================
-    # PUBLIC WS RESTART
-    # =====================================
-
-    def restart_public_ws(self):
-
-
-        print(
-
-            "RESTART PUBLIC WS"
-
-        )
-
-
-        # ws_client.start()
-
-
-
-
-    # =====================================
-    # LOOP
-    # =====================================
-
-    def start(self):
-
-
-        print(
-
-            "WATCHDOG START"
-
-        )
-
-
-
-        while self.running:
-
-
-            try:
-
-
-                self.check()
-
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "WATCHDOG ERROR",
-
-                    e
-
-                )
-
-
-
-            time.sleep(5)
-
-
-
-
-
-    # =====================================
-    # STOP
-    # =====================================
 
     def stop(self):
-
+        """
+        watchdog 종료
+        """
 
         self.running = False
 
 
+    def start(self):
+        """
+        watchdog 시작
+        """
+
+        self.running = True
+        self.heartbeat()
+
+        print("[Watchdog] started")
+
+        return True
 
 
 
-watchdog = WatchDog()
+# =================================================
+# 외부 모듈 import용 객체
+#
+# 사용:
+# from watchdog.watchdog import watchdog
+# =================================================
+
+watchdog = Watchdog()
