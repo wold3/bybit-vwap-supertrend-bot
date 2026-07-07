@@ -1,260 +1,141 @@
 import sqlite3
-import os
-import threading
-import time
+from datetime import datetime
 
+
+DB_PATH = "trades.db"
 
 
 class TradeDB:
 
-
-    def __init__(self):
-
-        self.db_file = os.getenv(
-            "TRADE_DB",
-            "trades.db"
-        )
-
-        self.lock = threading.Lock()
-
+    def __init__(self, db_path=DB_PATH):
+        self.db_path = db_path
         self.init_db()
 
 
+    def get_connection(self):
+        return sqlite3.connect(self.db_path)
 
-    # =====================================
-    # DATABASE INIT
-    # =====================================
 
     def init_db(self):
 
-        with sqlite3.connect(
-            self.db_file
-        ) as conn:
+        conn = self.get_connection()
+        c = conn.cursor()
 
-            cursor = conn.cursor()
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS trades (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            time TEXT,
+            symbol TEXT,
+            side TEXT,
+            qty REAL,
+            price REAL,
+            pnl REAL
+        )
+        """)
 
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS trades
-                (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                    symbol TEXT,
-
-                    side TEXT,
-
-                    qty REAL,
-
-                    price REAL,
-
-                    pnl REAL DEFAULT 0,
-
-                    trade_type TEXT,
-
-                    timestamp REAL
-                )
-                """
-            )
-
-            conn.commit()
+        conn.commit()
+        conn.close()
 
 
 
-    # =====================================
-    # INSERT TRADE
-    # =====================================
-
-    def insert(
+    def insert_trade(
         self,
         symbol,
         side,
         qty,
         price,
-        pnl=0,
-        trade_type="ENTRY"
+        pnl=0
     ):
 
-        with self.lock:
+        conn = self.get_connection()
+        c = conn.cursor()
 
-            with sqlite3.connect(
-                self.db_file
-            ) as conn:
+        c.execute("""
+        INSERT INTO trades
+        (
+            time,
+            symbol,
+            side,
+            qty,
+            price,
+            pnl
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            datetime.utcnow().isoformat(),
+            symbol,
+            side,
+            qty,
+            price,
+            pnl
+        ))
 
-                cursor = conn.cursor()
+        conn.commit()
+        conn.close()
 
 
-                cursor.execute(
-                    """
-                    INSERT INTO trades
-                    (
-                        symbol,
-                        side,
-                        qty,
-                        price,
-                        pnl,
-                        trade_type,
-                        timestamp
-                    )
 
-                    VALUES(?,?,?,?,?,?,?)
-                    """,
-                    (
-                        symbol,
-                        side,
-                        qty,
-                        price,
-                        pnl,
-                        trade_type,
-                        time.time()
-                    )
-                )
+    def get_recent_trades(self, limit=50):
 
+        conn = self.get_connection()
+        c = conn.cursor()
 
-                conn.commit()
+        c.execute("""
+        SELECT *
+        FROM trades
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (limit,))
 
+        rows = c.fetchall()
 
+        conn.close()
 
-    # =====================================
-    # RECENT TRADES
-    # =====================================
+        return rows
 
-    def get_recent(
-        self,
-        limit=100
-    ):
 
-        with sqlite3.connect(
-            self.db_file
-        ) as conn:
 
+    def get_summary(self):
 
-            cursor = conn.cursor()
+        conn = self.get_connection()
+        c = conn.cursor()
 
+        c.execute("""
+        SELECT
+            COUNT(*),
+            COALESCE(SUM(pnl),0)
+        FROM trades
+        """)
 
-            cursor.execute(
-                """
-                SELECT
+        result = c.fetchone()
 
-                    id,
-                    symbol,
-                    side,
-                    qty,
-                    price,
-                    pnl,
-                    trade_type,
-                    timestamp
+        conn.close()
 
-                FROM trades
+        return {
+            "count": result[0],
+            "pnl": result[1]
+        }
 
-                ORDER BY id DESC
 
-                LIMIT ?
-                """,
-                (
-                    limit,
-                )
-            )
 
-
-            rows = cursor.fetchall()
-
-
-            result = []
-
-
-            for row in rows:
-
-                result.append(
-
-                    {
-                        "id": row[0],
-
-                        "symbol": row[1],
-
-                        "side": row[2],
-
-                        "qty": row[3],
-
-                        "price": row[4],
-
-                        "pnl": row[5],
-
-                        "type": row[6],
-
-                        "time": row[7]
-                    }
-
-                )
-
-
-            return result
-
-
-
-    # =====================================
-    # LAST TRADE
-    # =====================================
-
-    def last(
-        self,
-        symbol
-    ):
-
-
-        with sqlite3.connect(
-            self.db_file
-        ) as conn:
-
-
-            cursor = conn.cursor()
-
-
-            cursor.execute(
-                """
-                SELECT *
-
-                FROM trades
-
-                WHERE symbol=?
-
-                ORDER BY id DESC
-
-                LIMIT 1
-                """,
-                (
-                    symbol,
-                )
-            )
-
-
-            return cursor.fetchone()
-
-
-
-    # =====================================
-    # DELETE ALL (TEST)
-    # =====================================
-
-    def clear(self):
-
-        with self.lock:
-
-            with sqlite3.connect(
-                self.db_file
-            ) as conn:
-
-                cursor = conn.cursor()
-
-                cursor.execute(
-                    "DELETE FROM trades"
-                )
-
-                conn.commit()
-
-
-
-# =====================================
-# SINGLETON
-# =====================================
-
+# dashboard/app.py 에서 사용하는 객체
 trade_db = TradeDB()
+
+
+
+# 기존 함수 호출 호환용
+
+def init_db():
+    return trade_db.init_db()
+
+
+def insert_trade(symbol, side, qty, price, pnl=0):
+    return trade_db.insert_trade(
+        symbol,
+        side,
+        qty,
+        price,
+        pnl
+    )
