@@ -25,3 +25,5 @@ class TelegramService:
 # 형태로 가져갈 객체 생성
 
 telegram = TelegramService()
+
+telegram.py 맨 아래에 추가하세요.
