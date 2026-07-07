@@ -1,1 +1,1 @@
-New-Item watchdog\__init__.py
+New-Item watchdog\__init__.py -ItemType File
