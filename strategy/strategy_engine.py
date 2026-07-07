@@ -2,18 +2,17 @@ import os
 from dotenv import load_dotenv
 
 
-from risk.drawdown_guard import drawdown_guard
-
-
 from risk.risk_engine import risk_engine
 
+from risk.drawdown_guard import drawdown_guard
 
 from ml.ml_filter import ml_filter
 
+from position.position_manager import position_manager
+
+
 
 load_dotenv()
-
-
 
 
 
@@ -23,61 +22,24 @@ class StrategyEngine:
     def __init__(self):
 
 
-        self.vwap_enable = (
+        self.default_qty = float(
 
             os.getenv(
-                "VWAP_ENABLE",
-                "true"
-            ).lower()
-            ==
-            "true"
 
-        )
+                "DEFAULT_QTY",
 
+                "0.001"
 
-        self.supertrend_enable = (
-
-            os.getenv(
-                "SUPERTREND_ENABLE",
-                "true"
-            ).lower()
-            ==
-            "true"
-
-        )
-
-
-        self.ml_enable = (
-
-            os.getenv(
-                "ML_FILTER_ENABLE",
-                "true"
-            ).lower()
-            ==
-            "true"
-
-        )
-
-
-        self.ml_threshold = float(
-
-            os.getenv(
-                "ML_THRESHOLD",
-                "0.65"
             )
 
         )
 
 
 
-        self.position = {}
-
-
-
 
 
     # =====================================
-    # MAIN CHECK
+    # MAIN STRATEGY
     # =====================================
 
     def check(
@@ -86,39 +48,44 @@ class StrategyEngine:
     ):
 
 
+        if not market_data:
+
+
+            return None
+
+
+
         symbol = market_data.get(
+
             "symbol"
+
         )
 
 
         price = market_data.get(
+
             "close"
+
+        )
+
+
+        vwap = market_data.get(
+
+            "vwap"
+
+        )
+
+
+        trend = market_data.get(
+
+            "supertrend"
+
         )
 
 
 
         if not symbol:
 
-            return None
-
-
-
-        # ==========================
-        # Risk Check
-        # ==========================
-
-
-        if not risk_engine.can_trade():
-
-            return None
-
-
-
-        if not drawdown_guard.can_trade():
-
-            print(
-                "DRAW DOWN BLOCK"
-            )
 
             return None
 
@@ -126,154 +93,16 @@ class StrategyEngine:
 
 
 
-        # ==========================
-        # Indicator
-        # ==========================
+        # =================================
+        # EXIT CHECK FIRST
+        # =================================
 
 
-        vwap = market_data.get(
-            "vwap"
-        )
+        if position_manager.has_position(
 
-
-        supertrend = market_data.get(
-            "supertrend"
-        )
-
-
-
-        signal = None
-
-
-
-
-
-        # ==========================
-        # LONG 조건
-        # ==========================
-
-
-        if (
-
-            self.vwap_enable
-
-            and
-
-            price > vwap
+            symbol
 
         ):
-
-
-            signal = "Buy"
-
-
-
-
-
-        # ==========================
-        # SHORT 조건
-        # ==========================
-
-
-        elif (
-
-            self.vwap_enable
-
-            and
-
-            price < vwap
-
-        ):
-
-
-            signal = "Sell"
-
-
-
-
-
-        # ==========================
-        # Supertrend Filter
-        # ==========================
-
-
-        if self.supertrend_enable:
-
-
-            if supertrend == "UP":
-
-
-                if signal != "Buy":
-
-                    return None
-
-
-
-            elif supertrend == "DOWN":
-
-
-                if signal != "Sell":
-
-                    return None
-
-
-
-            else:
-
-                return None
-
-
-
-
-
-        # ==========================
-        # ML FILTER
-        # ==========================
-
-
-        if self.ml_enable:
-
-
-            probability = ml_filter.predict(
-
-                market_data
-
-            )
-
-
-
-            print(
-
-                "ML SCORE",
-
-                probability
-
-            )
-
-
-
-            if probability < self.ml_threshold:
-
-
-                print(
-
-                    "ML BLOCK"
-
-                )
-
-
-                return None
-
-
-
-
-
-        # ==========================
-        # POSITION CHECK
-        # ==========================
-
-
-        if symbol in self.position:
 
 
             return self.check_exit(
@@ -286,76 +115,212 @@ class StrategyEngine:
 
 
 
-        # ==========================
-        # ENTRY SIGNAL
-        # ==========================
+        # =================================
+        # RISK CHECK
+        # =================================
 
 
-        self.position[symbol] = signal
+        if not risk_engine.can_trade():
+
+
+            print(
+
+                "RISK BLOCK"
+
+            )
+
+
+            return None
 
 
 
-        return {
 
 
-            "type":
-
-                "ENTRY",
+        if not drawdown_guard.can_trade():
 
 
-            "symbol":
+            print(
 
-                symbol,
+                "DRAWDOWN BLOCK"
 
-
-            "side":
-
-                signal,
+            )
 
 
-            "qty":
+            return None
 
-                float(
 
-                    os.getenv(
 
-                        "DEFAULT_QTY",
 
-                        "0.001"
 
-                    )
+        # =================================
+        # ML FILTER
+        # =================================
 
-                )
 
-        }
+        if not ml_filter.allow_trade(
+
+            market_data
+
+        ):
+
+
+            return None
+
+
+
+
+
+        # =================================
+        # LONG ENTRY
+        # =================================
+
+
+        if (
+
+
+            price > vwap
+
+
+            and
+
+
+            trend == "UP"
+
+
+        ):
+
+
+            return {
+
+
+                "type":
+
+                    "ENTRY",
+
+
+                "symbol":
+
+                    symbol,
+
+
+                "side":
+
+                    "Buy",
+
+
+                "qty":
+
+                    self.default_qty
+
+
+            }
+
+
+
+
+
+        # =================================
+        # SHORT ENTRY
+        # =================================
+
+
+        if (
+
+
+            price < vwap
+
+
+            and
+
+
+            trend == "DOWN"
+
+
+        ):
+
+
+            return {
+
+
+                "type":
+
+                    "ENTRY",
+
+
+                "symbol":
+
+                    symbol,
+
+
+                "side":
+
+                    "Sell",
+
+
+                "qty":
+
+                    self.default_qty
+
+
+            }
+
+
+
+
+
+        return None
 
 
 
 
 
     # =====================================
-    # EXIT CHECK
+    # EXIT
     # =====================================
 
     def check_exit(
         self,
-        data
+        market_data
     ):
 
 
-        symbol = data.get(
+        symbol = market_data.get(
+
             "symbol"
+
         )
 
 
-        current = self.position.get(
-            symbol
-        )
+        trend = market_data.get(
 
-
-        trend = data.get(
             "supertrend"
+
         )
+
+
+
+        position = position_manager.get_position(
+
+            symbol
+
+        )
+
+
+
+        if not position:
+
+
+            return None
+
+
+
+        side = position.get(
+
+            "side"
+
+        )
+
+
 
 
 
@@ -363,7 +328,7 @@ class StrategyEngine:
 
         if (
 
-            current == "Buy"
+            side == "Buy"
 
             and
 
@@ -372,9 +337,6 @@ class StrategyEngine:
         ):
 
 
-            del self.position[symbol]
-
-
             return {
 
 
@@ -390,9 +352,19 @@ class StrategyEngine:
 
                 "side":
 
-                    "Sell"
+                    "Sell",
+
+
+                "qty":
+
+                    position.get(
+
+                        "size"
+
+                    )
 
             }
+
 
 
 
@@ -401,16 +373,13 @@ class StrategyEngine:
 
         if (
 
-            current == "Sell"
+            side == "Sell"
 
             and
 
             trend == "UP"
 
         ):
-
-
-            del self.position[symbol]
 
 
             return {
@@ -428,9 +397,19 @@ class StrategyEngine:
 
                 "side":
 
-                    "Buy"
+                    "Buy",
+
+
+                "qty":
+
+                    position.get(
+
+                        "size"
+
+                    )
 
             }
+
 
 
 
