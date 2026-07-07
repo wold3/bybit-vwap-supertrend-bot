@@ -5,7 +5,7 @@
 <head>
 
 <title>
-Bybit AI Trading Dashboard
+AI Trading Dashboard
 </title>
 
 
@@ -16,110 +16,65 @@ Bybit AI Trading Dashboard
 
 body{
 
-background:#111;
+    font-family: Arial;
 
-color:white;
-
-font-family:Arial;
+    margin:20px;
 
 }
 
 
 .card{
 
-background:#1e1e1e;
+    border:1px solid #ddd;
 
-padding:20px;
+    padding:15px;
 
-margin:10px;
+    margin-bottom:15px;
 
-border-radius:10px;
-
-}
-
-
-.green{
-
-color:#00ff88;
-
-}
-
-
-.red{
-
-color:#ff4444;
+    border-radius:10px;
 
 }
 
 
 table{
 
-width:100%;
+    width:100%;
+
+    border-collapse:collapse;
 
 }
 
 
 td,th{
 
-padding:8px;
+    border-bottom:1px solid #ddd;
 
-text-align:center;
+    padding:8px;
 
 }
 
 
 </style>
 
-
 </head>
+
 
 
 <body>
 
 
+
 <h1>
-🚀 BYBIT AI TRADING SYSTEM
+🚀 Bybit AI Trading Dashboard
 </h1>
 
 
 
-<!-- ======================
-SUMMARY
-======================= -->
-
-
 <div class="card">
 
-
-<h2>
-Account Summary
-</h2>
-
-
-<div id="summary">
-
-Loading...
-
-</div>
-
-
-</div>
-
-
-
-
-
-<!-- ======================
-RISK
-======================= -->
-
-
-<div class="card">
-
-
-<h2>
-🛡 Risk Monitor
-</h2>
+<h3>
+Risk Status
+</h3>
 
 
 <div id="risk">
@@ -135,18 +90,27 @@ Loading...
 
 
 
+<div class="card">
 
-<!-- ======================
-POSITIONS
-======================= -->
+<h3>
+Equity Curve
+</h3>
+
+
+<canvas id="equityChart"></canvas>
+
+
+</div>
+
+
+
 
 
 <div class="card">
 
-
-<h2>
-Open Positions
-</h2>
+<h3>
+Positions
+</h3>
 
 
 <table>
@@ -156,24 +120,33 @@ Open Positions
 
 <tr>
 
-<th>Symbol</th>
+<th>
+Symbol
+</th>
 
-<th>Side</th>
+<th>
+Side
+</th>
 
-<th>Size</th>
+<th>
+Size
+</th>
 
-<th>Entry</th>
-
-<th>PnL</th>
+<th>
+PnL
+</th>
 
 </tr>
 
+
 </thead>
+
 
 
 <tbody id="positions">
 
 </tbody>
+
 
 
 </table>
@@ -185,19 +158,12 @@ Open Positions
 
 
 
-
-
-<!-- ======================
-TRADES
-======================= -->
-
-
 <div class="card">
 
 
-<h2>
+<h3>
 Recent Trades
-</h2>
+</h3>
 
 
 <table>
@@ -207,15 +173,24 @@ Recent Trades
 
 <tr>
 
-<th>Symbol</th>
+<th>
+Symbol
+</th>
 
-<th>Side</th>
+<th>
+Side
+</th>
 
-<th>Qty</th>
+<th>
+Price
+</th>
 
-<th>Price</th>
+<th>
+Type
+</th>
 
 </tr>
+
 
 </thead>
 
@@ -235,106 +210,113 @@ Recent Trades
 
 
 
-
-<!-- ======================
-EQUITY
-======================= -->
-
-
-<div class="card">
-
-
-<h2>
-📈 Equity Curve
-</h2>
-
-
-<canvas id="equityChart"></canvas>
-
-
-</div>
-
-
-
-
-
-
-<!-- ======================
-DRAWDOWN
-======================= -->
-
-
-<div class="card">
-
-
-<h2>
-📉 Drawdown
-</h2>
-
-
-<canvas id="drawdownChart"></canvas>
-
-
-</div>
-
-
-
-
-
-
-
 <script>
 
 
-let equityChart;
-
-let drawdownChart;
-
-
+let chart;
 
 
 
 // =================================
-// SUMMARY
+// EQUITY
 // =================================
 
-
-async function loadSummary(){
-
-
-let r =
-await fetch(
-"/api/summary"
-);
+async function loadEquity(){
 
 
-let d =
-await r.json();
+    let res = await fetch(
+
+        "/api/equity"
+
+    );
+
+
+    let data = await res.json();
 
 
 
-document.getElementById(
-"summary"
-).innerHTML =
+    let labels = data.map(
+
+        x => new Date(
+
+            x.time * 1000
+
+        ).toLocaleTimeString()
+
+    );
 
 
-`
 
-Positions :
-${d.positions}
+    let values = data.map(
 
-<br>
+        x => x.equity
 
-Unrealized PnL :
-${d.unrealized_pnl}
-
-`;
+    );
 
 
+
+    if(!chart){
+
+
+        chart = new Chart(
+
+            document
+
+            .getElementById(
+
+                "equityChart"
+
+            ),
+
+            {
+
+
+            type:"line",
+
+
+            data:{
+
+
+                labels:labels,
+
+
+                datasets:[{
+
+
+                    label:"Equity",
+
+
+                    data:values
+
+
+                }]
+
+
+            }
+
+
+            }
+
+        );
+
+
+    }
+
+    else{
+
+
+        chart.data.labels = labels;
+
+
+        chart.data.datasets[0].data = values;
+
+
+        chart.update();
+
+
+    }
 
 }
-
-
 
 
 
@@ -344,61 +326,73 @@ ${d.unrealized_pnl}
 // RISK
 // =================================
 
-
 async function loadRisk(){
 
 
-let r =
-await fetch(
-"/api/risk"
-);
+    let res = await fetch(
+
+        "/api/risk"
+
+    );
 
 
-let d =
-await r.json();
-
-
-
-let status =
-d.can_trade
-?
-"<span class='green'>TRADING ON</span>"
-:
-"<span class='red'>STOPPED</span>";
+    let data = await res.json();
 
 
 
-document.getElementById(
-"risk"
-).innerHTML =
+    document
+
+    .getElementById(
+
+        "risk"
+
+    )
+
+    .innerHTML = `
 
 
-`
+    Equity :
 
-Equity :
-${d.current_equity}
+    ${data.current_equity}
 
-<br>
 
-Peak :
-${d.peak_equity}
+    <br>
 
-<br>
 
-Drawdown :
-${d.drawdown} %
+    Peak :
 
-<br>
+    ${data.peak_equity}
 
-Max DD :
-${d.max_drawdown} %
 
-<br><br>
+    <br>
 
-${status}
 
-`;
+    Drawdown :
 
+    ${data.drawdown}%
+
+
+    <br>
+
+
+    Trade :
+
+    ${
+
+        data.can_trade
+
+        ?
+
+        "ACTIVE"
+
+        :
+
+        "BLOCK"
+
+    }
+
+
+    `;
 
 
 }
@@ -407,84 +401,64 @@ ${status}
 
 
 
-
-
-
 // =================================
-// POSITIONS
+// POSITION
 // =================================
-
 
 async function loadPositions(){
 
 
-let r =
-await fetch(
-"/api/positions"
-);
+    let res = await fetch(
+
+        "/api/positions"
+
+    );
 
 
-let data =
-await r.json();
-
-
-
-let html="";
+    let data = await res.json();
 
 
 
-data.forEach(p=>{
-
-
-let c =
-p.unrealized_pnl >=0
-?
-"green"
-:
-"red";
+    let html="";
 
 
 
-html +=
+    data.forEach(p=>{
 
 
-`
+        html += `
 
-<tr>
+        <tr>
 
-<td>${p.symbol}</td>
+        <td>${p.symbol}</td>
 
-<td>${p.side}</td>
+        <td>${p.side}</td>
 
-<td>${p.size}</td>
+        <td>${p.size}</td>
 
-<td>${p.entry_price}</td>
+        <td>${p.unrealized_pnl}</td>
 
-<td class="${c}">
-${p.unrealized_pnl}
-</td>
+        </tr>
 
-
-</tr>
+        `;
 
 
-`;
+    });
 
 
 
-});
+    document
 
+    .getElementById(
 
+        "positions"
 
-document.getElementById(
-"positions"
-).innerHTML =
-html;
+    )
+
+    .innerHTML = html;
 
 
 }
-
-
 
 
 
@@ -494,253 +468,98 @@ html;
 // TRADES
 // =================================
 
-
 async function loadTrades(){
 
 
-let r =
-await fetch(
-"/api/trades"
-);
+    let res = await fetch(
+
+        "/api/trades"
+
+    );
 
 
-let data =
-await r.json();
-
-
-
-let html="";
+    let data = await res.json();
 
 
 
-data.forEach(t=>{
-
-
-html +=
-
-
-`
-
-<tr>
-
-<td>${t.symbol}</td>
-
-<td>${t.side}</td>
-
-<td>${t.qty}</td>
-
-<td>${t.price}</td>
-
-</tr>
-
-
-`;
+    let html="";
 
 
 
-});
+    data.forEach(t=>{
+
+
+        html += `
+
+        <tr>
+
+        <td>${t.symbol}</td>
+
+        <td>${t.side}</td>
+
+        <td>${t.price}</td>
+
+        <td>${t.type}</td>
+
+
+        </tr>
+
+
+        `;
+
+
+    });
 
 
 
-document.getElementById(
-"trades"
-).innerHTML =
-html;
+    document
+
+    .getElementById(
+
+        "trades"
+
+    )
+
+    .innerHTML = html;
 
 
 }
-
-
-
 
 
 
 
 
 // =================================
-// CHART INIT
+// AUTO UPDATE
 // =================================
 
-
-function initChart(){
-
-
-equityChart =
-new Chart(
-
-document
-.getElementById(
-"equityChart"
-),
-
-{
-
-type:"line",
-
-data:{
-
-labels:[],
-
-datasets:[{
-
-label:"Equity",
-
-data:[]
-
-}]
-
-}
-
-}
-
-);
+async function refresh(){
 
 
+    await loadEquity();
 
 
-drawdownChart =
-new Chart(
+    await loadRisk();
 
-document
-.getElementById(
-"drawdownChart"
-),
 
-{
+    await loadPositions();
 
-type:"line",
 
-data:{
-
-labels:[],
-
-datasets:[{
-
-label:"Drawdown %",
-
-data:[]
-
-}]
-
-}
-
-}
-
-);
-
+    await loadTrades();
 
 
 }
 
-
-
-
-
-
-
-// =================================
-// CHART UPDATE
-// =================================
-
-
-async function updateCharts(){
-
-
-let r =
-await fetch(
-"/api/equity"
-);
-
-
-let data =
-await r.json();
-
-
-
-let labels =
-data.map(
-x=>x.time
-);
-
-
-
-equityChart.data.labels =
-labels;
-
-
-equityChart.data.datasets[0].data =
-
-data.map(
-x=>x.equity
-);
-
-
-
-equityChart.update();
-
-
-
-
-
-drawdownChart.data.labels =
-labels;
-
-
-drawdownChart.data.datasets[0].data =
-
-data.map(
-x=>x.drawdown
-);
-
-
-
-drawdownChart.update();
-
-
-
-}
-
-
-
-
-
-
-
-// =================================
-// LOOP
-// =================================
-
-
-function refresh(){
-
-
-loadSummary();
-
-loadRisk();
-
-loadPositions();
-
-loadTrades();
-
-updateCharts();
-
-
-}
-
-
-
-initChart();
 
 
 refresh();
 
 
-
 setInterval(
 
-refresh,
+    refresh,
 
-3000
+    5000
 
 );
 
@@ -749,7 +568,7 @@ refresh,
 </script>
 
 
-</body>
 
+</body>
 
 </html>
