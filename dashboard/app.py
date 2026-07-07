@@ -1,87 +1,43 @@
 from flask import Flask, jsonify, render_template
 
 
-from trade_db import trade_db
-
-
 from position.position_manager import position_manager
+
+
+from execution.execution_engine import execution_engine
 
 
 from risk.drawdown_guard import drawdown_guard
 
 
-
-app = Flask(__name__)
-
+from trade_db import trade_db
 
 
 
-# ======================================
-# HOME
-# ======================================
+import time
+
+
+
+app = Flask(
+    __name__,
+    template_folder="templates"
+)
+
+
+
+
+
+# =====================================
+# DASHBOARD PAGE
+# =====================================
 
 @app.route("/")
-def home():
+def dashboard():
+
 
     return render_template(
+
         "dashboard.html"
-    )
-
-
-
-
-
-# ======================================
-# TRADES API
-# ======================================
-
-@app.route("/api/trades")
-def trades():
-
-
-    rows = trade_db.all()
-
-
-
-    return jsonify([
-
-        {
-
-            "id": r[0],
-
-            "symbol": r[1],
-
-            "side": r[2],
-
-            "qty": r[3],
-
-            "price": r[4],
-
-            "pnl": r[5],
-
-            "time": r[6]
-
-        }
-
-        for r in rows
-
-    ])
-
-
-
-
-
-# ======================================
-# POSITION API
-# ======================================
-
-@app.route("/api/positions")
-def positions():
-
-
-    return jsonify(
-
-        position_manager.get_positions()
 
     )
 
@@ -89,11 +45,14 @@ def positions():
 
 
 
-# ======================================
-# SUMMARY API
-# ======================================
+# =====================================
+# SUMMARY
+# =====================================
 
-@app.route("/api/summary")
+@app.route(
+    "/api/summary"
+)
+
 def summary():
 
 
@@ -105,22 +64,26 @@ def summary():
     )
 
 
-    unrealized_pnl = sum(
 
-        float(
+    pnl = sum(
+
+        [
+
             p.get(
                 "unrealized_pnl",
                 0
             )
-        )
 
-        for p in positions
+            for p in positions
+
+        ]
 
     )
 
 
 
     return jsonify({
+
 
         "positions":
 
@@ -129,12 +92,8 @@ def summary():
 
         "unrealized_pnl":
 
-            unrealized_pnl,
+            pnl
 
-
-        "risk":
-
-            drawdown_guard.get_status()
 
     })
 
@@ -142,107 +101,210 @@ def summary():
 
 
 
-# ======================================
-# EQUITY CURVE API
-# ======================================
+# =====================================
+# POSITIONS
+# =====================================
 
-@app.route("/api/equity")
+@app.route(
+    "/api/positions"
+)
+
+def positions():
+
+
+    return jsonify(
+
+        position_manager
+        .get_positions()
+
+    )
+
+
+
+
+
+# =====================================
+# EQUITY CURVE
+# =====================================
+
+@app.route(
+    "/api/equity"
+)
+
 def equity():
 
 
-    try:
+    history = (
+
+        drawdown_guard
+        .get_history()
+
+    )
 
 
-        return jsonify(
+    return jsonify(
 
-            drawdown_guard.history
+        history
 
-        )
-
-
-    except Exception as e:
-
-
-        print(
-            "[EQUITY API ERROR]",
-            e
-        )
-
-
-        return jsonify([])
+    )
 
 
 
 
 
-# ======================================
-# RISK API
-# ======================================
+# =====================================
+# RISK
+# =====================================
 
-@app.route("/api/risk")
+@app.route(
+    "/api/risk"
+)
+
 def risk():
 
 
-    try:
+    data = (
+
+        drawdown_guard
+        .status()
+
+    )
 
 
-        return jsonify(
+    return jsonify(
 
-            drawdown_guard.get_status()
+        data
+
+    )
+
+
+
+
+
+# =====================================
+# TRADES
+# =====================================
+
+@app.route(
+    "/api/trades"
+)
+
+def trades():
+
+
+    data = (
+
+        trade_db
+        .get_recent()
+
+    )
+
+
+    return jsonify(
+
+        data
+
+    )
+
+
+
+
+
+# =====================================
+# BOT STATUS
+# =====================================
+
+@app.route(
+    "/api/status"
+)
+
+def status():
+
+
+    return jsonify({
+
+
+        "status":
+
+            "RUNNING",
+
+
+        "time":
+
+            time.time()
+
+
+    })
+
+
+
+
+
+# =====================================
+# MANUAL CLOSE
+# =====================================
+
+@app.route(
+    "/api/close/<symbol>"
+)
+
+def close(symbol):
+
+
+    position = (
+
+        position_manager
+        .get_position(
+
+            symbol
 
         )
 
+    )
 
-    except Exception as e:
+
+    if not position:
 
 
         return jsonify({
 
-            "error":str(e)
+            "error":
+
+                "NO POSITION"
 
         })
 
 
 
+    result = execution_engine.close_position(
 
+        symbol,
 
-# ======================================
-# HEALTH CHECK
-# ======================================
+        position["side"],
 
-@app.route("/api/health")
-def health():
+        position["size"]
 
-
-    return jsonify({
-
-        "status":
-        "RUNNING"
-
-    })
+    )
 
 
 
+    return jsonify(
+
+        result
+
+    )
 
 
-# ======================================
-# RUN
-# ======================================
+
+
 
 if __name__ == "__main__":
-
-
-    print(
-        "🚀 Dashboard running"
-    )
 
 
     app.run(
 
         host="0.0.0.0",
 
-        port=5000,
-
-        debug=False
+        port=5000
 
     )
