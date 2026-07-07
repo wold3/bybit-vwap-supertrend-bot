@@ -1,28 +1,36 @@
 import threading
 
 
+
 class PositionManager:
 
 
     def __init__(self):
 
+
         self.positions = {}
+
 
         self.lock = threading.Lock()
 
 
 
-    # ==================================
-    # UPDATE FROM BYBIT WS
-    # ==================================
 
-    def update_position(self, data):
+
+    # =====================================
+    # BYBIT POSITION UPDATE
+    # =====================================
+
+    def update_position(
+        self,
+        positions
+    ):
 
 
         with self.lock:
 
 
-            for p in data:
+            for p in positions:
 
 
                 symbol = p.get(
@@ -31,7 +39,39 @@ class PositionManager:
 
 
                 if not symbol:
+
                     continue
+
+
+
+                size = float(
+
+                    p.get(
+                        "size",
+                        0
+                    )
+
+                )
+
+
+
+                # 포지션 종료
+
+                if size == 0:
+
+
+                    self.positions.pop(
+
+                        symbol,
+
+                        None
+
+                    )
+
+
+                    continue
+
+
 
 
 
@@ -39,76 +79,213 @@ class PositionManager:
 
 
                     "symbol":
-                    symbol,
+
+                        symbol,
 
 
                     "side":
-                    p.get("side"),
+
+                        p.get(
+
+                            "side"
+
+                        ),
 
 
                     "size":
-                    float(
-                        p.get(
-                            "size",
-                            0
-                        )
-                    ),
+
+                        size,
 
 
                     "entry_price":
-                    float(
-                        p.get(
-                            "avgPrice",
-                            0
-                        )
-                    ),
+
+                        float(
+
+                            p.get(
+
+                                "avgPrice",
+
+                                0
+
+                            )
+
+                        ),
 
 
                     "mark_price":
-                    float(
-                        p.get(
-                            "markPrice",
-                            0
-                        )
-                    ),
+
+                        float(
+
+                            p.get(
+
+                                "markPrice",
+
+                                0
+
+                            )
+
+                        ),
 
 
                     "unrealized_pnl":
-                    float(
-                        p.get(
-                            "unrealisedPnl",
-                            0
+
+                        float(
+
+                            p.get(
+
+                                "unrealisedPnl",
+
+                                0
+
+                            )
+
                         )
-                    )
+
 
                 }
 
 
 
 
-    # ==================================
-    # GET ALL
-    # ==================================
 
-    def get_positions(self):
+    # =====================================
+    # SINGLE POSITION
+    # =====================================
+
+    def get_position(
+        self,
+        symbol
+    ):
+
 
         with self.lock:
 
-            return list(
-                self.positions.values()
+
+            return (
+
+                self.positions
+                .get(symbol)
+
             )
 
 
 
-    # ==================================
-    # GET ONE
-    # ==================================
 
-    def get_position(self, symbol):
 
-        return self.positions.get(
+    # =====================================
+    # ALL POSITION
+    # =====================================
+
+    def get_positions(
+        self
+    ):
+
+
+        with self.lock:
+
+
+            return list(
+
+                self.positions.values()
+
+            )
+
+
+
+
+
+    # =====================================
+    # CHECK HOLDING
+    # =====================================
+
+    def has_position(
+        self,
+        symbol
+    ):
+
+
+        with self.lock:
+
+
+            return (
+
+                symbol
+
+                in
+
+                self.positions
+
+            )
+
+
+
+
+
+    # =====================================
+    # POSITION SIDE
+    # =====================================
+
+    def get_side(
+        self,
+        symbol
+    ):
+
+
+        position = self.get_position(
+
             symbol
+
         )
+
+
+        if position:
+
+
+            return position.get(
+
+                "side"
+
+            )
+
+
+        return None
+
+
+
+
+
+    # =====================================
+    # SIZE
+    # =====================================
+
+    def get_size(
+        self,
+        symbol
+    ):
+
+
+        position = self.get_position(
+
+            symbol
+
+        )
+
+
+        if position:
+
+
+            return position.get(
+
+                "size",
+
+                0
+
+            )
+
+
+        return 0
+
+
 
 
 
