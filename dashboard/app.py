@@ -7,9 +7,11 @@ from trade_db import trade_db
 from position.position_manager import position_manager
 
 
+from risk.drawdown_guard import drawdown_guard
+
+
 
 app = Flask(__name__)
-
 
 
 
@@ -30,7 +32,7 @@ def home():
 
 
 # ======================================
-# TRADES
+# TRADES API
 # ======================================
 
 @app.route("/api/trades")
@@ -43,28 +45,25 @@ def trades():
 
     return jsonify([
 
-
         {
 
-            "id":r[0],
+            "id": r[0],
 
-            "symbol":r[1],
+            "symbol": r[1],
 
-            "side":r[2],
+            "side": r[2],
 
-            "qty":r[3],
+            "qty": r[3],
 
-            "price":r[4],
+            "price": r[4],
 
-            "pnl":r[5],
+            "pnl": r[5],
 
-            "time":r[6]
+            "time": r[6]
 
         }
 
-
         for r in rows
-
 
     ])
 
@@ -72,9 +71,8 @@ def trades():
 
 
 
-
 # ======================================
-# POSITIONS
+# POSITION API
 # ======================================
 
 @app.route("/api/positions")
@@ -92,7 +90,7 @@ def positions():
 
 
 # ======================================
-# SUMMARY
+# SUMMARY API
 # ======================================
 
 @app.route("/api/summary")
@@ -107,16 +105,19 @@ def summary():
     )
 
 
-    total_pnl = sum(
+    unrealized_pnl = sum(
 
-        p.get(
-            "unrealized_pnl",
-            0
+        float(
+            p.get(
+                "unrealized_pnl",
+                0
+            )
         )
 
         for p in positions
 
     )
+
 
 
     return jsonify({
@@ -128,8 +129,95 @@ def summary():
 
         "unrealized_pnl":
 
-            total_pnl
+            unrealized_pnl,
 
+
+        "risk":
+
+            drawdown_guard.get_status()
+
+    })
+
+
+
+
+
+# ======================================
+# EQUITY CURVE API
+# ======================================
+
+@app.route("/api/equity")
+def equity():
+
+
+    try:
+
+
+        return jsonify(
+
+            drawdown_guard.history
+
+        )
+
+
+    except Exception as e:
+
+
+        print(
+            "[EQUITY API ERROR]",
+            e
+        )
+
+
+        return jsonify([])
+
+
+
+
+
+# ======================================
+# RISK API
+# ======================================
+
+@app.route("/api/risk")
+def risk():
+
+
+    try:
+
+
+        return jsonify(
+
+            drawdown_guard.get_status()
+
+        )
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+            "error":str(e)
+
+        })
+
+
+
+
+
+# ======================================
+# HEALTH CHECK
+# ======================================
+
+@app.route("/api/health")
+def health():
+
+
+    return jsonify({
+
+        "status":
+        "RUNNING"
 
     })
 
