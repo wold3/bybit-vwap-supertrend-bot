@@ -10,52 +10,33 @@ class TradeDB:
 
     def __init__(self):
 
-
         self.db_file = os.getenv(
-
             "TRADE_DB",
-
             "trades.db"
-
         )
 
-
         self.lock = threading.Lock()
-
-
 
         self.init_db()
 
 
 
-
-
     # =====================================
-    # CREATE TABLE
+    # DATABASE INIT
     # =====================================
 
-    def init_db(
-        self
-    ):
-
+    def init_db(self):
 
         with sqlite3.connect(
             self.db_file
         ) as conn:
 
-
             cursor = conn.cursor()
 
-
-
             cursor.execute(
-
                 """
-
                 CREATE TABLE IF NOT EXISTS trades
-
                 (
-
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
                     symbol TEXT,
@@ -71,18 +52,11 @@ class TradeDB:
                     trade_type TEXT,
 
                     timestamp REAL
-
                 )
-
                 """
-
             )
 
-
-
             conn.commit()
-
-
 
 
 
@@ -100,74 +74,43 @@ class TradeDB:
         trade_type="ENTRY"
     ):
 
-
         with self.lock:
 
-
             with sqlite3.connect(
-
                 self.db_file
-
             ) as conn:
-
 
                 cursor = conn.cursor()
 
 
-
                 cursor.execute(
-
                     """
-
                     INSERT INTO trades
-
                     (
-
-                    symbol,
-
-                    side,
-
-                    qty,
-
-                    price,
-
-                    pnl,
-
-                    trade_type,
-
-                    timestamp
-
+                        symbol,
+                        side,
+                        qty,
+                        price,
+                        pnl,
+                        trade_type,
+                        timestamp
                     )
 
                     VALUES(?,?,?,?,?,?,?)
-
                     """,
-
                     (
-
                         symbol,
-
                         side,
-
                         qty,
-
                         price,
-
                         pnl,
-
                         trade_type,
-
                         time.time()
-
                     )
-
                 )
 
 
-
                 conn.commit()
-
-
 
 
 
@@ -180,120 +123,71 @@ class TradeDB:
         limit=100
     ):
 
-
         with sqlite3.connect(
-
             self.db_file
-
         ) as conn:
 
 
             cursor = conn.cursor()
 
 
-
             cursor.execute(
-
                 """
-
                 SELECT
 
-                id,
-
-                symbol,
-
-                side,
-
-                qty,
-
-                price,
-
-                pnl,
-
-                trade_type,
-
-                timestamp
-
+                    id,
+                    symbol,
+                    side,
+                    qty,
+                    price,
+                    pnl,
+                    trade_type,
+                    timestamp
 
                 FROM trades
 
                 ORDER BY id DESC
 
                 LIMIT ?
-
                 """,
-
                 (
-
                     limit,
-
                 )
-
             )
-
 
 
             rows = cursor.fetchall()
 
 
-
             result = []
 
 
+            for row in rows:
 
-            for r in rows:
+                result.append(
 
+                    {
+                        "id": row[0],
 
-                result.append({
+                        "symbol": row[1],
 
+                        "side": row[2],
 
-                    "id":
+                        "qty": row[3],
 
-                        r[0],
+                        "price": row[4],
 
+                        "pnl": row[5],
 
-                    "symbol":
+                        "type": row[6],
 
-                        r[1],
+                        "time": row[7]
+                    }
 
-
-                    "side":
-
-                        r[2],
-
-
-                    "qty":
-
-                        r[3],
-
-
-                    "price":
-
-                        r[4],
-
-
-                    "pnl":
-
-                        r[5],
-
-
-                    "type":
-
-                        r[6],
-
-
-                    "time":
-
-                        r[7]
-
-
-                })
-
+                )
 
 
             return result
-
-
 
 
 
@@ -308,20 +202,15 @@ class TradeDB:
 
 
         with sqlite3.connect(
-
             self.db_file
-
         ) as conn:
 
 
             cursor = conn.cursor()
 
 
-
             cursor.execute(
-
                 """
-
                 SELECT *
 
                 FROM trades
@@ -331,15 +220,10 @@ class TradeDB:
                 ORDER BY id DESC
 
                 LIMIT 1
-
                 """,
-
                 (
-
                     symbol,
-
                 )
-
             )
 
 
@@ -347,6 +231,30 @@ class TradeDB:
 
 
 
+    # =====================================
+    # DELETE ALL (TEST)
+    # =====================================
 
+    def clear(self):
+
+        with self.lock:
+
+            with sqlite3.connect(
+                self.db_file
+            ) as conn:
+
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    "DELETE FROM trades"
+                )
+
+                conn.commit()
+
+
+
+# =====================================
+# SINGLETON
+# =====================================
 
 trade_db = TradeDB()
