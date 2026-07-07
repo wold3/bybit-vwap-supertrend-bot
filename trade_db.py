@@ -7,18 +7,13 @@ DB_PATH = "trades.db"
 
 class TradeDB:
 
-    def __init__(self, db_path=DB_PATH):
-        self.db_path = db_path
+    def __init__(self):
         self.init_db()
-
-
-    def get_connection(self):
-        return sqlite3.connect(self.db_path)
 
 
     def init_db(self):
 
-        conn = self.get_connection()
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         c.execute("""
@@ -47,7 +42,7 @@ class TradeDB:
         pnl=0
     ):
 
-        conn = self.get_connection()
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         c.execute("""
@@ -76,9 +71,14 @@ class TradeDB:
 
 
 
-    def get_recent_trades(self, limit=50):
+    def get_recent_trades(
+        self,
+        limit=50
+    ):
 
-        conn = self.get_connection()
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+
         c = conn.cursor()
 
         c.execute("""
@@ -93,13 +93,26 @@ class TradeDB:
 
         conn.close()
 
-        return rows
+        return [
+            dict(row)
+            for row in rows
+        ]
+
+
+
+    # dashboard/app.py 호환용
+    def get_recent(
+        self,
+        limit=50
+    ):
+
+        return self.get_recent_trades(limit)
 
 
 
     def get_summary(self):
 
-        conn = self.get_connection()
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         c.execute("""
@@ -109,33 +122,22 @@ class TradeDB:
         FROM trades
         """)
 
-        result = c.fetchone()
+        row = c.fetchone()
 
         conn.close()
 
         return {
-            "count": result[0],
-            "pnl": result[1]
+            "total_trades": row[0],
+            "total_pnl": row[1]
         }
 
 
 
-# dashboard/app.py 에서 사용하는 객체
+    def get_all(self):
+
+        return self.get_recent_trades(1000)
+
+
+
+# dashboard에서 사용하는 객체
 trade_db = TradeDB()
-
-
-
-# 기존 함수 호출 호환용
-
-def init_db():
-    return trade_db.init_db()
-
-
-def insert_trade(symbol, side, qty, price, pnl=0):
-    return trade_db.insert_trade(
-        symbol,
-        side,
-        qty,
-        price,
-        pnl
-    )
