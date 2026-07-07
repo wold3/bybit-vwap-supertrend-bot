@@ -1,4 +1,6 @@
 import os
+import threading
+
 from dotenv import load_dotenv
 
 
@@ -11,35 +13,37 @@ class TrailingStopManager:
 
     def __init__(self):
 
-        self.enabled = (
+
+        self.trailing_percent = float(
 
             os.getenv(
-                "TRAILING_STOP_ENABLE",
-                "true"
-            ).lower()
-            == "true"
 
-        )
-
-
-        self.callback_percent = float(
-
-            os.getenv(
                 "TRAILING_STOP_PERCENT",
-                "0.5"
+
+                "1.5"
+
             )
 
         )
 
 
+        # symbol별 최고/최저 가격
+
         self.highest_price = {}
+
 
         self.lowest_price = {}
 
 
 
+        self.lock = threading.Lock()
+
+
+
+
+
     # =====================================
-    # UPDATE PRICE
+    # UPDATE POSITION PRICE
     # =====================================
 
     def update(
@@ -50,105 +54,233 @@ class TrailingStopManager:
     ):
 
 
-        if not self.enabled:
-
-            return None
+        with self.lock:
 
 
-
-        price = float(price)
+            price = float(price)
 
 
 
-        # LONG
-
-        if side.lower() == "buy":
+            if side == "Buy":
 
 
-            current_high = self.highest_price.get(
+                old = self.highest_price.get(
 
-                symbol,
+                    symbol,
 
-                0
-
-            )
-
-
-
-            if price > current_high:
-
-
-                self.highest_price[symbol] = price
-
-
-
-            stop_price = (
-
-                self.highest_price[symbol]
-
-                *
-
-                (
-                    1 -
-
-                    self.callback_percent / 100
+                    price
 
                 )
 
-            )
+
+
+                if price > old:
+
+
+                    self.highest_price[symbol] = price
 
 
 
-        # SHORT
-
-        else:
+            elif side == "Sell":
 
 
-            current_low = self.lowest_price.get(
+                old = self.lowest_price.get(
 
-                symbol,
+                    symbol,
 
-                float("inf")
-
-            )
-
-
-
-            if price < current_low:
-
-
-                self.lowest_price[symbol] = price
-
-
-
-            stop_price = (
-
-                self.lowest_price[symbol]
-
-                *
-
-                (
-                    1 +
-
-                    self.callback_percent / 100
+                    price
 
                 )
 
-            )
 
 
+                if price < old:
 
-        return round(
-            stop_price,
-            2
-        )
+
+                    self.lowest_price[symbol] = price
 
 
 
 
 
     # =====================================
-    # RESET POSITION
+    # CALCULATE NEW SL
+    # =====================================
+
+    def calculate_stop(
+        self,
+        symbol,
+        side
+    ):
+
+
+        with self.lock:
+
+
+
+            percent = (
+
+                self.trailing_percent
+
+                /
+
+                100
+
+            )
+
+
+
+            # LONG
+
+            if side == "Buy":
+
+
+                highest = self.highest_price.get(
+
+                    symbol
+
+                )
+
+
+
+                if not highest:
+
+
+                    return None
+
+
+
+                stop = highest * (
+
+                    1 - percent
+
+                )
+
+
+
+                return round(
+
+                    stop,
+
+                    2
+
+                )
+
+
+
+
+
+            # SHORT
+
+            elif side == "Sell":
+
+
+                lowest = self.lowest_price.get(
+
+                    symbol
+
+                )
+
+
+
+                if not lowest:
+
+
+                    return None
+
+
+
+                stop = lowest * (
+
+                    1 + percent
+
+                )
+
+
+
+                return round(
+
+                    stop,
+
+                    2
+
+                )
+
+
+
+        return None
+
+
+
+
+
+    # =====================================
+    # SHOULD MOVE SL
+    # =====================================
+
+    def should_update(
+        self,
+        symbol,
+        side,
+        current_sl
+    ):
+
+
+        new_sl = self.calculate_stop(
+
+            symbol,
+
+            side
+
+        )
+
+
+
+        if not new_sl:
+
+
+            return False
+
+
+
+
+
+        current_sl = float(
+
+            current_sl
+
+        )
+
+
+
+        # LONG SL 상승만 허용
+
+        if side == "Buy":
+
+
+            return new_sl > current_sl
+
+
+
+
+
+        # SHORT SL 하락만 허용
+
+        if side == "Sell":
+
+
+            return new_sl < current_sl
+
+
+
+        return False
+
+
+
+
+
+    # =====================================
+    # RESET
     # =====================================
 
     def reset(
@@ -157,16 +289,66 @@ class TrailingStopManager:
     ):
 
 
-        self.highest_price.pop(
-            symbol,
-            None
-        )
+        with self.lock:
 
 
-        self.lowest_price.pop(
-            symbol,
-            None
-        )
+            self.highest_price.pop(
+
+                symbol,
+
+                None
+
+            )
+
+
+            self.lowest_price.pop(
+
+                symbol,
+
+                None
+
+            )
+
+
+
+            print(
+
+                "TRAILING RESET",
+
+                symbol
+
+            )
+
+
+
+
+
+    # =====================================
+    # STATUS
+    # =====================================
+
+    def status(
+        self
+    ):
+
+
+        with self.lock:
+
+
+            return {
+
+
+                "highest":
+
+                    self.highest_price,
+
+
+                "lowest":
+
+                    self.lowest_price
+
+
+            }
 
 
 
