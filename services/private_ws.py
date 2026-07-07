@@ -1,13 +1,12 @@
 import os
-import time
 import json
+import time
 import hmac
 import hashlib
 import websocket
 
 
 class BybitPrivateWS:
-
 
     def __init__(self):
 
@@ -24,9 +23,9 @@ class BybitPrivateWS:
         )
 
 
-    # =====================================
+    # ======================================
     # AUTH
-    # =====================================
+    # ======================================
 
     def auth(self, ws):
 
@@ -35,37 +34,39 @@ class BybitPrivateWS:
         )
 
 
+        sign_payload = (
+            f"GET/realtime{expires}"
+        )
+
+
         signature = hmac.new(
             self.api_secret.encode(),
-            f"GET/realtime{expires}".encode(),
+            sign_payload.encode(),
             hashlib.sha256
         ).hexdigest()
 
 
-        msg = {
+        ws.send(json.dumps({
+
             "op": "auth",
+
             "args": [
                 self.api_key,
                 expires,
                 signature
             ]
-        }
+
+        }))
 
 
-        ws.send(
-            json.dumps(msg)
-        )
-
-
-
-    # =====================================
+    # ======================================
     # OPEN
-    # =====================================
+    # ======================================
 
     def on_open(self, ws):
 
         print(
-            "🔐 BYBIT PRIVATE WS CONNECTED"
+            "🔐 PRIVATE WS CONNECTED"
         )
 
 
@@ -74,35 +75,44 @@ class BybitPrivateWS:
 
         # 체결
         ws.send(json.dumps({
+
             "op":"subscribe",
+
             "args":[
                 "execution"
             ]
+
         }))
 
 
         # 포지션
         ws.send(json.dumps({
+
             "op":"subscribe",
+
             "args":[
                 "position"
             ]
+
         }))
 
 
-        # 잔고
+        # Wallet
         ws.send(json.dumps({
+
             "op":"subscribe",
+
             "args":[
                 "wallet"
             ]
+
         }))
 
 
 
-    # =====================================
+    # ======================================
     # MESSAGE
-    # =====================================
+    # ======================================
 
     def on_message(self, ws, message):
 
@@ -114,67 +124,90 @@ class BybitPrivateWS:
         )
 
 
-        # -----------------------------
-        # 체결
-        # -----------------------------
-
         if topic == "execution":
 
-            print(
-                "✅ FILL:",
-                data
-            )
+            self.handle_fill(data)
 
 
-            self.handle_fill(
-                data
-            )
-
-
-
-        # -----------------------------
-        # 포지션
-        # -----------------------------
 
         elif topic == "position":
 
             print(
-                "📌 POSITION:",
+                "POSITION UPDATE",
                 data
             )
 
 
-        # -----------------------------
-        # 지갑
-        # -----------------------------
 
         elif topic == "wallet":
 
             print(
-                "💰 WALLET:",
+                "WALLET UPDATE",
                 data
             )
 
 
 
+    # ======================================
+    # FILL PROCESS
+    # ======================================
+
     def handle_fill(self, data):
 
-        # execution_engine 연결 자리
-
-        pass
+        from execution.execution_engine import execution_engine
 
 
+        fills = data.get(
+            "data",
+            []
+        )
 
-    # =====================================
+
+        for fill in fills:
+
+
+            execution_engine.on_fill(
+
+                symbol=fill.get(
+                    "symbol"
+                ),
+
+                side=fill.get(
+                    "side"
+                ),
+
+                qty=float(
+                    fill.get(
+                        "execQty",
+                        0
+                    )
+                ),
+
+                price=float(
+                    fill.get(
+                        "execPrice",
+                        0
+                    )
+                )
+
+            )
+
+
+
+    # ======================================
     # START
-    # =====================================
+    # ======================================
 
     def start(self):
 
         ws = websocket.WebSocketApp(
+
             self.url,
+
             on_open=self.on_open,
+
             on_message=self.on_message
+
         )
 
 
