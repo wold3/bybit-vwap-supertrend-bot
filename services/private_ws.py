@@ -4,6 +4,11 @@ import time
 import hmac
 import hashlib
 import websocket
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 
 class BybitPrivateWS:
@@ -19,28 +24,55 @@ class BybitPrivateWS:
             "BYBIT_API_SECRET"
         )
 
-        self.url = (
+
+        self.url = os.getenv(
+
+            "PRIVATE_WS_URL",
+
             "wss://stream.bybit.com/v5/private"
+
         )
 
 
 
-    # ======================================
+    # =====================================
     # AUTH
-    # ======================================
+    # =====================================
 
-    def auth(self, ws):
+    def auth(
+        self,
+        ws
+    ):
+
 
         expires = int(
-            (time.time() + 10) * 1000
+
+            (time.time() + 10)
+
+            *
+
+            1000
+
         )
 
 
-        sign = hmac.new(
+        payload = (
+
+            "GET/realtime"
+
+            +
+
+            str(expires)
+
+        )
+
+
+
+        signature = hmac.new(
 
             self.api_secret.encode(),
 
-            f"GET/realtime{expires}".encode(),
+            payload.encode(),
 
             hashlib.sha256
 
@@ -50,60 +82,85 @@ class BybitPrivateWS:
 
         ws.send(json.dumps({
 
-            "op": "auth",
+            "op":
 
-            "args": [
+                "auth",
 
-                self.api_key,
 
-                expires,
+            "args":
 
-                sign
+                [
 
-            ]
+                    self.api_key,
+
+                    expires,
+
+                    signature
+
+                ]
 
         }))
 
 
 
-    # ======================================
+    # =====================================
     # OPEN
-    # ======================================
+    # =====================================
 
-    def on_open(self, ws):
+    def on_open(
+        self,
+        ws
+    ):
+
 
         print(
-            "🔐 BYBIT PRIVATE WS CONNECTED"
+            "🔐 PRIVATE WS CONNECTED"
         )
+
 
 
         self.auth(ws)
 
 
 
+        time.sleep(1)
+
+
+
         ws.send(json.dumps({
 
-            "op":"subscribe",
+            "op":
 
-            "args":[
+                "subscribe",
 
-                "execution",
 
-                "position",
+            "args":
 
-                "wallet"
+                [
 
-            ]
+                    "execution",
+
+                    "position",
+
+                    "wallet"
+
+                ]
 
         }))
 
 
 
+        print(
+            "PRIVATE CHANNEL SUBSCRIBED"
+        )
 
 
-    # ======================================
+
+
+
+    # =====================================
     # MESSAGE
-    # ======================================
+    # =====================================
 
     def on_message(
         self,
@@ -114,9 +171,11 @@ class BybitPrivateWS:
 
         try:
 
+
             data = json.loads(
                 message
             )
+
 
 
             topic = data.get(
@@ -125,39 +184,47 @@ class BybitPrivateWS:
 
 
 
-            # ==============================
-            # REAL FILL
-            # ==============================
+            # ==========================
+            # 체결
+            # ==========================
 
             if topic == "execution":
 
-                self.handle_fill(
+
+                self.handle_execution(
+
                     data
+
                 )
 
 
 
-            # ==============================
-            # POSITION UPDATE
-            # ==============================
+            # ==========================
+            # 포지션
+            # ==========================
 
             elif topic == "position":
 
 
                 self.handle_position(
+
                     data
+
                 )
 
 
 
-            # ==============================
-            # WALLET UPDATE
-            # ==============================
+            # ==========================
+            # 지갑
+            # ==========================
 
             elif topic == "wallet":
 
+
                 self.handle_wallet(
+
                     data
+
                 )
 
 
@@ -166,18 +233,22 @@ class BybitPrivateWS:
 
 
             print(
-                "[PRIVATE WS MESSAGE ERROR]",
+
+                "PRIVATE WS ERROR",
+
                 e
+
             )
 
 
 
 
-    # ======================================
-    # FILL HANDLER
-    # ======================================
 
-    def handle_fill(
+    # =====================================
+    # EXECUTION FILL
+    # =====================================
+
+    def handle_execution(
         self,
         data
     ):
@@ -199,15 +270,23 @@ class BybitPrivateWS:
 
             execution_engine.on_fill(
 
-                symbol=fill.get(
+                symbol=
+
+                fill.get(
                     "symbol"
                 ),
 
-                side=fill.get(
+
+                side=
+
+                fill.get(
                     "side"
                 ),
 
-                qty=float(
+
+                qty=
+
+                float(
 
                     fill.get(
                         "execQty",
@@ -216,7 +295,10 @@ class BybitPrivateWS:
 
                 ),
 
-                price=float(
+
+                price=
+
+                float(
 
                     fill.get(
                         "execPrice",
@@ -231,9 +313,9 @@ class BybitPrivateWS:
 
 
 
-    # ======================================
-    # POSITION HANDLER
-    # ======================================
+    # =====================================
+    # POSITION UPDATE
+    # =====================================
 
     def handle_position(
         self,
@@ -243,16 +325,76 @@ class BybitPrivateWS:
 
         from position.position_manager import position_manager
 
+        from execution.execution_engine import execution_engine
 
+
+
+        positions = data.get(
+            "data",
+            []
+        )
+
+
+
+        # Position 저장
 
         position_manager.update_position(
 
-            data.get(
-                "data",
-                []
-            )
+            positions
 
         )
+
+
+
+        # Trailing Stop
+
+        for p in positions:
+
+
+            symbol = p.get(
+                "symbol"
+            )
+
+
+            side = p.get(
+                "side"
+            )
+
+
+            mark_price = p.get(
+                "markPrice"
+            )
+
+
+
+            if not all(
+
+                [
+
+                    symbol,
+
+                    side,
+
+                    mark_price
+
+                ]
+
+            ):
+
+                continue
+
+
+
+            execution_engine.update_trailing_stop(
+
+                symbol,
+
+                side,
+
+                float(mark_price)
+
+            )
+
 
 
         print(
@@ -263,9 +405,9 @@ class BybitPrivateWS:
 
 
 
-    # ======================================
-    # WALLET HANDLER
-    # ======================================
+    # =====================================
+    # WALLET
+    # =====================================
 
     def handle_wallet(
         self,
@@ -273,35 +415,120 @@ class BybitPrivateWS:
     ):
 
 
+        wallet = data.get(
+            "data"
+        )
+
+
         print(
+
             "💰 WALLET UPDATE",
-            data
+
+            wallet
+
         )
 
 
 
 
 
-    # ======================================
+    # =====================================
+    # ERROR
+    # =====================================
+
+    def on_error(
+        self,
+        ws,
+        error
+    ):
+
+
+        print(
+
+            "PRIVATE WS ERROR",
+
+            error
+
+        )
+
+
+
+
+
+    # =====================================
+    # CLOSE
+    # =====================================
+
+    def on_close(
+        self,
+        ws,
+        code,
+        msg
+    ):
+
+
+        print(
+
+            "PRIVATE WS CLOSED",
+
+            code,
+
+            msg
+
+        )
+
+
+
+
+
+    # =====================================
     # START
-    # ======================================
+    # =====================================
 
     def start(self):
 
 
-        ws = websocket.WebSocketApp(
-
-            self.url,
-
-            on_open=self.on_open,
-
-            on_message=self.on_message
-
-        )
+        while True:
 
 
+            try:
 
-        ws.run_forever()
+
+                ws = websocket.WebSocketApp(
+
+                    self.url,
+
+                    on_open=self.on_open,
+
+                    on_message=self.on_message,
+
+                    on_error=self.on_error,
+
+                    on_close=self.on_close
+
+                )
+
+
+                ws.run_forever()
+
+
+
+            except Exception as e:
+
+
+                print(
+
+                    "PRIVATE WS RECONNECT",
+
+                    e
+
+                )
+
+
+
+            time.sleep(5)
+
+
 
 
 
