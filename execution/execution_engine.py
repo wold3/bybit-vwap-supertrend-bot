@@ -1,148 +1,399 @@
-# =====================================
-# CLOSE POSITION
-# =====================================
-
-def close_position(
-    self,
-    symbol,
-    side,
-    qty
-):
+import os
+import time
+import hmac
+import hashlib
+import requests
 
 
-    """
-    현재 포지션 강제 종료
-
-    Buy 포지션 → Sell reduceOnly
-    Sell 포지션 → Buy reduceOnly
-    """
+from dotenv import load_dotenv
 
 
-
-    if side.lower() == "buy":
-
-
-        close_side = "Sell"
+from trade_db import trade_db
 
 
-    else:
+from risk.trailing_stop_manager import (
+    trailing_stop_manager
+)
 
 
-        close_side = "Buy"
+load_dotenv()
 
 
 
-
-    endpoint = (
-
-        "/v5/order/create"
-
-    )
+class ExecutionEngine:
 
 
-    url = (
-
-        self.base_url
-
-        +
-
-        endpoint
-
-    )
+    def __init__(self):
 
 
+        self.api_key = os.getenv(
 
-    timestamp = str(
-
-        int(
-
-            time.time()
-
-            *
-
-            1000
+            "BYBIT_API_KEY"
 
         )
 
-    )
+
+        self.api_secret = os.getenv(
+
+            "BYBIT_API_SECRET"
+
+        )
 
 
+        self.base_url = os.getenv(
 
-    body = {
+            "BYBIT_BASE_URL",
 
+            "https://api.bybit.com"
 
-        "category":
-
-            "linear",
-
-
-        "symbol":
-
-            symbol,
+        )
 
 
-        "side":
+        self.retry = int(
 
-            close_side,
+            os.getenv(
 
+                "ORDER_RETRY",
 
-        "orderType":
+                "3"
 
-            "Market",
+            )
 
-
-        "qty":
-
-            str(qty),
-
-
-        "reduceOnly":
-
-            True
-
-    }
+        )
 
 
 
 
 
-    headers = {
+    # =====================================
+    # SIGN
+    # =====================================
+
+    def sign(
+        self,
+        timestamp,
+        body
+    ):
 
 
-        "X-BAPI-API-KEY":
-
-            self.api_key,
+        recv = "5000"
 
 
-        "X-BAPI-SIGN":
+        payload = (
 
-            self._sign(
+            timestamp
+
+            +
+
+            self.api_key
+
+            +
+
+            recv
+
+            +
+
+            body
+
+        )
+
+
+        return hmac.new(
+
+            self.api_secret.encode(),
+
+            payload.encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+
+
+
+    # =====================================
+    # MARKET ORDER
+    # =====================================
+
+    def execute(
+        self,
+        symbol,
+        side,
+        qty
+    ):
+
+
+        endpoint = "/v5/order/create"
+
+
+        url = self.base_url + endpoint
+
+
+
+        body = {
+
+
+            "category":
+
+                "linear",
+
+
+            "symbol":
+
+                symbol,
+
+
+            "side":
+
+                side,
+
+
+            "orderType":
+
+                "Market",
+
+
+            "qty":
+
+                str(qty)
+
+        }
+
+
+
+        for i in range(
+
+            self.retry
+
+        ):
+
+
+            try:
+
+
+                result = self.request(
+
+                    url,
+
+                    body
+
+                )
+
+
+
+                if result.get(
+
+                    "retCode"
+
+                ) == 0:
+
+
+                    print(
+
+                        "ORDER SUCCESS",
+
+                        result
+
+                    )
+
+
+                    return result
+
+
+
+
+
+            except Exception as e:
+
+
+                print(
+
+                    "ORDER RETRY",
+
+                    i,
+
+                    e
+
+                )
+
+
+
+            time.sleep(2)
+
+
+
+        return None
+
+
+
+
+
+    # =====================================
+    # CLOSE POSITION
+    # =====================================
+
+    def close_position(
+        self,
+        symbol,
+        side,
+        qty
+    ):
+
+
+        close_side = (
+
+            "Sell"
+
+            if side == "Buy"
+
+            else
+
+            "Buy"
+
+        )
+
+
+
+        body = {
+
+
+            "category":
+
+                "linear",
+
+
+            "symbol":
+
+                symbol,
+
+
+            "side":
+
+                close_side,
+
+
+            "orderType":
+
+                "Market",
+
+
+            "qty":
+
+                str(qty),
+
+
+            "reduceOnly":
+
+                True
+
+        }
+
+
+
+        result = self.request(
+
+            self.base_url
+
+            +
+
+            "/v5/order/create",
+
+            body
+
+        )
+
+
+
+        if result and result.get(
+
+            "retCode"
+
+        ) == 0:
+
+
+            trailing_stop_manager.reset(
+
+                symbol
+
+            )
+
+
+
+        return result
+
+
+
+
+
+    # =====================================
+    # REQUEST
+    # =====================================
+
+    def request(
+        self,
+        url,
+        body
+    ):
+
+
+        timestamp = str(
+
+            int(
+
+                time.time()
+
+                *
+
+                1000
+
+            )
+
+        )
+
+
+        headers = {
+
+
+            "X-BAPI-API-KEY":
+
+                self.api_key,
+
+
+            "X-BAPI-TIMESTAMP":
 
                 timestamp,
 
-                body
 
-            ),
+            "X-BAPI-RECV-WINDOW":
+
+                "5000"
+
+        }
 
 
-        "X-BAPI-TIMESTAMP":
+
+        raw = str(body).replace(
+
+            "'",
+
+            '"'
+
+        )
+
+
+
+        headers["X-BAPI-SIGN"] = self.sign(
 
             timestamp,
 
+            raw
 
-        "X-BAPI-RECV-WINDOW":
-
-            "5000"
-
-    }
+        )
 
 
 
-
-    try:
-
-
-        response = requests.post(
+        r = requests.post(
 
             url,
 
@@ -155,36 +406,227 @@ def close_position(
         )
 
 
+        return r.json()
 
-        result = response.json()
 
+
+
+
+    # =====================================
+    # FILL CALLBACK
+    # =====================================
+
+    def on_fill(
+        self,
+        symbol,
+        side,
+        qty,
+        price
+    ):
 
 
         print(
 
-            "CLOSE POSITION RESULT",
+            "FILL",
 
-            result
+            symbol,
+
+            side,
+
+            qty,
+
+            price
+
+        )
+
+
+        trade_db.insert(
+
+            symbol,
+
+            side,
+
+            qty,
+
+            price,
+
+            0,
+
+            "ENTRY"
 
         )
 
 
 
-        return result
 
 
+    # =====================================
+    # TRAILING UPDATE
+    # =====================================
+
+    def update_trailing_stop(
+        self,
+        symbol,
+        side,
+        price
+    ):
 
 
-    except Exception as e:
+        trailing_stop_manager.update(
 
+            symbol,
 
-        print(
+            side,
 
-            "CLOSE POSITION ERROR",
-
-            e
+            price
 
         )
 
 
-        return None
+        new_sl = trailing_stop_manager.calculate_stop(
+
+            symbol,
+
+            side
+
+        )
+
+
+        if new_sl:
+
+
+            self.modify_stop_loss(
+
+                symbol,
+
+                new_sl
+
+            )
+
+
+
+
+
+    # =====================================
+    # MODIFY SL
+    # =====================================
+
+    def modify_stop_loss(
+        self,
+        symbol,
+        stop_price
+    ):
+
+
+        body = {
+
+
+            "category":
+
+                "linear",
+
+
+            "symbol":
+
+                symbol,
+
+
+            "stopLoss":
+
+                str(stop_price)
+
+        }
+
+
+
+        return self.request(
+
+            self.base_url
+
+            +
+
+            "/v5/position/trading-stop",
+
+            body
+
+        )
+
+
+
+
+
+    # =====================================
+    # EQUITY
+    # =====================================
+
+    def get_account_equity(
+        self
+    ):
+
+
+        url = (
+
+            self.base_url
+
+            +
+
+            "/v5/account/wallet-balance"
+
+        )
+
+
+        timestamp = str(
+
+            int(
+
+                time.time()
+
+                *
+
+                1000
+
+            )
+
+        )
+
+
+        body = {
+
+            "accountType":
+
+                "UNIFIED"
+
+        }
+
+
+
+        result = self.request(
+
+            url,
+
+            body
+
+        )
+
+
+
+        try:
+
+
+            return float(
+
+                result["result"]["list"][0]["totalEquity"]
+
+            )
+
+
+        except:
+
+
+            return 0
+
+
+
+
+
+execution_engine = ExecutionEngine()
