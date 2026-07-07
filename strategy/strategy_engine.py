@@ -1,124 +1,444 @@
+import os
+from dotenv import load_dotenv
 
-from ml_filter import ml_filter
-from position_sizer import position_sizer
+
+from risk.drawdown_guard import drawdown_guard
+
+
+from risk.risk_engine import risk_engine
+
+
+from ml.ml_filter import ml_filter
+
+
+load_dotenv()
+
+
+
 
 
 class StrategyEngine:
 
-    def __init__(self, execution_engine):
 
-        self.execution = execution_engine
+    def __init__(self):
 
-        self.tp1_hit = {}
-        self.be_moved = {}
 
-    # =================================================
-    # SIGNAL ENTRY (ML + SIZING + EXECUTION)
-    # =================================================
-    def on_signal(self, symbol, side, price, market_data=None):
+        self.vwap_enable = (
 
-        # ============================================
-        # 1. ML FILTER GATE
-        # ============================================
-        if market_data:
+            os.getenv(
+                "VWAP_ENABLE",
+                "true"
+            ).lower()
+            ==
+            "true"
 
-            if not ml_filter.allow_trade(market_data):
-
-                print(f"[STRATEGY] BLOCKED BY ML FILTER: {symbol}")
-
-                return
-
-        # ============================================
-        # 2. STOP LOSS 기준 설정
-        # ============================================
-        stop_loss_price = price * 0.995  # -0.5% 고정 예시
-
-        # ============================================
-        # 3. ACCOUNT BALANCE (임시 or API 연결 가능)
-        # ============================================
-        balance = 10000  # TODO: Bybit wallet balance API 연결
-
-        # ============================================
-        # 4. POSITION SIZE 계산 (핵심)
-        # ============================================
-        qty = position_sizer.calculate(
-            balance=balance,
-            entry_price=price,
-            stop_loss_price=stop_loss_price
         )
 
-        if qty <= 0:
-            print("[STRATEGY] INVALID QTY")
-            return
 
-        # ============================================
-        # 5. EXECUTE TRADE
-        # ============================================
-        self.execution.execute(symbol, side, qty)
+        self.supertrend_enable = (
 
-        # 상태 초기화
-        self.tp1_hit[symbol] = False
-        self.be_moved[symbol] = False
+            os.getenv(
+                "SUPERTREND_ENABLE",
+                "true"
+            ).lower()
+            ==
+            "true"
 
-    # =================================================
-    # PRICE UPDATE LOOP (TP / SL / BE MANAGEMENT)
-    # =================================================
-    def on_price(self, symbol, price, position):
+        )
 
-        if not position:
-            return
 
-        entry = position["entry_price"]
-        side = position["side"]
+        self.ml_enable = (
 
-        pnl_pct = self._calc_pnl(entry, price, side)
+            os.getenv(
+                "ML_FILTER_ENABLE",
+                "true"
+            ).lower()
+            ==
+            "true"
 
-        # ============================================
-        # TP1 (부분 익절)
-        # ============================================
-        if pnl_pct >= 0.5 and not self.tp1_hit.get(symbol):
+        )
 
-            print(f"[TP1] {symbol}")
 
-            self.tp1_hit[symbol] = True
+        self.ml_threshold = float(
 
-            self.execution.partial_close(symbol, 0.5)
+            os.getenv(
+                "ML_THRESHOLD",
+                "0.65"
+            )
 
-        # ============================================
-        # BREAKEVEN MOVE
-        # ============================================
-        if pnl_pct >= 0.3 and not self.be_moved.get(symbol):
+        )
 
-            print(f"[BE MOVE] {symbol}")
 
-            self.be_moved[symbol] = True
 
-            self.execution.move_sl_to_be(symbol)
+        self.position = {}
 
-        # ============================================
-        # FINAL TAKE PROFIT
-        # ============================================
-        if pnl_pct >= 1.0:
 
-            print(f"[TP2 EXIT] {symbol}")
 
-            self.execution.close_position(symbol)
 
-        # ============================================
-        # STOP LOSS
-        # ============================================
-        if pnl_pct <= -0.5:
 
-            print(f"[STOP LOSS] {symbol}")
+    # =====================================
+    # MAIN CHECK
+    # =====================================
 
-            self.execution.close_position(symbol)
+    def check(
+        self,
+        market_data
+    ):
 
-    # =================================================
-    # PNL CALCULATION
-    # =================================================
-    def _calc_pnl(self, entry, price, side):
 
-        if side == "Buy":
-            return (price - entry) / entry * 100
-        else:
-            return (entry - price) / entry * 100
+        symbol = market_data.get(
+            "symbol"
+        )
+
+
+        price = market_data.get(
+            "close"
+        )
+
+
+
+        if not symbol:
+
+            return None
+
+
+
+        # ==========================
+        # Risk Check
+        # ==========================
+
+
+        if not risk_engine.can_trade():
+
+            return None
+
+
+
+        if not drawdown_guard.can_trade():
+
+            print(
+                "DRAW DOWN BLOCK"
+            )
+
+            return None
+
+
+
+
+
+        # ==========================
+        # Indicator
+        # ==========================
+
+
+        vwap = market_data.get(
+            "vwap"
+        )
+
+
+        supertrend = market_data.get(
+            "supertrend"
+        )
+
+
+
+        signal = None
+
+
+
+
+
+        # ==========================
+        # LONG 조건
+        # ==========================
+
+
+        if (
+
+            self.vwap_enable
+
+            and
+
+            price > vwap
+
+        ):
+
+
+            signal = "Buy"
+
+
+
+
+
+        # ==========================
+        # SHORT 조건
+        # ==========================
+
+
+        elif (
+
+            self.vwap_enable
+
+            and
+
+            price < vwap
+
+        ):
+
+
+            signal = "Sell"
+
+
+
+
+
+        # ==========================
+        # Supertrend Filter
+        # ==========================
+
+
+        if self.supertrend_enable:
+
+
+            if supertrend == "UP":
+
+
+                if signal != "Buy":
+
+                    return None
+
+
+
+            elif supertrend == "DOWN":
+
+
+                if signal != "Sell":
+
+                    return None
+
+
+
+            else:
+
+                return None
+
+
+
+
+
+        # ==========================
+        # ML FILTER
+        # ==========================
+
+
+        if self.ml_enable:
+
+
+            probability = ml_filter.predict(
+
+                market_data
+
+            )
+
+
+
+            print(
+
+                "ML SCORE",
+
+                probability
+
+            )
+
+
+
+            if probability < self.ml_threshold:
+
+
+                print(
+
+                    "ML BLOCK"
+
+                )
+
+
+                return None
+
+
+
+
+
+        # ==========================
+        # POSITION CHECK
+        # ==========================
+
+
+        if symbol in self.position:
+
+
+            return self.check_exit(
+
+                market_data
+
+            )
+
+
+
+
+
+        # ==========================
+        # ENTRY SIGNAL
+        # ==========================
+
+
+        self.position[symbol] = signal
+
+
+
+        return {
+
+
+            "type":
+
+                "ENTRY",
+
+
+            "symbol":
+
+                symbol,
+
+
+            "side":
+
+                signal,
+
+
+            "qty":
+
+                float(
+
+                    os.getenv(
+
+                        "DEFAULT_QTY",
+
+                        "0.001"
+
+                    )
+
+                )
+
+        }
+
+
+
+
+
+    # =====================================
+    # EXIT CHECK
+    # =====================================
+
+    def check_exit(
+        self,
+        data
+    ):
+
+
+        symbol = data.get(
+            "symbol"
+        )
+
+
+        current = self.position.get(
+            symbol
+        )
+
+
+        trend = data.get(
+            "supertrend"
+        )
+
+
+
+        # LONG 종료
+
+        if (
+
+            current == "Buy"
+
+            and
+
+            trend == "DOWN"
+
+        ):
+
+
+            del self.position[symbol]
+
+
+            return {
+
+
+                "type":
+
+                    "EXIT",
+
+
+                "symbol":
+
+                    symbol,
+
+
+                "side":
+
+                    "Sell"
+
+            }
+
+
+
+
+        # SHORT 종료
+
+        if (
+
+            current == "Sell"
+
+            and
+
+            trend == "UP"
+
+        ):
+
+
+            del self.position[symbol]
+
+
+            return {
+
+
+                "type":
+
+                    "EXIT",
+
+
+                "symbol":
+
+                    symbol,
+
+
+                "side":
+
+                    "Buy"
+
+            }
+
+
+
+
+        return None
+
+
+
+
+
+strategy_engine = StrategyEngine()
