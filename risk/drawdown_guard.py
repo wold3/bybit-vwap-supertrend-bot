@@ -9,8 +9,6 @@ load_dotenv()
 
 
 
-
-
 class DrawdownGuard:
 
 
@@ -30,23 +28,19 @@ class DrawdownGuard:
         )
 
 
-
-        self.current_equity = 0
-
-
-        self.peak_equity = 0
+        self.current_equity = 0.0
 
 
-        self.drawdown = 0
+        self.peak_equity = 0.0
 
+
+        self.drawdown = 0.0
 
 
         self.history = []
 
 
-
         self.block_trade = False
-
 
 
         self.lock = threading.Lock()
@@ -56,7 +50,7 @@ class DrawdownGuard:
 
 
     # =====================================
-    # UPDATE EQUITY
+    # EQUITY UPDATE
     # =====================================
 
     def update(
@@ -68,16 +62,25 @@ class DrawdownGuard:
         with self.lock:
 
 
-            equity = float(
-                equity
-            )
+            equity = float(equity)
 
 
             self.current_equity = equity
 
 
 
-            # 최고 자산 갱신
+            # 최초 Equity
+
+            if self.peak_equity == 0:
+
+
+                self.peak_equity = equity
+
+
+
+
+
+            # 최고 Equity 갱신
 
             if equity > self.peak_equity:
 
@@ -87,6 +90,8 @@ class DrawdownGuard:
 
 
 
+
+            # Drawdown 계산
 
             if self.peak_equity > 0:
 
@@ -107,24 +112,20 @@ class DrawdownGuard:
 
                     self.peak_equity
 
-                )
-
-                *
-
-                100
+                ) * 100
 
 
 
             else:
 
 
-                self.drawdown = 0
+                self.drawdown = 0.0
 
 
 
 
 
-            # 기록
+            # Equity 기록
 
             self.history.append({
 
@@ -136,7 +137,13 @@ class DrawdownGuard:
 
                 "equity":
 
-                    equity,
+                    round(
+
+                        equity,
+
+                        4
+
+                    ),
 
 
                 "drawdown":
@@ -153,7 +160,9 @@ class DrawdownGuard:
 
 
 
-            # 최근 1000개 유지
+
+
+            # 최대 기록 제한
 
             if len(self.history) > 1000:
 
@@ -164,7 +173,7 @@ class DrawdownGuard:
 
 
 
-            # 위험 차단
+            # 거래 차단
 
             if self.drawdown >= self.max_drawdown:
 
@@ -172,12 +181,19 @@ class DrawdownGuard:
                 self.block_trade = True
 
 
-
                 print(
 
-                    "🚨 MAX DRAWDOWN REACHED",
+                    "🚨 MAX DRAWDOWN BLOCK",
 
-                    self.drawdown
+                    round(
+
+                        self.drawdown,
+
+                        2
+
+                    ),
+
+                    "%"
 
                 )
 
@@ -186,7 +202,7 @@ class DrawdownGuard:
 
 
     # =====================================
-    # TRADE CHECK
+    # CAN TRADE
     # =====================================
 
     def can_trade(
@@ -218,14 +234,18 @@ class DrawdownGuard:
             self.block_trade = False
 
 
-            self.drawdown = 0
+            self.drawdown = 0.0
+
+
+            self.history.clear()
 
 
 
 
 
     # =====================================
-    # HISTORY
+    # EQUITY HISTORY
+    # Dashboard Chart
     # =====================================
 
     def get_history(
@@ -236,7 +256,11 @@ class DrawdownGuard:
         with self.lock:
 
 
-            return self.history
+            return list(
+
+                self.history
+
+            )
 
 
 
@@ -244,6 +268,7 @@ class DrawdownGuard:
 
     # =====================================
     # STATUS
+    # Dashboard Risk API
     # =====================================
 
     def status(
@@ -259,12 +284,24 @@ class DrawdownGuard:
 
                 "current_equity":
 
-                    self.current_equity,
+                    round(
+
+                        self.current_equity,
+
+                        4
+
+                    ),
 
 
                 "peak_equity":
 
-                    self.peak_equity,
+                    round(
+
+                        self.peak_equity,
+
+                        4
+
+                    ),
 
 
                 "drawdown":
@@ -287,7 +324,44 @@ class DrawdownGuard:
 
                     not self.block_trade
 
+
             }
+
+
+
+
+
+    # =====================================
+    # FORCE BLOCK
+    # =====================================
+
+    def block(
+        self
+    ):
+
+
+        with self.lock:
+
+
+            self.block_trade = True
+
+
+
+
+
+    # =====================================
+    # UNBLOCK
+    # =====================================
+
+    def unblock(
+        self
+    ):
+
+
+        with self.lock:
+
+
+            self.block_trade = False
 
 
 
