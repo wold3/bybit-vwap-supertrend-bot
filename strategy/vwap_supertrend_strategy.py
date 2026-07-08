@@ -1,25 +1,26 @@
 from strategy.indicators import indicators
 
 
+
 class VWAPSuperTrendStrategy:
 
 
     def __init__(
         self,
-        st_length=400,
-        st_multiplier=15.0
+        st_length=14,
+        st_multiplier=3.0
     ):
 
+
         self.st_length = st_length
+
         self.st_multiplier = st_multiplier
 
         self.position = {}
 
 
 
-    # =====================================
-    # PROCESS CANDLES
-    # =====================================
+
 
     def analyze(
         self,
@@ -27,13 +28,17 @@ class VWAPSuperTrendStrategy:
     ):
 
 
-        if candles is None:
+        if not candles:
+
             return None
+
 
 
         if len(candles) < self.st_length:
 
             return None
+
+
 
 
 
@@ -46,6 +51,7 @@ class VWAPSuperTrendStrategy:
         ]
 
 
+
         highs = [
 
             float(c["high"])
@@ -55,6 +61,7 @@ class VWAPSuperTrendStrategy:
         ]
 
 
+
         lows = [
 
             float(c["low"])
@@ -62,6 +69,7 @@ class VWAPSuperTrendStrategy:
             for c in candles
 
         ]
+
 
 
         volumes = [
@@ -74,9 +82,8 @@ class VWAPSuperTrendStrategy:
 
 
 
-        # ==========================
-        # VWAP
-        # ==========================
+
+
 
         vwap = indicators.vwap(
 
@@ -87,10 +94,6 @@ class VWAPSuperTrendStrategy:
         )
 
 
-
-        # ==========================
-        # SuperTrend
-        # ==========================
 
         st = indicators.supertrend(
 
@@ -108,9 +111,11 @@ class VWAPSuperTrendStrategy:
 
 
 
-        if st is None:
+        if not st:
 
             return None
+
+
 
 
 
@@ -120,96 +125,164 @@ class VWAPSuperTrendStrategy:
 
 
 
-        signal = None
+        current = self.position.get(
+            "side"
+        )
 
 
 
-        # ==========================
-        # ENTRY LOGIC
-        # ==========================
-
-        if direction == 1 and price > vwap:
 
 
-            if self.position.get(
-                "side"
-            ) != "Buy":
+        # ====================
+        # BUY
+        # ====================
+
+        if (
+
+            direction == 1
+
+            and
+
+            price > vwap
+
+            and
+
+            current != "Buy"
+
+        ):
 
 
-                self.position["side"] = "Buy"
+            self.position["side"] = "Buy"
 
 
-                signal = {
-
-                    "type":
-                        "ENTRY",
-
-                    "side":
-                        "Buy",
-
-                    "price":
-                        price
-
-                }
+            return {
 
 
-
-        elif direction == -1 and price < vwap:
-
-
-            if self.position.get(
-                "side"
-            ) != "Sell":
+                "type":
+                    "ENTRY",
 
 
-                self.position["side"] = "Sell"
+                "side":
+                    "Buy",
 
 
-                signal = {
+                "price":
+                    price,
 
-                    "type":
-                        "ENTRY",
 
-                    "side":
-                        "Sell",
+                "vwap":
+                    vwap,
 
-                    "price":
-                        price
 
-                }
+                "supertrend":
+                    direction
+
+            }
 
 
 
-        # ==========================
-        # EXIT LOGIC
-        # ==========================
-
-        elif direction == 0:
 
 
-            if self.position.get("side"):
+        # ====================
+        # SELL
+        # ====================
 
-                signal = {
+        if (
 
-                    "type":
-                        "EXIT",
+            direction == -1
 
-                    "side":
-                        self.position["side"]
+            and
 
-                }
+            price < vwap
+
+            and
+
+            current != "Sell"
+
+        ):
+
+
+            self.position["side"] = "Sell"
+
+
+            return {
+
+
+                "type":
+                    "ENTRY",
+
+
+                "side":
+                    "Sell",
+
+
+                "price":
+                    price,
+
+
+                "vwap":
+                    vwap,
+
+
+                "supertrend":
+                    direction
+
+            }
+
+
+
+
+
+        # ====================
+        # EXIT
+        # ====================
+
+        if current:
+
+
+            if (
+
+                current == "Buy"
+
+                and
+
+                direction == -1
+
+            ) or (
+
+                current == "Sell"
+
+                and
+
+                direction == 1
+
+            ):
+
+
+                old = current
 
 
                 self.position.clear()
 
 
-
-        return signal
-
+                return {
 
 
+                    "type":
+                        "EXIT",
 
 
-# singleton
+                    "side":
+                        old
+
+                }
+
+
+
+        return None
+
+
+
+
 
 vwap_supertrend_strategy = VWAPSuperTrendStrategy()
