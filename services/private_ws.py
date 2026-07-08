@@ -4,8 +4,6 @@ import time
 
 from watchdog.watchdog import watchdog
 
-from execution.execution_engine import execution_engine
-
 from position.position_manager import position_manager
 
 from risk.drawdown_guard import drawdown_guard
@@ -16,11 +14,10 @@ class PrivateWS:
     """
     Bybit Private WebSocket
 
-    기능:
-    - Private WS 관리
-    - 주문 체결 이벤트 처리
-    - Position 업데이트
-    - Wallet 업데이트
+    담당:
+    - execution event
+    - position event
+    - wallet event
     """
 
 
@@ -37,21 +34,14 @@ class PrivateWS:
 
 
 
-    # =====================================
-    # START
-    # =====================================
-
     def start(self):
-
 
         if self.running:
 
             return
 
 
-
         self.running = True
-
 
 
         self.thread = threading.Thread(
@@ -66,7 +56,6 @@ class PrivateWS:
         self.thread.start()
 
 
-
         print(
             "🔐 PRIVATE WS START"
         )
@@ -75,12 +64,7 @@ class PrivateWS:
 
 
 
-    # =====================================
-    # LOOP
-    # =====================================
-
     def _run(self):
-
 
         self.connected = True
 
@@ -90,31 +74,17 @@ class PrivateWS:
         )
 
 
-
         while self.running:
 
 
             try:
 
+                watchdog.heartbeat(
+                    "private_ws"
+                )
 
-                watchdog.heartbeat()
 
-
-
-                # =================================
                 # 실제 Bybit Private WS 위치
-                #
-                # 수신 예:
-                #
-                # order
-                # execution
-                # position
-                # wallet
-                #
-                # self.handle_message(data)
-                #
-                # =================================
-
 
 
                 time.sleep(1)
@@ -125,11 +95,8 @@ class PrivateWS:
 
 
                 print(
-
-                    "PRIVATE WS ERROR",
-
+                    "[PRIVATE WS ERROR]",
                     e
-
                 )
 
 
@@ -144,7 +111,7 @@ class PrivateWS:
 
 
     # =====================================
-    # MESSAGE HANDLER
+    # MESSAGE ROUTER
     # =====================================
 
     def handle_message(
@@ -154,42 +121,28 @@ class PrivateWS:
 
 
         topic = data.get(
-
             "topic"
-
         )
-
 
 
         if topic == "execution":
 
-
             self.handle_execution(
-
                 data
-
             )
-
 
 
         elif topic == "position":
 
-
             self.handle_position(
-
                 data
-
             )
-
 
 
         elif topic == "wallet":
 
-
             self.handle_wallet(
-
                 data
-
             )
 
 
@@ -197,7 +150,7 @@ class PrivateWS:
 
 
     # =====================================
-    # EXECUTION EVENT
+    # EXECUTION
     # =====================================
 
     def handle_execution(
@@ -208,75 +161,31 @@ class PrivateWS:
 
         try:
 
+            from execution.execution_engine import execution_engine
+
 
             item = data["data"][0]
 
 
-
-            symbol = item.get(
-
-                "symbol"
-
-            )
-
-
-            side = item.get(
-
-                "side"
-
-            )
-
-
-            qty = float(
-
-                item.get(
-
-                    "execQty",
-
-                    0
-
-                )
-
-            )
-
-
-            price = float(
-
-                item.get(
-
-                    "execPrice",
-
-                    0
-
-                )
-
-            )
-
-
-
             execution_engine.on_fill(
 
-                symbol,
+                item["symbol"],
 
-                side,
+                item["side"],
 
-                qty,
+                float(item["execQty"]),
 
-                price
+                float(item["execPrice"])
 
             )
-
 
 
         except Exception as e:
 
 
             print(
-
-                "[EXECUTION HANDLE ERROR]",
-
+                "[EXECUTION ERROR]",
                 e
-
             )
 
 
@@ -284,7 +193,7 @@ class PrivateWS:
 
 
     # =====================================
-    # POSITION EVENT
+    # POSITION
     # =====================================
 
     def handle_position(
@@ -299,32 +208,14 @@ class PrivateWS:
             item = data["data"][0]
 
 
-
-            symbol = item.get(
-
-                "symbol"
-
-            )
-
+            symbol = item["symbol"]
 
             size = float(
-
-                item.get(
-
-                    "size",
-
-                    0
-
-                )
-
+                item["size"]
             )
 
 
-            side = item.get(
-
-                "side"
-
-            )
+            side = item["side"]
 
 
 
@@ -345,23 +236,19 @@ class PrivateWS:
             else:
 
 
-                position_manager.close_position(
+                position_manager.remove_position(
 
                     symbol
 
                 )
 
 
-
         except Exception as e:
 
 
             print(
-
-                "[POSITION HANDLE ERROR]",
-
+                "[POSITION ERROR]",
                 e
-
             )
 
 
@@ -369,7 +256,7 @@ class PrivateWS:
 
 
     # =====================================
-    # WALLET EVENT
+    # WALLET
     # =====================================
 
     def handle_wallet(
@@ -381,11 +268,12 @@ class PrivateWS:
         try:
 
 
+            item = data["data"][0]
+
+
             equity = float(
 
-                data["data"][0]
-
-                .get(
+                item.get(
 
                     "totalEquity",
 
@@ -396,14 +284,10 @@ class PrivateWS:
             )
 
 
-
             if equity > 0:
 
-
                 drawdown_guard.update(
-
                     equity
-
                 )
 
 
@@ -411,62 +295,34 @@ class PrivateWS:
 
 
             print(
-
-                "[WALLET HANDLE ERROR]",
-
+                "[WALLET ERROR]",
                 e
-
             )
 
 
 
 
 
-    # =====================================
-    # STOP
-    # =====================================
-
     def stop(self):
-
 
         self.running = False
 
         self.connected = False
 
 
-        print(
-            "PRIVATE WS STOPPED"
-        )
-
-
-
-
-
-    # =====================================
-    # STATUS
-    # =====================================
 
     def status(self):
 
-
         return {
 
+            "running": self.running,
 
-            "running":
-
-                self.running,
-
-
-            "connected":
-
-                self.connected
+            "connected": self.connected
 
         }
 
 
 
 
-
-# singleton
 
 private_ws = PrivateWS()
