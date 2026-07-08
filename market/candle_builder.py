@@ -8,11 +8,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-
 class CandleBuilder:
 
 
     def __init__(self):
+
 
         self.interval = int(
             os.getenv(
@@ -38,7 +38,9 @@ class CandleBuilder:
         )
 
 
+        # 현재 진행중 캔들
         self.current = {}
+
 
 
 
@@ -63,16 +65,11 @@ class CandleBuilder:
 
 
 
-        key = symbol
+        # 첫 tick
+        if symbol not in self.current:
 
 
-
-        # 새 캔들 시작
-
-        if key not in self.current:
-
-
-            self.current[key] = {
+            self.current[symbol] = {
 
 
                 "symbol":
@@ -110,16 +107,21 @@ class CandleBuilder:
 
 
 
-        candle = self.current[key]
+        candle = self.current[symbol]
 
 
 
-        # 시간이 넘어가면 저장
+        # =====================================
+        # 새 캔들 생성
+        # =====================================
 
         if candle_time > candle["timestamp"]:
 
 
-            self.candles[key].append(
+
+            # 이전 캔들 저장
+
+            self.candles[symbol].append(
 
                 candle.copy()
 
@@ -127,7 +129,9 @@ class CandleBuilder:
 
 
 
-            self.current[key] = {
+            # 새 캔들 시작
+
+            self.current[symbol] = {
 
 
                 "symbol":
@@ -163,6 +167,9 @@ class CandleBuilder:
 
         else:
 
+
+
+            # 현재 캔들 업데이트
 
             candle["high"] = max(
 
@@ -201,7 +208,7 @@ class CandleBuilder:
     ):
 
 
-        return list(
+        result = list(
 
             self.candles.get(
 
@@ -212,6 +219,83 @@ class CandleBuilder:
             )
 
         )
+
+
+        # 진행중 캔들 포함
+
+        if symbol in self.current:
+
+
+            result.append(
+
+                self.current[symbol].copy()
+
+            )
+
+
+        return result
+
+
+
+
+
+    # =====================================
+    # GET CURRENT
+    # =====================================
+
+    def get_current(
+        self,
+        symbol
+    ):
+
+
+        return self.current.get(
+
+            symbol
+
+        )
+
+
+
+
+
+    # =====================================
+    # RESET
+    # =====================================
+
+    def reset(
+        self,
+        symbol=None
+    ):
+
+
+        if symbol:
+
+
+            self.candles.pop(
+
+                symbol,
+
+                None
+
+            )
+
+
+            self.current.pop(
+
+                symbol,
+
+                None
+
+            )
+
+
+        else:
+
+
+            self.candles.clear()
+
+            self.current.clear()
 
 
 
@@ -230,11 +314,13 @@ class CandleBuilder:
             "symbols":
 
                 list(
+
                     self.candles.keys()
+
                 ),
 
 
-            "count":
+            "history_count":
 
                 sum(
 
@@ -242,7 +328,21 @@ class CandleBuilder:
 
                     for v in self.candles.values()
 
-                )
+                ),
+
+
+            "current":
+
+                list(
+
+                    self.current.keys()
+
+                ),
+
+
+            "interval":
+
+                self.interval
 
         }
 
