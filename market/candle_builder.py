@@ -1,24 +1,9 @@
-# market/candle_builder.py
-
 import time
-from collections import deque
-import threading
+from collections import defaultdict, deque
 
 
 
 class CandleBuilder:
-    """
-    1분 Candle Builder
-
-    입력:
-        symbol
-        price
-        volume
-
-    출력:
-        OHLCV Candle
-    """
-
 
 
     def __init__(
@@ -33,10 +18,11 @@ class CandleBuilder:
         self.current = {}
 
 
-        self.candles = {}
+        self.candles = defaultdict(
 
+            lambda: deque(maxlen=300)
 
-        self.lock = threading.Lock()
+        )
 
 
 
@@ -54,7 +40,11 @@ class CandleBuilder:
     ):
 
 
-        now = int(time.time())
+        now = int(
+
+            time.time()
+
+        )
 
 
         bucket = now - (
@@ -65,115 +55,112 @@ class CandleBuilder:
 
 
 
-        with self.lock:
+        candle = self.current.get(
+
+            symbol
+
+        )
 
 
 
-            candle = self.current.get(
+        # 새로운 candle
 
-                symbol
-
-            )
+        if candle is None or candle["timestamp"] != bucket:
 
 
 
-            # 새 Candle 시작
-
-            if candle is None or candle["timestamp"] != bucket:
+            if candle:
 
 
+                self.candles[symbol].append(
 
-                if candle:
-
-
-                    self.candles.setdefault(
-
-                        symbol,
-
-                        deque(maxlen=300)
-
-                    ).append(
-
-                        candle
-
-                    )
-
-
-
-                self.current[symbol] = {
-
-
-                    "symbol":
-
-                        symbol,
-
-
-                    "open":
-
-                        price,
-
-
-                    "high":
-
-                        price,
-
-
-                    "low":
-
-                        price,
-
-
-                    "close":
-
-                        price,
-
-
-                    "volume":
-
-                        volume,
-
-
-                    "timestamp":
-
-                        bucket
-
-                }
-
-
-
-            else:
-
-
-
-                candle["high"] = max(
-
-                    candle["high"],
-
-                    price
+                    candle
 
                 )
 
 
-                candle["low"] = min(
 
-                    candle["low"],
-
-                    price
-
-                )
+            self.current[symbol] = {
 
 
-                candle["close"] = price
+                "symbol":
+
+                    symbol,
 
 
-                candle["volume"] += volume
+                "open":
+
+                    float(price),
+
+
+                "high":
+
+                    float(price),
+
+
+                "low":
+
+                    float(price),
+
+
+                "close":
+
+                    float(price),
+
+
+                "volume":
+
+                    float(volume),
+
+
+                "timestamp":
+
+                    bucket
+
+
+            }
+
+
+
+            return None
+
+
+
+
+
+        # 기존 candle 업데이트
+
+
+        candle["high"] = max(
+
+            candle["high"],
+
+            float(price)
+
+        )
+
+
+        candle["low"] = min(
+
+            candle["low"],
+
+            float(price)
+
+        )
+
+
+        candle["close"] = float(price)
+
+
+
+        candle["volume"] += float(volume)
 
 
 
 
 
     # =====================================
-    # CLOSE CANDLE
+    # CLOSE CURRENT CANDLE
     # =====================================
 
     def close_candle(
@@ -182,25 +169,34 @@ class CandleBuilder:
     ):
 
 
-        with self.lock:
+        candle = self.current.get(
 
+            symbol
 
-            candle = self.current.get(
-
-                symbol
-
-            )
+        )
 
 
 
-            if not candle:
+        if not candle:
 
 
-                return None
+            return None
 
 
 
-            return candle.copy()
+        self.candles[symbol].append(
+
+            candle.copy()
+
+        )
+
+
+
+        del self.current[symbol]
+
+
+
+        return candle
 
 
 
@@ -216,32 +212,20 @@ class CandleBuilder:
     ):
 
 
-        with self.lock:
+        if not self.candles[symbol]:
 
-
-            data = self.candles.get(
-
-                symbol
-
-            )
+            return None
 
 
 
-            if not data:
-
-
-                return None
-
-
-
-            return data[-1]
+        return self.candles[symbol][-1]
 
 
 
 
 
     # =====================================
-    # HISTORY
+    # ALL CANDLES
     # =====================================
 
     def get_candles(
@@ -250,20 +234,11 @@ class CandleBuilder:
     ):
 
 
-        with self.lock:
+        return list(
 
+            self.candles[symbol]
 
-            return list(
-
-                self.candles.get(
-
-                    symbol,
-
-                    []
-
-                )
-
-            )
+        )
 
 
 
@@ -279,76 +254,34 @@ class CandleBuilder:
     ):
 
 
-        with self.lock:
+        if symbol:
 
 
-            if symbol:
+            self.current.pop(
+
+                symbol,
+
+                None
+
+            )
 
 
-                self.current.pop(
-
-                    symbol,
-
-                    None
-
-                )
+            self.candles[symbol].clear()
 
 
-                self.candles.pop(
 
-                    symbol,
-
-                    None
-
-                )
+        else:
 
 
-            else:
+            self.current.clear()
 
 
-                self.current.clear()
-
-
-                self.candles.clear()
+            self.candles.clear()
 
 
 
 
 
-    # =====================================
-    # STATUS
-    # =====================================
-
-    def status(self):
-
-
-        with self.lock:
-
-
-            return {
-
-
-                "symbols":
-
-                    list(
-
-                        self.current.keys()
-
-                    ),
-
-
-                "count":
-
-                    len(
-
-                        self.current
-
-                    )
-
-            }
-
-
-
-
+# singleton
 
 candle_builder = CandleBuilder()
