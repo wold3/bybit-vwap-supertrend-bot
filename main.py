@@ -3,52 +3,35 @@
 import os
 import time
 import threading
+import signal
 
 
 from dotenv import load_dotenv
 
-
-load_dotenv()
-
-
-
-# =====================================
-# SERVICES
-# =====================================
 
 from services.ws_client import ws_client
 
 from services.private_ws import private_ws
 
 
-
-# =====================================
-# STRATEGY / EXECUTION
-# =====================================
-
 from strategy.strategy_engine import strategy_engine
 
 from execution.execution_engine import execution_engine
 
 
-
-# =====================================
-# RISK / POSITION
-# =====================================
-
-from risk.drawdown_guard import drawdown_guard
-
 from position.position_manager import position_manager
 
 
+from risk.drawdown_guard import drawdown_guard
 
-# =====================================
-# WATCHDOG
-# =====================================
+from risk.risk_engine import risk_engine
+
 
 from watchdog.watchdog import watchdog
 
 
+
+load_dotenv()
 
 
 
@@ -59,69 +42,31 @@ running = True
 
 
 # =====================================
-# WATCHDOG LOOP
-# =====================================
-
-def watchdog_loop():
-
-    print(
-        "START WATCHDOG"
-    )
-
-
-    watchdog.start()
-
-
-    while running:
-
-
-        try:
-
-            watchdog.heartbeat()
-
-
-        except Exception as e:
-
-            print(
-                "[WATCHDOG ERROR]",
-                e
-            )
-
-
-        time.sleep(5)
-
-
-
-
-
-# =====================================
-# PUBLIC WS LOOP
+# PUBLIC WS
 # =====================================
 
 def public_ws_loop():
 
+
     print(
-        "START PUBLIC WS"
+
+        "[START] PUBLIC WS"
+
     )
 
 
     ws_client.start()
 
 
+
     while running:
 
 
-        try:
+        watchdog.heartbeat(
 
-            watchdog.heartbeat()
+            "public_ws"
 
-
-        except Exception as e:
-
-            print(
-                "[PUBLIC WS LOOP ERROR]",
-                e
-            )
+        )
 
 
         time.sleep(5)
@@ -131,33 +76,31 @@ def public_ws_loop():
 
 
 # =====================================
-# PRIVATE WS LOOP
+# PRIVATE WS
 # =====================================
 
 def private_ws_loop():
 
+
     print(
-        "START PRIVATE WS"
+
+        "[START] PRIVATE WS"
+
     )
 
 
     private_ws.start()
 
 
+
     while running:
 
 
-        try:
+        watchdog.heartbeat(
 
-            watchdog.heartbeat()
+            "private_ws"
 
-
-        except Exception as e:
-
-            print(
-                "[PRIVATE WS LOOP ERROR]",
-                e
-            )
+        )
 
 
         time.sleep(5)
@@ -167,14 +110,18 @@ def private_ws_loop():
 
 
 # =====================================
-# EQUITY LOOP
+# STRATEGY
 # =====================================
 
-def equity_loop():
+def strategy_loop():
+
 
     print(
-        "START EQUITY LOOP"
+
+        "[START] STRATEGY LOOP"
+
     )
+
 
 
     while running:
@@ -183,12 +130,124 @@ def equity_loop():
         try:
 
 
-            equity = (
+            watchdog.heartbeat(
 
-                execution_engine
-                .get_account_equity()
+                "strategy"
 
             )
+
+
+
+            market_data = (
+
+                ws_client
+
+                .get_latest_data()
+
+            )
+
+
+
+            if not market_data:
+
+
+                time.sleep(1)
+
+                continue
+
+
+
+
+
+            signal_data = strategy_engine.check(
+
+                market_data
+
+            )
+
+
+
+            if signal_data:
+
+
+                print(
+
+                    "[SIGNAL]",
+
+                    signal_data
+
+                )
+
+
+
+                result = execution_engine.execute_signal(
+
+                    signal_data
+
+                )
+
+
+
+                print(
+
+                    "[EXEC RESULT]",
+
+                    result
+
+                )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[STRATEGY ERROR]",
+
+                e
+
+            )
+
+
+
+        time.sleep(1)
+
+
+
+
+
+# =====================================
+# EQUITY
+# =====================================
+
+def equity_loop():
+
+
+    print(
+
+        "[START] EQUITY LOOP"
+
+    )
+
+
+
+    while running:
+
+
+        try:
+
+
+            watchdog.heartbeat(
+
+                "equity"
+
+            )
+
+
+
+            equity = execution_engine.get_account_equity()
+
 
 
             if equity > 0:
@@ -211,10 +270,6 @@ def equity_loop():
 
 
 
-            watchdog.heartbeat()
-
-
-
         except Exception as e:
 
 
@@ -229,103 +284,6 @@ def equity_loop():
 
 
         time.sleep(10)
-
-
-
-
-
-# =====================================
-# STRATEGY LOOP
-# =====================================
-
-def strategy_loop():
-
-    print(
-        "START STRATEGY LOOP"
-    )
-
-
-    while running:
-
-
-        try:
-
-
-            market_data = (
-
-                ws_client
-                .get_latest_data()
-
-            )
-
-
-
-            if not market_data:
-
-
-                time.sleep(1)
-
-                continue
-
-
-
-
-
-            signal = strategy_engine.check(
-
-                market_data
-
-            )
-
-
-
-            if signal:
-
-
-                print(
-
-                    "[SIGNAL]",
-
-                    signal
-
-                )
-
-
-                result = execution_engine.execute_signal(
-
-                    signal
-
-                )
-
-
-                print(
-
-                    "[EXECUTION RESULT]",
-
-                    result
-
-                )
-
-
-
-            watchdog.heartbeat()
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[STRATEGY ERROR]",
-
-                e
-
-            )
-
-
-
-        time.sleep(1)
 
 
 
@@ -352,6 +310,7 @@ def start_thread(
     thread.start()
 
 
+
     return thread
 
 
@@ -359,13 +318,24 @@ def start_thread(
 
 
 # =====================================
-# STOP
+# SHUTDOWN
 # =====================================
 
-def shutdown():
+def shutdown(
+    signum=None,
+    frame=None
+):
 
 
     global running
+
+
+
+    print(
+
+        "\n[SHUTDOWN]"
+
+    )
 
 
     running = False
@@ -392,13 +362,7 @@ def shutdown():
 
 
 
-    try:
-
-        watchdog.stop()
-
-    except:
-
-        pass
+    watchdog.stop()
 
 
 
@@ -412,6 +376,27 @@ def shutdown():
 
 
 
+signal.signal(
+
+    signal.SIGINT,
+
+    shutdown
+
+)
+
+
+signal.signal(
+
+    signal.SIGTERM,
+
+    shutdown
+
+)
+
+
+
+
+
 # =====================================
 # MAIN
 # =====================================
@@ -419,27 +404,31 @@ def shutdown():
 if __name__ == "__main__":
 
 
+    mode = os.getenv(
+
+        "LIVE_TRADING",
+
+        "false"
+
+    )
+
+
 
     print(
+
         """
 
-====================================
+=====================================
 
-🚀 BYBIT AI TRADING BOT START
+🚀 BYBIT AI TRADING BOT
 
 MODE : {}
 
-====================================
+=====================================
 
 """.format(
 
-            os.getenv(
-
-                "LIVE_TRADING",
-
-                "false"
-
-            )
+            mode
 
         )
 
@@ -447,32 +436,31 @@ MODE : {}
 
 
 
-    services = [
-
-        # 1순위
-        watchdog_loop,
 
 
-        # 시장 데이터
-        public_ws_loop,
-
-
-        # 계좌/체결 동기화
-        private_ws_loop,
-
-
-        # 리스크 관리
-        equity_loop,
-
-
-        # 최종 판단
-        strategy_loop
-
-    ]
+    watchdog.start()
 
 
 
     threads = []
+
+
+
+    services = [
+
+
+        public_ws_loop,
+
+
+        private_ws_loop,
+
+
+        strategy_loop,
+
+
+        equity_loop
+
+    ]
 
 
 
@@ -496,7 +484,7 @@ MODE : {}
     try:
 
 
-        while True:
+        while running:
 
 
             time.sleep(1)
