@@ -10,14 +10,33 @@ load_dotenv()
 
 
 
+# =====================================
+# SERVICES
+# =====================================
+
 from services.ws_client import ws_client
-from services.private_ws_client import private_ws_client
 
-from portfolio.bybit_wallet import wallet
+from services.private_ws_client import (
+    private_ws_client
+)
 
-from watchdog.watchdog import watchdog
+
+# =====================================
+# WALLET
+# =====================================
+
+from portfolio.bybit_wallet import (
+    wallet
+)
 
 
+# =====================================
+# WATCHDOG
+# =====================================
+
+from watchdog.watchdog import (
+    watchdog
+)
 
 
 
@@ -26,7 +45,6 @@ from watchdog.watchdog import watchdog
 # =====================================
 
 running = True
-
 
 
 
@@ -69,9 +87,8 @@ def strategy_loop():
             )
 
 
+
         time.sleep(1)
-
-
 
 
 
@@ -99,12 +116,16 @@ def equity_loop():
             equity = wallet.get_equity()
 
 
+
             if equity:
 
 
                 print(
+
                     "[EQUITY]",
+
                     equity
+
                 )
 
 
@@ -113,16 +134,16 @@ def equity_loop():
 
 
             print(
+
                 "[EQUITY ERROR]",
+
                 e
+
             )
 
 
 
-        time.sleep(10)
-
-
-
+        time.sleep(30)
 
 
 
@@ -142,12 +163,15 @@ def shutdown(
     global running
 
 
+
     print(
         "\n[BOT STOPPING]"
     )
 
 
+
     running = False
+
 
 
 
@@ -155,7 +179,7 @@ def shutdown(
 
         ws_client.stop()
 
-    except Exception:
+    except:
 
         pass
 
@@ -165,7 +189,7 @@ def shutdown(
 
         private_ws_client.stop()
 
-    except Exception:
+    except:
 
         pass
 
@@ -175,17 +199,16 @@ def shutdown(
 
         watchdog.stop()
 
-    except Exception:
+    except:
 
         pass
+
 
 
 
     print(
         "[BOT STOPPED]"
     )
-
-
 
 
 
@@ -235,37 +258,35 @@ def start():
 
 
 
-
     signal.signal(
+
         signal.SIGINT,
+
         shutdown
+
     )
+
 
 
     signal.signal(
+
         signal.SIGTERM,
+
         shutdown
+
     )
 
 
 
 
 
-
-    # =================================
-    # WATCHDOG
-    # =================================
+    # watchdog
 
     watchdog.start()
 
 
 
-
-
-
-    # =================================
     # PUBLIC WS
-    # =================================
 
     print(
         "[START] PUBLIC WS"
@@ -277,11 +298,7 @@ def start():
 
 
 
-
-
-    # =================================
     # PRIVATE WS
-    # =================================
 
     print(
         "[START] PRIVATE WS"
@@ -293,11 +310,7 @@ def start():
 
 
 
-
-
-    # =================================
     # STRATEGY THREAD
-    # =================================
 
     threading.Thread(
 
@@ -310,11 +323,7 @@ def start():
 
 
 
-
-
-    # =================================
     # EQUITY THREAD
-    # =================================
 
     threading.Thread(
 
@@ -327,15 +336,10 @@ def start():
 
 
 
-
-
     while running:
 
 
         time.sleep(1)
-
-
-
 
 
 
