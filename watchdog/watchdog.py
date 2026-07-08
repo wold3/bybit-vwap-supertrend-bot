@@ -1,5 +1,5 @@
-import time
 import threading
+import time
 
 
 class Watchdog:
@@ -8,23 +8,25 @@ class Watchdog:
 
     기능:
     - heartbeat 기록
-    - 프로세스 상태 확인
-    - 서비스 생존 체크
-    - 외부 모듈 import 호환
+    - 서비스 상태 확인
+    - 생존 여부 확인
     """
-
 
     def __init__(self):
 
         self.running = False
+
         self.last_heartbeat = 0
-        self.lock = threading.Lock()
+
+        # RLock 사용 (status -> is_alive 데드락 방지)
+        self.lock = threading.RLock()
 
 
 
     def start(self):
 
         with self.lock:
+
             self.running = True
             self.last_heartbeat = time.time()
 
@@ -37,6 +39,7 @@ class Watchdog:
     def stop(self):
 
         with self.lock:
+
             self.running = False
 
         print("[Watchdog] stopped")
@@ -48,6 +51,7 @@ class Watchdog:
     def heartbeat(self):
 
         with self.lock:
+
             self.last_heartbeat = time.time()
 
         return True
@@ -61,9 +65,9 @@ class Watchdog:
             if not self.running:
                 return False
 
-            elapsed = time.time() - self.last_heartbeat
-
-        return elapsed <= timeout
+            return (
+                time.time() - self.last_heartbeat
+            ) <= timeout
 
 
 
@@ -71,26 +75,42 @@ class Watchdog:
 
         with self.lock:
 
-            elapsed = (
-                time.time() - self.last_heartbeat
-                if self.last_heartbeat
-                else None
-            )
+            elapsed = None
+
+            if self.last_heartbeat:
+
+                elapsed = (
+                    time.time()
+                    - self.last_heartbeat
+                )
 
             return {
+
                 "running": self.running,
+
                 "alive": self.is_alive(),
+
                 "last_heartbeat": self.last_heartbeat,
+
                 "elapsed": elapsed
+
             }
 
 
 
-# =================================================
-# GitHub style singleton object
-#
-# 사용:
-# from watchdog.watchdog import watchdog
-# =================================================
+    def reset(self):
+
+        with self.lock:
+
+            self.running = False
+            self.last_heartbeat = 0
+
+        return True
+
+
+
+# ===========================================
+# Singleton
+# ===========================================
 
 watchdog = Watchdog()
