@@ -14,11 +14,14 @@ load_dotenv()
 # SERVICES
 # =====================================
 
-from services.ws_client import ws_client
+from services.ws_client import (
+    ws_client
+)
 
 from services.private_ws_client import (
     private_ws_client
 )
+
 
 
 # =====================================
@@ -30,6 +33,7 @@ from portfolio.bybit_wallet import (
 )
 
 
+
 # =====================================
 # WATCHDOG
 # =====================================
@@ -37,6 +41,7 @@ from portfolio.bybit_wallet import (
 from watchdog.watchdog import (
     watchdog
 )
+
 
 
 
@@ -73,7 +78,6 @@ def strategy_loop():
 
             if data:
 
-
                 pass
 
 
@@ -89,6 +93,7 @@ def strategy_loop():
 
 
         time.sleep(1)
+
 
 
 
@@ -121,11 +126,8 @@ def equity_loop():
 
 
                 print(
-
                     "[EQUITY]",
-
                     equity
-
                 )
 
 
@@ -134,16 +136,14 @@ def equity_loop():
 
 
             print(
-
                 "[EQUITY ERROR]",
-
                 e
-
             )
 
 
 
         time.sleep(30)
+
 
 
 
@@ -163,15 +163,12 @@ def shutdown(
     global running
 
 
-
     print(
         "\n[BOT STOPPING]"
     )
 
 
-
     running = False
-
 
 
 
@@ -179,7 +176,7 @@ def shutdown(
 
         ws_client.stop()
 
-    except:
+    except Exception:
 
         pass
 
@@ -189,7 +186,7 @@ def shutdown(
 
         private_ws_client.stop()
 
-    except:
+    except Exception:
 
         pass
 
@@ -199,10 +196,9 @@ def shutdown(
 
         watchdog.stop()
 
-    except:
+    except Exception:
 
         pass
-
 
 
 
@@ -257,26 +253,16 @@ def start():
 
 
 
-
     signal.signal(
-
         signal.SIGINT,
-
         shutdown
-
     )
-
 
 
     signal.signal(
-
         signal.SIGTERM,
-
         shutdown
-
     )
-
-
 
 
 
@@ -286,7 +272,7 @@ def start():
 
 
 
-    # PUBLIC WS
+    # public websocket
 
     print(
         "[START] PUBLIC WS"
@@ -297,8 +283,7 @@ def start():
 
 
 
-
-    # PRIVATE WS
+    # private websocket
 
     print(
         "[START] PRIVATE WS"
@@ -309,8 +294,7 @@ def start():
 
 
 
-
-    # STRATEGY THREAD
+    # strategy thread
 
     threading.Thread(
 
@@ -322,8 +306,7 @@ def start():
 
 
 
-
-    # EQUITY THREAD
+    # equity thread
 
     threading.Thread(
 
@@ -340,6 +323,7 @@ def start():
 
 
         time.sleep(1)
+
 
 
 
