@@ -1,12 +1,11 @@
 import json
 import time
 import threading
+import requests
 import websocket
 
 
-from config import (
-    DEFAULT_SYMBOL
-)
+from config import DEFAULT_SYMBOL
 
 
 from strategy.vwap_supertrend_strategy import (
@@ -38,15 +37,11 @@ class WSClient:
         self.thread = None
 
 
-
         self.latest_data = None
 
 
         self.last_update = 0
 
-
-
-        # candle storage
 
         self.candles = []
 
@@ -57,6 +52,9 @@ class WSClient:
     # =====================================
 
     def start(self):
+
+
+        self.load_initial_candles()
 
 
         self.running = True
@@ -92,7 +90,7 @@ class WSClient:
                 self.ws.close()
 
 
-        except:
+        except Exception:
 
             pass
 
@@ -101,6 +99,135 @@ class WSClient:
         print(
             "[PUBLIC WS CLOSED]"
         )
+
+
+
+    # =====================================
+    # INITIAL CANDLE LOAD
+    # =====================================
+
+    def load_initial_candles(self):
+
+
+        try:
+
+
+            url = (
+                "https://api.bybit.com/v5/market/kline"
+            )
+
+
+            params = {
+
+                "category": "linear",
+
+                "symbol": self.symbol,
+
+                "interval": "1",
+
+                "limit": "500"
+
+            }
+
+
+
+            response = requests.get(
+
+                url,
+
+                params=params,
+
+                timeout=5
+
+            )
+
+
+
+            data = response.json()
+
+
+
+            if data.get("retCode") != 0:
+
+
+                print(
+                    "[KLINE LOAD ERROR]",
+                    data
+                )
+
+                return
+
+
+
+            rows = (
+                data["result"]["list"]
+            )
+
+
+            rows.reverse()
+
+
+
+            self.candles.clear()
+
+
+
+            for row in rows:
+
+
+                candle = {
+
+
+                    "symbol":
+                        self.symbol,
+
+
+                    "timestamp":
+                        int(row[0]),
+
+
+                    "open":
+                        float(row[1]),
+
+
+                    "high":
+                        float(row[2]),
+
+
+                    "low":
+                        float(row[3]),
+
+
+                    "close":
+                        float(row[4]),
+
+
+                    "volume":
+                        float(row[5])
+
+                }
+
+
+                self.candles.append(
+                    candle
+                )
+
+
+
+            print(
+                "[INITIAL CANDLES]",
+                len(self.candles)
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[INITIAL CANDLE ERROR]",
+                e
+            )
 
 
 
@@ -116,22 +243,45 @@ class WSClient:
         )
 
 
-        self.ws = websocket.WebSocketApp(
-
-            url,
-
-            on_open=self.on_open,
-
-            on_message=self.on_message,
-
-            on_error=self.on_error,
-
-            on_close=self.on_close
-
-        )
+        while self.running:
 
 
-        self.ws.run_forever()
+            try:
+
+
+                self.ws = websocket.WebSocketApp(
+
+                    url,
+
+                    on_open=self.on_open,
+
+                    on_message=self.on_message,
+
+                    on_error=self.on_error,
+
+                    on_close=self.on_close
+
+                )
+
+
+                self.ws.run_forever()
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[WS RECONNECT ERROR]",
+                    e
+                )
+
+
+
+            if self.running:
+
+
+                time.sleep(3)
 
 
 
@@ -147,9 +297,12 @@ class WSClient:
         )
 
 
-        sub = {
+        subscribe = {
 
-            "op":"subscribe",
+
+            "op":
+                "subscribe",
+
 
             "args":[
 
@@ -161,7 +314,7 @@ class WSClient:
 
 
         ws.send(
-            json.dumps(sub)
+            json.dumps(subscribe)
         )
 
 
@@ -198,15 +351,18 @@ class WSClient:
 
 
 
-            if "kline" in topic:
+            if "kline" not in topic:
+
+                return
 
 
-                for candle in data["data"]:
+
+            for candle in data["data"]:
 
 
-                    self.process_market(
-                        candle
-                    )
+                self.process_market(
+                    candle
+                )
 
 
 
@@ -221,7 +377,7 @@ class WSClient:
 
 
     # =====================================
-    # PROCESS MARKET
+    # MARKET PROCESS
     # =====================================
 
     def process_market(
@@ -239,7 +395,7 @@ class WSClient:
 
 
             "timestamp":
-                candle["start"],
+                int(candle["start"]),
 
 
             "open":
@@ -272,19 +428,12 @@ class WSClient:
 
 
 
-        # ===============================
-        # CANDLE BUFFER
-        # ===============================
-
+        # candle update
 
         if self.candles:
 
 
-            if (
-                self.candles[-1]["timestamp"]
-                ==
-                market_data["timestamp"]
-            ):
+            if self.candles[-1]["timestamp"] == market_data["timestamp"]:
 
 
                 self.candles[-1] = market_data
@@ -307,8 +456,6 @@ class WSClient:
 
 
 
-        # keep 500 candles
-
         if len(self.candles) > 500:
 
 
@@ -327,28 +474,37 @@ class WSClient:
         # STRATEGY
         # ===============================
 
-
-        signal = vwap_supertrend_strategy.analyze(
-
-            self.candles
-
-        )
+        try:
 
 
-
-        if signal:
-
-
-            print(
-                "[SIGNAL]",
-                signal
+            signal = (
+                vwap_supertrend_strategy.analyze(
+                    self.candles
+                )
             )
 
 
-            order_manager.execute(
 
-                signal
+            if signal:
 
+
+                print(
+                    "[SIGNAL]",
+                    signal
+                )
+
+
+                order_manager.execute(
+                    signal
+                )
+
+
+        except Exception as e:
+
+
+            print(
+                "[STRATEGY ERROR]",
+                e
             )
 
 
@@ -357,7 +513,6 @@ class WSClient:
             "[LAST CANDLE]",
             market_data
         )
-
 
 
 
