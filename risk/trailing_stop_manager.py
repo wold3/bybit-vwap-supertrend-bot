@@ -1,37 +1,73 @@
+# risk/trailing_stop_manager.py
+
 import os
 import threading
 
 from dotenv import load_dotenv
 
+
 load_dotenv()
+
+
+
 
 
 class TrailingStopManager:
     """
     Trailing Stop Manager
 
-    기능
-    - 최고가/최저가 추적
-    - Trailing Stop 계산
-    - 상태 관리
+    기능:
+    - 포지션별 최고/최저 가격 관리
+    - Stop 가격 계산
+    - 자동 리셋
     """
+
+
 
     def __init__(self):
 
+
         self.lock = threading.Lock()
 
-        self.trailing_percent = float(
+
+        self.enabled = (
+
             os.getenv(
-                "TRAILING_STOP_PERCENT",
-                "1.0"
-            )
+
+                "USE_TRAILING_STOP",
+
+                "true"
+
+            ).lower()
+
+            ==
+
+            "true"
+
         )
+
+
+        self.percent = float(
+
+            os.getenv(
+
+                "TRAILING_STOP_PERCENT",
+
+                "0.5"
+
+            )
+
+        )
+
 
         self.positions = {}
 
 
+
+
+
     # =====================================
-    # UPDATE
+    # UPDATE PRICE
     # =====================================
 
     def update(
@@ -41,35 +77,67 @@ class TrailingStopManager:
         price
     ):
 
+
+        if not self.enabled:
+
+            return
+
+
+
         with self.lock:
+
 
             if symbol not in self.positions:
 
+
                 self.positions[symbol] = {
 
-                    "side": side,
 
-                    "highest": price,
+                    "side":
 
-                    "lowest": price
+                        side,
+
+
+                    "high":
+
+                        price,
+
+
+                    "low":
+
+                        price
 
                 }
 
+
                 return
 
-            position = self.positions[symbol]
+
+
+
+
+            data = self.positions[symbol]
+
+
 
             if side == "Buy":
 
-                if price > position["highest"]:
 
-                    position["highest"] = price
+                if price > data["high"]:
 
-            else:
+                    data["high"] = price
 
-                if price < position["lowest"]:
 
-                    position["lowest"] = price
+
+            elif side == "Sell":
+
+
+                if price < data["low"]:
+
+                    data["low"] = price
+
+
+
 
 
     # =====================================
@@ -82,27 +150,122 @@ class TrailingStopManager:
         side
     ):
 
+
+        if not self.enabled:
+
+            return None
+
+
+
         with self.lock:
 
-            position = self.positions.get(symbol)
 
-            if position is None:
+            data = self.positions.get(
+
+                symbol
+
+            )
+
+
+
+            if not data:
 
                 return None
 
-            percent = self.trailing_percent / 100
+
+
+            rate = (
+
+                self.percent
+
+                /
+
+                100
+
+            )
+
+
+
+
+
+            # LONG
 
             if side == "Buy":
 
-                return round(
-                    position["highest"] * (1 - percent),
-                    4
+
+                high = data["high"]
+
+
+
+                stop = (
+
+                    high
+
+                    *
+
+                    (
+
+                        1-rate
+
+                    )
+
                 )
 
-            return round(
-                position["lowest"] * (1 + percent),
-                4
-            )
+
+
+                return round(
+
+                    stop,
+
+                    2
+
+                )
+
+
+
+
+
+            # SHORT
+
+            if side == "Sell":
+
+
+                low = data["low"]
+
+
+
+                stop = (
+
+                    low
+
+                    *
+
+                    (
+
+                        1+rate
+
+                    )
+
+                )
+
+
+
+                return round(
+
+                    stop,
+
+                    2
+
+                )
+
+
+
+
+
+            return None
+
+
+
 
 
     # =====================================
@@ -114,9 +277,33 @@ class TrailingStopManager:
         symbol
     ):
 
+
         with self.lock:
 
-            self.positions.pop(symbol, None)
+
+            if symbol in self.positions:
+
+
+                del self.positions[symbol]
+
+
+
+
+
+    # =====================================
+    # CLEAR
+    # =====================================
+
+    def clear(self):
+
+
+        with self.lock:
+
+
+            self.positions.clear()
+
+
+
 
 
     # =====================================
@@ -125,18 +312,31 @@ class TrailingStopManager:
 
     def status(self):
 
+
         with self.lock:
+
 
             return {
 
-                "symbols": list(self.positions.keys()),
 
-                "count": len(self.positions),
+                "enabled":
 
-                "trailing_percent": self.trailing_percent
+                    self.enabled,
+
+
+                "percent":
+
+                    self.percent,
+
+
+                "positions":
+
+                    self.positions.copy()
 
             }
 
 
-# singleton
+
+
+
 trailing_stop_manager = TrailingStopManager()
