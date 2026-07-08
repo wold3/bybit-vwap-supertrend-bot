@@ -28,45 +28,29 @@ class WSClient:
             "false"
         ).lower() == "true"
 
-        # =====================================
-        # WEBSOCKET URL SELECT
-        # =====================================
+
 
         if live:
 
             self.url = os.getenv(
-
                 "BYBIT_LIVE_PUBLIC_WS",
-
                 "wss://stream.bybit.com/v5/public/linear"
-
             )
-
-
-
 
         else:
-            
+
             self.url = os.getenv(
-
                 "BYBIT_DEMO_PUBLIC_WS",
-
                 "wss://stream-demo.bybit.com/v5/public/linear"
-
             )
 
 
-        # =====================================
-        # COMMON SETTINGS
-        # =====================================
-        
+
         self.symbol = os.getenv(
-
             "DEFAULT_SYMBOL",
-
             "BTCUSDT"
-
         )
+
 
 
         self.running = False
@@ -79,9 +63,12 @@ class WSClient:
         self.thread = None
 
 
+
         self.latest_data = None
 
         self.last_update = 0
+
+
 
 
 
@@ -95,6 +82,7 @@ class WSClient:
         if self.running:
 
             return
+
 
 
         self.running = True
@@ -112,14 +100,17 @@ class WSClient:
         self.thread.start()
 
 
-        print("[PUBLIC WS START]")
+        print(
+            "[PUBLIC WS START]"
+        )
+
 
 
 
 
 
     # =====================================
-    # WEBSOCKET LOOP
+    # LOOP
     # =====================================
 
     def _run(self):
@@ -146,6 +137,7 @@ class WSClient:
                 )
 
 
+
                 self.ws.run_forever(
 
                     ping_interval=20,
@@ -155,19 +147,19 @@ class WSClient:
                 )
 
 
+
             except Exception as e:
 
 
                 print(
-
                     "[WS LOOP ERROR]",
-
                     e
-
                 )
 
 
+
             time.sleep(5)
+
 
 
 
@@ -186,16 +178,15 @@ class WSClient:
         self.connected = True
 
 
-        subscribe = {
+
+        payload = {
 
 
             "op":
-
                 "subscribe",
 
 
             "args":
-
                 [
 
                     "publicTrade."
@@ -212,22 +203,17 @@ class WSClient:
 
         ws.send(
 
-            json.dumps(
-
-                subscribe
-
-            )
+            json.dumps(payload)
 
         )
+
 
 
         print(
-
             "[PUBLIC SUBSCRIBED]",
-
             self.symbol
-
         )
+
 
 
 
@@ -252,6 +238,7 @@ class WSClient:
                 message
 
             )
+
 
 
             watchdog.heartbeat()
@@ -285,6 +272,7 @@ class WSClient:
             for trade in trades:
 
 
+
                 price = float(
 
                     trade["p"]
@@ -298,6 +286,7 @@ class WSClient:
 
                 )
 
+
                 symbol = trade.get(
 
                     "s",
@@ -305,13 +294,21 @@ class WSClient:
                     self.symbol
 
                 )
-                
+
+
+
                 print(
-                     "[TICK]",
-                     symbol,
-                     price,
-                     volume
-                 )
+
+                    "[TICK]",
+
+                    symbol,
+
+                    price,
+
+                    volume
+
+                )
+
 
 
                 # tick -> candle
@@ -326,13 +323,6 @@ class WSClient:
 
                 )
 
-                print(
-                    "[CANDLE COUNT]",
-                    symbol,
-                    len(
-                        candle_builder.get_candles(symbol)
-                    )
-                )
 
 
                 candles = candle_builder.get_candles(
@@ -341,15 +331,23 @@ class WSClient:
 
                 )
 
+
+
                 print(
-                    "[LAST CANDLE]",
-                    candles[-1]
+
+                    "[CANDLE COUNT]",
+
+                    symbol,
+
+                    len(candles)
+
                 )
- 
 
-                # 최소 데이터 확보
 
-                if len(candles) < 5:
+
+                # 캔들 없으면 종료
+
+                if not candles:
 
                     continue
 
@@ -378,8 +376,9 @@ class WSClient:
 
 
 
+
     # =====================================
-    # INDICATOR PROCESS
+    # MARKET PROCESS
     # =====================================
 
     def process_market(
@@ -388,14 +387,26 @@ class WSClient:
     ):
 
 
+
+        if not candles:
+
+            return
+
+
+
         candle = candles[-1]
 
+
+
         print(
-            "[PROCESS MARKET]",
+
+            "[LAST CANDLE]",
+
             candle
+
         )
-        
-        # indicator update
+
+
 
         indicator_engine.update(
 
@@ -404,12 +415,24 @@ class WSClient:
         )
 
 
-        indicators = indicator_engine.calculate()
+
+        indicators = indicator_engine.calculate(
+
+            candle["symbol"]
+
+        )
+
+
 
         print(
+
             "[INDICATORS]",
+
             indicators
+
         )
+
+
 
         market_data = {
 
@@ -462,6 +485,9 @@ class WSClient:
 
 
 
+
+
+
     # =====================================
     # ERROR
     # =====================================
@@ -480,6 +506,7 @@ class WSClient:
             error
 
         )
+
 
 
 
@@ -510,6 +537,7 @@ class WSClient:
 
 
 
+
     # =====================================
     # STOP
     # =====================================
@@ -531,9 +559,11 @@ class WSClient:
 
                 self.ws.close()
 
+
             except:
 
                 pass
+
 
 
 
@@ -549,6 +579,7 @@ class WSClient:
 
 
         return self.latest_data
+
 
 
 
