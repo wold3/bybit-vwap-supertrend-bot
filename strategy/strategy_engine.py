@@ -1,59 +1,312 @@
-import pandas as pd
-import numpy as np
+# strategy/strategy_engine.py
+
+import os
+
+from dotenv import load_dotenv
 
 
-class IndicatorEngine:
+from risk.risk_engine import risk_engine
+
+from risk.drawdown_guard import drawdown_guard
+
+from ml.ml_filter import ml_filter
+
+from position.position_manager import position_manager
+
+
+
+load_dotenv()
+
+
+
+
+class StrategyEngine:
 
 
     def __init__(self):
 
-        # symbol별 candle 저장
-        self.history = {}
+
+        self.default_qty = float(
+
+            os.getenv(
+
+                "DEFAULT_QTY",
+
+                "0.001"
+
+            )
+
+        )
+
+
 
 
 
     # =====================================
-    # UPDATE CANDLE
+    # MAIN CHECK
     # =====================================
 
-    def update(
+    def check(
         self,
-        candle
+        market_data
     ):
 
-        symbol = candle.get("symbol")
 
+        if not market_data:
 
-        if not symbol:
 
             return None
 
 
 
-        # symbol 초기화
+        symbol = market_data.get(
 
-        if symbol not in self.history:
-
-            self.history[symbol] = []
-
-
-
-        self.history[symbol].append(
-
-            candle
+            "symbol"
 
         )
 
 
-        # 최근 200개 candle 유지
+        price = market_data.get(
 
-        if len(self.history[symbol]) > 200:
+            "close"
 
-            self.history[symbol].pop(0)
+        )
+
+
+        vwap = market_data.get(
+
+            "vwap"
+
+        )
+
+
+        trend = market_data.get(
+
+            "supertrend"
+
+        )
 
 
 
-        indicators = self.calculate(
+        if not symbol or price is None:
+
+
+            return None
+
+
+
+
+
+        # =================================
+        # EXIT FIRST
+        # =================================
+
+        if position_manager.has_position(
+
+            symbol
+
+        ):
+
+
+            return self.check_exit(
+
+                market_data
+
+            )
+
+
+
+
+
+        # =================================
+        # INDICATOR CHECK
+        # =================================
+
+        if vwap is None:
+
+            return None
+
+
+
+        if trend is None:
+
+            return None
+
+
+
+
+
+        # =================================
+        # RISK CHECK
+        # =================================
+
+        if not risk_engine.can_trade():
+
+
+            print(
+
+                "[RISK BLOCK]"
+
+            )
+
+
+            return None
+
+
+
+
+
+        if not drawdown_guard.can_trade():
+
+
+            print(
+
+                "[DRAWDOWN BLOCK]"
+
+            )
+
+
+            return None
+
+
+
+
+
+        # =================================
+        # ML FILTER
+        # =================================
+
+        if not ml_filter.allow_trade(
+
+            market_data
+
+        ):
+
+
+            return None
+
+
+
+
+
+        # =================================
+        # LONG ENTRY
+        # =================================
+
+        if (
+
+            price > vwap
+
+            and
+
+            trend == "UP"
+
+        ):
+
+
+            return {
+
+
+                "type":
+
+                    "ENTRY",
+
+
+                "symbol":
+
+                    symbol,
+
+
+                "side":
+
+                    "Buy",
+
+
+                "qty":
+
+                    self.default_qty
+
+            }
+
+
+
+
+
+        # =================================
+        # SHORT ENTRY
+        # =================================
+
+        if (
+
+            price < vwap
+
+            and
+
+            trend == "DOWN"
+
+        ):
+
+
+            return {
+
+
+                "type":
+
+                    "ENTRY",
+
+
+                "symbol":
+
+                    symbol,
+
+
+                "side":
+
+                    "Sell",
+
+
+                "qty":
+
+                    self.default_qty
+
+            }
+
+
+
+
+
+        return None
+
+
+
+
+
+    # =====================================
+    # EXIT
+    # =====================================
+
+    def check_exit(
+        self,
+        market_data
+    ):
+
+
+        symbol = market_data.get(
+
+            "symbol"
+
+        )
+
+
+        trend = market_data.get(
+
+            "supertrend"
+
+        )
+
+
+
+        position = position_manager.get_position(
 
             symbol
 
@@ -61,369 +314,132 @@ class IndicatorEngine:
 
 
 
-        if not indicators:
+        if not position:
+
 
             return None
 
 
 
-        market_data = {
+        side = position.get(
 
+            "side"
 
-            "symbol":
-
-                symbol,
-
-
-            "close":
-
-                candle["close"],
-
-
-            "volume":
-
-                candle["volume"],
-
-
-            "timestamp":
-
-                candle["timestamp"],
+        )
 
 
 
-            # StrategyEngine 입력 형식
+        size = position.get(
 
-            "vwap":
+            "size"
 
-                indicators["vwap"],
-
-
-
-            "supertrend":
-
-                indicators["supertrend"]
-
-        }
+        )
 
 
 
-        return market_data
+
+
+        # LONG EXIT
+
+        if (
+
+            side == "Buy"
+
+            and
+
+            trend == "DOWN"
+
+        ):
+
+
+            return {
+
+
+                "type":
+
+                    "EXIT",
+
+
+                "symbol":
+
+                    symbol,
+
+
+                "side":
+
+                    "Sell",
+
+
+                "qty":
+
+                    size
+
+            }
+
+
+
+
+
+        # SHORT EXIT
+
+        if (
+
+            side == "Sell"
+
+            and
+
+            trend == "UP"
+
+        ):
+
+
+            return {
+
+
+                "type":
+
+                    "EXIT",
+
+
+                "symbol":
+
+                    symbol,
+
+
+                "side":
+
+                    "Buy",
+
+
+                "qty":
+
+                    size
+
+            }
+
+
+
+
+
+        return None
 
 
 
 
 
     # =====================================
-    # VWAP
+    # STATUS
     # =====================================
 
-    def calculate_vwap(
-        self,
-        symbol
-    ):
-
-
-        candles = self.history.get(
-
-            symbol
-
-        )
-
-
-        if not candles:
-
-            return None
-
-
-
-        df = pd.DataFrame(
-
-            candles
-
-        )
-
-
-
-        price = (
-
-            df["high"]
-
-            +
-
-            df["low"]
-
-            +
-
-            df["close"]
-
-        ) / 3
-
-
-
-        volume = df["volume"]
-
-
-
-        if volume.sum() == 0:
-
-            return None
-
-
-
-        vwap = (
-
-            price * volume
-
-        ).sum() / volume.sum()
-
-
-
-        return float(vwap)
-
-
-
-
-
-    # =====================================
-    # ATR
-    # =====================================
-
-    def atr(
-        self,
-        symbol,
-        period=10
-    ):
-
-
-        candles = self.history.get(
-
-            symbol
-
-        )
-
-
-        if not candles:
-
-            return None
-
-
-
-        df = pd.DataFrame(
-
-            candles
-
-        )
-
-
-
-        high = df["high"]
-
-        low = df["low"]
-
-        close = df["close"]
-
-
-
-        tr = pd.concat(
-
-            [
-
-                high - low,
-
-
-                abs(
-
-                    high - close.shift()
-
-                ),
-
-
-                abs(
-
-                    low - close.shift()
-
-                )
-
-            ],
-
-            axis=1
-
-        ).max(axis=1)
-
-
-
-        atr = tr.rolling(
-
-            period
-
-        ).mean()
-
-
-
-        value = atr.iloc[-1]
-
-
-
-        if np.isnan(value):
-
-            return None
-
-
-
-        return float(value)
-
-
-
-
-
-    # =====================================
-    # SUPER TREND
-    # =====================================
-
-    def calculate_supertrend(
-        self,
-        symbol,
-        period=10,
-        multiplier=3
-    ):
-
-
-        candles = self.history.get(
-
-            symbol
-
-        )
-
-
-        if not candles:
-
-            return None
-
-
-
-        if len(candles) < period:
-
-            return None
-
-
-
-        df = pd.DataFrame(
-
-            candles
-
-        )
-
-
-
-        current = df.iloc[-1]
-
-
-
-        atr = self.atr(
-
-            symbol,
-
-            period
-
-        )
-
-
-        if atr is None:
-
-            return None
-
-
-
-        hl2 = (
-
-            current["high"]
-
-            +
-
-            current["low"]
-
-        ) / 2
-
-
-
-        upper = (
-
-            hl2
-
-            +
-
-            multiplier * atr
-
-        )
-
-
-
-        lower = (
-
-            hl2
-
-            -
-
-            multiplier * atr
-
-        )
-
-
-
-        close = current["close"]
-
-
-
-        if close > upper:
-
-            return "UP"
-
-
-
-        elif close < lower:
-
-            return "DOWN"
-
-
-
-        else:
-
-            return "FLAT"
-
-
-
-
-
-    # =====================================
-    # ALL INDICATORS
-    # =====================================
-
-    def calculate(
-        self,
-        symbol
-    ):
+    def status(self):
 
 
         return {
 
 
-            "vwap":
+            "default_qty":
 
-                self.calculate_vwap(
-
-                    symbol
-
-                ),
-
-
-
-            "supertrend":
-
-                self.calculate_supertrend(
-
-                    symbol
-
-                )
+                self.default_qty
 
         }
 
@@ -431,6 +447,4 @@ class IndicatorEngine:
 
 
 
-# Singleton
-
-indicator_engine = IndicatorEngine()
+strategy_engine = StrategyEngine()
