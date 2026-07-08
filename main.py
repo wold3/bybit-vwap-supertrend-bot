@@ -13,7 +13,7 @@ load_dotenv()
 from services.ws_client import ws_client
 from services.private_ws_client import private_ws_client
 
-from account.equity_monitor import equity_monitor
+from portfolio.bybit_wallet import bybit_wallet
 
 from watchdog.watchdog import watchdog
 
@@ -56,6 +56,7 @@ def strategy_loop():
                 pass
 
 
+
         except Exception as e:
 
 
@@ -66,6 +67,8 @@ def strategy_loop():
 
 
         time.sleep(1)
+
+
 
 
 
@@ -89,7 +92,7 @@ def equity_loop():
         try:
 
 
-            equity = equity_monitor.get_equity()
+            equity = bybit_wallet.get_equity()
 
 
             if equity:
@@ -101,6 +104,7 @@ def equity_loop():
                 )
 
 
+
         except Exception as e:
 
 
@@ -110,7 +114,11 @@ def equity_loop():
             )
 
 
+
         time.sleep(10)
+
+
+
 
 
 
@@ -179,6 +187,8 @@ def shutdown(
 
 
 
+
+
 # =====================================
 # START
 # =====================================
@@ -239,13 +249,17 @@ def start():
 
 
 
-    # watchdog
+    # =================================
+    # WATCHDOG
+    # =================================
 
     watchdog.start()
 
 
 
-    # websocket
+    # =================================
+    # PUBLIC WS
+    # =================================
 
     print(
         "[START] PUBLIC WS"
@@ -256,6 +270,12 @@ def start():
 
 
 
+
+
+    # =================================
+    # PRIVATE WS
+    # =================================
+
     print(
         "[START] PRIVATE WS"
     )
@@ -265,7 +285,11 @@ def start():
 
 
 
-    # strategy
+
+
+    # =================================
+    # STRATEGY THREAD
+    # =================================
 
     threading.Thread(
 
@@ -277,7 +301,11 @@ def start():
 
 
 
-    # equity
+
+
+    # =================================
+    # EQUITY THREAD
+    # =================================
 
     threading.Thread(
 
@@ -289,10 +317,15 @@ def start():
 
 
 
+
+
     while running:
 
 
         time.sleep(1)
+
+
+
 
 
 
