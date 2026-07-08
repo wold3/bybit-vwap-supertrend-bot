@@ -1,8 +1,8 @@
 import os
 import time
+import json
 import hmac
 import hashlib
-import json
 import requests
 
 from dotenv import load_dotenv
@@ -30,26 +30,31 @@ class OrderManager:
 
         if self.live:
 
-            self.base_url = (
+            self.base_url = os.getenv(
+                "BYBIT_LIVE_API",
                 "https://api.bybit.com"
             )
 
         else:
 
-            self.base_url = (
+            self.base_url = os.getenv(
+                "BYBIT_DEMO_API",
                 "https://api-demo.bybit.com"
             )
 
 
 
         self.api_key = os.getenv(
-            "BYBIT_API_KEY"
+            "BYBIT_API_KEY",
+            ""
         )
 
 
         self.api_secret = os.getenv(
-            "BYBIT_API_SECRET"
+            "BYBIT_API_SECRET",
+            ""
         )
+
 
 
         self.symbol = os.getenv(
@@ -72,11 +77,12 @@ class OrderManager:
 
 
 
+
     # =====================================
     # SIGN
     # =====================================
 
-    def sign(
+    def _sign(
         self,
         timestamp,
         recv_window,
@@ -85,13 +91,21 @@ class OrderManager:
 
 
         param = (
+
             str(timestamp)
+
             +
+
             self.api_key
+
             +
+
             str(recv_window)
+
             +
+
             body
+
         )
 
 
@@ -113,11 +127,16 @@ class OrderManager:
     # REQUEST
     # =====================================
 
-    def request(
+    def _request(
         self,
         endpoint,
         payload
     ):
+
+
+        body = json.dumps(
+            payload
+        )
 
 
         timestamp = int(
@@ -125,13 +144,7 @@ class OrderManager:
         )
 
 
-        recv_window = "5000"
-
-
-        body = json.dumps(
-            payload
-        )
-
+        recv_window = 5000
 
 
         headers = {
@@ -149,12 +162,12 @@ class OrderManager:
 
             "X-BAPI-RECV-WINDOW":
 
-                recv_window,
+                str(recv_window),
 
 
             "X-BAPI-SIGN":
 
-                self.sign(
+                self._sign(
 
                     timestamp,
 
@@ -174,102 +187,63 @@ class OrderManager:
 
 
         url = (
+
             self.base_url
+
             +
+
             endpoint
-        )
-
-
-
-        response = requests.post(
-
-            url,
-
-            headers=headers,
-
-            data=body,
-
-            timeout=10
 
         )
 
 
-        return response.json()
+
+        try:
+
+
+            r = requests.post(
+
+                url,
+
+                headers=headers,
+
+                data=body,
+
+                timeout=10
+
+            )
+
+
+            result = r.json()
+
+
+            print(
+                "[ORDER RESPONSE]",
+                result
+            )
+
+
+            return result
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[ORDER ERROR]",
+                e
+            )
+
+
+            return None
 
 
 
 
 
     # =====================================
-    # MARKET ORDER
-    # =====================================
-
-    def market_order(
-        self,
-        side
-    ):
-
-
-        payload = {
-
-
-            "category":
-
-                self.category,
-
-
-            "symbol":
-
-                self.symbol,
-
-
-            "side":
-
-                side,
-
-
-            "orderType":
-
-                "Market",
-
-
-            "qty":
-
-                str(self.qty),
-
-
-            "timeInForce":
-
-                "IOC"
-
-        }
-
-
-
-        result = self.request(
-
-            "/v5/order/create",
-
-            payload
-
-        )
-
-
-
-        print(
-            "[ORDER RESULT]",
-            result
-        )
-
-
-        return result
-
-
-
-
-
-    # =====================================
-    # SIGNAL HANDLER
+    # EXECUTE SIGNAL
     # =====================================
 
     def execute(
@@ -291,110 +265,217 @@ class OrderManager:
 
 
 
-        signal_type = signal.get(
-            "type"
-        )
+        if signal["type"] == "EXIT":
 
 
-        side = signal.get(
-            "side"
-        )
+            self.close_position()
 
 
-
-        # ==========================
-        # ENTRY
-        # ==========================
-
-        if signal_type == "ENTRY":
-
-
-            if self.position == side:
-
-
-                print(
-                    "[SKIP] SAME POSITION"
-                )
-
-                return
+            return
 
 
 
-            result = self.market_order(
+        if signal["type"] != "ENTRY":
 
+            return
+
+
+
+        side = signal["side"]
+
+
+
+        # 중복 포지션 방지
+
+        if self.position == side:
+
+
+            print(
+                "[SKIP SAME POSITION]",
                 side
-
             )
+
+
+            return
+
+
+
+
+
+        order_side = side
+
+
+
+        payload = {
+
+
+            "category":
+
+                self.category,
+
+
+            "symbol":
+
+                self.symbol,
+
+
+            "side":
+
+                order_side,
+
+
+            "orderType":
+
+                "Market",
+
+
+            "qty":
+
+                str(self.qty),
+
+
+            "timeInForce":
+
+                "IOC"
+
+        }
+
+
+
+        print(
+            "[ORDER SEND]",
+            payload
+        )
+
+
+
+        result = self._request(
+
+            "/v5/order/create",
+
+            payload
+
+        )
+
+
+
+        if result and result.get(
+            "retCode"
+        ) == 0:
 
 
             self.position = side
 
 
-
             print(
-
                 "[POSITION OPEN]",
-
                 side
-
-            )
-
-
-            return result
-
-
-
-
-
-        # ==========================
-        # EXIT
-        # ==========================
-
-        if signal_type == "EXIT":
-
-
-            if self.position is None:
-
-                return
-
-
-
-            close_side = (
-
-                "Sell"
-
-                if self.position == "Buy"
-
-                else
-
-                "Buy"
-
             )
 
 
 
-            result = self.market_order(
 
-                close_side
 
-            )
+    # =====================================
+    # CLOSE
+    # =====================================
 
+    def close_position(
+        self
+    ):
+
+
+        if self.position is None:
 
 
             print(
-
-                "[POSITION CLOSED]",
-
-                self.position
-
+                "[NO POSITION]"
             )
+
+
+            return
+
+
+
+        close_side = (
+
+            "Sell"
+
+            if self.position == "Buy"
+
+            else
+
+            "Buy"
+
+        )
+
+
+
+        payload = {
+
+
+            "category":
+
+                self.category,
+
+
+            "symbol":
+
+                self.symbol,
+
+
+            "side":
+
+                close_side,
+
+
+            "orderType":
+
+                "Market",
+
+
+            "qty":
+
+                str(self.qty),
+
+
+            "reduceOnly":
+
+                True
+
+
+        }
+
+
+
+        print(
+            "[CLOSE ORDER]",
+            payload
+        )
+
+
+
+        result = self._request(
+
+            "/v5/order/create",
+
+            payload
+
+        )
+
+
+
+        if result and result.get(
+            "retCode"
+        ) == 0:
 
 
             self.position = None
 
 
-
-            return result
+            print(
+                "[POSITION CLOSED]"
+            )
 
 
 
@@ -410,20 +491,19 @@ class OrderManager:
         return {
 
 
-            "symbol":
-
-                self.symbol,
-
-
             "live":
 
                 self.live,
 
 
+            "symbol":
+
+                self.symbol,
+
+
             "position":
 
                 self.position
-
 
         }
 
