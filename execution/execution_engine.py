@@ -1,12 +1,9 @@
-# execution/execution_engine.py
-
 import os
 import time
 import hmac
 import hashlib
 import json
 import requests
-
 
 from dotenv import load_dotenv
 
@@ -15,10 +12,7 @@ from trade_db import trade_db
 
 from position.position_manager import position_manager
 
-from risk.risk_engine import risk_engine
-
 from risk.trailing_stop_manager import trailing_stop_manager
-
 
 
 load_dotenv()
@@ -26,17 +20,6 @@ load_dotenv()
 
 
 class ExecutionEngine:
-    """
-    Execution Engine
-
-    기능:
-    - Bybit 주문 실행
-    - Entry / Exit 처리
-    - Position 관리
-    - Trade DB 기록
-    - Trailing Stop 관리
-    """
-
 
 
     def __init__(self):
@@ -64,7 +47,7 @@ class ExecutionEngine:
 
             "BYBIT_BASE_URL",
 
-            "https://api.bybit.com"
+            "https://api-testnet.bybit.com"
 
         )
 
@@ -147,7 +130,13 @@ class ExecutionEngine:
         timestamp = str(
 
             int(
-                time.time() * 1000
+
+                time.time()
+
+                *
+
+                1000
+
             )
 
         )
@@ -247,16 +236,18 @@ class ExecutionEngine:
 
 
 
-            print("============================")
-            print("METHOD :", method)
-            print("URL    :", url)
-            print("BODY   :", body)
-            print("RESULT :", response.text)
-            print("============================")
+            print(
+
+                "[BYBIT]",
+
+                response.text
+
+            )
 
 
 
             response.raise_for_status()
+
 
 
             return response.json()
@@ -297,31 +288,60 @@ class ExecutionEngine:
 
 
 
-        if signal["type"] == "ENTRY":
+        signal_type = signal.get(
+
+            "type"
+
+        )
+
+
+        symbol = signal.get(
+
+            "symbol"
+
+        )
+
+
+        side = signal.get(
+
+            "side"
+
+        )
+
+
+        qty = signal.get(
+
+            "qty"
+
+        )
+
+
+
+        if signal_type == "ENTRY":
 
 
             return self.execute(
 
-                signal["symbol"],
+                symbol,
 
-                signal["side"],
+                side,
 
-                signal["qty"]
+                qty
 
             )
 
 
 
-        if signal["type"] == "EXIT":
+        if signal_type == "EXIT":
 
 
             return self.close_position(
 
-                signal["symbol"],
+                symbol,
 
-                signal["side"],
+                side,
 
-                signal["qty"]
+                qty
 
             )
 
@@ -333,7 +353,7 @@ class ExecutionEngine:
 
 
     # =====================================
-    # MARKET ORDER
+    # MARKET ENTRY
     # =====================================
 
     def execute(
@@ -375,12 +395,7 @@ class ExecutionEngine:
 
 
 
-        for attempt in range(
-
-            self.retry
-
-        ):
-
+        for i in range(self.retry):
 
 
             result = self.request(
@@ -404,18 +419,9 @@ class ExecutionEngine:
             ) == 0:
 
 
-
                 print(
 
-                    "[ORDER SUCCESS]",
-
-                    result
-
-                )
-
-
-
-                position_manager.set_position(
+                    "[ORDER ACCEPTED]",
 
                     symbol,
 
@@ -426,27 +432,10 @@ class ExecutionEngine:
                 )
 
 
-
-                risk_engine.register_trade()
-
-
-
-                trade_db.insert_trade(
-
-                    symbol=symbol,
-
-                    side=side,
-
-                    qty=qty,
-
-                    price=0,
-
-                    pnl=0,
-
-                    trade_type="ENTRY"
-
-                )
-
+                # 중요:
+                # Position 업데이트 금지
+                #
+                # Private WS execution 이벤트에서 처리
 
 
                 return result
@@ -460,7 +449,6 @@ class ExecutionEngine:
                 result
 
             )
-
 
 
             time.sleep(2)
@@ -489,7 +477,7 @@ class ExecutionEngine:
 
             "Sell"
 
-            if side=="Buy"
+            if side == "Buy"
 
             else
 
@@ -556,47 +544,13 @@ class ExecutionEngine:
         ) == 0:
 
 
-
             print(
 
-                "[POSITION CLOSED]"
-
-            )
-
-
-
-            position_manager.remove_position(
+                "[CLOSE ORDER ACCEPTED]",
 
                 symbol
 
             )
-
-
-
-            trailing_stop_manager.reset(
-
-                symbol
-
-            )
-
-
-
-            trade_db.insert_trade(
-
-                symbol=symbol,
-
-                side=close_side,
-
-                qty=qty,
-
-                price=0,
-
-                pnl=0,
-
-                trade_type="EXIT"
-
-            )
-
 
 
         return result
@@ -607,6 +561,7 @@ class ExecutionEngine:
 
     # =====================================
     # FILL CALLBACK
+    # private_ws 호출
     # =====================================
 
     def on_fill(
@@ -634,21 +589,67 @@ class ExecutionEngine:
 
 
 
-        trade_db.insert_trade(
+        try:
 
-            symbol=symbol,
 
-            side=side,
+            position_manager.set_position(
 
-            qty=qty,
+                symbol,
 
-            price=price,
+                side,
 
-            pnl=0,
+                qty,
 
-            trade_type="FILL"
+                price
 
-        )
+            )
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[POSITION ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+        try:
+
+
+            trade_db.insert(
+
+                symbol,
+
+                side,
+
+                qty,
+
+                price,
+
+                0,
+
+                "ENTRY"
+
+            )
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[DB ERROR]",
+
+                e
+
+            )
 
 
 
@@ -687,7 +688,6 @@ class ExecutionEngine:
                 side
 
             )
-
 
 
             if stop_price:
@@ -816,8 +816,7 @@ class ExecutionEngine:
             )
 
 
-
-        except Exception:
+        except:
 
 
             return 0.0
@@ -841,7 +840,9 @@ class ExecutionEngine:
     # STATUS
     # =====================================
 
-    def status(self):
+    def status(
+        self
+    ):
 
 
         return {
