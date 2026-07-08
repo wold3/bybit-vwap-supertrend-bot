@@ -19,11 +19,8 @@ class IndicatorEngine:
         self.max_history = int(
 
             os.getenv(
-
                 "MAX_HISTORY",
-
-                "200"
-
+                "500"
             )
 
         )
@@ -32,11 +29,8 @@ class IndicatorEngine:
         self.period = int(
 
             os.getenv(
-
                 "SUPER_TREND_PERIOD",
-
-                "10"
-
+                "400"
             )
 
         )
@@ -45,11 +39,8 @@ class IndicatorEngine:
         self.multiplier = float(
 
             os.getenv(
-
                 "SUPER_TREND_MULTIPLIER",
-
-                "3"
-
+                "15.0"
             )
 
         )
@@ -57,11 +48,13 @@ class IndicatorEngine:
 
         self.history = defaultdict(
 
-            lambda: deque(
+            lambda:
 
-                maxlen=self.max_history
+                deque(
 
-            )
+                    maxlen=self.max_history
+
+                )
 
         )
 
@@ -92,7 +85,6 @@ class IndicatorEngine:
         )
 
 
-
         if not symbol:
 
             return
@@ -101,7 +93,7 @@ class IndicatorEngine:
 
         self.history[symbol].append(
 
-            candle
+            candle.copy()
 
         )
 
@@ -124,7 +116,6 @@ class IndicatorEngine:
             symbol
 
         )
-
 
 
         if not data:
@@ -160,14 +151,13 @@ class IndicatorEngine:
         )
 
 
-
-        if df is None or len(df)==0:
+        if df is None or len(df) == 0:
 
             return None
 
 
 
-        typical_price = (
+        price = (
 
             df["high"]
 
@@ -191,7 +181,7 @@ class IndicatorEngine:
 
 
 
-        if total_volume == 0:
+        if total_volume <= 0:
 
             return None
 
@@ -199,15 +189,7 @@ class IndicatorEngine:
 
         return float(
 
-            (
-
-                typical_price
-
-                *
-
-                volume
-
-            ).sum()
+            (price * volume).sum()
 
             /
 
@@ -236,8 +218,13 @@ class IndicatorEngine:
         )
 
 
+        if df is None:
 
-        if df is None or len(df) < self.period:
+            return None
+
+
+
+        if len(df) < self.period:
 
             return None
 
@@ -251,7 +238,7 @@ class IndicatorEngine:
 
 
 
-        tr1 = high-low
+        tr1 = high - low
 
 
         tr2 = (
@@ -336,10 +323,9 @@ class IndicatorEngine:
         )
 
 
-
         if df is None:
 
-            return None
+            return "FLAT"
 
 
 
@@ -348,7 +334,6 @@ class IndicatorEngine:
             symbol
 
         )
-
 
 
         if atr is None:
@@ -373,7 +358,7 @@ class IndicatorEngine:
 
 
 
-        upper = (
+        upper_band = (
 
             hl2
 
@@ -388,7 +373,7 @@ class IndicatorEngine:
         )
 
 
-        lower = (
+        lower_band = (
 
             hl2
 
@@ -408,13 +393,13 @@ class IndicatorEngine:
 
 
 
-        if close > upper:
+        if close > upper_band:
 
             return "UP"
 
 
 
-        elif close < lower:
+        if close < lower_band:
 
             return "DOWN"
 
@@ -432,25 +417,8 @@ class IndicatorEngine:
 
     def calculate(
         self,
-        symbol=None
+        symbol
     ):
-
-
-        if symbol is None:
-
-
-            if len(self.history)==0:
-
-                return {}
-
-
-
-            symbol = list(
-
-                self.history.keys()
-
-            )[0]
-
 
 
         return {
@@ -481,7 +449,7 @@ class IndicatorEngine:
 
 
     # =====================================
-    # MARKET DATA
+    # MARKET DATA BUILDER
     # =====================================
 
     def get_market_data(
@@ -490,11 +458,26 @@ class IndicatorEngine:
     ):
 
 
-        indicators = self.calculate(
+        if not candle:
 
-            candle["symbol"]
+            return None
+
+
+
+        symbol = candle.get(
+
+            "symbol"
 
         )
+
+
+
+        indicators = self.calculate(
+
+            symbol
+
+        )
+
 
 
         return {
@@ -522,6 +505,7 @@ class IndicatorEngine:
 
         if symbol:
 
+
             self.history.pop(
 
                 symbol,
@@ -530,7 +514,9 @@ class IndicatorEngine:
 
             )
 
+
         else:
+
 
             self.history.clear()
 
@@ -542,9 +528,7 @@ class IndicatorEngine:
     # STATUS
     # =====================================
 
-    def status(
-        self
-    ):
+    def status(self):
 
 
         return {
@@ -563,11 +547,21 @@ class IndicatorEngine:
 
                 sum(
 
-                    len(x)
+                    len(v)
 
-                    for x in self.history.values()
+                    for v in self.history.values()
 
-                )
+                ),
+
+
+            "period":
+
+                self.period,
+
+
+            "multiplier":
+
+                self.multiplier
 
         }
 
