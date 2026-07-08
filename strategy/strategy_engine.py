@@ -1,5 +1,3 @@
-# strategy/strategy_engine.py
-
 import os
 
 from dotenv import load_dotenv
@@ -16,6 +14,7 @@ from position.position_manager import position_manager
 
 
 load_dotenv()
+
 
 
 
@@ -54,7 +53,6 @@ class StrategyEngine:
 
         if not market_data:
 
-
             return None
 
 
@@ -89,7 +87,6 @@ class StrategyEngine:
 
 
         if not symbol or price is None:
-
 
             return None
 
@@ -128,7 +125,13 @@ class StrategyEngine:
 
 
 
-        if trend is None:
+        if trend in (
+
+            None,
+
+            "FLAT"
+
+        ):
 
             return None
 
@@ -183,6 +186,13 @@ class StrategyEngine:
         ):
 
 
+            print(
+
+                "[ML BLOCK]"
+
+            )
+
+
             return None
 
 
@@ -225,6 +235,7 @@ class StrategyEngine:
                 "qty":
 
                     self.default_qty
+
 
             }
 
@@ -269,9 +280,8 @@ class StrategyEngine:
 
                     self.default_qty
 
+
             }
-
-
 
 
 
@@ -282,7 +292,7 @@ class StrategyEngine:
 
 
     # =====================================
-    # EXIT
+    # EXIT CHECK
     # =====================================
 
     def check_exit(
@@ -315,7 +325,6 @@ class StrategyEngine:
 
 
         if not position:
-
 
             return None
 
@@ -374,6 +383,7 @@ class StrategyEngine:
 
                     size
 
+
             }
 
 
@@ -415,6 +425,7 @@ class StrategyEngine:
 
                     size
 
+
             }
 
 
@@ -431,7 +442,9 @@ class StrategyEngine:
     # STATUS
     # =====================================
 
-    def status(self):
+    def status(
+        self
+    ):
 
 
         return {
