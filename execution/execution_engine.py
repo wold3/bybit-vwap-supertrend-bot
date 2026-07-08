@@ -80,7 +80,10 @@ class ExecutionEngine:
         )
 
 
-        self.recv_window = "5000"
+        self.recv_window = os.getenv(
+            "BYBIT_RECV_WINDOW",
+            "5000"
+        )
 
         self.time_offset = 0
 
