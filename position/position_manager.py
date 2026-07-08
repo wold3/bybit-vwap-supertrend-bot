@@ -1,155 +1,56 @@
 import threading
 
 
-
 class PositionManager:
+    """
+    Position Manager
 
+    기능
+    - 현재 포지션 저장
+    - 포지션 조회
+    - 포지션 삭제
+    """
 
     def __init__(self):
 
+        self.lock = threading.Lock()
 
         self.positions = {}
 
 
-        self.lock = threading.Lock()
-
-
-
-
 
     # =====================================
-    # BYBIT POSITION UPDATE
+    # ADD / UPDATE
     # =====================================
 
-    def update_position(
+    def set_position(
         self,
-        positions
+        symbol,
+        side,
+        size,
+        entry_price=0
     ):
-
 
         with self.lock:
 
+            self.positions[symbol] = {
 
-            for p in positions:
+                "symbol": symbol,
 
+                "side": side,
 
-                symbol = p.get(
-                    "symbol"
-                )
+                "size": size,
 
+                "entry_price": entry_price
 
-                if not symbol:
+            }
 
-                    continue
-
-
-
-                size = float(
-
-                    p.get(
-                        "size",
-                        0
-                    )
-
-                )
-
-
-
-                # 포지션 종료
-
-                if size == 0:
-
-
-                    self.positions.pop(
-
-                        symbol,
-
-                        None
-
-                    )
-
-
-                    continue
-
-
-
-
-
-                self.positions[symbol] = {
-
-
-                    "symbol":
-
-                        symbol,
-
-
-                    "side":
-
-                        p.get(
-
-                            "side"
-
-                        ),
-
-
-                    "size":
-
-                        size,
-
-
-                    "entry_price":
-
-                        float(
-
-                            p.get(
-
-                                "avgPrice",
-
-                                0
-
-                            )
-
-                        ),
-
-
-                    "mark_price":
-
-                        float(
-
-                            p.get(
-
-                                "markPrice",
-
-                                0
-
-                            )
-
-                        ),
-
-
-                    "unrealized_pnl":
-
-                        float(
-
-                            p.get(
-
-                                "unrealisedPnl",
-
-                                0
-
-                            )
-
-                        )
-
-
-                }
-
-
+        return True
 
 
 
     # =====================================
-    # SINGLE POSITION
+    # GET
     # =====================================
 
     def get_position(
@@ -157,45 +58,14 @@ class PositionManager:
         symbol
     ):
 
-
         with self.lock:
 
-
-            return (
-
-                self.positions
-                .get(symbol)
-
-            )
-
-
+            return self.positions.get(symbol)
 
 
 
     # =====================================
-    # ALL POSITION
-    # =====================================
-
-    def get_positions(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            return list(
-
-                self.positions.values()
-
-            )
-
-
-
-
-
-    # =====================================
-    # CHECK HOLDING
+    # HAS POSITION
     # =====================================
 
     def has_position(
@@ -203,90 +73,69 @@ class PositionManager:
         symbol
     ):
 
+        with self.lock:
+
+            return symbol in self.positions
+
+
+
+    # =====================================
+    # REMOVE
+    # =====================================
+
+    def remove_position(
+        self,
+        symbol
+    ):
 
         with self.lock:
 
+            if symbol in self.positions:
 
-            return (
-
-                symbol
-
-                in
-
-                self.positions
-
-            )
-
-
+                del self.positions[symbol]
 
 
 
     # =====================================
-    # POSITION SIDE
+    # ALL POSITIONS
     # =====================================
 
-    def get_side(
-        self,
-        symbol
-    ):
+    def get_all_positions(self):
 
+        with self.lock:
 
-        position = self.get_position(
-
-            symbol
-
-        )
-
-
-        if position:
-
-
-            return position.get(
-
-                "side"
-
-            )
-
-
-        return None
-
-
+            return list(self.positions.values())
 
 
 
     # =====================================
-    # SIZE
+    # CLEAR
     # =====================================
 
-    def get_size(
-        self,
-        symbol
-    ):
+    def clear(self):
 
+        with self.lock:
 
-        position = self.get_position(
-
-            symbol
-
-        )
-
-
-        if position:
-
-
-            return position.get(
-
-                "size",
-
-                0
-
-            )
-
-
-        return 0
+            self.positions.clear()
 
 
 
+    # =====================================
+    # STATUS
+    # =====================================
+
+    def status(self):
+
+        with self.lock:
+
+            return {
+
+                "count": len(self.positions),
+
+                "symbols": list(self.positions.keys())
+
+            }
 
 
+# singleton
 position_manager = PositionManager()
