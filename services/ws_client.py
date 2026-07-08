@@ -326,6 +326,13 @@ class WSClient:
 
                 )
 
+                print(
+                    "[CANDLE COUNT]",
+                    symbol,
+                    len(
+                        candle_builder.get_candles(symbol)
+                    )
+                )
 
 
                 candles = candle_builder.get_candles(
