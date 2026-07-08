@@ -1,5 +1,3 @@
-# main.py
-
 import os
 import time
 import threading
@@ -19,12 +17,7 @@ from strategy.strategy_engine import strategy_engine
 from execution.execution_engine import execution_engine
 
 
-from position.position_manager import position_manager
-
-
 from risk.drawdown_guard import drawdown_guard
-
-from risk.risk_engine import risk_engine
 
 
 from watchdog.watchdog import watchdog
@@ -59,20 +52,6 @@ def public_ws_loop():
 
 
 
-    while running:
-
-
-        watchdog.heartbeat(
-
-            "public_ws"
-
-        )
-
-
-        time.sleep(5)
-
-
-
 
 
 # =====================================
@@ -93,24 +72,10 @@ def private_ws_loop():
 
 
 
-    while running:
-
-
-        watchdog.heartbeat(
-
-            "private_ws"
-
-        )
-
-
-        time.sleep(5)
-
-
-
 
 
 # =====================================
-# STRATEGY
+# STRATEGY LOOP
 # =====================================
 
 def strategy_loop():
@@ -130,21 +95,7 @@ def strategy_loop():
         try:
 
 
-            watchdog.heartbeat(
-
-                "strategy"
-
-            )
-
-
-
-            market_data = (
-
-                ws_client
-
-                .get_latest_data()
-
-            )
+            market_data = ws_client.get_latest_data()
 
 
 
@@ -154,8 +105,6 @@ def strategy_loop():
                 time.sleep(1)
 
                 continue
-
-
 
 
 
@@ -190,7 +139,7 @@ def strategy_loop():
 
                 print(
 
-                    "[EXEC RESULT]",
+                    "[EXECUTION]",
 
                     result
 
@@ -218,7 +167,7 @@ def strategy_loop():
 
 
 # =====================================
-# EQUITY
+# EQUITY MONITOR
 # =====================================
 
 def equity_loop():
@@ -236,14 +185,6 @@ def equity_loop():
 
 
         try:
-
-
-            watchdog.heartbeat(
-
-                "equity"
-
-            )
-
 
 
             equity = execution_engine.get_account_equity()
@@ -294,13 +235,13 @@ def equity_loop():
 # =====================================
 
 def start_thread(
-    target
+    func
 ):
 
 
     thread = threading.Thread(
 
-        target=target,
+        target=func,
 
         daemon=True
 
@@ -308,7 +249,6 @@ def start_thread(
 
 
     thread.start()
-
 
 
     return thread
@@ -330,10 +270,9 @@ def shutdown(
     global running
 
 
-
     print(
 
-        "\n[SHUTDOWN]"
+        "\n[BOT STOPPING]"
 
     )
 
@@ -344,9 +283,12 @@ def shutdown(
 
     try:
 
+
         ws_client.stop()
 
+
     except:
+
 
         pass
 
@@ -354,44 +296,35 @@ def shutdown(
 
     try:
 
+
         private_ws.stop()
 
+
     except:
+
 
         pass
 
 
 
-    watchdog.stop()
+    try:
+
+
+        watchdog.stop()
+
+
+    except:
+
+
+        pass
 
 
 
     print(
 
-        "BOT STOPPED"
+        "[BOT STOPPED]"
 
     )
-
-
-
-
-
-signal.signal(
-
-    signal.SIGINT,
-
-    shutdown
-
-)
-
-
-signal.signal(
-
-    signal.SIGTERM,
-
-    shutdown
-
-)
 
 
 
@@ -404,31 +337,38 @@ signal.signal(
 if __name__ == "__main__":
 
 
-    mode = os.getenv(
-
-        "LIVE_TRADING",
-
-        "false"
-
-    )
-
-
 
     print(
 
         """
 
-=====================================
+====================================
 
 🚀 BYBIT AI TRADING BOT
 
 MODE : {}
 
-=====================================
+SYMBOL : {}
+
+====================================
 
 """.format(
 
-            mode
+            os.getenv(
+
+                "LIVE_TRADING",
+
+                "false"
+
+            ),
+
+            os.getenv(
+
+                "DEFAULT_SYMBOL",
+
+                "BTCUSDT"
+
+            )
 
         )
 
@@ -437,8 +377,30 @@ MODE : {}
 
 
 
+    # Watchdog FIRST
 
     watchdog.start()
+
+
+
+    signal.signal(
+
+        signal.SIGINT,
+
+        shutdown
+
+    )
+
+
+    signal.signal(
+
+        signal.SIGTERM,
+
+        shutdown
+
+    )
+
+
 
 
 
@@ -459,6 +421,7 @@ MODE : {}
 
 
         equity_loop
+
 
     ]
 
