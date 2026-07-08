@@ -1,305 +1,95 @@
 import os
-import numpy as np
+import threading
 
 from dotenv import load_dotenv
-
 
 load_dotenv()
 
 
-
 class MLFilter:
+    """
+    ML Trade Filter
 
+    기능
+    - ML 사용 여부
+    - 신호 필터링
+    """
 
     def __init__(self):
 
+        self.lock = threading.Lock()
 
         self.enabled = (
 
             os.getenv(
-
-                "ML_FILTER_ENABLE",
-
-                "true"
-
-            ).lower()
-
-            ==
-
-            "true"
+                "USE_ML_FILTER",
+                "false"
+            ).lower() == "true"
 
         )
-
-
-        self.threshold = float(
-
-            os.getenv(
-
-                "ML_THRESHOLD",
-
-                "0.65"
-
-            )
-
-        )
-
-
-
 
 
     # =====================================
-    # FEATURE 생성
-    # =====================================
-
-    def create_features(
-        self,
-        data
-    ):
-
-
-        close = float(
-
-            data.get(
-
-                "close",
-
-                0
-
-            )
-
-        )
-
-
-        volume = float(
-
-            data.get(
-
-                "volume",
-
-                0
-
-            )
-
-        )
-
-
-        vwap = float(
-
-            data.get(
-
-                "vwap",
-
-                close
-
-            )
-
-        )
-
-
-
-        trend = data.get(
-
-            "supertrend",
-
-            "DOWN"
-
-        )
-
-
-
-        trend_value = 1 if trend == "UP" else 0
-
-
-
-        return np.array([
-
-
-            close,
-
-
-            volume,
-
-
-            vwap,
-
-
-            trend_value
-
-
-        ])
-
-
-
-
-
-    # =====================================
-    # Predict
-    # =====================================
-
-    def predict(
-        self,
-        data
-    ):
-
-
-        if not self.enabled:
-
-
-            return 1.0
-
-
-
-
-
-        features = self.create_features(
-
-            data
-
-        )
-
-
-
-        probability = self.simple_model(
-
-            features
-
-        )
-
-
-
-        return round(
-
-            probability,
-
-            3
-
-        )
-
-
-
-
-
-    # =====================================
-    # 기본 ML 모델 자리
-    # =====================================
-
-    def simple_model(
-        self,
-        features
-    ):
-
-
-        close = features[0]
-
-        vwap = features[2]
-
-        trend = features[3]
-
-
-
-        score = 0.5
-
-
-
-        # 가격 위치
-
-        if close > vwap:
-
-
-            score += 0.2
-
-
-
-        else:
-
-
-            score -= 0.2
-
-
-
-
-
-        # Supertrend
-
-        if trend == 1:
-
-
-            score += 0.2
-
-
-
-        else:
-
-
-            score -= 0.2
-
-
-
-
-
-        # 범위 제한
-
-        score = max(
-
-            0.01,
-
-            min(
-
-                0.99,
-
-                score
-
-            )
-
-        )
-
-
-
-        return score
-
-
-
-
-
-    # =====================================
-    # 거래 가능 여부
+    # TRADE FILTER
     # =====================================
 
     def allow_trade(
         self,
-        data
+        market_data
     ):
 
+        if not self.enabled:
 
-        probability = self.predict(
+            return True
 
-            data
+        if market_data is None:
 
-        )
+            return False
 
+        # ============================
+        # TODO
+        # 실제 ML 모델 예측 추가
+        # ============================
 
-        print(
-
-            "ML PROBABILITY",
-
-            probability
-
-        )
-
+        return True
 
 
-        return (
+    # =====================================
+    # ENABLE
+    # =====================================
 
-            probability
+    def enable(self):
 
-            >=
+        with self.lock:
 
-            self.threshold
-
-        )
-
-
+            self.enabled = True
 
 
+    # =====================================
+    # DISABLE
+    # =====================================
 
+    def disable(self):
+
+        with self.lock:
+
+            self.enabled = False
+
+
+    # =====================================
+    # STATUS
+    # =====================================
+
+    def status(self):
+
+        with self.lock:
+
+            return {
+
+                "enabled": self.enabled
+
+            }
+
+
+# singleton
 ml_filter = MLFilter()
