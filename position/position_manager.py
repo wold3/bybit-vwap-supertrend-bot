@@ -1,3 +1,5 @@
+# position/position_manager.py
+
 import threading
 
 
@@ -7,10 +9,9 @@ class PositionManager:
     Position Manager
 
     기능:
-    - 현재 포지션 저장
-    - 포지션 조회
-    - 포지션 삭제
-    - ExecutionEngine 연동
+    - 현재 보유 포지션 관리
+    - Entry/Exit 상태 저장
+    - Private WS 동기화
     """
 
 
@@ -23,8 +24,10 @@ class PositionManager:
 
 
 
+
+
     # =====================================
-    # ADD / UPDATE
+    # SET POSITION
     # =====================================
 
     def set_position(
@@ -35,22 +38,40 @@ class PositionManager:
         entry_price=0
     ):
 
+
         with self.lock:
+
 
             self.positions[symbol] = {
 
-                "symbol": symbol,
 
-                "side": side,
+                "symbol":
 
-                "size": float(size),
+                    symbol,
 
-                "entry_price": float(entry_price)
+
+                "side":
+
+                    side,
+
+
+                "size":
+
+                    float(size),
+
+
+                "entry_price":
+
+                    float(entry_price)
+
 
             }
 
 
+
         return True
+
+
 
 
 
@@ -66,6 +87,7 @@ class PositionManager:
         entry_price=0
     ):
 
+
         return self.set_position(
 
             symbol,
@@ -80,6 +102,8 @@ class PositionManager:
 
 
 
+
+
     # =====================================
     # GET POSITION
     # =====================================
@@ -89,16 +113,30 @@ class PositionManager:
         symbol
     ):
 
+
         with self.lock:
 
-            return self.positions.get(
+
+            position = self.positions.get(
+
                 symbol
+
             )
+
+
+            if position:
+
+                return position.copy()
+
+
+            return None
+
+
 
 
 
     # =====================================
-    # HAS POSITION
+    # CHECK POSITION
     # =====================================
 
     def has_position(
@@ -106,48 +144,13 @@ class PositionManager:
         symbol
     ):
 
+
         with self.lock:
+
 
             return symbol in self.positions
 
 
-
-    # =====================================
-    # REMOVE POSITION
-    # =====================================
-
-    def remove_position(
-        self,
-        symbol
-    ):
-
-        with self.lock:
-
-            if symbol in self.positions:
-
-                del self.positions[symbol]
-
-                return True
-
-
-        return False
-
-
-
-    # =====================================
-    # CLOSE POSITION
-    # =====================================
-
-    def close_position(
-        self,
-        symbol
-    ):
-
-        return self.remove_position(
-
-            symbol
-
-        )
 
 
 
@@ -161,45 +164,72 @@ class PositionManager:
         size
     ):
 
+
         with self.lock:
 
-            if symbol not in self.positions:
 
-                return False
-
-
-            self.positions[symbol]["size"] = float(
-                size
-            )
+            if symbol in self.positions:
 
 
-        return True
+                self.positions[symbol]["size"] = float(size)
+
+
+                return True
+
+
+
+        return False
+
+
 
 
 
     # =====================================
-    # UPDATE ENTRY PRICE
+    # CLOSE POSITION
     # =====================================
 
-    def update_entry_price(
+    def close_position(
         self,
-        symbol,
-        price
+        symbol
     ):
 
+
+        return self.remove_position(
+
+            symbol
+
+        )
+
+
+
+
+
+    # =====================================
+    # REMOVE
+    # =====================================
+
+    def remove_position(
+        self,
+        symbol
+    ):
+
+
         with self.lock:
 
-            if symbol not in self.positions:
 
-                return False
-
-
-            self.positions[symbol]["entry_price"] = float(
-                price
-            )
+            if symbol in self.positions:
 
 
-        return True
+                del self.positions[symbol]
+
+
+                return True
+
+
+
+        return False
+
+
 
 
 
@@ -211,25 +241,19 @@ class PositionManager:
         self
     ):
 
-        with self.lock:
-
-            return list(
-                self.positions.values()
-            )
-
-
-
-    # =====================================
-    # CLEAR
-    # =====================================
-
-    def clear(
-        self
-    ):
 
         with self.lock:
 
-            self.positions.clear()
+
+            return [
+
+                pos.copy()
+
+                for pos in self.positions.values()
+
+            ]
+
+
 
 
 
@@ -241,11 +265,35 @@ class PositionManager:
         self
     ):
 
+
         with self.lock:
 
+
             return len(
+
                 self.positions
+
             )
+
+
+
+
+
+    # =====================================
+    # CLEAR
+    # =====================================
+
+    def clear(
+        self
+    ):
+
+
+        with self.lock:
+
+
+            self.positions.clear()
+
+
 
 
 
@@ -257,25 +305,33 @@ class PositionManager:
         self
     ):
 
+
         with self.lock:
+
 
             return {
 
+
                 "count":
+
                     len(self.positions),
 
-                "symbols":
-                    list(self.positions.keys()),
 
                 "positions":
-                    list(self.positions.values())
+
+                    list(
+
+                        self.positions.values()
+
+                    )
+
 
             }
 
 
 
-# =====================================
-# SINGLETON
-# =====================================
+
+
+# singleton
 
 position_manager = PositionManager()
