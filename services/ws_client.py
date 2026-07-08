@@ -7,11 +7,31 @@ import websocket
 
 from dotenv import load_dotenv
 
-from market.candle_builder import candle_builder
-from indicators.indicator_engine import indicator_engine
-from strategy.vwap_supertrend_strategy import vwap_supertrend_strategy
 
-from watchdog.watchdog import watchdog
+from market.candle_builder import (
+    candle_builder
+)
+
+
+from indicators.indicator_engine import (
+    indicator_engine
+)
+
+
+from strategy.vwap_supertrend_strategy import (
+    vwap_supertrend_strategy
+)
+
+
+from execution.order_manager import (
+    order_manager
+)
+
+
+from watchdog.watchdog import (
+    watchdog
+)
+
 
 
 load_dotenv()
@@ -37,6 +57,7 @@ class WSClient:
                 "BYBIT_LIVE_PUBLIC_WS",
                 "wss://stream.bybit.com/v5/public/linear"
             )
+
 
         else:
 
@@ -65,6 +86,7 @@ class WSClient:
         self.latest_data = None
 
         self.last_update = 0
+
 
 
 
@@ -130,6 +152,7 @@ class WSClient:
                     on_close=self.on_close
 
                 )
+
 
 
                 self.ws.run_forever(
@@ -274,11 +297,13 @@ class WSClient:
             for trade in trades:
 
 
+
                 price = float(
 
                     trade["p"]
 
                 )
+
 
 
                 volume = float(
@@ -314,10 +339,6 @@ class WSClient:
 
 
 
-                # =================================
-                # TICK -> CANDLE
-                # =================================
-
 
                 candle_builder.update(
 
@@ -331,11 +352,15 @@ class WSClient:
 
 
 
+
+
                 candles = candle_builder.get_candles(
 
                     symbol
 
                 )
+
+
 
 
 
@@ -351,13 +376,14 @@ class WSClient:
 
 
 
-                # 현재 진행중 candle 표시
+
 
                 current = candle_builder.current.get(
 
                     symbol
 
                 )
+
 
 
                 if current:
@@ -374,20 +400,10 @@ class WSClient:
 
 
 
-                if len(candles) < 1:
-
-
-                    continue
-
-
-
-
 
                 self.process_market(
 
-                    candles,
-
-                    current
+                    symbol
 
                 )
 
@@ -418,22 +434,55 @@ class WSClient:
 
     def process_market(
         self,
-        candles,
-        current=None
+        symbol
     ):
+
+
+        candles = candle_builder.get_candles(
+
+            symbol
+
+        )
+
+
+
+        current = candle_builder.current.get(
+
+            symbol
+
+        )
 
 
 
         if current:
 
+            candles = candles + [
 
-            candle = current
+                current
+
+            ]
 
 
-        else:
+
+        if len(candles) < 2:
+
+            return
 
 
-            candle = candles[-1]
+
+
+
+        candle = candles[-1]
+
+
+
+        print(
+
+            "[LAST CANDLE]",
+
+            candle
+
+        )
 
 
 
@@ -448,11 +497,13 @@ class WSClient:
 
 
 
+
         indicators = indicator_engine.calculate(
 
-            candle["symbol"]
+            symbol
 
         )
+
 
 
 
@@ -469,9 +520,65 @@ class WSClient:
 
 
 
-        # =================================
+
+        market_data = {
+
+
+            "symbol":
+
+                candle["symbol"],
+
+
+            "timestamp":
+
+                candle["timestamp"],
+
+
+            "open":
+
+                candle["open"],
+
+
+            "high":
+
+                candle["high"],
+
+
+            "low":
+
+                candle["low"],
+
+
+            "close":
+
+                candle["close"],
+
+
+            "volume":
+
+                candle["volume"],
+
+
+            **indicators
+
+        }
+
+
+
+
+
+        self.latest_data = market_data
+
+
+        self.last_update = time.time()
+
+
+
+
+
+        # =====================================
         # STRATEGY
-        # =================================
+        # =====================================
 
 
         signal = vwap_supertrend_strategy.analyze(
@@ -495,70 +602,12 @@ class WSClient:
 
 
 
-
-
-        market_data = {
-
-
-            "symbol":
-
-                candle["symbol"],
-
-
-
-            "open":
-
-                candle["open"],
-
-
-
-            "high":
-
-                candle["high"],
-
-
-
-            "low":
-
-                candle["low"],
-
-
-
-            "close":
-
-                candle["close"],
-
-
-
-            "volume":
-
-                candle["volume"],
-
-
-
-            "timestamp":
-
-                candle["timestamp"],
-
-
-
-            **indicators,
-
-
-
-            "signal":
+            order_manager.execute(
 
                 signal
 
-        }
+            )
 
-
-
-
-        self.latest_data = market_data
-
-
-        self.last_update = time.time()
 
 
 
@@ -584,6 +633,7 @@ class WSClient:
             error
 
         )
+
 
 
 
@@ -667,6 +717,7 @@ class WSClient:
 
 
 
+
     # =====================================
     # STATUS
     # =====================================
@@ -682,11 +733,9 @@ class WSClient:
                 self.running,
 
 
-
             "connected":
 
                 self.connected,
-
 
 
             "symbol":
@@ -694,11 +743,9 @@ class WSClient:
                 self.symbol,
 
 
-
             "last_update":
 
                 self.last_update,
-
 
 
             "latest":
