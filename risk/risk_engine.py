@@ -1,4 +1,7 @@
+# risk/risk_engine.py
+
 import os
+import time
 import threading
 
 from dotenv import load_dotenv
@@ -10,27 +13,21 @@ load_dotenv()
 
 class RiskEngine:
     """
-    Risk Engine
+    Risk Management Engine
 
     기능:
     - 최대 거래 횟수 제한
-    - 최대 동시 포지션 제한
-    - 일일 손실 제한
-    - 거래 기록 관리
-    - 거래 가능 여부 판단
+    - 일일 거래 관리
+    - 거래 상태 확인
     """
 
 
 
     def __init__(self):
 
+
         self.lock = threading.Lock()
 
-
-
-        # =====================================
-        # CONFIG
-        # =====================================
 
         self.max_trades = int(
 
@@ -45,44 +42,52 @@ class RiskEngine:
         )
 
 
-
-        self.max_positions = int(
-
-            os.getenv(
-
-                "MAX_POSITIONS",
-
-                "3"
-
-            )
-
-        )
-
-
-
-        self.max_daily_loss = float(
-
-            os.getenv(
-
-                "MAX_DAILY_LOSS",
-
-                "100"
-
-            )
-
-        )
-
-
-
-        # =====================================
-        # STATE
-        # =====================================
-
         self.trade_count = 0
 
-        self.open_positions = 0
 
-        self.daily_pnl = 0.0
+        self.day_start = self.get_day()
+
+
+
+
+
+    # =====================================
+    # DAY
+    # =====================================
+
+    def get_day(self):
+
+
+        return time.strftime(
+
+            "%Y-%m-%d"
+
+        )
+
+
+
+
+
+    # =====================================
+    # RESET CHECK
+    # =====================================
+
+    def check_daily_reset(self):
+
+
+        today = self.get_day()
+
+
+
+        if today != self.day_start:
+
+
+            self.trade_count = 0
+
+
+            self.day_start = today
+
+
 
 
 
@@ -90,129 +95,100 @@ class RiskEngine:
     # CAN TRADE
     # =====================================
 
-    def can_trade(
-        self
-    ):
+    def can_trade(self):
+
 
         with self.lock:
 
 
-            if self.trade_count >= self.max_trades:
-
-                return False
+            self.check_daily_reset()
 
 
 
-            if self.open_positions >= self.max_positions:
+            return (
 
-                return False
+                self.trade_count
 
+                <
 
+                self.max_trades
 
-            if self.daily_pnl <= -abs(
-                self.max_daily_loss
-            ):
-
-                return False
+            )
 
 
-
-            return True
 
 
 
     # =====================================
-    # REGISTER ENTRY
+    # REGISTER TRADE
     # =====================================
 
-    def register_trade(
-        self
-    ):
+    def register_trade(self):
+
 
         with self.lock:
+
+
+            self.check_daily_reset()
+
 
 
             self.trade_count += 1
 
-            self.open_positions += 1
+
+
+            return self.trade_count
+
+
 
 
 
     # =====================================
-    # CLOSE TRADE
+    # REMAINING
     # =====================================
 
-    def close_trade(
-        self,
-        pnl=0
-    ):
+    def remaining_trades(self):
+
 
         with self.lock:
 
 
-            if self.open_positions > 0:
-
-                self.open_positions -= 1
+            self.check_daily_reset()
 
 
 
-            self.daily_pnl += float(
-                pnl
+            return max(
+
+                self.max_trades
+
+                -
+
+                self.trade_count,
+
+                0
+
             )
 
 
 
-    # =====================================
-    # UPDATE PNL
-    # =====================================
-
-    def update_pnl(
-        self,
-        pnl
-    ):
-
-        with self.lock:
-
-
-            self.daily_pnl += float(
-                pnl
-            )
-
 
 
     # =====================================
-    # RESET DAILY
+    # RESET
     # =====================================
 
-    def reset(
-        self
-    ):
+    def reset(self):
+
 
         with self.lock:
 
 
             self.trade_count = 0
 
-            self.open_positions = 0
 
-            self.daily_pnl = 0.0
-
+            self.day_start = self.get_day()
 
 
-    # =====================================
-    # FORCE STOP
-    # =====================================
-
-    def emergency_stop(
-        self
-    ):
-
-        with self.lock:
-
-
-            self.daily_pnl = -abs(
-                self.max_daily_loss
-            )
 
 
 
@@ -220,11 +196,14 @@ class RiskEngine:
     # STATUS
     # =====================================
 
-    def status(
-        self
-    ):
+    def status(self):
+
 
         with self.lock:
+
+
+            self.check_daily_reset()
+
 
 
             return {
@@ -240,52 +219,28 @@ class RiskEngine:
                     self.max_trades,
 
 
-                "open_positions":
+                "remaining":
 
-                    self.open_positions,
-
-
-                "max_positions":
-
-                    self.max_positions,
+                    self.remaining_trades(),
 
 
-                "daily_pnl":
+                "day":
 
-                    self.daily_pnl,
-
-
-                "max_daily_loss":
-
-                    self.max_daily_loss,
+                    self.day_start,
 
 
                 "can_trade":
 
-                    (
+                    self.trade_count
 
-                        self.trade_count < self.max_trades
+                    <
 
-                        and
-
-                        self.open_positions < self.max_positions
-
-                        and
-
-                        self.daily_pnl > -abs(
-                            self.max_daily_loss
-                        )
-
-                    )
+                    self.max_trades
 
             }
 
 
 
 
-
-# =====================================
-# SINGLETON
-# =====================================
 
 risk_engine = RiskEngine()
