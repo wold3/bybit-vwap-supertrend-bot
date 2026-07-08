@@ -381,7 +381,32 @@ class ExecutionEngine:
         qty
     ):
 
+        live = os.getenv(
+            "LIVE_TRADING",
+            "false"
+        ).lower() == "true"
 
+
+        if live:
+
+            print(
+                "[LIVE ORDER WARNING]",
+                symbol,
+                side,
+                qty
+            )
+
+
+        else:
+
+            print(
+                "[DEMO ORDER]",
+                symbol,
+                side,
+                qty
+            )
+
+        
         body = {
 
             "category":
