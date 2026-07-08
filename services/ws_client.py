@@ -23,15 +23,43 @@ class WSClient:
     def __init__(self):
 
 
-        self.url = os.getenv(
+        live = os.getenv(
+            "LIVE_TRADING",
+            "false"
+        ).lower() == "true"
 
-            "BYBIT_PUBLIC_WS",
+        # =====================================
+        # WEBSOCKET URL SELECT
+        # =====================================
 
-            "wss://stream-demo.bybit.com/v5/public/linear"
+        if live:
 
-        )
+            self.url = os.getenv(
+
+                "BYBIT_LIVE_PUBLIC_WS",
+
+                "wss://stream.bybit.com/v5/public/linear"
+
+            )
 
 
+
+
+        else:
+            
+            self.url = os.getenv(
+
+                "BYBIT_DEMO_PUBLIC_WS",
+
+                "wss://stream-demo.bybit.com/v5/public/linear"
+
+            )
+
+
+        # =====================================
+        # COMMON SETTINGS
+        # =====================================
+        
         self.symbol = os.getenv(
 
             "DEFAULT_SYMBOL",
@@ -54,8 +82,6 @@ class WSClient:
         self.latest_data = None
 
         self.last_update = 0
-
-
 
 
 
