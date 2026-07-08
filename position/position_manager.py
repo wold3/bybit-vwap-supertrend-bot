@@ -1,5 +1,3 @@
-# position/position_manager.py
-
 import threading
 
 
@@ -9,16 +7,18 @@ class PositionManager:
     Position Manager
 
     기능:
-    - 현재 보유 포지션 관리
-    - Entry/Exit 상태 저장
+    - 현재 포지션 관리
     - Private WS 동기화
+    - Entry / Exit 상태 관리
     """
 
 
 
     def __init__(self):
 
+
         self.lock = threading.Lock()
+
 
         self.positions = {}
 
@@ -77,6 +77,7 @@ class PositionManager:
 
     # =====================================
     # OPEN POSITION
+    # 호환 함수
     # =====================================
 
     def open_position(
@@ -117,26 +118,18 @@ class PositionManager:
         with self.lock:
 
 
-            position = self.positions.get(
+            return self.positions.get(
 
                 symbol
 
             )
 
 
-            if position:
-
-                return position.copy()
-
-
-            return None
-
-
 
 
 
     # =====================================
-    # CHECK POSITION
+    # HAS POSITION
     # =====================================
 
     def has_position(
@@ -148,7 +141,75 @@ class PositionManager:
         with self.lock:
 
 
-            return symbol in self.positions
+            position = self.positions.get(
+
+                symbol
+
+            )
+
+
+            if not position:
+
+                return False
+
+
+
+            return (
+
+                float(position["size"])
+
+                >
+
+                0
+
+            )
+
+
+
+
+
+    # =====================================
+    # REMOVE POSITION
+    # =====================================
+
+    def remove_position(
+        self,
+        symbol
+    ):
+
+
+        with self.lock:
+
+
+            if symbol in self.positions:
+
+
+                del self.positions[symbol]
+
+
+
+        return True
+
+
+
+
+
+    # =====================================
+    # CLOSE POSITION
+    # 호환 함수
+    # =====================================
+
+    def close_position(
+        self,
+        symbol
+    ):
+
+
+        return self.remove_position(
+
+            symbol
+
+        )
 
 
 
@@ -171,63 +232,21 @@ class PositionManager:
             if symbol in self.positions:
 
 
-                self.positions[symbol]["size"] = float(size)
+                self.positions[symbol]["size"] = float(
+
+                    size
+
+                )
 
 
-                return True
+                if float(size) <= 0:
 
 
-
-        return False
-
-
-
-
-
-    # =====================================
-    # CLOSE POSITION
-    # =====================================
-
-    def close_position(
-        self,
-        symbol
-    ):
-
-
-        return self.remove_position(
-
-            symbol
-
-        )
+                    del self.positions[symbol]
 
 
 
-
-
-    # =====================================
-    # REMOVE
-    # =====================================
-
-    def remove_position(
-        self,
-        symbol
-    ):
-
-
-        with self.lock:
-
-
-            if symbol in self.positions:
-
-
-                del self.positions[symbol]
-
-
-                return True
-
-
-
-        return False
+        return True
 
 
 
@@ -245,33 +264,9 @@ class PositionManager:
         with self.lock:
 
 
-            return [
+            return list(
 
-                pos.copy()
-
-                for pos in self.positions.values()
-
-            ]
-
-
-
-
-
-    # =====================================
-    # COUNT
-    # =====================================
-
-    def count(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            return len(
-
-                self.positions
+                self.positions.values()
 
             )
 
@@ -319,12 +314,7 @@ class PositionManager:
 
                 "positions":
 
-                    list(
-
-                        self.positions.values()
-
-                    )
-
+                    self.positions
 
             }
 
