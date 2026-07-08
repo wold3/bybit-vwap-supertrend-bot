@@ -4,24 +4,10 @@ import hmac
 import hashlib
 import requests
 
-from pathlib import Path
 from dotenv import load_dotenv
 
 
-
-# =====================================
-# LOAD ENV
-# =====================================
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-ENV_PATH = BASE_DIR / ".env"
-
-load_dotenv(
-    dotenv_path=ENV_PATH
-)
-
-
+load_dotenv()
 
 
 class BybitWallet:
@@ -29,50 +15,81 @@ class BybitWallet:
 
     def __init__(self):
 
-
-        self.api_key = os.getenv(
-            "BYBIT_API_KEY"
+        self.api_key = (
+            os.getenv("BYBIT_API_KEY", "")
+            .strip()
         )
 
 
-        self.api_secret = os.getenv(
-            "BYBIT_API_SECRET"
+        self.api_secret = (
+            os.getenv("BYBIT_API_SECRET", "")
+            .strip()
         )
 
 
-        self.base_url = os.getenv(
-            "BYBIT_BASE_URL",
-            "https://api.bybit.com"
+        self.base_url = (
+            os.getenv(
+                "BYBIT_BASE_URL",
+                "https://api.bybit.com"
+            )
+            .strip()
         )
 
 
         print(
-            "[WALLET INIT] KEY:",
+            "[WALLET INIT]"
+        )
+
+        print(
+            "KEY:",
             self.api_key[:6]
             if self.api_key
-            else "NONE"
+            else None
+        )
+
+        print(
+            "SECRET:",
+            self.api_secret[:6]
+            if self.api_secret
+            else None
+        )
+
+        print(
+            "BASE:",
+            self.base_url
         )
 
 
 
-    def _sign(self, params):
+    # ==================================
+    # SIGN
+    # ==================================
+
+    def _sign(
+        self,
+        params
+    ):
 
 
-        query = "&".join(
+        query_string = "&".join(
 
             [
-                f"{k}={params[k]}"
-                for k in sorted(params)
+                f"{key}={params[key]}"
+                for key in sorted(params)
             ]
 
         )
 
 
-        return hmac.new(
+        signature = hmac.new(
 
-            self.api_secret.encode(),
+            self.api_secret.encode(
+                "utf-8"
+            ),
 
-            query.encode(),
+            query_string.encode(
+                "utf-8"
+            ),
 
             hashlib.sha256
 
@@ -80,7 +97,38 @@ class BybitWallet:
 
 
 
+        print(
+            "[SIGN STRING]",
+            query_string
+        )
+
+
+        print(
+            "[SIGN]",
+            signature
+        )
+
+
+        return signature
+
+
+
+
+    # ==================================
+    # EQUITY
+    # ==================================
+
     def get_equity(self):
+
+
+        if not self.api_key:
+
+            print(
+                "[ERROR] API KEY EMPTY"
+            )
+
+            return 0
+
 
 
         endpoint = (
@@ -88,11 +136,22 @@ class BybitWallet:
         )
 
 
-        timestamp = str(
-            int(
-                time.time()*1000
-            )
+        url = (
+            self.base_url
+            +
+            endpoint
         )
+
+
+
+        timestamp = str(
+
+            int(
+                time.time() * 1000
+            )
+
+        )
+
 
 
         params = {
@@ -113,6 +172,7 @@ class BybitWallet:
             "recv_window":
                 "5000"
 
+
         }
 
 
@@ -123,43 +183,101 @@ class BybitWallet:
 
 
 
+        headers = {
+
+
+            "X-BAPI-API-KEY":
+                self.api_key,
+
+
+            "X-BAPI-SIGN":
+                params["sign"],
+
+
+            "X-BAPI-TIMESTAMP":
+                timestamp,
+
+
+            "X-BAPI-RECV-WINDOW":
+                "5000"
+
+
+        }
+
+
+
         try:
 
 
-            r = requests.get(
+            print(
+                "[REQUEST URL]",
+                url
+            )
 
-                self.base_url + endpoint,
+
+            print(
+                "[REQUEST PARAMS]",
+                params
+            )
+
+
+
+            response = requests.get(
+
+                url,
 
                 params=params,
+
+                headers=headers,
 
                 timeout=5
 
             )
 
 
-            data = r.json()
+
+            print(
+                "[HTTP]",
+                response.status_code
+            )
 
 
 
-            if data.get("retCode") != 0:
+            data = response.json()
 
 
-                print(
-                    "[BYBIT WALLET ERROR]",
-                    data
-                )
+
+            print(
+                "[BYBIT RESPONSE]",
+                data
+            )
+
+
+
+            if data.get(
+                "retCode"
+            ) != 0:
+
 
                 return 0
 
 
 
-            equity = float(
-
+            account = (
                 data["result"]
                 ["list"][0]
-                ["totalEquity"]
+            )
+
+
+
+            equity = float(
+
+                account[
+                    "totalEquity"
+                ]
 
             )
+
 
 
             return equity
@@ -170,11 +288,13 @@ class BybitWallet:
 
 
             print(
-                "[WALLET ERROR]",
+                "[WALLET EXCEPTION]",
                 e
             )
 
+
             return 0
+
 
 
 
