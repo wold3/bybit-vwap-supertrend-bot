@@ -1,14 +1,31 @@
 import pandas as pd
-import numpy as np
+import threading
 
 
 
 class IndicatorEngine:
+    """
+    Indicator Engine
+
+    기능:
+    - Candle 저장
+    - VWAP 계산
+    - ATR 계산
+    - Supertrend 계산
+    - Strategy Engine용 market_data 생성
+    """
+
 
 
     def __init__(self):
 
+        self.lock = threading.Lock()
+
         self.history = []
+
+        self.max_history = 200
+
+
 
 
 
@@ -22,18 +39,59 @@ class IndicatorEngine:
     ):
 
 
-        self.history.append(
+        if not candle:
 
-            candle
-
-        )
+            return None
 
 
-        # 최근 데이터 유지
 
-        if len(self.history) > 200:
+        with self.lock:
 
-            self.history.pop(0)
+
+            self.history.append(
+
+                candle
+
+            )
+
+
+            if len(self.history) > self.max_history:
+
+                self.history.pop(0)
+
+
+
+            result = {
+
+
+                "symbol":
+
+                    candle.get(
+                        "symbol"
+                    ),
+
+
+                "close":
+
+                    candle.get(
+                        "close"
+                    ),
+
+
+                "vwap":
+
+                    self.calculate_vwap(),
+
+
+                "supertrend":
+
+                    self.calculate_supertrend()
+
+            }
+
+
+
+            return result
 
 
 
@@ -48,6 +106,12 @@ class IndicatorEngine:
     ):
 
 
+        if not self.history:
+
+            return None
+
+
+
         df = pd.DataFrame(
 
             self.history
@@ -55,13 +119,8 @@ class IndicatorEngine:
         )
 
 
-        if len(df) == 0:
 
-            return None
-
-
-
-        price = (
+        typical_price = (
 
             df["high"]
 
@@ -81,15 +140,33 @@ class IndicatorEngine:
 
 
 
-        vwap = (
-
-            price * volume
-
-        ).sum() / volume.sum()
+        total_volume = volume.sum()
 
 
 
-        return float(vwap)
+        if total_volume == 0:
+
+            return float(
+
+                df["close"].iloc[-1]
+
+            )
+
+
+
+        return float(
+
+            (
+
+                typical_price * volume
+
+            ).sum()
+
+            /
+
+            total_volume
+
+        )
 
 
 
@@ -112,6 +189,13 @@ class IndicatorEngine:
         )
 
 
+
+        if len(df) < period + 1:
+
+            return None
+
+
+
         high = df["high"]
 
         low = df["low"]
@@ -124,20 +208,16 @@ class IndicatorEngine:
 
             [
 
-                high-low,
+                high - low,
 
 
                 abs(
-
-                    high-close.shift()
-
+                    high - close.shift()
                 ),
 
 
                 abs(
-
-                    low-close.shift()
-
+                    low - close.shift()
                 )
 
             ],
@@ -148,17 +228,13 @@ class IndicatorEngine:
 
 
 
-        atr = tr.rolling(
-
-            period
-
-        ).mean()
-
-
-
         return float(
 
-            atr.iloc[-1]
+            tr.rolling(
+
+                period
+
+            ).mean().iloc[-1]
 
         )
 
@@ -177,20 +253,17 @@ class IndicatorEngine:
     ):
 
 
+        if len(self.history) < period:
+
+            return "FLAT"
+
+
+
         df = pd.DataFrame(
 
             self.history
 
         )
-
-
-        if len(df) < period:
-
-            return None
-
-
-
-        current = df.iloc[-1]
 
 
 
@@ -199,6 +272,16 @@ class IndicatorEngine:
             period
 
         )
+
+
+
+        if atr is None:
+
+            return "FLAT"
+
+
+
+        current = df.iloc[-1]
 
 
 
@@ -220,13 +303,10 @@ class IndicatorEngine:
 
             +
 
-            multiplier
-
-            *
-
-            atr
+            multiplier * atr
 
         )
+
 
 
         lower = (
@@ -235,11 +315,7 @@ class IndicatorEngine:
 
             -
 
-            multiplier
-
-            *
-
-            atr
+            multiplier * atr
 
         )
 
@@ -251,17 +327,17 @@ class IndicatorEngine:
 
         if close > upper:
 
-
             return "UP"
 
 
 
-        elif close < lower:
-
+        if close < lower:
 
             return "DOWN"
 
 
+
+        # 기존 전략과 호환
 
         return "UP"
 
@@ -270,30 +346,39 @@ class IndicatorEngine:
 
 
     # =====================================
-    # ALL INDICATORS
+    # STATUS
     # =====================================
 
-    def calculate(
+    def status(
         self
     ):
 
 
-        return {
+        with self.lock:
 
 
-            "vwap":
-
-                self.calculate_vwap(),
+            return {
 
 
-            "supertrend":
+                "history":
 
-                self.calculate_supertrend()
-
-        }
+                    len(self.history),
 
 
+                "latest":
+
+                    self.history[-1]
+
+                    if self.history
+
+                    else None
+
+            }
 
 
+
+
+
+# singleton
 
 indicator_engine = IndicatorEngine()
