@@ -171,102 +171,85 @@ class ExecutionEngine:
         method="POST"
     ):
 
-
         body = body or {}
 
-
         timestamp = str(
-
-            int(
-                time.time()*1000
-            )
-
-            +
-
-            self.time_offset
-
+            int(time.time() * 1000)
+            + self.time_offset
         )
 
-
-        # GET SIGN
+        # ==========================
+        # SIGN PAYLOAD
+        # ==========================
 
         if method.upper() == "GET":
 
             payload = "&".join(
                 sorted(
                     [
-                       f"{k}={v}"
-                       for k, v in body.items()
-                   ]
+                        f"{k}={v}"
+                        for k, v in body.items()
+                    ]
                 )
             )
 
-
         else:
 
-
             payload = json.dumps(
-
                 body,
-
                 separators=(",", ":")
-
             )
 
+
+        signature = self.sign(
+            timestamp,
+            payload
+        )
 
 
         headers = {
 
-
             "Content-Type":
-
                 "application/json",
 
-
-
             "X-BAPI-API-KEY":
-
                 self.api_key,
 
-
-
             "X-BAPI-TIMESTAMP":
-
                 timestamp,
 
-
-
             "X-BAPI-RECV-WINDOW":
-
                 self.recv_window,
 
-
-
             "X-BAPI-SIGN":
-
-                self.sign(
-
-                    timestamp,
-
-                    payload
-
-                )
-
+                signature
         }
-
 
 
         try:
 
+            if method.upper() == "GET":
 
-            if method.upper()=="GET":
+                query = "&".join(
+                    sorted(
+                        [
+                            f"{k}={v}"
+                            for k, v in body.items()
+                        ]
+                    )
+                )
+
+
+                request_url = url
+
+                if query:
+
+                    request_url += "?" + query
 
 
                 response = requests.get(
 
-                    url,
-
-                    params=body,
+                    request_url,
 
                     headers=headers,
 
@@ -276,7 +259,6 @@ class ExecutionEngine:
 
 
             else:
-
 
                 response = requests.post(
 
@@ -291,32 +273,31 @@ class ExecutionEngine:
                 )
 
 
-
             print("====================")
-
+            print("[STATUS]", response.status_code)
+            print("[URL]", response.url)
             print("[BYBIT]")
-
             print(response.text)
-
             print("====================")
 
 
+            try:
 
-            return response.json()
+                return response.json()
 
+
+            except Exception:
+
+                print("[JSON PARSE ERROR]")
+                return {}
 
 
         except Exception as e:
 
-
             print(
-
                 "[REQUEST ERROR]",
-
                 e
-
             )
-
 
             return {}
 
