@@ -4,18 +4,41 @@ import hmac
 import hashlib
 import requests
 
+from pathlib import Path
+from dotenv import load_dotenv
+
+
+
+# =====================================
+# LOAD ENV
+# =====================================
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+ENV_PATH = BASE_DIR / ".env"
+
+load_dotenv(
+    dotenv_path=ENV_PATH
+)
+
+
+
 
 class BybitWallet:
 
+
     def __init__(self):
+
 
         self.api_key = os.getenv(
             "BYBIT_API_KEY"
         )
 
+
         self.api_secret = os.getenv(
             "BYBIT_API_SECRET"
         )
+
 
         self.base_url = os.getenv(
             "BYBIT_BASE_URL",
@@ -25,51 +48,50 @@ class BybitWallet:
 
         print(
             "[WALLET INIT] KEY:",
-            self.api_key[:6] if self.api_key else None
+            self.api_key[:6]
+            if self.api_key
+            else "NONE"
         )
 
 
-
-    # =====================================
-    # SIGN
-    # =====================================
 
     def _sign(self, params):
 
 
         query = "&".join(
-            f"{k}={params[k]}"
-            for k in sorted(params)
+
+            [
+                f"{k}={params[k]}"
+                for k in sorted(params)
+            ]
+
         )
 
 
         return hmac.new(
+
             self.api_secret.encode(),
+
             query.encode(),
+
             hashlib.sha256
+
         ).hexdigest()
 
 
 
-    # =====================================
-    # EQUITY
-    # =====================================
-
     def get_equity(self):
-
-
-        if not self.api_key or not self.api_secret:
-
-            print(
-                "[WALLET] API KEY NOT FOUND"
-            )
-
-            return 0
-
 
 
         endpoint = (
             "/v5/account/wallet-balance"
+        )
+
+
+        timestamp = str(
+            int(
+                time.time()*1000
+            )
         )
 
 
@@ -85,11 +107,7 @@ class BybitWallet:
 
 
             "timestamp":
-                str(
-                    int(
-                        time.time()*1000
-                    )
-                ),
+                timestamp,
 
 
             "recv_window":
@@ -131,27 +149,17 @@ class BybitWallet:
                     data
                 )
 
-
                 return 0
-
-
-
-            account = (
-                data["result"]
-                ["list"][0]
-            )
 
 
 
             equity = float(
 
-                account.get(
-                    "totalEquity",
-                    0
-                )
+                data["result"]
+                ["list"][0]
+                ["totalEquity"]
 
             )
-
 
 
             return equity
@@ -162,13 +170,11 @@ class BybitWallet:
 
 
             print(
-                "[WALLET EXCEPTION]",
+                "[WALLET ERROR]",
                 e
             )
 
-
             return 0
-
 
 
 
