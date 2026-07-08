@@ -341,7 +341,11 @@ class WSClient:
 
                 )
 
-
+                print(
+                    "[LAST CANDLE]",
+                    candles[-1]
+                )
+ 
 
                 # 최소 데이터 확보
 
