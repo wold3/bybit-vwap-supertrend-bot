@@ -5,8 +5,8 @@ strategy("VWAP + SuperTrend Webhook Bot", overlay=true, initial_capital=1000)
 // Inputs
 //==================================================
 
-st_length = input.int(10, "SuperTrend ATR Length")
-st_mult   = input.float(3.0, "SuperTrend Multiplier")
+st_length = input.int(400, "SuperTrend ATR Length")
+st_mult   = input.float(15.0, "SuperTrend Multiplier")
 
 qty       = input.float(0.001, "Order Qty")
 
