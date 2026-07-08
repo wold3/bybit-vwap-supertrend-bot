@@ -1,32 +1,73 @@
-import threading
+# services/private_ws.py
+
+import os
 import time
+import json
+import hmac
+import hashlib
+import threading
 
+import websocket
 
-from watchdog.watchdog import watchdog
+from dotenv import load_dotenv
+
 
 from position.position_manager import position_manager
 
-from risk.drawdown_guard import drawdown_guard
+from execution.execution_engine import execution_engine
+
+from trade_db import trade_db
+
+from watchdog.watchdog import watchdog
+
+
+
+load_dotenv()
+
+
 
 
 
 class PrivateWS:
-    """
-    Bybit Private WebSocket
-
-    담당:
-    - execution event
-    - position event
-    - wallet event
-    """
-
 
 
     def __init__(self):
 
+
+        self.api_key = os.getenv(
+
+            "BYBIT_API_KEY",
+
+            ""
+
+        )
+
+
+        self.api_secret = os.getenv(
+
+            "BYBIT_API_SECRET",
+
+            ""
+
+        )
+
+
+        self.url = os.getenv(
+
+            "BYBIT_PRIVATE_WS",
+
+            "wss://stream-testnet.bybit.com/v5/private"
+
+        )
+
+
+
         self.running = False
 
         self.connected = False
+
+
+        self.ws = None
 
         self.thread = None
 
@@ -34,14 +75,21 @@ class PrivateWS:
 
 
 
+    # =====================================
+    # START
+    # =====================================
+
     def start(self):
+
 
         if self.running:
 
             return
 
 
+
         self.running = True
+
 
 
         self.thread = threading.Thread(
@@ -56,22 +104,22 @@ class PrivateWS:
         self.thread.start()
 
 
+
         print(
-            "🔐 PRIVATE WS START"
+
+            "[PRIVATE WS START]"
+
         )
 
 
 
 
+
+    # =====================================
+    # RUN
+    # =====================================
 
     def _run(self):
-
-        self.connected = True
-
-
-        print(
-            "PRIVATE CHANNEL SUBSCRIBED"
-        )
 
 
         while self.running:
@@ -79,15 +127,23 @@ class PrivateWS:
 
             try:
 
-                watchdog.heartbeat(
-                    "private_ws"
+
+                self.ws = websocket.WebSocketApp(
+
+                    self.url,
+
+                    on_open=self.on_open,
+
+                    on_message=self.on_message,
+
+                    on_error=self.on_error,
+
+                    on_close=self.on_close
+
                 )
 
 
-                # 실제 Bybit Private WS 위치
-
-
-                time.sleep(1)
+                self.ws.run_forever()
 
 
 
@@ -95,54 +151,230 @@ class PrivateWS:
 
 
                 print(
+
                     "[PRIVATE WS ERROR]",
+
                     e
+
                 )
 
 
-                time.sleep(5)
 
-
-
-        self.connected = False
+            time.sleep(5)
 
 
 
 
 
     # =====================================
-    # MESSAGE ROUTER
+    # AUTH SIGN
     # =====================================
 
-    def handle_message(
-        self,
-        data
-    ):
+    def generate_auth(self):
 
 
-        topic = data.get(
-            "topic"
+        expires = int(
+
+            time.time() * 1000
+
+        ) + 10000
+
+
+
+        param = (
+
+            "GET/realtime"
+
+            +
+
+            str(expires)
+
         )
 
 
-        if topic == "execution":
 
-            self.handle_execution(
-                data
+        signature = hmac.new(
+
+            self.api_secret.encode(),
+
+            param.encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+
+        return {
+
+
+            "op":
+
+                "auth",
+
+
+            "args":
+
+                [
+
+                    self.api_key,
+
+                    expires,
+
+                    signature
+
+                ]
+
+        }
+
+
+
+
+
+    # =====================================
+    # OPEN
+    # =====================================
+
+    def on_open(
+        self,
+        ws
+    ):
+
+
+        self.connected = True
+
+
+
+        ws.send(
+
+            json.dumps(
+
+                self.generate_auth()
+
+            )
+
+        )
+
+
+
+        time.sleep(1)
+
+
+
+        subscribe = {
+
+
+            "op":
+
+                "subscribe",
+
+
+            "args":
+
+                [
+
+                    "execution",
+
+                    "position",
+
+                    "wallet"
+
+                ]
+
+        }
+
+
+
+        ws.send(
+
+            json.dumps(
+
+                subscribe
+
+            )
+
+        )
+
+
+
+        print(
+
+            "[PRIVATE AUTH OK]"
+
+        )
+
+
+
+
+
+    # =====================================
+    # MESSAGE
+    # =====================================
+
+    def on_message(
+        self,
+        ws,
+        message
+    ):
+
+
+        try:
+
+
+            data = json.loads(
+
+                message
+
             )
 
 
-        elif topic == "position":
+            watchdog.heartbeat(
 
-            self.handle_position(
-                data
+                "private_ws"
+
             )
 
 
-        elif topic == "wallet":
 
-            self.handle_wallet(
-                data
+            topic = data.get(
+
+                "topic"
+
+            )
+
+
+
+            if topic == "execution":
+
+
+                self.handle_execution(
+
+                    data.get("data")
+
+                )
+
+
+
+            elif topic == "position":
+
+
+                self.handle_position(
+
+                    data.get("data")
+
+                )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[PRIVATE MESSAGE ERROR]",
+
+                e
+
             )
 
 
@@ -150,7 +382,7 @@ class PrivateWS:
 
 
     # =====================================
-    # EXECUTION
+    # EXECUTION EVENT
     # =====================================
 
     def handle_execution(
@@ -159,33 +391,82 @@ class PrivateWS:
     ):
 
 
-        try:
+        if not data:
 
-            from execution.execution_engine import execution_engine
-
-
-            item = data["data"][0]
+            return
 
 
-            execution_engine.on_fill(
 
-                item["symbol"],
+        for item in data:
 
-                item["side"],
 
-                float(item["execQty"]),
+            symbol = item.get(
 
-                float(item["execPrice"])
+                "symbol"
 
             )
 
 
-        except Exception as e:
+            side = item.get(
+
+                "side"
+
+            )
+
+
+            qty = float(
+
+                item.get(
+
+                    "execQty",
+
+                    0
+
+                )
+
+            )
+
+
+            price = float(
+
+                item.get(
+
+                    "execPrice",
+
+                    0
+
+                )
+
+            )
+
 
 
             print(
-                "[EXECUTION ERROR]",
-                e
+
+                "[FILL]",
+
+                symbol,
+
+                side,
+
+                qty,
+
+                price
+
+            )
+
+
+
+            execution_engine.on_fill(
+
+                symbol,
+
+                side,
+
+                qty,
+
+                price
+
             )
 
 
@@ -193,7 +474,7 @@ class PrivateWS:
 
 
     # =====================================
-    # POSITION
+    # POSITION EVENT
     # =====================================
 
     def handle_position(
@@ -202,20 +483,40 @@ class PrivateWS:
     ):
 
 
-        try:
+        if not data:
+
+            return
 
 
-            item = data["data"][0]
+
+        for item in data:
 
 
-            symbol = item["symbol"]
+            symbol = item.get(
 
-            size = float(
-                item["size"]
+                "symbol"
+
             )
 
 
-            side = item["side"]
+            size = float(
+
+                item.get(
+
+                    "size",
+
+                    0
+
+                )
+
+            )
+
+
+            side = item.get(
+
+                "side"
+
+            )
 
 
 
@@ -228,9 +529,22 @@ class PrivateWS:
 
                     side,
 
-                    size
+                    size,
+
+                    float(
+
+                        item.get(
+
+                            "avgPrice",
+
+                            0
+
+                        )
+
+                    )
 
                 )
+
 
 
             else:
@@ -243,81 +557,97 @@ class PrivateWS:
                 )
 
 
-        except Exception as e:
-
-
-            print(
-                "[POSITION ERROR]",
-                e
-            )
-
-
 
 
 
     # =====================================
-    # WALLET
+    # ERROR
     # =====================================
 
-    def handle_wallet(
+    def on_error(
         self,
-        data
+        ws,
+        error
     ):
 
 
-        try:
+        print(
 
+            "[PRIVATE ERROR]",
 
-            item = data["data"][0]
+            error
 
-
-            equity = float(
-
-                item.get(
-
-                    "totalEquity",
-
-                    0
-
-                )
-
-            )
-
-
-            if equity > 0:
-
-                drawdown_guard.update(
-                    equity
-                )
-
-
-        except Exception as e:
-
-
-            print(
-                "[WALLET ERROR]",
-                e
-            )
+        )
 
 
 
 
+
+    # =====================================
+    # CLOSE
+    # =====================================
+
+    def on_close(
+        self,
+        ws,
+        code,
+        msg
+    ):
+
+
+        self.connected = False
+
+
+        print(
+
+            "[PRIVATE CLOSED]"
+
+        )
+
+
+
+
+
+    # =====================================
+    # STOP
+    # =====================================
 
     def stop(self):
 
+
         self.running = False
+
 
         self.connected = False
 
 
 
+        if self.ws:
+
+            self.ws.close()
+
+
+
+
+
+    # =====================================
+    # STATUS
+    # =====================================
+
     def status(self):
+
 
         return {
 
-            "running": self.running,
 
-            "connected": self.connected
+            "running":
+
+                self.running,
+
+
+            "connected":
+
+                self.connected
 
         }
 
