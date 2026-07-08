@@ -1,5 +1,3 @@
-# services/ws_client.py
-
 import os
 import json
 import time
@@ -17,30 +15,21 @@ from indicators.indicator_engine import indicator_engine
 from watchdog.watchdog import watchdog
 
 
-
 load_dotenv()
 
 
 
 class WSClient:
-    """
-    Bybit Public WebSocket Client
-
-    기능:
-    - Market Tick 수신
-    - Candle 생성
-    - Indicator 업데이트
-    - Strategy 데이터 제공
-    """
-
 
 
     def __init__(self):
 
 
-        self.url = (
+        self.url = os.getenv(
 
-            "wss://stream.bybit.com/v5/public/linear"
+            "BYBIT_PUBLIC_WS",
+
+            "wss://stream-testnet.bybit.com/v5/public/linear"
 
         )
 
@@ -54,13 +43,16 @@ class WSClient:
         )
 
 
+
         self.running = False
 
         self.connected = False
 
+
         self.ws = None
 
         self.thread = None
+
 
 
         self.latest_data = None
@@ -113,7 +105,7 @@ class WSClient:
 
 
     # =====================================
-    # CONNECT LOOP
+    # LOOP
     # =====================================
 
     def _run(self):
@@ -141,7 +133,13 @@ class WSClient:
 
 
 
-                self.ws.run_forever()
+                self.ws.run_forever(
+
+                    ping_interval=20,
+
+                    ping_timeout=10
+
+                )
 
 
 
@@ -150,7 +148,7 @@ class WSClient:
 
                 print(
 
-                    "[WS LOOP ERROR]",
+                    "[PUBLIC WS ERROR]",
 
                     e
 
@@ -178,7 +176,7 @@ class WSClient:
 
 
 
-        payload = {
+        subscribe = {
 
 
             "op":
@@ -190,7 +188,11 @@ class WSClient:
 
                 [
 
-                    f"tickers.{self.symbol}"
+                    "publicTrade."
+
+                    +
+
+                    self.symbol
 
                 ]
 
@@ -200,7 +202,11 @@ class WSClient:
 
         ws.send(
 
-            json.dumps(payload)
+            json.dumps(
+
+                subscribe
+
+            )
 
         )
 
@@ -208,7 +214,7 @@ class WSClient:
 
         print(
 
-            "[WS CONNECTED]",
+            "[PUBLIC SUBSCRIBED]",
 
             self.symbol
 
@@ -244,39 +250,103 @@ class WSClient:
 
 
 
-            if "data" not in data:
+            topic = data.get(
+
+                "topic"
+
+            )
+
+
+
+            if topic != (
+
+                "publicTrade."
+
+                +
+
+                self.symbol
+
+            ):
+
 
                 return
 
 
 
-            topic = data.get(
+            trades = data.get(
 
-                "topic",
+                "data",
 
-                ""
+                []
 
             )
 
 
 
-            if (
+            for trade in trades:
 
-                topic.startswith(
 
-                    "tickers."
+                price = float(
+
+                    trade.get(
+
+                        "p"
+
+                    )
+
+                )
+
+
+                volume = float(
+
+                    trade.get(
+
+                        "v"
+
+                    )
 
                 )
 
-            ):
 
 
+                symbol = trade.get(
 
-                self.handle_ticker(
-
-                    data["data"]
+                    "s"
 
                 )
+
+
+
+                candle_builder.update(
+
+                    symbol,
+
+                    price,
+
+                    volume
+
+                )
+
+
+
+                candle = candle_builder.get_latest(
+
+                    symbol
+
+                )
+
+
+
+                if candle:
+
+
+                    self.process_candle(
+
+                        candle
+
+                    )
+
+
 
 
 
@@ -285,7 +355,7 @@ class WSClient:
 
             print(
 
-                "[WS MESSAGE ERROR]",
+                "[MESSAGE ERROR]",
 
                 e
 
@@ -296,154 +366,42 @@ class WSClient:
 
 
     # =====================================
-    # TICKER HANDLER
+    # CANDLE PROCESS
     # =====================================
 
-    def handle_ticker(
+    def process_candle(
         self,
-        data
+        candle
     ):
 
 
-        try:
+        indicator_engine.update(
 
+            candle
 
-            symbol = data.get(
+        )
 
-                "symbol"
 
-            )
+        indicators = indicator_engine.calculate()
 
 
 
-            last_price = float(
+        market_data = {
 
-                data.get(
 
-                    "lastPrice"
+            **candle,
 
-                )
 
-            )
+            **indicators
 
+        }
 
 
-            volume = float(
 
-                data.get(
-
-                    "volume24h",
-
-                    0
-
-                )
-
-            )
-
-
-
-            # Tick 전달
-
-            candle_builder.update(
-
-                symbol,
-
-                last_price,
-
-                volume
-
-            )
-
-
-
-            candle = candle_builder.close_candle(
-
-                symbol
-
-            )
-
-
-
-            if candle:
-
-
-
-                indicator_engine.update(
-
-                    candle
-
-                )
-
-
-                indicators = indicator_engine.calculate()
-
-
-
-                market_data = {
-
-
-                    **candle,
-
-
-                    **indicators
-
-
-                }
-
-
-
-                self.update_market_data(
-
-                    market_data
-
-                )
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[TICK ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-    # =====================================
-    # DATA UPDATE
-    # =====================================
-
-    def update_market_data(
-        self,
-        data
-    ):
-
-
-        self.latest_data = data
+        self.latest_data = market_data
 
 
         self.last_update = time.time()
-
-
-
-
-
-    # =====================================
-    # GET DATA
-    # =====================================
-
-    def get_latest_data(
-        self
-    ):
-
-
-        return self.latest_data
 
 
 
@@ -489,7 +447,7 @@ class WSClient:
 
         print(
 
-            "[WS CLOSED]"
+            "[PUBLIC WS CLOSED]"
 
         )
 
@@ -511,26 +469,33 @@ class WSClient:
 
 
 
-        try:
-
-            if self.ws:
-
-                self.ws.close()
+        if self.ws:
 
 
-        except:
-
-            pass
+            self.ws.close()
 
 
 
 
 
     # =====================================
-    # STATUS
+    # DATA
     # =====================================
 
-    def status(self):
+    def get_latest_data(
+        self
+    ):
+
+
+        return self.latest_data
+
+
+
+
+
+    def status(
+        self
+    ):
 
 
         return {
@@ -546,19 +511,9 @@ class WSClient:
                 self.connected,
 
 
-            "symbol":
+            "latest":
 
-                self.symbol,
-
-
-            "has_data":
-
-                self.latest_data is not None,
-
-
-            "last_update":
-
-                self.last_update
+                self.latest_data
 
         }
 
