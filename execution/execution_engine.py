@@ -1,3 +1,5 @@
+# execution/execution_engine.py
+
 import os
 import time
 import hmac
@@ -15,6 +17,7 @@ from position.position_manager import position_manager
 load_dotenv()
 
 
+
 class ExecutionEngine:
 
 
@@ -30,10 +33,12 @@ class ExecutionEngine:
             ""
         )
 
+
         self.base_url = os.getenv(
             "BYBIT_BASE_URL",
             "https://api-testnet.bybit.com"
         )
+
 
         self.retry = int(
             os.getenv(
@@ -43,30 +48,26 @@ class ExecutionEngine:
         )
 
 
-        # ==============================
-        # TIME SYNC
-        # ==============================
-
         self.recv_window = "10000"
 
         self.time_offset = 0
+
 
         self.sync_time()
 
 
 
     # =====================================
-    # BYBIT SERVER TIME SYNC
+    # TIME SYNC
     # =====================================
 
     def sync_time(self):
 
         try:
 
-            response = requests.get(
+            r = requests.get(
 
-                self.base_url
-                +
+                self.base_url +
                 "/v5/market/time",
 
                 timeout=5
@@ -74,7 +75,7 @@ class ExecutionEngine:
             )
 
 
-            data = response.json()
+            data = r.json()
 
 
             server_time = int(
@@ -83,7 +84,7 @@ class ExecutionEngine:
 
 
             local_time = int(
-                time.time() * 1000
+                time.time()*1000
             )
 
 
@@ -99,28 +100,21 @@ class ExecutionEngine:
 
 
             print(
-
                 "[TIME SYNC]",
-
                 self.time_offset,
-
                 "ms"
-
             )
 
 
         except Exception as e:
 
-
             print(
-
                 "[TIME SYNC ERROR]",
-
                 e
-
             )
 
             self.time_offset = 0
+
 
 
 
@@ -131,11 +125,11 @@ class ExecutionEngine:
     def sign(
         self,
         timestamp,
-        body
+        payload
     ):
 
 
-        payload = (
+        origin = (
 
             timestamp
 
@@ -149,7 +143,7 @@ class ExecutionEngine:
 
             +
 
-            body
+            payload
 
         )
 
@@ -158,7 +152,7 @@ class ExecutionEngine:
 
             self.api_secret.encode(),
 
-            payload.encode(),
+            origin.encode(),
 
             hashlib.sha256
 
@@ -178,10 +172,13 @@ class ExecutionEngine:
     ):
 
 
+        body = body or {}
+
+
         timestamp = str(
 
             int(
-                time.time() * 1000
+                time.time()*1000
             )
 
             +
@@ -191,16 +188,35 @@ class ExecutionEngine:
         )
 
 
-        body = body or {}
+        # GET SIGN
+
+        if method.upper() == "GET":
 
 
-        body_json = json.dumps(
+            payload = "&".join(
 
-            body,
+                [
 
-            separators=(",", ":")
+                    f"{k}={v}"
 
-        )
+                    for k,v in body.items()
+
+                ]
+
+            )
+
+
+        else:
+
+
+            payload = json.dumps(
+
+                body,
+
+                separators=(",", ":")
+
+            )
+
 
 
         headers = {
@@ -236,11 +252,7 @@ class ExecutionEngine:
 
                     timestamp,
 
-                    body_json
-
-                    if method.upper()=="POST"
-
-                    else ""
+                    payload
 
                 )
 
@@ -284,14 +296,14 @@ class ExecutionEngine:
 
 
 
-            print("======================")
+            print("====================")
 
-            print(
-                "[BYBIT]",
-                response.text
-            )
+            print("[BYBIT]")
 
-            print("======================")
+            print(response.text)
+
+            print("====================")
+
 
 
             return response.json()
@@ -314,25 +326,213 @@ class ExecutionEngine:
 
 
 
+
+
     # =====================================
-    # ACCOUNT EQUITY
+    # EXECUTE SIGNAL
     # =====================================
 
-    def get_account_equity(self):
+    def execute_signal(
+        self,
+        signal
+    ):
+
+
+        if not signal:
+
+            return None
+
+
+        if signal.get("type")=="ENTRY":
+
+
+            return self.execute(
+
+                signal["symbol"],
+
+                signal["side"],
+
+                signal["qty"]
+
+            )
+
+
+        elif signal.get("type")=="EXIT":
+
+
+            return self.close_position(
+
+                signal["symbol"],
+
+                signal["side"],
+
+                signal["qty"]
+
+            )
+
+
+
+    # =====================================
+    # MARKET ORDER
+    # =====================================
+
+    def execute(
+        self,
+        symbol,
+        side,
+        qty
+    ):
+
+
+        body = {
+
+            "category":
+                "linear",
+
+            "symbol":
+                symbol,
+
+            "side":
+                side,
+
+            "orderType":
+                "Market",
+
+            "qty":
+                str(qty)
+
+        }
+
+
+
+        for _ in range(self.retry):
+
+
+            result = self.request(
+
+                self.base_url+
+                "/v5/order/create",
+
+                body
+
+            )
+
+
+            if result.get("retCode")==0:
+
+
+                position_manager.open_position(
+
+                    symbol,
+
+                    side,
+
+                    qty
+
+                )
+
+
+                return result
+
+
+
+            time.sleep(2)
+
+
+
+        return None
+
+
+
+
+    # =====================================
+    # CLOSE POSITION
+    # =====================================
+
+    def close_position(
+        self,
+        symbol,
+        side,
+        qty
+    ):
+
+
+        close_side = (
+
+            "Sell"
+
+            if side=="Buy"
+
+            else
+
+            "Buy"
+
+        )
+
+
+        body = {
+
+            "category":
+                "linear",
+
+            "symbol":
+                symbol,
+
+            "side":
+                close_side,
+
+            "orderType":
+                "Market",
+
+            "qty":
+                str(qty),
+
+            "reduceOnly":
+                True
+
+        }
 
 
         result = self.request(
 
-            self.base_url
+            self.base_url+
+            "/v5/order/create",
 
-            +
+            body
 
+        )
+
+
+        if result.get("retCode")==0:
+
+
+            position_manager.close_position(symbol)
+
+            trailing_stop_manager.reset(symbol)
+
+
+        return result
+
+
+
+
+    # =====================================
+    # WALLET
+    # =====================================
+
+    def get_account_equity(
+        self
+    ):
+
+
+        result = self.request(
+
+            self.base_url+
             "/v5/account/wallet-balance",
 
             {
 
                 "accountType":
-
                     "UNIFIED"
 
             },
@@ -348,11 +548,8 @@ class ExecutionEngine:
             return float(
 
                 result["result"]
-
                 ["list"]
-
                 [0]
-
                 ["totalEquity"]
 
             )
@@ -364,10 +561,6 @@ class ExecutionEngine:
             return 0.0
 
 
-
-    # =====================================
-    # WALLET
-    # =====================================
 
     def get_wallet_balance(self):
 
@@ -395,14 +588,14 @@ class ExecutionEngine:
                 self.base_url,
 
 
-            "time_offset":
-
-                self.time_offset,
-
-
             "recv_window":
 
-                self.recv_window
+                self.recv_window,
+
+
+            "time_offset":
+
+                self.time_offset
 
 
         }
