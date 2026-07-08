@@ -190,16 +190,16 @@ class ExecutionEngine:
 
         # GET SIGN
 
-if method.upper() == "GET":
+            if method.upper() == "GET":
 
-    payload = "&".join(
-        sorted(
-            [
-                f"{k}={v}"
-                for k, v in body.items()
-            ]
-        )
-    )
+                payload = "&".join(
+                    sorted(
+                        [
+                           f"{k}={v}"
+                           for k, v in body.items()
+                        ]
+                   )
+                )
 
 
         else:
