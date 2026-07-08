@@ -20,6 +20,14 @@ from services.private_ws import private_ws
 
 
 # ===============================
+# INDICATOR
+# ===============================
+
+from indicators.indicator_engine import indicator_engine
+
+
+
+# ===============================
 # STRATEGY / EXECUTION
 # ===============================
 
@@ -48,7 +56,6 @@ from watchdog.watchdog import watchdog
 
 
 
-
 running = True
 
 
@@ -63,9 +70,7 @@ def public_ws_loop():
 
 
     print(
-
         "START PUBLIC WS"
-
     )
 
 
@@ -83,9 +88,7 @@ def private_ws_loop():
 
 
     print(
-
         "START PRIVATE WS"
-
     )
 
 
@@ -103,9 +106,7 @@ def strategy_loop():
 
 
     print(
-
         "START STRATEGY LOOP"
-
     )
 
 
@@ -115,10 +116,31 @@ def strategy_loop():
         try:
 
 
-            market_data = (
+            # =========================
+            # GET CLOSED CANDLE
+            # =========================
 
-                ws_client
-                .get_latest_data()
+            candle = ws_client.get_latest_candle()
+
+
+
+            if not candle:
+
+
+                time.sleep(1)
+
+                continue
+
+
+
+
+            # =========================
+            # INDICATOR
+            # =========================
+
+            market_data = indicator_engine.update(
+
+                candle
 
             )
 
@@ -134,6 +156,9 @@ def strategy_loop():
 
 
 
+            # =========================
+            # STRATEGY
+            # =========================
 
             signal = strategy_engine.check(
 
@@ -153,7 +178,6 @@ def strategy_loop():
 
 
 
-
             print(
 
                 "SIGNAL",
@@ -165,99 +189,25 @@ def strategy_loop():
 
 
 
+            # =========================
+            # EXECUTION
+            # =========================
 
-            # ==========================
-            # ENTRY
-            # ==========================
+            result = execution_engine.execute_signal(
 
-            if signal["type"] == "ENTRY":
+                signal
 
-
-                result = execution_engine.execute(
-
-                    symbol=
-
-                    signal["symbol"],
-
-
-                    side=
-
-                    signal["side"],
-
-
-                    qty=
-
-                    signal["qty"]
-
-                )
+            )
 
 
 
-                print(
+            print(
 
-                    "ENTRY RESULT",
+                "EXECUTION RESULT",
 
-                    result
+                result
 
-                )
-
-
-
-
-
-            # ==========================
-            # EXIT
-            # ==========================
-
-            elif signal["type"] == "EXIT":
-
-
-
-                position = (
-
-                    position_manager
-                    .get_position(
-
-                        signal["symbol"]
-
-                    )
-
-                )
-
-
-
-                if position:
-
-
-                    result = execution_engine.close_position(
-
-                        symbol=
-
-                        signal["symbol"],
-
-
-                        side=
-
-                        position["side"],
-
-
-                        qty=
-
-                        position["size"]
-
-                    )
-
-
-
-                    print(
-
-                        "EXIT RESULT",
-
-                        result
-
-                    )
-
-
+            )
 
 
 
@@ -275,8 +225,6 @@ def strategy_loop():
 
 
         time.sleep(1)
-
-
 
 
 
@@ -303,12 +251,7 @@ def equity_loop():
         try:
 
 
-            equity = (
-
-                execution_engine
-                .get_account_equity()
-
-            )
+            equity = execution_engine.get_account_equity()
 
 
 
@@ -372,7 +315,7 @@ def watchdog_loop():
 
 
 # =====================================
-# START THREAD
+# THREAD START
 # =====================================
 
 def start_thread(
@@ -380,7 +323,7 @@ def start_thread(
 ):
 
 
-    t = threading.Thread(
+    thread = threading.Thread(
 
         target=target,
 
@@ -389,10 +332,10 @@ def start_thread(
     )
 
 
-    t.start()
+    thread.start()
 
 
-    return t
+    return thread
 
 
 
@@ -413,9 +356,11 @@ if __name__ == "__main__":
 
 🚀 BYBIT AI TRADING BOT START
 
-MODE:
+
+LIVE MODE:
 
 {}
+
 
 ====================================
 
@@ -441,21 +386,15 @@ MODE:
 
     services = [
 
-
         public_ws_loop,
-
 
         private_ws_loop,
 
-
         strategy_loop,
-
 
         equity_loop,
 
-
         watchdog_loop
-
 
     ]
 
@@ -476,8 +415,6 @@ MODE:
 
 
 
-
-
     try:
 
 
@@ -495,7 +432,13 @@ MODE:
 
 
 
-        watchdog.stop()
+        try:
+
+            watchdog.stop()
+
+        except Exception:
+
+            pass
 
 
 
