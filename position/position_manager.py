@@ -1,15 +1,19 @@
 import threading
 
 
+
 class PositionManager:
     """
     Position Manager
 
-    기능
+    기능:
     - 현재 포지션 저장
     - 포지션 조회
     - 포지션 삭제
+    - ExecutionEngine 연동
     """
+
+
 
     def __init__(self):
 
@@ -39,18 +43,45 @@ class PositionManager:
 
                 "side": side,
 
-                "size": size,
+                "size": float(size),
 
-                "entry_price": entry_price
+                "entry_price": float(entry_price)
 
             }
+
 
         return True
 
 
 
     # =====================================
-    # GET
+    # OPEN POSITION
+    # =====================================
+
+    def open_position(
+        self,
+        symbol,
+        side,
+        size,
+        entry_price=0
+    ):
+
+        return self.set_position(
+
+            symbol,
+
+            side,
+
+            size,
+
+            entry_price
+
+        )
+
+
+
+    # =====================================
+    # GET POSITION
     # =====================================
 
     def get_position(
@@ -60,7 +91,9 @@ class PositionManager:
 
         with self.lock:
 
-            return self.positions.get(symbol)
+            return self.positions.get(
+                symbol
+            )
 
 
 
@@ -80,7 +113,7 @@ class PositionManager:
 
 
     # =====================================
-    # REMOVE
+    # REMOVE POSITION
     # =====================================
 
     def remove_position(
@@ -94,17 +127,95 @@ class PositionManager:
 
                 del self.positions[symbol]
 
+                return True
+
+
+        return False
+
+
+
+    # =====================================
+    # CLOSE POSITION
+    # =====================================
+
+    def close_position(
+        self,
+        symbol
+    ):
+
+        return self.remove_position(
+
+            symbol
+
+        )
+
+
+
+    # =====================================
+    # UPDATE SIZE
+    # =====================================
+
+    def update_size(
+        self,
+        symbol,
+        size
+    ):
+
+        with self.lock:
+
+            if symbol not in self.positions:
+
+                return False
+
+
+            self.positions[symbol]["size"] = float(
+                size
+            )
+
+
+        return True
+
+
+
+    # =====================================
+    # UPDATE ENTRY PRICE
+    # =====================================
+
+    def update_entry_price(
+        self,
+        symbol,
+        price
+    ):
+
+        with self.lock:
+
+            if symbol not in self.positions:
+
+                return False
+
+
+            self.positions[symbol]["entry_price"] = float(
+                price
+            )
+
+
+        return True
+
 
 
     # =====================================
     # ALL POSITIONS
     # =====================================
 
-    def get_all_positions(self):
+    def get_all_positions(
+        self
+    ):
 
         with self.lock:
 
-            return list(self.positions.values())
+            return list(
+                self.positions.values()
+            )
 
 
 
@@ -112,7 +223,9 @@ class PositionManager:
     # CLEAR
     # =====================================
 
-    def clear(self):
+    def clear(
+        self
+    ):
 
         with self.lock:
 
@@ -121,21 +234,48 @@ class PositionManager:
 
 
     # =====================================
+    # COUNT
+    # =====================================
+
+    def count(
+        self
+    ):
+
+        with self.lock:
+
+            return len(
+                self.positions
+            )
+
+
+
+    # =====================================
     # STATUS
     # =====================================
 
-    def status(self):
+    def status(
+        self
+    ):
 
         with self.lock:
 
             return {
 
-                "count": len(self.positions),
+                "count":
+                    len(self.positions),
 
-                "symbols": list(self.positions.keys())
+                "symbols":
+                    list(self.positions.keys()),
+
+                "positions":
+                    list(self.positions.values())
 
             }
 
 
-# singleton
+
+# =====================================
+# SINGLETON
+# =====================================
+
 position_manager = PositionManager()
