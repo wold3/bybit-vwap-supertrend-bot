@@ -1,27 +1,29 @@
 import threading
 import time
 
-
-# GitHub 구조 호환 import
-from watchdog import watchdog
-
+from watchdog.watchdog import watchdog
 
 
 class WSClient:
     """
-    WebSocket Client Manager
+    Public WebSocket Client
 
-    기능:
-    - websocket 서비스 상태 관리
-    - heartbeat 전송
-    - watchdog 연동
+    기능
+    - websocket 시작/종료
+    - 최신 시세 저장
+    - watchdog heartbeat
     """
-
 
     def __init__(self):
 
         self.running = False
+
         self.thread = None
+
+        # 최신 시장 데이터
+        self.latest_data = None
+
+        self.connected = False
 
 
 
@@ -29,7 +31,6 @@ class WSClient:
 
         if self.running:
             return
-
 
         self.running = True
 
@@ -46,6 +47,8 @@ class WSClient:
 
     def _run(self):
 
+        self.connected = True
+
         while self.running:
 
             try:
@@ -53,23 +56,25 @@ class WSClient:
                 # watchdog heartbeat
                 watchdog.heartbeat()
 
+                # ===========================
+                # TODO
+                # Bybit Public WebSocket 연결
+                # 수신 데이터는
+                # self.update_market_data(data)
+                # 호출
+                # ===========================
 
-                # websocket 처리 위치
-                # TODO:
-                # Bybit websocket 연결 코드 추가
-
-
-                time.sleep(5)
-
+                time.sleep(1)
 
             except Exception as e:
 
-                print(
-                    "[WS ERROR]",
-                    e
-                )
+                print("[WS ERROR]", e)
 
                 time.sleep(5)
+
+
+
+        self.connected = False
 
 
 
@@ -77,18 +82,44 @@ class WSClient:
 
         self.running = False
 
+        self.connected = False
+
         print("[WS] stopped")
+
+
+
+    def update_market_data(self, data):
+
+        """
+        websocket에서 호출
+        """
+
+        self.latest_data = data
+
+
+
+    def get_latest_data(self):
+
+        """
+        strategy에서 호출
+        """
+
+        return self.latest_data
 
 
 
     def status(self):
 
         return {
-            "running": self.running
+
+            "running": self.running,
+
+            "connected": self.connected,
+
+            "has_market_data": self.latest_data is not None
+
         }
 
 
-
-# 외부 import용 singleton
-
+# singleton
 ws_client = WSClient()
