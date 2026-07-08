@@ -3,47 +3,35 @@ import threading
 
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 
-
 class TrailingStopManager:
+    """
+    Trailing Stop Manager
 
+    기능
+    - 최고가/최저가 추적
+    - Trailing Stop 계산
+    - 상태 관리
+    """
 
     def __init__(self):
 
-
-        self.trailing_percent = float(
-
-            os.getenv(
-
-                "TRAILING_STOP_PERCENT",
-
-                "1.5"
-
-            )
-
-        )
-
-
-        # symbol별 최고/최저 가격
-
-        self.highest_price = {}
-
-
-        self.lowest_price = {}
-
-
-
         self.lock = threading.Lock()
 
+        self.trailing_percent = float(
+            os.getenv(
+                "TRAILING_STOP_PERCENT",
+                "1.0"
+            )
+        )
 
-
+        self.positions = {}
 
 
     # =====================================
-    # UPDATE POSITION PRICE
+    # UPDATE
     # =====================================
 
     def update(
@@ -53,58 +41,39 @@ class TrailingStopManager:
         price
     ):
 
-
         with self.lock:
 
+            if symbol not in self.positions:
 
-            price = float(price)
+                self.positions[symbol] = {
 
+                    "side": side,
 
+                    "highest": price,
+
+                    "lowest": price
+
+                }
+
+                return
+
+            position = self.positions[symbol]
 
             if side == "Buy":
 
+                if price > position["highest"]:
 
-                old = self.highest_price.get(
+                    position["highest"] = price
 
-                    symbol,
+            else:
 
-                    price
+                if price < position["lowest"]:
 
-                )
-
-
-
-                if price > old:
-
-
-                    self.highest_price[symbol] = price
-
-
-
-            elif side == "Sell":
-
-
-                old = self.lowest_price.get(
-
-                    symbol,
-
-                    price
-
-                )
-
-
-
-                if price < old:
-
-
-                    self.lowest_price[symbol] = price
-
-
-
+                    position["lowest"] = price
 
 
     # =====================================
-    # CALCULATE NEW SL
+    # CALCULATE STOP
     # =====================================
 
     def calculate_stop(
@@ -113,170 +82,27 @@ class TrailingStopManager:
         side
     ):
 
-
         with self.lock:
 
+            position = self.positions.get(symbol)
 
+            if position is None:
 
-            percent = (
+                return None
 
-                self.trailing_percent
-
-                /
-
-                100
-
-            )
-
-
-
-            # LONG
+            percent = self.trailing_percent / 100
 
             if side == "Buy":
 
-
-                highest = self.highest_price.get(
-
-                    symbol
-
-                )
-
-
-
-                if not highest:
-
-
-                    return None
-
-
-
-                stop = highest * (
-
-                    1 - percent
-
-                )
-
-
-
                 return round(
-
-                    stop,
-
-                    2
-
+                    position["highest"] * (1 - percent),
+                    4
                 )
 
-
-
-
-
-            # SHORT
-
-            elif side == "Sell":
-
-
-                lowest = self.lowest_price.get(
-
-                    symbol
-
-                )
-
-
-
-                if not lowest:
-
-
-                    return None
-
-
-
-                stop = lowest * (
-
-                    1 + percent
-
-                )
-
-
-
-                return round(
-
-                    stop,
-
-                    2
-
-                )
-
-
-
-        return None
-
-
-
-
-
-    # =====================================
-    # SHOULD MOVE SL
-    # =====================================
-
-    def should_update(
-        self,
-        symbol,
-        side,
-        current_sl
-    ):
-
-
-        new_sl = self.calculate_stop(
-
-            symbol,
-
-            side
-
-        )
-
-
-
-        if not new_sl:
-
-
-            return False
-
-
-
-
-
-        current_sl = float(
-
-            current_sl
-
-        )
-
-
-
-        # LONG SL 상승만 허용
-
-        if side == "Buy":
-
-
-            return new_sl > current_sl
-
-
-
-
-
-        # SHORT SL 하락만 허용
-
-        if side == "Sell":
-
-
-            return new_sl < current_sl
-
-
-
-        return False
-
-
-
+            return round(
+                position["lowest"] * (1 + percent),
+                4
+            )
 
 
     # =====================================
@@ -288,70 +114,29 @@ class TrailingStopManager:
         symbol
     ):
 
-
         with self.lock:
 
-
-            self.highest_price.pop(
-
-                symbol,
-
-                None
-
-            )
-
-
-            self.lowest_price.pop(
-
-                symbol,
-
-                None
-
-            )
-
-
-
-            print(
-
-                "TRAILING RESET",
-
-                symbol
-
-            )
-
-
-
+            self.positions.pop(symbol, None)
 
 
     # =====================================
     # STATUS
     # =====================================
 
-    def status(
-        self
-    ):
-
+    def status(self):
 
         with self.lock:
 
-
             return {
 
+                "symbols": list(self.positions.keys()),
 
-                "highest":
+                "count": len(self.positions),
 
-                    self.highest_price,
-
-
-                "lowest":
-
-                    self.lowest_price
-
+                "trailing_percent": self.trailing_percent
 
             }
 
 
-
-
-
+# singleton
 trailing_stop_manager = TrailingStopManager()
