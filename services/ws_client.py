@@ -349,7 +349,7 @@ class WSClient:
 
                 # 최소 데이터 확보
 
-                if len(candles) < 50:
+                if len(candles) < 5:
 
                     continue
 
@@ -390,7 +390,11 @@ class WSClient:
 
         candle = candles[-1]
 
-
+        print(
+            "[PROCESS MARKET]",
+            candle
+        )
+        
         # indicator update
 
         indicator_engine.update(
@@ -402,7 +406,10 @@ class WSClient:
 
         indicators = indicator_engine.calculate()
 
-
+        print(
+            "[INDICATORS]",
+            indicators
+        )
 
         market_data = {
 
