@@ -1,86 +1,85 @@
-import time
+import os
+import threading
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class RiskEngine:
+    """
+    Risk Engine
+
+    기능
+    - 최대 거래횟수 관리
+    - 거래 가능 여부 판단
+    """
 
     def __init__(self):
 
-        self.start_equity = 10000
-        self.current_equity = 10000
-        self.peak_equity = 10000
+        self.lock = threading.Lock()
 
-        self.max_drawdown = 10.0   # %
-        self.daily_loss_limit = 5.0
+        self.max_trades = int(
+            os.getenv(
+                "MAX_TRADES",
+                "100"
+            )
+        )
 
-        self.trading_halted = False
+        self.trade_count = 0
 
-    # =================================================
-    # EQUITY UPDATE
-    # =================================================
-    def update_equity(self, equity):
 
-        self.current_equity = equity
+    # =====================================
+    # 거래 가능 여부
+    # =====================================
 
-        if equity > self.peak_equity:
-            self.peak_equity = equity
-
-    # =================================================
-    # DRAW DOWN CALC
-    # =================================================
-    def get_drawdown(self):
-
-        if self.peak_equity == 0:
-            return 0
-
-        dd = (
-            (self.peak_equity - self.current_equity)
-            / self.peak_equity
-        ) * 100
-
-        return dd
-
-    # =================================================
-    # RISK CHECK
-    # =================================================
     def can_trade(self):
 
-        dd = self.get_drawdown()
+        with self.lock:
 
-        # ================================
-        # MAX DRAWDOWN STOP
-        # ================================
-        if dd >= self.max_drawdown:
-            self.trading_halted = True
-            print("[RISK] MAX DRAWDOWN HIT → STOP")
-            return False
+            return self.trade_count < self.max_trades
 
-        # ================================
-        # DAILY LOSS STOP
-        # ================================
-        pnl_pct = (
-            (self.current_equity - self.start_equity)
-            / self.start_equity
-        ) * 100
 
-        if pnl_pct <= -self.daily_loss_limit:
-            self.trading_halted = True
-            print("[RISK] DAILY LOSS HIT → STOP")
-            return False
+    # =====================================
+    # 거래 기록
+    # =====================================
 
-        return True
+    def register_trade(self):
 
-    # =================================================
-    # STATUS
-    # =================================================
+        with self.lock:
+
+            self.trade_count += 1
+
+
+    # =====================================
+    # 리셋
+    # =====================================
+
+    def reset(self):
+
+        with self.lock:
+
+            self.trade_count = 0
+
+
+    # =====================================
+    # 상태
+    # =====================================
+
     def status(self):
 
-        return {
-            "equity": self.current_equity,
-            "peak": self.peak_equity,
-            "drawdown": self.get_drawdown(),
-            "halted": self.trading_halted
-        }
+        with self.lock:
+
+            return {
+
+                "trade_count": self.trade_count,
+
+                "max_trades": self.max_trades,
+
+                "can_trade": self.trade_count < self.max_trades
+
+            }
 
 
-# SINGLETON
+# singleton
 risk_engine = RiskEngine()
