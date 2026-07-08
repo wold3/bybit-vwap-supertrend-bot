@@ -176,13 +176,8 @@ class ExecutionEngine:
 
         if method.upper() == "GET":
 
-            payload = "&".join(
-                sorted(
-                    [
-                        f"{k}={v}"
-                        for k, v in body.items()
-                    ]
-                )
+            payload = urlencode(
+                sorted(body.items())
             )
 
         else:
