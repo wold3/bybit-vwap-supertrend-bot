@@ -7,9 +7,7 @@ import websocket
 
 from dotenv import load_dotenv
 
-
 from market.candle_builder import candle_builder
-
 from indicators.indicator_engine import indicator_engine
 
 from watchdog.watchdog import watchdog
@@ -29,7 +27,7 @@ class WSClient:
 
             "BYBIT_PUBLIC_WS",
 
-            "wss://stream-testnet.bybit.com/v5/public/linear"
+            "wss://stream-demo.bybit.com/v5/public/linear"
 
         )
 
@@ -43,7 +41,6 @@ class WSClient:
         )
 
 
-
         self.running = False
 
         self.connected = False
@@ -54,9 +51,7 @@ class WSClient:
         self.thread = None
 
 
-
         self.latest_data = None
-
 
         self.last_update = 0
 
@@ -76,9 +71,7 @@ class WSClient:
             return
 
 
-
         self.running = True
-
 
 
         self.thread = threading.Thread(
@@ -93,19 +86,14 @@ class WSClient:
         self.thread.start()
 
 
-
-        print(
-
-            "[PUBLIC WS START]"
-
-        )
+        print("[PUBLIC WS START]")
 
 
 
 
 
     # =====================================
-    # LOOP
+    # WEBSOCKET LOOP
     # =====================================
 
     def _run(self):
@@ -132,7 +120,6 @@ class WSClient:
                 )
 
 
-
                 self.ws.run_forever(
 
                     ping_interval=20,
@@ -142,18 +129,16 @@ class WSClient:
                 )
 
 
-
             except Exception as e:
 
 
                 print(
 
-                    "[PUBLIC WS ERROR]",
+                    "[WS LOOP ERROR]",
 
                     e
 
                 )
-
 
 
             time.sleep(5)
@@ -173,7 +158,6 @@ class WSClient:
 
 
         self.connected = True
-
 
 
         subscribe = {
@@ -211,7 +195,6 @@ class WSClient:
         )
 
 
-
         print(
 
             "[PUBLIC SUBSCRIBED]",
@@ -245,20 +228,11 @@ class WSClient:
             )
 
 
-
             watchdog.heartbeat()
 
 
 
-            topic = data.get(
-
-                "topic"
-
-            )
-
-
-
-            if topic != (
+            if data.get("topic") != (
 
                 "publicTrade."
 
@@ -267,7 +241,6 @@ class WSClient:
                 self.symbol
 
             ):
-
 
                 return
 
@@ -288,34 +261,29 @@ class WSClient:
 
                 price = float(
 
-                    trade.get(
-
-                        "p"
-
-                    )
+                    trade["p"]
 
                 )
 
 
                 volume = float(
 
-                    trade.get(
-
-                        "v"
-
-                    )
+                    trade["v"]
 
                 )
-
 
 
                 symbol = trade.get(
 
-                    "s"
+                    "s",
+
+                    self.symbol
 
                 )
 
 
+
+                # tick -> candle
 
                 candle_builder.update(
 
@@ -329,7 +297,7 @@ class WSClient:
 
 
 
-                candle = candle_builder.get_latest(
+                candles = candle_builder.get_candles(
 
                     symbol
 
@@ -337,16 +305,19 @@ class WSClient:
 
 
 
-                if candle:
+                # 최소 데이터 확보
+
+                if len(candles) < 50:
+
+                    continue
 
 
-                    self.process_candle(
 
-                        candle
+                self.process_market(
 
-                    )
+                    candles
 
-
+                )
 
 
 
@@ -366,14 +337,19 @@ class WSClient:
 
 
     # =====================================
-    # CANDLE PROCESS
+    # INDICATOR PROCESS
     # =====================================
 
-    def process_candle(
+    def process_market(
         self,
-        candle
+        candles
     ):
 
+
+        candle = candles[-1]
+
+
+        # indicator update
 
         indicator_engine.update(
 
@@ -389,7 +365,39 @@ class WSClient:
         market_data = {
 
 
-            **candle,
+            "symbol":
+
+                candle["symbol"],
+
+
+            "open":
+
+                candle["open"],
+
+
+            "high":
+
+                candle["high"],
+
+
+            "low":
+
+                candle["low"],
+
+
+            "close":
+
+                candle["close"],
+
+
+            "volume":
+
+                candle["volume"],
+
+
+            "timestamp":
+
+                candle["timestamp"],
 
 
             **indicators
@@ -402,8 +410,6 @@ class WSClient:
 
 
         self.last_update = time.time()
-
-
 
 
 
@@ -420,7 +426,7 @@ class WSClient:
 
         print(
 
-            "[WS ERROR]",
+            "[PUBLIC WS ERROR]",
 
             error
 
@@ -472,7 +478,13 @@ class WSClient:
         if self.ws:
 
 
-            self.ws.close()
+            try:
+
+                self.ws.close()
+
+            except:
+
+                pass
 
 
 
@@ -493,9 +505,11 @@ class WSClient:
 
 
 
-    def status(
-        self
-    ):
+    # =====================================
+    # STATUS
+    # =====================================
+
+    def status(self):
 
 
         return {
@@ -509,6 +523,16 @@ class WSClient:
             "connected":
 
                 self.connected,
+
+
+            "symbol":
+
+                self.symbol,
+
+
+            "last_update":
+
+                self.last_update,
 
 
             "latest":
