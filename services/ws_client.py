@@ -2,14 +2,15 @@ import os
 import json
 import time
 import threading
-import traceback
 
 import websocket
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 
 from market.candle_builder import candle_builder
 from indicators.indicator_engine import indicator_engine
+from strategy.vwap_supertrend_strategy import vwap_supertrend_strategy
+
 from watchdog.watchdog import watchdog
 
 
@@ -23,21 +24,11 @@ class WSClient:
     def __init__(self):
 
 
-        self.symbol = os.getenv(
-            "DEFAULT_SYMBOL",
-            "BTCUSDT"
-        )
+        live = os.getenv(
+            "LIVE_TRADING",
+            "false"
+        ).lower() == "true"
 
-
-        live = (
-            os.getenv(
-                "LIVE_TRADING",
-                "false"
-            )
-            .lower()
-            ==
-            "true"
-        )
 
 
         if live:
@@ -56,6 +47,12 @@ class WSClient:
 
 
 
+        self.symbol = os.getenv(
+            "DEFAULT_SYMBOL",
+            "BTCUSDT"
+        )
+
+
         self.running = False
 
         self.connected = False
@@ -72,14 +69,15 @@ class WSClient:
 
 
 
-
-    # ================================
+    # =====================================
     # START
-    # ================================
+    # =====================================
 
     def start(self):
 
+
         if self.running:
+
             return
 
 
@@ -87,8 +85,11 @@ class WSClient:
 
 
         self.thread = threading.Thread(
+
             target=self._run,
+
             daemon=True
+
         )
 
 
@@ -103,9 +104,9 @@ class WSClient:
 
 
 
-    # ================================
-    # WS LOOP
-    # ================================
+    # =====================================
+    # LOOP
+    # =====================================
 
     def _run(self):
 
@@ -140,25 +141,27 @@ class WSClient:
                 )
 
 
-            except Exception:
+
+            except Exception as e:
 
 
-                traceback.print_exc()
-
-
-
-            if self.running:
-
-                time.sleep(5)
-
+                print(
+                    "[WS LOOP ERROR]",
+                    e
+                )
 
 
 
+            time.sleep(5)
 
 
-    # ================================
+
+
+
+
+    # =====================================
     # OPEN
-    # ================================
+    # =====================================
 
     def on_open(
         self,
@@ -169,17 +172,24 @@ class WSClient:
         self.connected = True
 
 
-        subscribe = {
+
+        payload = {
 
 
             "op":
+
                 "subscribe",
 
 
             "args":
+
                 [
 
-                    f"publicTrade.{self.symbol}"
+                    "publicTrade."
+
+                    +
+
+                    self.symbol
 
                 ]
 
@@ -188,15 +198,19 @@ class WSClient:
 
 
         ws.send(
-            json.dumps(
-                subscribe
-            )
+
+            json.dumps(payload)
+
         )
+
 
 
         print(
+
             "[PUBLIC SUBSCRIBED]",
+
             self.symbol
+
         )
 
 
@@ -205,9 +219,9 @@ class WSClient:
 
 
 
-    # ================================
+    # =====================================
     # MESSAGE
-    # ================================
+    # =====================================
 
     def on_message(
         self,
@@ -220,53 +234,89 @@ class WSClient:
 
 
             data = json.loads(
+
                 message
+
             )
+
 
 
             watchdog.heartbeat()
 
 
 
-            if data.get("topic") != f"publicTrade.{self.symbol}":
+            if data.get("topic") != (
+
+                "publicTrade."
+
+                +
+
+                self.symbol
+
+            ):
 
                 return
 
 
 
+
             trades = data.get(
+
                 "data",
+
                 []
+
             )
+
+
 
 
             for trade in trades:
 
 
                 price = float(
+
                     trade["p"]
+
                 )
 
 
                 volume = float(
+
                     trade["v"]
+
                 )
 
 
+
                 symbol = trade.get(
+
                     "s",
+
                     self.symbol
+
                 )
 
 
 
                 print(
+
                     "[TICK]",
+
                     symbol,
+
                     price,
+
                     volume
+
                 )
 
+
+
+
+                # =================================
+                # TICK -> CANDLE
+                # =================================
 
 
                 candle_builder.update(
@@ -282,40 +332,50 @@ class WSClient:
 
 
                 candles = candle_builder.get_candles(
+
                     symbol
+
                 )
 
 
 
                 print(
+
                     "[CANDLE COUNT]",
+
                     symbol,
+
                     len(candles)
+
                 )
 
 
 
+                # 현재 진행중 candle 표시
 
-                # 현재 진행중 캔들도 사용
+                current = candle_builder.current.get(
 
-                current = (
-                    candle_builder.current.get(
-                        symbol
-                    )
+                    symbol
+
                 )
 
 
                 if current:
 
-                    candle = current.copy()
+
+                    print(
+
+                        "[LAST CANDLE]",
+
+                        current
+
+                    )
 
 
-                elif candles:
-
-                    candle = candles[-1]
 
 
-                else:
+                if len(candles) < 1:
+
 
                     continue
 
@@ -323,16 +383,15 @@ class WSClient:
 
 
 
-                print(
-                    "[LAST CANDLE]",
-                    candle
-                )
-
-
-
                 self.process_market(
-                    candle
+
+                    candles,
+
+                    current
+
                 )
+
+
 
 
 
@@ -340,84 +399,176 @@ class WSClient:
 
 
             print(
+
                 "[MESSAGE ERROR]",
+
                 e
+
             )
 
 
-            traceback.print_exc()
 
 
 
 
 
-
-    # ================================
-    # PROCESS
-    # ================================
+    # =====================================
+    # MARKET PROCESS
+    # =====================================
 
     def process_market(
         self,
-        candle
+        candles,
+        current=None
     ):
 
 
-        try:
+
+        if current:
 
 
-            indicator_engine.update(
-                candle
-            )
+            candle = current
+
+
+        else:
+
+
+            candle = candles[-1]
 
 
 
-            indicators = indicator_engine.calculate(
 
-                candle["symbol"]
 
-            )
+        indicator_engine.update(
 
+            candle
+
+        )
+
+
+
+
+        indicators = indicator_engine.calculate(
+
+            candle["symbol"]
+
+        )
+
+
+
+
+        print(
+
+            "[INDICATORS]",
+
+            indicators
+
+        )
+
+
+
+
+
+        # =================================
+        # STRATEGY
+        # =================================
+
+
+        signal = vwap_supertrend_strategy.analyze(
+
+            candles
+
+        )
+
+
+
+        if signal:
 
 
             print(
-                "[INDICATORS]",
-                indicators
-            )
 
+                "[STRATEGY SIGNAL]",
 
+                signal
 
-            self.latest_data = {
-
-
-                **candle,
-
-
-                **indicators
-
-            }
-
-
-            self.last_update = time.time()
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[PROCESS ERROR]",
-                e
             )
 
 
 
 
 
+        market_data = {
 
 
-    # ================================
+            "symbol":
+
+                candle["symbol"],
+
+
+
+            "open":
+
+                candle["open"],
+
+
+
+            "high":
+
+                candle["high"],
+
+
+
+            "low":
+
+                candle["low"],
+
+
+
+            "close":
+
+                candle["close"],
+
+
+
+            "volume":
+
+                candle["volume"],
+
+
+
+            "timestamp":
+
+                candle["timestamp"],
+
+
+
+            **indicators,
+
+
+
+            "signal":
+
+                signal
+
+        }
+
+
+
+
+        self.latest_data = market_data
+
+
+        self.last_update = time.time()
+
+
+
+
+
+
+
+    # =====================================
     # ERROR
-    # ================================
+    # =====================================
 
     def on_error(
         self,
@@ -427,8 +578,11 @@ class WSClient:
 
 
         print(
+
             "[PUBLIC WS ERROR]",
+
             error
+
         )
 
 
@@ -436,9 +590,9 @@ class WSClient:
 
 
 
-    # ================================
+    # =====================================
     # CLOSE
-    # ================================
+    # =====================================
 
     def on_close(
         self,
@@ -451,8 +605,11 @@ class WSClient:
         self.connected = False
 
 
+
         print(
+
             "[PUBLIC WS CLOSED]"
+
         )
 
 
@@ -460,9 +617,10 @@ class WSClient:
 
 
 
-    # ================================
+
+    # =====================================
     # STOP
-    # ================================
+    # =====================================
 
     def stop(self):
 
@@ -481,33 +639,37 @@ class WSClient:
 
                 self.ws.close()
 
+
             except:
+
 
                 pass
 
 
 
-        print(
-            "[PUBLIC WS STOPPED]"
-        )
 
 
 
 
-
-
-
-    # ================================
+    # =====================================
     # DATA
-    # ================================
+    # =====================================
 
-    def get_latest_data(self):
+    def get_latest_data(
+        self
+    ):
+
 
         return self.latest_data
 
 
 
 
+
+
+    # =====================================
+    # STATUS
+    # =====================================
 
     def status(self):
 
@@ -516,22 +678,31 @@ class WSClient:
 
 
             "running":
+
                 self.running,
 
 
+
             "connected":
+
                 self.connected,
 
 
+
             "symbol":
+
                 self.symbol,
 
 
+
             "last_update":
+
                 self.last_update,
 
 
+
             "latest":
+
                 self.latest_data
 
         }
