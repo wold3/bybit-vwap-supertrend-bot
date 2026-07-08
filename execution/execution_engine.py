@@ -1,3 +1,5 @@
+# execution/execution_engine.py
+
 import os
 import time
 import hmac
@@ -5,11 +7,18 @@ import hashlib
 import json
 import requests
 
+
 from dotenv import load_dotenv
 
+
 from trade_db import trade_db
-from risk.trailing_stop_manager import trailing_stop_manager
+
 from position.position_manager import position_manager
+
+from risk.risk_engine import risk_engine
+
+from risk.trailing_stop_manager import trailing_stop_manager
+
 
 
 load_dotenv()
@@ -17,35 +26,62 @@ load_dotenv()
 
 
 class ExecutionEngine:
+    """
+    Execution Engine
+
+    기능:
+    - Bybit 주문 실행
+    - Entry / Exit 처리
+    - Position 관리
+    - Trade DB 기록
+    - Trailing Stop 관리
+    """
+
 
 
     def __init__(self):
 
 
         self.api_key = os.getenv(
+
             "BYBIT_API_KEY",
+
             ""
+
         )
 
 
         self.api_secret = os.getenv(
+
             "BYBIT_API_SECRET",
+
             ""
+
         )
 
 
         self.base_url = os.getenv(
+
             "BYBIT_BASE_URL",
+
             "https://api.bybit.com"
+
         )
 
 
         self.retry = int(
+
             os.getenv(
+
                 "ORDER_RETRY",
+
                 "3"
+
             )
+
         )
+
+
 
 
 
@@ -59,17 +95,26 @@ class ExecutionEngine:
         body
     ):
 
+
         recv_window = "5000"
 
 
         payload = (
+
             timestamp
+
             +
+
             self.api_key
+
             +
+
             recv_window
+
             +
+
             body
+
         )
 
 
@@ -82,6 +127,8 @@ class ExecutionEngine:
             hashlib.sha256
 
         ).hexdigest()
+
+
 
 
 
@@ -98,7 +145,11 @@ class ExecutionEngine:
 
 
         timestamp = str(
-            int(time.time() * 1000)
+
+            int(
+                time.time() * 1000
+            )
+
         )
 
 
@@ -106,6 +157,7 @@ class ExecutionEngine:
 
 
         body = body or {}
+
 
 
         body_json = json.dumps(
@@ -117,32 +169,40 @@ class ExecutionEngine:
         )
 
 
+
         headers = {
 
 
             "Content-Type":
+
                 "application/json",
 
 
             "X-BAPI-API-KEY":
+
                 self.api_key,
 
 
             "X-BAPI-TIMESTAMP":
+
                 timestamp,
 
 
             "X-BAPI-RECV-WINDOW":
+
                 recv_window,
 
 
             "X-BAPI-SIGN":
+
                 self.sign(
 
                     timestamp,
 
                     body_json
-                    if method == "POST"
+
+                    if method.upper()=="POST"
+
                     else ""
 
                 )
@@ -150,10 +210,11 @@ class ExecutionEngine:
         }
 
 
+
         try:
 
 
-            if method.upper() == "GET":
+            if method.upper()=="GET":
 
 
                 response = requests.get(
@@ -186,11 +247,13 @@ class ExecutionEngine:
 
 
 
-            print("==============================")
-            print("REQUEST :", method, url)
-            print("BODY    :", body)
-            print("RESULT  :", response.text)
-            print("==============================")
+            print("============================")
+            print("METHOD :", method)
+            print("URL    :", url)
+            print("BODY   :", body)
+            print("RESULT :", response.text)
+            print("============================")
+
 
 
             response.raise_for_status()
@@ -204,8 +267,11 @@ class ExecutionEngine:
 
 
             print(
+
                 "[REQUEST ERROR]",
+
                 e
+
             )
 
 
@@ -213,8 +279,10 @@ class ExecutionEngine:
 
 
 
+
+
     # =====================================
-    # STRATEGY SIGNAL ENTRY POINT
+    # SIGNAL ENTRY POINT
     # =====================================
 
     def execute_signal(
@@ -229,57 +297,38 @@ class ExecutionEngine:
 
 
 
-        signal_type = signal.get(
-            "type"
-        )
-
-
-        symbol = signal.get(
-            "symbol"
-        )
-
-
-        side = signal.get(
-            "side"
-        )
-
-
-        qty = signal.get(
-            "qty"
-        )
-
-
-
-        if signal_type == "ENTRY":
+        if signal["type"] == "ENTRY":
 
 
             return self.execute(
 
-                symbol,
+                signal["symbol"],
 
-                side,
+                signal["side"],
 
-                qty
+                signal["qty"]
 
             )
 
 
 
-        elif signal_type == "EXIT":
+        if signal["type"] == "EXIT":
 
 
             return self.close_position(
 
-                symbol,
+                signal["symbol"],
 
-                side,
+                signal["side"],
 
-                qty
+                signal["qty"]
 
             )
 
 
         return None
+
+
 
 
 
@@ -299,35 +348,47 @@ class ExecutionEngine:
 
 
             "category":
+
                 "linear",
 
 
             "symbol":
+
                 symbol,
 
 
             "side":
+
                 side,
 
 
             "orderType":
+
                 "Market",
 
 
             "qty":
+
                 str(qty)
 
         }
 
 
 
-        for i in range(self.retry):
+        for attempt in range(
+
+            self.retry
+
+        ):
+
 
 
             result = self.request(
 
                 self.base_url
+
                 +
+
                 "/v5/order/create",
 
                 body
@@ -337,33 +398,55 @@ class ExecutionEngine:
 
 
             if result.get(
+
                 "retCode"
+
             ) == 0:
 
 
+
                 print(
-                    "[ORDER SUCCESS]"
+
+                    "[ORDER SUCCESS]",
+
+                    result
+
                 )
 
 
-                try:
 
-                    position_manager.open_position(
+                position_manager.set_position(
 
-                        symbol,
+                    symbol,
 
-                        side,
+                    side,
 
-                        qty
+                    qty
 
-                    )
+                )
 
-                except Exception as e:
 
-                    print(
-                        "[POSITION UPDATE ERROR]",
-                        e
-                    )
+
+                risk_engine.register_trade()
+
+
+
+                trade_db.insert_trade(
+
+                    symbol=symbol,
+
+                    side=side,
+
+                    qty=qty,
+
+                    price=0,
+
+                    pnl=0,
+
+                    trade_type="ENTRY"
+
+                )
+
 
 
                 return result
@@ -371,9 +454,13 @@ class ExecutionEngine:
 
 
             print(
+
                 "[ORDER FAILED]",
+
                 result
+
             )
+
 
 
             time.sleep(2)
@@ -381,6 +468,8 @@ class ExecutionEngine:
 
 
         return None
+
+
 
 
 
@@ -400,7 +489,7 @@ class ExecutionEngine:
 
             "Sell"
 
-            if side == "Buy"
+            if side=="Buy"
 
             else
 
@@ -414,26 +503,32 @@ class ExecutionEngine:
 
 
             "category":
+
                 "linear",
 
 
             "symbol":
+
                 symbol,
 
 
             "side":
+
                 close_side,
 
 
             "orderType":
+
                 "Market",
 
 
             "qty":
+
                 str(qty),
 
 
             "reduceOnly":
+
                 True
 
         }
@@ -443,7 +538,9 @@ class ExecutionEngine:
         result = self.request(
 
             self.base_url
+
             +
+
             "/v5/order/create",
 
             body
@@ -453,47 +550,58 @@ class ExecutionEngine:
 
 
         if result.get(
+
             "retCode"
+
         ) == 0:
 
 
 
-            try:
+            print(
 
-                position_manager.close_position(
+                "[POSITION CLOSED]"
 
-                    symbol
-
-                )
-
-
-            except Exception as e:
-
-                print(
-                    "[POSITION CLOSE ERROR]",
-                    e
-                )
+            )
 
 
 
-            try:
+            position_manager.remove_position(
 
-                trailing_stop_manager.reset(
+                symbol
 
-                    symbol
-
-                )
+            )
 
 
-            except Exception as e:
 
-                print(
-                    "[TRAIL RESET ERROR]",
-                    e
-                )
+            trailing_stop_manager.reset(
+
+                symbol
+
+            )
+
+
+
+            trade_db.insert_trade(
+
+                symbol=symbol,
+
+                side=close_side,
+
+                qty=qty,
+
+                price=0,
+
+                pnl=0,
+
+                trade_type="EXIT"
+
+            )
+
 
 
         return result
+
+
 
 
 
@@ -511,53 +619,43 @@ class ExecutionEngine:
 
 
         print(
+
             "[FILL]",
+
             symbol,
+
             side,
+
             qty,
+
             price
+
         )
 
 
 
-        try:
+        trade_db.insert_trade(
+
+            symbol=symbol,
+
+            side=side,
+
+            qty=qty,
+
+            price=price,
+
+            pnl=0,
+
+            trade_type="FILL"
+
+        )
 
 
-            if hasattr(
-                trade_db,
-                "insert_trade"
-            ):
-
-
-                trade_db.insert_trade(
-
-                    symbol=symbol,
-
-                    side=side,
-
-                    qty=qty,
-
-                    price=price,
-
-                    pnl=0,
-
-                    trade_type="ENTRY"
-
-                )
-
-
-        except Exception as e:
-
-
-            print(
-                "[TRADE DB ERROR]",
-                e
-            )
 
 
 
     # =====================================
-    # TRAILING STOP
+    # TRAILING STOP UPDATE
     # =====================================
 
     def update_trailing_stop(
@@ -604,13 +702,19 @@ class ExecutionEngine:
                 )
 
 
+
         except Exception as e:
 
 
             print(
-                "[TRAILING ERROR]",
+
+                "[TRAIL ERROR]",
+
                 e
+
             )
+
+
 
 
 
@@ -629,14 +733,17 @@ class ExecutionEngine:
 
 
             "category":
+
                 "linear",
 
 
             "symbol":
+
                 symbol,
 
 
             "stopLoss":
+
                 str(stop_price)
 
         }
@@ -646,7 +753,9 @@ class ExecutionEngine:
         return self.request(
 
             self.base_url
+
             +
+
             "/v5/position/trading-stop",
 
             body
@@ -655,8 +764,10 @@ class ExecutionEngine:
 
 
 
+
+
     # =====================================
-    # ACCOUNT EQUITY
+    # EQUITY
     # =====================================
 
     def get_account_equity(
@@ -667,17 +778,23 @@ class ExecutionEngine:
         result = self.request(
 
             self.base_url
+
             +
+
             "/v5/account/wallet-balance",
 
             {
+
                 "accountType":
+
                     "UNIFIED"
+
             },
 
             method="GET"
 
         )
+
 
 
         try:
@@ -689,17 +806,23 @@ class ExecutionEngine:
             return float(
 
                 account.get(
+
                     "totalEquity",
+
                     0
+
                 )
 
             )
 
 
-        except:
+
+        except Exception:
 
 
             return 0.0
+
+
 
 
 
@@ -707,7 +830,10 @@ class ExecutionEngine:
         self
     ):
 
+
         return self.get_account_equity()
+
+
 
 
 
@@ -715,27 +841,29 @@ class ExecutionEngine:
     # STATUS
     # =====================================
 
-    def status(
-        self
-    ):
+    def status(self):
 
 
         return {
 
 
             "api_key":
+
                 bool(self.api_key),
 
 
             "api_secret":
+
                 bool(self.api_secret),
 
 
             "base_url":
+
                 self.base_url,
 
 
             "retry":
+
                 self.retry
 
         }
