@@ -48,7 +48,7 @@ class ExecutionEngine:
         )
 
 
-        self.recv_window = "10000"
+        self.recv_window = "5000"
 
         self.time_offset = 0
 
