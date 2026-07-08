@@ -13,9 +13,11 @@ load_dotenv()
 from services.ws_client import ws_client
 from services.private_ws_client import private_ws_client
 
-from portfolio.bybit_wallet import bybit_wallet
+from portfolio.bybit_wallet import wallet
 
 from watchdog.watchdog import watchdog
+
+
 
 
 
@@ -24,6 +26,7 @@ from watchdog.watchdog import watchdog
 # =====================================
 
 running = True
+
 
 
 
@@ -74,6 +77,7 @@ def strategy_loop():
 
 
 
+
 # =====================================
 # EQUITY LOOP
 # =====================================
@@ -92,7 +96,7 @@ def equity_loop():
         try:
 
 
-            equity = bybit_wallet.get_equity()
+            equity = wallet.get_equity()
 
 
             if equity:
@@ -116,6 +120,7 @@ def equity_loop():
 
 
         time.sleep(10)
+
 
 
 
@@ -150,7 +155,6 @@ def shutdown(
 
         ws_client.stop()
 
-
     except Exception:
 
         pass
@@ -160,7 +164,6 @@ def shutdown(
     try:
 
         private_ws_client.stop()
-
 
     except Exception:
 
@@ -172,7 +175,6 @@ def shutdown(
 
         watchdog.stop()
 
-
     except Exception:
 
         pass
@@ -182,6 +184,8 @@ def shutdown(
     print(
         "[BOT STOPPED]"
     )
+
+
 
 
 
@@ -230,22 +234,21 @@ def start():
 
 
 
-    signal.signal(
 
+
+    signal.signal(
         signal.SIGINT,
-
         shutdown
-
     )
 
 
     signal.signal(
-
         signal.SIGTERM,
-
         shutdown
-
     )
+
+
+
 
 
 
@@ -254,6 +257,9 @@ def start():
     # =================================
 
     watchdog.start()
+
+
+
 
 
 
@@ -272,6 +278,7 @@ def start():
 
 
 
+
     # =================================
     # PRIVATE WS
     # =================================
@@ -282,6 +289,7 @@ def start():
 
 
     private_ws_client.start()
+
 
 
 
@@ -303,6 +311,7 @@ def start():
 
 
 
+
     # =================================
     # EQUITY THREAD
     # =================================
@@ -319,10 +328,12 @@ def start():
 
 
 
+
     while running:
 
 
         time.sleep(1)
+
 
 
 
