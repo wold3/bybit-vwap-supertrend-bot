@@ -43,13 +43,25 @@ class PrivateWS:
         )
 
 
-        self.url = os.getenv(
+        live = os.getenv(
+            "LIVE_TRADING",
+            "false"
+        ).lower() == "true"
 
-            "BYBIT_PRIVATE_WS",
 
-            "wss://stream-testnet.bybit.com/v5/private"
+        if live:
 
-        )
+            self.url = os.getenv(
+                "BYBIT_LIVE_PRIVATE_WS",
+                "wss://stream.bybit.com/v5/private"
+            )
+
+        else:
+
+            self.url = os.getenv(
+                "BYBIT_DEMO_PRIVATE_WS",
+                "wss://stream-demo.bybit.com/v5/private"
+            )
 
 
         self.running = False
