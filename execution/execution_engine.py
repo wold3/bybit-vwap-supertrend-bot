@@ -264,10 +264,17 @@ class ExecutionEngine:
             print("====================")
             print("[STATUS]", response.status_code)
             print("[URL]", response.url)
-            print("[BYBIT]")
-            print(response.text)
-            print("====================")
 
+            print("[REQUEST HEADER CHECK]")
+            print("KEY:", self.api_key)
+            print("SIGN:", headers["X-BAPI-SIGN"])
+            print("TIME:", headers["X-BAPI-TIMESTAMP"])
+            print("RECV:", headers["X-BAPI-RECV-WINDOW"])
+
+            print("[RESPONSE]")
+            print(response.text)
+
+            print("====================") 
 
             try:
 
