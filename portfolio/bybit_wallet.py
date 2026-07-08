@@ -4,30 +4,18 @@ import hmac
 import hashlib
 import requests
 
-from dotenv import load_dotenv
-
-
-load_dotenv()
-
-
 
 class BybitWallet:
 
-
     def __init__(self):
 
-
         self.api_key = os.getenv(
-            "BYBIT_API_KEY",
-            ""
+            "BYBIT_API_KEY"
         )
-
 
         self.api_secret = os.getenv(
-            "BYBIT_API_SECRET",
-            ""
+            "BYBIT_API_SECRET"
         )
-
 
         self.base_url = os.getenv(
             "BYBIT_BASE_URL",
@@ -36,116 +24,83 @@ class BybitWallet:
 
 
         print(
-            "[WALLET INIT]",
-            "KEY:",
-            self.api_key[:6] if self.api_key else "NONE"
+            "[WALLET INIT] KEY:",
+            self.api_key[:6] if self.api_key else None
         )
 
 
 
-    # ============================================
-    # SIGNATURE
-    # ============================================
+    # =====================================
+    # SIGN
+    # =====================================
 
-    def _generate_signature(
-        self,
-        params
-    ):
+    def _sign(self, params):
 
 
         query = "&".join(
-
-            [
-                f"{k}={params[k]}"
-                for k in sorted(params)
-            ]
-
+            f"{k}={params[k]}"
+            for k in sorted(params)
         )
 
 
-        signature = hmac.new(
-
+        return hmac.new(
             self.api_secret.encode(),
-
             query.encode(),
-
             hashlib.sha256
-
         ).hexdigest()
 
 
-        return signature
 
-
-
-
-    # ============================================
-    # WALLET BALANCE
-    # ============================================
+    # =====================================
+    # EQUITY
+    # =====================================
 
     def get_equity(self):
 
 
         if not self.api_key or not self.api_secret:
 
-
             print(
-                "[WALLET ERROR] API KEY MISSING"
+                "[WALLET] API KEY NOT FOUND"
             )
-
 
             return 0
 
 
 
-
-        endpoint = "/v5/account/wallet-balance"
-
-
-        timestamp = str(
-
-            int(
-                time.time() * 1000
-            )
-
+        endpoint = (
+            "/v5/account/wallet-balance"
         )
-
 
 
         params = {
 
 
             "accountType":
-
                 "UNIFIED",
 
 
-
             "api_key":
-
                 self.api_key,
 
 
-
             "timestamp":
-
-                timestamp,
-
+                str(
+                    int(
+                        time.time()*1000
+                    )
+                ),
 
 
             "recv_window":
-
                 "5000"
-
 
         }
 
 
 
-        params["sign"] = self._generate_signature(
-
+        params["sign"] = self._sign(
             params
-
         )
 
 
@@ -153,37 +108,27 @@ class BybitWallet:
         try:
 
 
-
-            response = requests.get(
-
+            r = requests.get(
 
                 self.base_url + endpoint,
 
-
                 params=params,
 
-
                 timeout=5
-
 
             )
 
 
-
-            data = response.json()
+            data = r.json()
 
 
 
             if data.get("retCode") != 0:
 
 
-
                 print(
-
                     "[BYBIT WALLET ERROR]",
-
                     data
-
                 )
 
 
@@ -191,52 +136,19 @@ class BybitWallet:
 
 
 
-
-            result = data.get(
-
-                "result",
-
-                {}
-
+            account = (
+                data["result"]
+                ["list"][0]
             )
-
-
-
-            accounts = result.get(
-
-                "list",
-
-                []
-
-            )
-
-
-
-            if not accounts:
-
-
-
-                print(
-
-                    "[WALLET ERROR] EMPTY RESULT"
-
-                )
-
-
-                return 0
-
 
 
 
             equity = float(
 
-
-                accounts[0]
-                .get(
+                account.get(
                     "totalEquity",
                     0
                 )
-
 
             )
 
@@ -246,33 +158,12 @@ class BybitWallet:
 
 
 
-
-        except requests.exceptions.Timeout:
-
-
-
-            print(
-
-                "[WALLET ERROR] TIMEOUT"
-
-            )
-
-
-            return 0
-
-
-
-
         except Exception as e:
 
 
-
             print(
-
-                "[WALLET ERROR]",
-
+                "[WALLET EXCEPTION]",
                 e
-
             )
 
 
@@ -281,27 +172,5 @@ class BybitWallet:
 
 
 
-    # ============================================
-    # AVAILABLE BALANCE
-    # ============================================
-
-    def get_available_balance(self):
-
-
-        endpoint = "/v5/account/wallet-balance"
-
-
-        equity = self.get_equity()
-
-
-        return equity
-
-
-
-
-
-# ============================================
-# SINGLETON
-# ============================================
 
 wallet = BybitWallet()
