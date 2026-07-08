@@ -3,24 +3,30 @@ import threading
 
 from dotenv import load_dotenv
 
+
 load_dotenv()
+
 
 
 class DrawdownGuard:
     """
     Drawdown Guard
 
-    기능
+    기능:
     - 최고 Equity 기록
     - 현재 Drawdown 계산
     - 최대 손실 초과 시 거래 차단
     """
 
+
+
     def __init__(self):
 
         self.lock = threading.Lock()
 
-        self.max_daily_loss = float(
+
+
+        self.max_drawdown = float(
 
             os.getenv(
 
@@ -32,6 +38,8 @@ class DrawdownGuard:
 
         )
 
+
+
         self.peak_equity = None
 
         self.current_equity = None
@@ -40,8 +48,10 @@ class DrawdownGuard:
 
 
 
+
+
     # =====================================
-    # Equity Update
+    # EQUITY UPDATE
     # =====================================
 
     def update(
@@ -49,51 +59,112 @@ class DrawdownGuard:
         equity
     ):
 
+
         with self.lock:
+
+
+            equity = float(equity)
+
 
             self.current_equity = equity
 
+
+
             if self.peak_equity is None:
 
+
                 self.peak_equity = equity
+
+
 
             if equity > self.peak_equity:
 
+
                 self.peak_equity = equity
+
+
 
             self.current_drawdown = (
 
-                equity - self.peak_equity
+                equity
+
+                -
+
+                self.peak_equity
 
             )
 
 
 
+            return self.current_drawdown
+
+
+
+
+
     # =====================================
-    # Trade Allowed?
+    # TRADE ALLOWED?
     # =====================================
 
-    def can_trade(self):
+    def can_trade(
+        self
+    ):
+
 
         with self.lock:
+
 
             return (
 
-                self.current_drawdown >
+                self.current_drawdown
 
-                self.max_daily_loss
+                >
+
+                self.max_drawdown
 
             )
 
 
 
+
+
     # =====================================
-    # Reset
+    # SHOULD STOP
     # =====================================
 
-    def reset(self):
+    def is_triggered(
+        self
+    ):
+
 
         with self.lock:
+
+
+            return (
+
+                self.current_drawdown
+
+                <=
+
+                self.max_drawdown
+
+            )
+
+
+
+
+
+    # =====================================
+    # RESET
+    # =====================================
+
+    def reset(
+        self
+    ):
+
+
+        with self.lock:
+
 
             self.peak_equity = None
 
@@ -103,28 +174,53 @@ class DrawdownGuard:
 
 
 
+
+
     # =====================================
-    # Status
+    # STATUS
     # =====================================
 
-    def status(self):
+    def status(
+        self
+    ):
+
 
         with self.lock:
 
+
             return {
 
-                "peak_equity": self.peak_equity,
 
-                "current_equity": self.current_equity,
+                "peak_equity":
 
-                "drawdown": self.current_drawdown,
+                    self.peak_equity,
 
-                "max_daily_loss": self.max_daily_loss,
 
-                "can_trade": self.can_trade()
+                "current_equity":
+
+                    self.current_equity,
+
+
+                "drawdown":
+
+                    self.current_drawdown,
+
+
+                "max_drawdown":
+
+                    self.max_drawdown,
+
+
+                "can_trade":
+
+                    self.current_drawdown > self.max_drawdown
 
             }
 
 
+
+
+
 # singleton
+
 drawdown_guard = DrawdownGuard()
