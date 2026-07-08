@@ -1,143 +1,154 @@
 import sqlite3
-from datetime import datetime
-
-
-DB_PATH = "trades.db"
+import threading
+from pathlib import Path
 
 
 class TradeDB:
+    """
+    Trade Database
+
+    기능
+    - 거래내역 저장
+    - 거래내역 조회
+    """
 
     def __init__(self):
-        self.init_db()
 
+        self.lock = threading.Lock()
 
-    def init_db(self):
+        self.db_path = Path("trade_history.db")
 
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-
-        c.execute("""
-        CREATE TABLE IF NOT EXISTS trades (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            time TEXT,
-            symbol TEXT,
-            side TEXT,
-            qty REAL,
-            price REAL,
-            pnl REAL
+        self.conn = sqlite3.connect(
+            self.db_path,
+            check_same_thread=False
         )
-        """)
 
-        conn.commit()
-        conn.close()
+        self._create_table()
 
 
+    # =====================================
+    # CREATE TABLE
+    # =====================================
 
-    def insert_trade(
+    def _create_table(self):
+
+        with self.lock:
+
+            cursor = self.conn.cursor()
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS trades (
+
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                    symbol TEXT,
+
+                    side TEXT,
+
+                    qty REAL,
+
+                    price REAL,
+
+                    pnl REAL,
+
+                    trade_type TEXT,
+
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+                )
+            """)
+
+            self.conn.commit()
+
+
+    # =====================================
+    # INSERT
+    # =====================================
+
+    def insert(
         self,
         symbol,
         side,
         qty,
         price,
-        pnl=0
+        pnl,
+        trade_type
     ):
 
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
+        with self.lock:
 
-        c.execute("""
-        INSERT INTO trades
-        (
-            time,
-            symbol,
-            side,
-            qty,
-            price,
-            pnl
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (
-            datetime.utcnow().isoformat(),
-            symbol,
-            side,
-            qty,
-            price,
-            pnl
-        ))
+            cursor = self.conn.cursor()
 
-        conn.commit()
-        conn.close()
+            cursor.execute(
+                """
+                INSERT INTO trades
+                (
+                    symbol,
+                    side,
+                    qty,
+                    price,
+                    pnl,
+                    trade_type
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    symbol,
+                    side,
+                    qty,
+                    price,
+                    pnl,
+                    trade_type
+                )
+            )
 
+            self.conn.commit()
 
-
-    def get_recent_trades(
-        self,
-        limit=50
-    ):
-
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-
-        c = conn.cursor()
-
-        c.execute("""
-        SELECT *
-        FROM trades
-        ORDER BY id DESC
-        LIMIT ?
-        """,
-        (limit,))
-
-        rows = c.fetchall()
-
-        conn.close()
-
-        return [
-            dict(row)
-            for row in rows
-        ]
+        return True
 
 
-
-    # dashboard/app.py 호환용
-    def get_recent(
-        self,
-        limit=50
-    ):
-
-        return self.get_recent_trades(limit)
-
-
-
-    def get_summary(self):
-
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-
-        c.execute("""
-        SELECT
-            COUNT(*),
-            COALESCE(SUM(pnl),0)
-        FROM trades
-        """)
-
-        row = c.fetchone()
-
-        conn.close()
-
-        return {
-            "total_trades": row[0],
-            "total_pnl": row[1]
-        }
-
-
+    # =====================================
+    # GET ALL
+    # =====================================
 
     def get_all(self):
 
-        return self.get_recent_trades(1000)
+        with self.lock:
+
+            cursor = self.conn.cursor()
+
+            cursor.execute(
+                "SELECT * FROM trades ORDER BY id DESC"
+            )
+
+            return cursor.fetchall()
 
 
+    # =====================================
+    # COUNT
+    # =====================================
 
-# dashboard에서 사용하는 객체
+    def count(self):
+
+        with self.lock:
+
+            cursor = self.conn.cursor()
+
+            cursor.execute(
+                "SELECT COUNT(*) FROM trades"
+            )
+
+            return cursor.fetchone()[0]
+
+
+    # =====================================
+    # CLOSE
+    # =====================================
+
+    def close(self):
+
+        self.conn.close()
+
+
+# singleton
 trade_db = TradeDB()
