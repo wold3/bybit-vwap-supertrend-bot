@@ -3,62 +3,95 @@ import threading
 from pathlib import Path
 
 
+
 class TradeDB:
     """
     Trade Database
 
-    기능
-    - 거래내역 저장
-    - 거래내역 조회
+    기능:
+    - Entry 기록
+    - Exit 기록
+    - PNL 기록
+    - 거래 조회
     """
+
+
 
     def __init__(self):
 
         self.lock = threading.Lock()
 
-        self.db_path = Path("trade_history.db")
+
+        self.db_path = Path(
+
+            "trade_history.db"
+
+        )
+
 
         self.conn = sqlite3.connect(
+
             self.db_path,
+
             check_same_thread=False
+
         )
+
 
         self._create_table()
 
 
+
+
+
     # =====================================
-    # CREATE TABLE
+    # TABLE
     # =====================================
 
     def _create_table(self):
 
+
         with self.lock:
+
 
             cursor = self.conn.cursor()
 
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS trades (
+
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS trades
+                (
 
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                    symbol TEXT,
+                    symbol TEXT NOT NULL,
 
                     side TEXT,
 
                     qty REAL,
 
-                    price REAL,
+                    entry_price REAL,
 
-                    pnl REAL,
+                    exit_price REAL,
+
+                    pnl REAL DEFAULT 0,
 
                     trade_type TEXT,
 
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP
+                    DEFAULT CURRENT_TIMESTAMP
 
                 )
-            """)
+                """
+            )
+
+
 
             self.conn.commit()
+
+
+
 
 
     # =====================================
@@ -71,13 +104,17 @@ class TradeDB:
         side,
         qty,
         price,
-        pnl,
-        trade_type
+        pnl=0,
+        trade_type="ENTRY"
     ):
+
 
         with self.lock:
 
+
             cursor = self.conn.cursor()
+
+
 
             cursor.execute(
                 """
@@ -86,11 +123,12 @@ class TradeDB:
                     symbol,
                     side,
                     qty,
-                    price,
+                    entry_price,
                     pnl,
                     trade_type
                 )
                 VALUES (?, ?, ?, ?, ?, ?)
+
                 """,
                 (
                     symbol,
@@ -102,9 +140,50 @@ class TradeDB:
                 )
             )
 
+
             self.conn.commit()
 
+
+
         return True
+
+
+
+
+
+    # =====================================
+    # COMPATIBILITY
+    # =====================================
+
+    def insert_trade(
+        self,
+        symbol,
+        side,
+        qty,
+        price,
+        pnl=0,
+        trade_type="ENTRY"
+    ):
+
+
+        return self.insert(
+
+            symbol,
+
+            side,
+
+            qty,
+
+            price,
+
+            pnl,
+
+            trade_type
+
+        )
+
+
+
 
 
     # =====================================
@@ -113,15 +192,66 @@ class TradeDB:
 
     def get_all(self):
 
+
         with self.lock:
+
 
             cursor = self.conn.cursor()
 
+
+
             cursor.execute(
-                "SELECT * FROM trades ORDER BY id DESC"
+                """
+                SELECT *
+                FROM trades
+                ORDER BY id DESC
+                """
             )
 
+
+
             return cursor.fetchall()
+
+
+
+
+
+    # =====================================
+    # RECENT
+    # =====================================
+
+    def get_recent(
+        self,
+        limit=50
+    ):
+
+
+        with self.lock:
+
+
+            cursor = self.conn.cursor()
+
+
+
+            cursor.execute(
+                """
+                SELECT *
+                FROM trades
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (
+                    limit,
+
+                )
+            )
+
+
+
+            return cursor.fetchall()
+
+
+
 
 
     # =====================================
@@ -130,15 +260,26 @@ class TradeDB:
 
     def count(self):
 
+
         with self.lock:
+
 
             cursor = self.conn.cursor()
 
+
+
             cursor.execute(
-                "SELECT COUNT(*) FROM trades"
+                """
+                SELECT COUNT(*)
+                FROM trades
+                """
             )
 
+
             return cursor.fetchone()[0]
+
+
+
 
 
     # =====================================
@@ -147,8 +288,14 @@ class TradeDB:
 
     def close(self):
 
-        self.conn.close()
+        with self.lock:
+
+            self.conn.close()
+
+
+
 
 
 # singleton
+
 trade_db = TradeDB()
