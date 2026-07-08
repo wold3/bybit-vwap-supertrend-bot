@@ -298,7 +298,7 @@ class WSClient:
 
 
 
-                if len(candles) < 5:
+                if len(candles) < 2:
 
                     continue
 
