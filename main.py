@@ -31,7 +31,7 @@ load_dotenv()
 running = True
 
 
-
+last_signal = None
 
 
 # =====================================
@@ -80,7 +80,8 @@ def private_ws_loop():
 
 def strategy_loop():
 
-
+    global last_signal
+    
     print(
 
         "[START] STRATEGY LOOP"
@@ -118,15 +119,25 @@ def strategy_loop():
 
             if signal_data:
 
-
-                print(
-
-                    "[SIGNAL]",
-
-                    signal_data
-
+                signal_key = (
+                    signal_data.get("type"),
+                    signal_data.get("symbol"),
+                    signal_data.get("side")
                 )
 
+
+                if signal_key == last_signal:
+
+                    continue
+
+
+                last_signal = signal_key
+
+
+                print(
+                    "[SIGNAL]",
+                    signal_data
+                )
 
 
                 result = execution_engine.execute_signal(
@@ -136,15 +147,10 @@ def strategy_loop():
                 )
 
 
-
                 print(
-
                     "[EXECUTION]",
-
                     result
-
                 )
-
 
 
         except Exception as e:
