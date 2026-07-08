@@ -1,74 +1,29 @@
 import os
 import time
-import threading
 import signal
-
+import threading
 
 from dotenv import load_dotenv
-
-
-from services.ws_client import ws_client
-
-from services.private_ws import private_ws
-
-
-from strategy.strategy_engine import strategy_engine
-
-from execution.execution_engine import execution_engine
-
-
-from risk.drawdown_guard import drawdown_guard
-
-
-from watchdog.watchdog import watchdog
-
 
 
 load_dotenv()
 
 
 
+from services.ws_client import ws_client
+from services.private_ws_client import private_ws_client
+
+from account.equity_monitor import equity_monitor
+
+from watchdog.watchdog import watchdog
+
+
+
+# =====================================
+# GLOBAL
+# =====================================
+
 running = True
-
-
-last_signal = None
-
-
-# =====================================
-# PUBLIC WS
-# =====================================
-
-def public_ws_loop():
-
-
-    print(
-
-        "[START] PUBLIC WS"
-
-    )
-
-
-    ws_client.start()
-
-
-
-
-
-# =====================================
-# PRIVATE WS
-# =====================================
-
-def private_ws_loop():
-
-
-    print(
-
-        "[START] PRIVATE WS"
-
-    )
-
-
-    private_ws.start()
 
 
 
@@ -80,14 +35,10 @@ def private_ws_loop():
 
 def strategy_loop():
 
-    global last_signal
-    
+
     print(
-
         "[START] STRATEGY LOOP"
-
     )
-
 
 
     while running:
@@ -96,74 +47,22 @@ def strategy_loop():
         try:
 
 
-            market_data = ws_client.get_latest_data()
+            data = ws_client.get_latest_data()
 
 
-
-            if not market_data:
-
-
-                time.sleep(1)
-
-                continue
+            if data:
 
 
-
-            signal_data = strategy_engine.check(
-
-                market_data
-
-            )
-
-
-
-            if signal_data:
-
-                signal_key = (
-                    signal_data.get("type"),
-                    signal_data.get("symbol"),
-                    signal_data.get("side")
-                )
-
-
-                if signal_key == last_signal:
-
-                    continue
-
-
-                last_signal = signal_key
-
-
-                print(
-                    "[SIGNAL]",
-                    signal_data
-                )
-
-
-                result = execution_engine.execute_signal(
-
-                    signal_data
-
-                )
-
-
-                print(
-                    "[EXECUTION]",
-                    result
-                )
+                pass
 
 
         except Exception as e:
 
 
             print(
-
-                "[STRATEGY ERROR]",
-
+                "[STRATEGY LOOP ERROR]",
                 e
-
             )
-
 
 
         time.sleep(1)
@@ -173,18 +72,15 @@ def strategy_loop():
 
 
 # =====================================
-# EQUITY MONITOR
+# EQUITY LOOP
 # =====================================
 
 def equity_loop():
 
 
     print(
-
         "[START] EQUITY LOOP"
-
     )
-
 
 
     while running:
@@ -193,71 +89,28 @@ def equity_loop():
         try:
 
 
-            equity = execution_engine.get_account_equity()
+            equity = equity_monitor.get_equity()
 
 
-
-            if equity > 0:
-
-
-                drawdown_guard.update(
-
-                    equity
-
-                )
+            if equity:
 
 
                 print(
-
                     "[EQUITY]",
-
                     equity
-
                 )
-
 
 
         except Exception as e:
 
 
             print(
-
                 "[EQUITY ERROR]",
-
                 e
-
             )
 
 
-
         time.sleep(10)
-
-
-
-
-
-# =====================================
-# THREAD START
-# =====================================
-
-def start_thread(
-    func
-):
-
-
-    thread = threading.Thread(
-
-        target=func,
-
-        daemon=True
-
-    )
-
-
-    thread.start()
-
-
-    return thread
 
 
 
@@ -268,7 +121,7 @@ def start_thread(
 # =====================================
 
 def shutdown(
-    signum=None,
+    sig=None,
     frame=None
 ):
 
@@ -277,9 +130,7 @@ def shutdown(
 
 
     print(
-
         "\n[BOT STOPPING]"
-
     )
 
 
@@ -289,25 +140,10 @@ def shutdown(
 
     try:
 
-
         ws_client.stop()
 
 
-    except:
-
-
-        pass
-
-
-
-    try:
-
-
-        private_ws.stop()
-
-
-    except:
-
+    except Exception:
 
         pass
 
@@ -315,21 +151,28 @@ def shutdown(
 
     try:
 
+        private_ws_client.stop()
+
+
+    except Exception:
+
+        pass
+
+
+
+    try:
 
         watchdog.stop()
 
 
-    except:
-
+    except Exception:
 
         pass
 
 
 
     print(
-
         "[BOT STOPPED]"
-
     )
 
 
@@ -337,55 +180,43 @@ def shutdown(
 
 
 # =====================================
-# MAIN
+# START
 # =====================================
 
-if __name__ == "__main__":
-
+def start():
 
 
     print(
-
-        """
-
-====================================
-
-🚀 BYBIT AI TRADING BOT
-
-MODE : {}
-
-SYMBOL : {}
-
-====================================
-
-""".format(
-
-            os.getenv(
-
-                "LIVE_TRADING",
-
-                "false"
-
-            ),
-
-            os.getenv(
-
-                "DEFAULT_SYMBOL",
-
-                "BTCUSDT"
-
-            )
-
-        )
-
+        "===================================="
     )
 
 
+    print(
+        "VWAP SUPERTREND BOT START"
+    )
 
 
-    # Watchdog FIRST
+    print(
+        "LIVE :",
+        os.getenv(
+            "LIVE_TRADING",
+            "false"
+        )
+    )
 
-    watchdog.start()
+
+    print(
+        "SYMBOL :",
+        os.getenv(
+            "DEFAULT_SYMBOL",
+            "BTCUSDT"
+        )
+    )
+
+
+    print(
+        "===================================="
+    )
 
 
 
@@ -408,59 +239,70 @@ SYMBOL : {}
 
 
 
+    # watchdog
 
-
-    threads = []
-
-
-
-    services = [
-
-
-        public_ws_loop,
-
-
-        private_ws_loop,
-
-
-        strategy_loop,
-
-
-        equity_loop
-
-
-    ]
+    watchdog.start()
 
 
 
-    for service in services:
+    # websocket
+
+    print(
+        "[START] PUBLIC WS"
+    )
 
 
-        threads.append(
-
-            start_thread(
-
-                service
-
-            )
-
-        )
+    ws_client.start()
 
 
 
+    print(
+        "[START] PRIVATE WS"
+    )
 
 
-    try:
-
-
-        while running:
-
-
-            time.sleep(1)
+    private_ws_client.start()
 
 
 
-    except KeyboardInterrupt:
+    # strategy
+
+    threading.Thread(
+
+        target=strategy_loop,
+
+        daemon=True
+
+    ).start()
 
 
-        shutdown()
+
+    # equity
+
+    threading.Thread(
+
+        target=equity_loop,
+
+        daemon=True
+
+    ).start()
+
+
+
+    while running:
+
+
+        time.sleep(1)
+
+
+
+
+
+# =====================================
+# ENTRY
+# =====================================
+
+if __name__ == "__main__":
+
+
+    start()
