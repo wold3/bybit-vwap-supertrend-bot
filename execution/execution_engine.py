@@ -6,6 +6,7 @@ import hmac
 import hashlib
 import json
 import requests
+from urllib.parse import urlencode
 
 from dotenv import load_dotenv
 
@@ -66,12 +67,9 @@ class ExecutionEngine:
         try:
 
             r = requests.get(
-
                 self.base_url +
                 "/v5/market/time",
-
                 timeout=5
-
             )
 
 
@@ -84,18 +82,13 @@ class ExecutionEngine:
 
 
             local_time = int(
-                time.time()*1000
+                time.time() * 1000
             )
 
 
             self.time_offset = (
-
-                server_time
-
-                -
-
+                server_time -
                 local_time
-
             )
 
 
@@ -108,15 +101,14 @@ class ExecutionEngine:
 
         except Exception as e:
 
+
             print(
                 "[TIME SYNC ERROR]",
                 e
             )
 
+
             self.time_offset = 0
-
-
-
 
     # =====================================
     # SIGN
@@ -230,17 +222,13 @@ class ExecutionEngine:
 
             if method.upper() == "GET":
 
-                query = "&".join(
-                    sorted(
-                        [
-                            f"{k}={v}"
-                            for k, v in body.items()
-                        ]
-                    )
+                query = urlencode(
+                    sorted(body.items())
                 )
 
 
                 request_url = url
+
 
                 if query:
 
