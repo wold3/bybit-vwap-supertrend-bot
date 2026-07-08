@@ -3,6 +3,13 @@ import json
 import time
 import threading
 
+import market.candle_builder
+
+print(
+    "[LOADED CANDLE BUILDER]",
+    market.candle_builder.__file__
+)
+
 import websocket
 
 from dotenv import load_dotenv
