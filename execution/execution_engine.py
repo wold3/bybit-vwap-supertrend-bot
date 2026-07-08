@@ -35,9 +35,40 @@ class ExecutionEngine:
         )
 
 
-        self.base_url = os.getenv(
-            "BYBIT_BASE_URL",
-            "https://api-testnet.bybit.com"
+        # =====================================
+        # API URL SELECT
+        # =====================================
+
+        live = os.getenv(
+            "LIVE_TRADING",
+            "false"
+        ).lower() == "true"
+
+
+        if live:
+
+            self.base_url = os.getenv(
+                "BYBIT_LIVE_BASE_URL",
+                "https://api.bybit.com"
+            )
+
+
+        else:
+
+            self.base_url = os.getenv(
+                "BYBIT_DEMO_BASE_URL",
+                "https://api-demo.bybit.com"
+            )
+
+
+        print(
+            "[TRADING MODE]",
+            "LIVE" if live else "DEMO"
+        )
+
+        print(
+            "[BASE URL]",
+            self.base_url
         )
 
 
