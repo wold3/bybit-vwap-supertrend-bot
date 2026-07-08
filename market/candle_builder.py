@@ -1,30 +1,44 @@
+import os
 import time
 from collections import defaultdict, deque
+
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 
 class CandleBuilder:
 
 
-    def __init__(
-        self,
-        interval=60
-    ):
+    def __init__(self):
 
-
-        self.interval = interval
-
-
-        self.current = {}
-
-
-        self.candles = defaultdict(
-
-            lambda: deque(maxlen=300)
-
+        self.interval = int(
+            os.getenv(
+                "CANDLE_INTERVAL",
+                "60"
+            )
         )
 
 
+        self.max_history = int(
+            os.getenv(
+                "MAX_HISTORY",
+                "500"
+            )
+        )
+
+
+        self.candles = defaultdict(
+            lambda:
+                deque(
+                    maxlen=self.max_history
+                )
+        )
+
+
+        self.current = {}
 
 
 
@@ -40,192 +54,145 @@ class CandleBuilder:
     ):
 
 
-        now = int(
-
-            time.time()
-
-        )
+        now = int(time.time())
 
 
-        bucket = now - (
-
+        candle_time = now - (
             now % self.interval
-
         )
 
 
 
-        candle = self.current.get(
-
-            symbol
-
-        )
+        key = symbol
 
 
 
-        # 새로운 candle
+        # 새 캔들 시작
 
-        if candle is None or candle["timestamp"] != bucket:
-
-
-
-            if candle:
+        if key not in self.current:
 
 
-                self.candles[symbol].append(
-
-                    candle
-
-                )
-
-
-
-            self.current[symbol] = {
+            self.current[key] = {
 
 
                 "symbol":
-
                     symbol,
 
 
-                "open":
+                "timestamp":
+                    candle_time,
 
-                    float(price),
+
+                "open":
+                    price,
 
 
                 "high":
-
-                    float(price),
+                    price,
 
 
                 "low":
-
-                    float(price),
+                    price,
 
 
                 "close":
-
-                    float(price),
+                    price,
 
 
                 "volume":
+                    volume
 
-                    float(volume),
+            }
+
+
+            return
+
+
+
+
+        candle = self.current[key]
+
+
+
+        # 시간이 넘어가면 저장
+
+        if candle_time > candle["timestamp"]:
+
+
+            self.candles[key].append(
+
+                candle.copy()
+
+            )
+
+
+
+            self.current[key] = {
+
+
+                "symbol":
+                    symbol,
 
 
                 "timestamp":
+                    candle_time,
 
-                    bucket
 
+                "open":
+                    price,
+
+
+                "high":
+                    price,
+
+
+                "low":
+                    price,
+
+
+                "close":
+                    price,
+
+
+                "volume":
+                    volume
 
             }
 
 
 
-            return None
+        else:
 
 
+            candle["high"] = max(
+
+                candle["high"],
+
+                price
+
+            )
 
 
+            candle["low"] = min(
 
-        # 기존 candle 업데이트
+                candle["low"],
 
+                price
 
-        candle["high"] = max(
-
-            candle["high"],
-
-            float(price)
-
-        )
+            )
 
 
-        candle["low"] = min(
-
-            candle["low"],
-
-            float(price)
-
-        )
+            candle["close"] = price
 
 
-        candle["close"] = float(price)
-
-
-
-        candle["volume"] += float(volume)
+            candle["volume"] += volume
 
 
 
 
 
     # =====================================
-    # CLOSE CURRENT CANDLE
-    # =====================================
-
-    def close_candle(
-        self,
-        symbol
-    ):
-
-
-        candle = self.current.get(
-
-            symbol
-
-        )
-
-
-
-        if not candle:
-
-
-            return None
-
-
-
-        self.candles[symbol].append(
-
-            candle.copy()
-
-        )
-
-
-
-        del self.current[symbol]
-
-
-
-        return candle
-
-
-
-
-
-    # =====================================
-    # LATEST CLOSED CANDLE
-    # =====================================
-
-    def get_latest(
-        self,
-        symbol
-    ):
-
-
-        if not self.candles[symbol]:
-
-            return None
-
-
-
-        return self.candles[symbol][-1]
-
-
-
-
-
-    # =====================================
-    # ALL CANDLES
+    # GET CANDLES
     # =====================================
 
     def get_candles(
@@ -236,7 +203,13 @@ class CandleBuilder:
 
         return list(
 
-            self.candles[symbol]
+            self.candles.get(
+
+                symbol,
+
+                []
+
+            )
 
         )
 
@@ -245,43 +218,36 @@ class CandleBuilder:
 
 
     # =====================================
-    # RESET
+    # STATUS
     # =====================================
 
-    def reset(
-        self,
-        symbol=None
-    ):
+    def status(self):
 
 
-        if symbol:
+        return {
 
 
-            self.current.pop(
+            "symbols":
 
-                symbol,
-
-                None
-
-            )
+                list(
+                    self.candles.keys()
+                ),
 
 
-            self.candles[symbol].clear()
+            "count":
 
+                sum(
 
+                    len(v)
 
-        else:
+                    for v in self.candles.values()
 
+                )
 
-            self.current.clear()
-
-
-            self.candles.clear()
+        }
 
 
 
 
-
-# singleton
 
 candle_builder = CandleBuilder()
