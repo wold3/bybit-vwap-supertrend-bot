@@ -298,7 +298,6 @@ class WSClient:
 
                 )
 
-
                 symbol = trade.get(
 
                     "s",
@@ -306,7 +305,13 @@ class WSClient:
                     self.symbol
 
                 )
-
+                
+                print(
+                     "[TICK]",
+                     symbol,
+                     price,
+                     volume
+                 )
 
 
                 # tick -> candle
