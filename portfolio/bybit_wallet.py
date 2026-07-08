@@ -10,30 +10,30 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+
 class BybitWallet:
 
 
     def __init__(self):
 
-        self.api_key = (
-            os.getenv("BYBIT_API_KEY", "")
-            .strip()
-        )
+
+        self.api_key = os.getenv(
+            "BYBIT_API_KEY",
+            ""
+        ).strip()
 
 
-        self.api_secret = (
-            os.getenv("BYBIT_API_SECRET", "")
-            .strip()
-        )
+        self.api_secret = os.getenv(
+            "BYBIT_API_SECRET",
+            ""
+        ).strip()
 
 
-        self.base_url = (
-            os.getenv(
-                "BYBIT_BASE_URL",
-                "https://api.bybit.com"
-            )
-            .strip()
-        )
+        self.base_url = os.getenv(
+            "BYBIT_BASE_URL",
+            "https://api.bybit.com"
+        ).strip()
+
 
 
         print(
@@ -43,30 +43,18 @@ class BybitWallet:
         print(
             "KEY:",
             self.api_key[:6]
-            if self.api_key
-            else None
-        )
-
-        print(
-            "SECRET:",
-            self.api_secret[:6]
-            if self.api_secret
-            else None
-        )
-
-        print(
-            "BASE:",
-            self.base_url
         )
 
 
 
     # ==================================
-    # SIGN
+    # BYBIT V5 SIGN
     # ==================================
 
-    def _sign(
+    def create_signature(
         self,
+        timestamp,
+        recv_window,
         params
     ):
 
@@ -74,11 +62,38 @@ class BybitWallet:
         query_string = "&".join(
 
             [
-                f"{key}={params[key]}"
-                for key in sorted(params)
+                f"{k}={params[k]}"
+                for k in sorted(params)
             ]
 
         )
+
+
+        origin_string = (
+
+            timestamp
+
+            +
+
+            self.api_key
+
+            +
+
+            recv_window
+
+            +
+
+            query_string
+
+        )
+
+
+
+        print(
+            "[ORIGIN STRING]",
+            origin_string
+        )
+
 
 
         signature = hmac.new(
@@ -87,7 +102,7 @@ class BybitWallet:
                 "utf-8"
             ),
 
-            query_string.encode(
+            origin_string.encode(
                 "utf-8"
             ),
 
@@ -95,12 +110,6 @@ class BybitWallet:
 
         ).hexdigest()
 
-
-
-        print(
-            "[SIGN STRING]",
-            query_string
-        )
 
 
         print(
@@ -114,21 +123,12 @@ class BybitWallet:
 
 
 
+
     # ==================================
     # EQUITY
     # ==================================
 
     def get_equity(self):
-
-
-        if not self.api_key:
-
-            print(
-                "[ERROR] API KEY EMPTY"
-            )
-
-            return 0
-
 
 
         endpoint = (
@@ -147,10 +147,13 @@ class BybitWallet:
         timestamp = str(
 
             int(
-                time.time() * 1000
+                time.time()*1000
             )
 
         )
+
+
+        recv_window = "5000"
 
 
 
@@ -158,27 +161,21 @@ class BybitWallet:
 
 
             "accountType":
-                "UNIFIED",
-
-
-            "api_key":
-                self.api_key,
-
-
-            "timestamp":
-                timestamp,
-
-
-            "recv_window":
-                "5000"
+                "UNIFIED"
 
 
         }
 
 
 
-        params["sign"] = self._sign(
+        sign = self.create_signature(
+
+            timestamp,
+
+            recv_window,
+
             params
+
         )
 
 
@@ -191,7 +188,7 @@ class BybitWallet:
 
 
             "X-BAPI-SIGN":
-                params["sign"],
+                sign,
 
 
             "X-BAPI-TIMESTAMP":
@@ -199,7 +196,7 @@ class BybitWallet:
 
 
             "X-BAPI-RECV-WINDOW":
-                "5000"
+                recv_window,
 
 
         }
@@ -209,20 +206,7 @@ class BybitWallet:
         try:
 
 
-            print(
-                "[REQUEST URL]",
-                url
-            )
-
-
-            print(
-                "[REQUEST PARAMS]",
-                params
-            )
-
-
-
-            response = requests.get(
+            r = requests.get(
 
                 url,
 
@@ -236,14 +220,7 @@ class BybitWallet:
 
 
 
-            print(
-                "[HTTP]",
-                response.status_code
-            )
-
-
-
-            data = response.json()
+            data = r.json()
 
 
 
@@ -263,21 +240,13 @@ class BybitWallet:
 
 
 
-            account = (
-                data["result"]
-                ["list"][0]
-            )
-
-
-
             equity = float(
 
-                account[
-                    "totalEquity"
-                ]
+                data["result"]
+                ["list"][0]
+                ["totalEquity"]
 
             )
-
 
 
             return equity
@@ -288,7 +257,7 @@ class BybitWallet:
 
 
             print(
-                "[WALLET EXCEPTION]",
+                "[WALLET ERROR]",
                 e
             )
 
