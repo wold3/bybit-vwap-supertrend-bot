@@ -1,5 +1,3 @@
-# services/private_ws.py
-
 import os
 import time
 import json
@@ -12,19 +10,12 @@ import websocket
 from dotenv import load_dotenv
 
 
-from position.position_manager import position_manager
-
-from execution.execution_engine import execution_engine
-
-from trade_db import trade_db
-
 from watchdog.watchdog import watchdog
 
+from position.position_manager import position_manager
 
 
 load_dotenv()
-
-
 
 
 
@@ -59,7 +50,6 @@ class PrivateWS:
             "wss://stream-testnet.bybit.com/v5/private"
 
         )
-
 
 
         self.running = False
@@ -116,7 +106,7 @@ class PrivateWS:
 
 
     # =====================================
-    # RUN
+    # MAIN LOOP
     # =====================================
 
     def _run(self):
@@ -143,7 +133,13 @@ class PrivateWS:
                 )
 
 
-                self.ws.run_forever()
+                self.ws.run_forever(
+
+                    ping_interval=20,
+
+                    ping_timeout=10
+
+                )
 
 
 
@@ -152,7 +148,7 @@ class PrivateWS:
 
                 print(
 
-                    "[PRIVATE WS ERROR]",
+                    "[PRIVATE WS LOOP ERROR]",
 
                     e
 
@@ -160,28 +156,38 @@ class PrivateWS:
 
 
 
-            time.sleep(5)
+            if self.running:
+
+
+                print(
+
+                    "[PRIVATE WS RECONNECT]"
+
+                )
+
+
+                time.sleep(5)
 
 
 
 
 
     # =====================================
-    # AUTH SIGN
+    # AUTH
     # =====================================
 
-    def generate_auth(self):
+    def create_auth_message(self):
 
 
         expires = int(
 
-            time.time() * 1000
+            time.time()*1000
 
         ) + 10000
 
 
 
-        param = (
+        signature_payload = (
 
             "GET/realtime"
 
@@ -197,7 +203,7 @@ class PrivateWS:
 
             self.api_secret.encode(),
 
-            param.encode(),
+            signature_payload.encode(),
 
             hashlib.sha256
 
@@ -245,11 +251,19 @@ class PrivateWS:
 
 
 
+        print(
+
+            "[PRIVATE CONNECTED]"
+
+        )
+
+
+
         ws.send(
 
             json.dumps(
 
-                self.generate_auth()
+                self.create_auth_message()
 
             )
 
@@ -299,7 +313,7 @@ class PrivateWS:
 
         print(
 
-            "[PRIVATE AUTH OK]"
+            "[PRIVATE SUBSCRIBED]"
 
         )
 
@@ -328,11 +342,26 @@ class PrivateWS:
             )
 
 
-            watchdog.heartbeat(
 
-                "private_ws"
+            watchdog.heartbeat()
 
-            )
+
+
+            if "success" in data:
+
+
+                if data.get("success"):
+
+                    print(
+
+                        "[PRIVATE AUTH SUCCESS]"
+
+                    )
+
+
+                return
+
+
 
 
 
@@ -359,6 +388,17 @@ class PrivateWS:
 
 
                 self.handle_position(
+
+                    data.get("data")
+
+                )
+
+
+
+            elif topic == "wallet":
+
+
+                self.handle_wallet(
 
                     data.get("data")
 
@@ -394,6 +434,10 @@ class PrivateWS:
         if not data:
 
             return
+
+
+
+        from execution.execution_engine import execution_engine
 
 
 
@@ -443,7 +487,7 @@ class PrivateWS:
 
             print(
 
-                "[FILL]",
+                "[EXECUTION]",
 
                 symbol,
 
@@ -512,9 +556,24 @@ class PrivateWS:
             )
 
 
+
             side = item.get(
 
                 "side"
+
+            )
+
+
+
+            entry = float(
+
+                item.get(
+
+                    "avgPrice",
+
+                    0
+
+                )
 
             )
 
@@ -531,17 +590,21 @@ class PrivateWS:
 
                     size,
 
-                    float(
+                    entry
 
-                        item.get(
+                )
 
-                            "avgPrice",
 
-                            0
 
-                        )
+                print(
 
-                    )
+                    "[POSITION UPDATE]",
+
+                    symbol,
+
+                    side,
+
+                    size
 
                 )
 
@@ -555,6 +618,42 @@ class PrivateWS:
                     symbol
 
                 )
+
+
+
+                print(
+
+                    "[POSITION CLOSED]",
+
+                    symbol
+
+                )
+
+
+
+
+
+    # =====================================
+    # WALLET EVENT
+    # =====================================
+
+    def handle_wallet(
+        self,
+        data
+    ):
+
+
+        if not data:
+
+            return
+
+
+
+        print(
+
+            "[WALLET UPDATE]"
+
+        )
 
 
 
@@ -573,7 +672,7 @@ class PrivateWS:
 
         print(
 
-            "[PRIVATE ERROR]",
+            "[PRIVATE WS ERROR]",
 
             error
 
@@ -600,7 +699,7 @@ class PrivateWS:
 
         print(
 
-            "[PRIVATE CLOSED]"
+            "[PRIVATE WS CLOSED]"
 
         )
 
@@ -622,9 +721,27 @@ class PrivateWS:
 
 
 
-        if self.ws:
+        try:
 
-            self.ws.close()
+
+            if self.ws:
+
+                self.ws.close()
+
+
+
+        except:
+
+
+            pass
+
+
+
+        print(
+
+            "[PRIVATE WS STOPPED]"
+
+        )
 
 
 
@@ -647,7 +764,12 @@ class PrivateWS:
 
             "connected":
 
-                self.connected
+                self.connected,
+
+
+            "url":
+
+                self.url
 
         }
 
