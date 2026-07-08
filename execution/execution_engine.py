@@ -567,6 +567,53 @@ class ExecutionEngine:
 
         }
 
+    # =====================================
+    # FILL CALLBACK
+    # =====================================
+
+    def on_fill(
+        self,
+        symbol,
+        side,
+        qty,
+        price
+    ):
+
+
+        print(
+            "[FILL CONFIRMED]",
+            symbol,
+            side,
+            qty,
+            price
+        )
+
+
+        # position sync
+        try:
+
+            from position.position_manager import position_manager
+
+
+            position_manager.set_position(
+
+                symbol,
+
+                side,
+
+                qty,
+
+                price
+
+            )
+
+
+        except Exception as e:
+
+            print(
+                "[FILL POSITION ERROR]",
+                e
+            )
 
 
 
