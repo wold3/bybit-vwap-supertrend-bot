@@ -1,56 +1,47 @@
 import os
-import time
 import threading
 
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 
-
 class DrawdownGuard:
+    """
+    Drawdown Guard
 
+    기능
+    - 최고 Equity 기록
+    - 현재 Drawdown 계산
+    - 최대 손실 초과 시 거래 차단
+    """
 
     def __init__(self):
 
+        self.lock = threading.Lock()
 
-        self.max_drawdown = float(
+        self.max_daily_loss = float(
 
             os.getenv(
 
-                "MAX_DRAWDOWN",
+                "MAX_DAILY_LOSS",
 
-                "10"
+                "-50"
 
             )
 
         )
 
+        self.peak_equity = None
 
-        self.current_equity = 0.0
+        self.current_equity = None
 
-
-        self.peak_equity = 0.0
-
-
-        self.drawdown = 0.0
-
-
-        self.history = []
-
-
-        self.block_trade = False
-
-
-        self.lock = threading.Lock()
-
-
+        self.current_drawdown = 0.0
 
 
 
     # =====================================
-    # EQUITY UPDATE
+    # Equity Update
     # =====================================
 
     def update(
@@ -58,313 +49,82 @@ class DrawdownGuard:
         equity
     ):
 
-
         with self.lock:
-
-
-            equity = float(equity)
-
 
             self.current_equity = equity
 
-
-
-            # 최초 Equity
-
-            if self.peak_equity == 0:
-
+            if self.peak_equity is None:
 
                 self.peak_equity = equity
-
-
-
-
-
-            # 최고 Equity 갱신
 
             if equity > self.peak_equity:
 
-
                 self.peak_equity = equity
 
+            self.current_drawdown = (
 
-
-
-
-            # Drawdown 계산
-
-            if self.peak_equity > 0:
-
-
-                self.drawdown = (
-
-                    (
-
-                        self.peak_equity
-
-                        -
-
-                        equity
-
-                    )
-
-                    /
-
-                    self.peak_equity
-
-                ) * 100
-
-
-
-            else:
-
-
-                self.drawdown = 0.0
-
-
-
-
-
-            # Equity 기록
-
-            self.history.append({
-
-
-                "time":
-
-                    time.time(),
-
-
-                "equity":
-
-                    round(
-
-                        equity,
-
-                        4
-
-                    ),
-
-
-                "drawdown":
-
-                    round(
-
-                        self.drawdown,
-
-                        2
-
-                    )
-
-            })
-
-
-
-
-
-            # 최대 기록 제한
-
-            if len(self.history) > 1000:
-
-
-                self.history.pop(0)
-
-
-
-
-
-            # 거래 차단
-
-            if self.drawdown >= self.max_drawdown:
-
-
-                self.block_trade = True
-
-
-                print(
-
-                    "🚨 MAX DRAWDOWN BLOCK",
-
-                    round(
-
-                        self.drawdown,
-
-                        2
-
-                    ),
-
-                    "%"
-
-                )
-
-
-
-
-
-    # =====================================
-    # CAN TRADE
-    # =====================================
-
-    def can_trade(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            return not self.block_trade
-
-
-
-
-
-    # =====================================
-    # RESET
-    # =====================================
-
-    def reset(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            self.block_trade = False
-
-
-            self.drawdown = 0.0
-
-
-            self.history.clear()
-
-
-
-
-
-    # =====================================
-    # EQUITY HISTORY
-    # Dashboard Chart
-    # =====================================
-
-    def get_history(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            return list(
-
-                self.history
+                equity - self.peak_equity
 
             )
 
 
 
-
-
     # =====================================
-    # STATUS
-    # Dashboard Risk API
+    # Trade Allowed?
     # =====================================
 
-    def status(
-        self
-    ):
-
+    def can_trade(self):
 
         with self.lock:
 
+            return (
+
+                self.current_drawdown >
+
+                self.max_daily_loss
+
+            )
+
+
+
+    # =====================================
+    # Reset
+    # =====================================
+
+    def reset(self):
+
+        with self.lock:
+
+            self.peak_equity = None
+
+            self.current_equity = None
+
+            self.current_drawdown = 0.0
+
+
+
+    # =====================================
+    # Status
+    # =====================================
+
+    def status(self):
+
+        with self.lock:
 
             return {
 
+                "peak_equity": self.peak_equity,
 
-                "current_equity":
+                "current_equity": self.current_equity,
 
-                    round(
+                "drawdown": self.current_drawdown,
 
-                        self.current_equity,
+                "max_daily_loss": self.max_daily_loss,
 
-                        4
-
-                    ),
-
-
-                "peak_equity":
-
-                    round(
-
-                        self.peak_equity,
-
-                        4
-
-                    ),
-
-
-                "drawdown":
-
-                    round(
-
-                        self.drawdown,
-
-                        2
-
-                    ),
-
-
-                "max_drawdown":
-
-                    self.max_drawdown,
-
-
-                "can_trade":
-
-                    not self.block_trade
-
+                "can_trade": self.can_trade()
 
             }
 
 
-
-
-
-    # =====================================
-    # FORCE BLOCK
-    # =====================================
-
-    def block(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            self.block_trade = True
-
-
-
-
-
-    # =====================================
-    # UNBLOCK
-    # =====================================
-
-    def unblock(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            self.block_trade = False
-
-
-
-
-
+# singleton
 drawdown_guard = DrawdownGuard()
