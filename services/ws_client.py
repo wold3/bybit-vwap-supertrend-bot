@@ -7,24 +7,16 @@ from watchdog.watchdog import watchdog
 class WSClient:
     """
     Public WebSocket Client
-
-    기능
-    - websocket 시작/종료
-    - 최신 시세 저장
-    - watchdog heartbeat
     """
 
     def __init__(self):
 
         self.running = False
-
+        self.connected = False
         self.thread = None
 
-        # 최신 시장 데이터
         self.latest_data = None
-
-        self.connected = False
-
+        self.last_update = 0
 
 
     def start(self):
@@ -44,7 +36,6 @@ class WSClient:
         print("[WS] started")
 
 
-
     def _run(self):
 
         self.connected = True
@@ -53,16 +44,24 @@ class WSClient:
 
             try:
 
-                # watchdog heartbeat
                 watchdog.heartbeat()
 
-                # ===========================
-                # TODO
-                # Bybit Public WebSocket 연결
-                # 수신 데이터는
-                # self.update_market_data(data)
-                # 호출
-                # ===========================
+                # TODO:
+                # 실제 Bybit WebSocket 연결 후
+                # self.update_market_data(data) 호출
+
+                # 테스트용 더미 데이터
+                if self.latest_data is None:
+
+                    self.update_market_data({
+
+                        "symbol": "BTCUSDT",
+
+                        "price": 0,
+
+                        "timestamp": time.time()
+
+                    })
 
                 time.sleep(1)
 
@@ -72,40 +71,31 @@ class WSClient:
 
                 time.sleep(5)
 
-
-
         self.connected = False
-
 
 
     def stop(self):
 
         self.running = False
-
         self.connected = False
 
         print("[WS] stopped")
 
 
-
     def update_market_data(self, data):
 
-        """
-        websocket에서 호출
-        """
-
         self.latest_data = data
-
+        self.last_update = time.time()
 
 
     def get_latest_data(self):
 
-        """
-        strategy에서 호출
-        """
-
         return self.latest_data
 
+
+    def is_connected(self):
+
+        return self.connected
 
 
     def status(self):
@@ -116,10 +106,11 @@ class WSClient:
 
             "connected": self.connected,
 
-            "has_market_data": self.latest_data is not None
+            "has_market_data": self.latest_data is not None,
+
+            "last_update": self.last_update
 
         }
 
 
-# singleton
 ws_client = WSClient()
