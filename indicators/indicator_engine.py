@@ -1,8 +1,7 @@
-# indicators/indicator_engine.py
-
 import os
+from collections import defaultdict, deque
+
 import pandas as pd
-import numpy as np
 
 from dotenv import load_dotenv
 
@@ -17,10 +16,17 @@ class IndicatorEngine:
     def __init__(self):
 
 
-        self.history = []
+        self.max_history = int(
 
+            os.getenv(
 
-        self.supertrend_direction = "UP"
+                "MAX_HISTORY",
+
+                "200"
+
+            )
+
+        )
 
 
         self.period = int(
@@ -49,13 +55,11 @@ class IndicatorEngine:
         )
 
 
-        self.max_history = int(
+        self.history = defaultdict(
 
-            os.getenv(
+            lambda: deque(
 
-                "MAX_HISTORY",
-
-                "200"
+                maxlen=self.max_history
 
             )
 
@@ -81,18 +85,25 @@ class IndicatorEngine:
 
 
 
-        self.history.append(
+        symbol = candle.get(
 
-            candle
+            "symbol"
 
         )
 
 
 
-        if len(self.history) > self.max_history:
+        if not symbol:
+
+            return
 
 
-            self.history.pop(0)
+
+        self.history[symbol].append(
+
+            candle
+
+        )
 
 
 
@@ -102,10 +113,21 @@ class IndicatorEngine:
     # DATAFRAME
     # =====================================
 
-    def dataframe(self):
+    def dataframe(
+        self,
+        symbol
+    ):
 
 
-        if not self.history:
+        data = self.history.get(
+
+            symbol
+
+        )
+
+
+
+        if not data:
 
             return None
 
@@ -113,7 +135,7 @@ class IndicatorEngine:
 
         return pd.DataFrame(
 
-            self.history
+            list(data)
 
         )
 
@@ -126,15 +148,20 @@ class IndicatorEngine:
     # =====================================
 
     def calculate_vwap(
-        self
+        self,
+        symbol
     ):
 
 
-        df = self.dataframe()
+        df = self.dataframe(
+
+            symbol
+
+        )
 
 
 
-        if df is None:
+        if df is None or len(df)==0:
 
             return None
 
@@ -166,11 +193,7 @@ class IndicatorEngine:
 
         if total_volume == 0:
 
-            return float(
-
-                typical_price.iloc[-1]
-
-            )
+            return None
 
 
 
@@ -201,21 +224,20 @@ class IndicatorEngine:
     # =====================================
 
     def calculate_atr(
-        self
+        self,
+        symbol
     ):
 
 
-        df = self.dataframe()
+        df = self.dataframe(
+
+            symbol
+
+        )
 
 
 
-        if df is None:
-
-            return None
-
-
-
-        if len(df) < self.period:
+        if df is None or len(df) < self.period:
 
             return None
 
@@ -229,21 +251,29 @@ class IndicatorEngine:
 
 
 
-        tr1 = high - low
+        tr1 = high-low
 
 
-        tr2 = abs(
+        tr2 = (
 
-            high - close.shift()
+            high
 
-        )
+            -
+
+            close.shift()
+
+        ).abs()
 
 
-        tr3 = abs(
+        tr3 = (
 
-            low - close.shift()
+            low
 
-        )
+            -
+
+            close.shift()
+
+        ).abs()
 
 
 
@@ -273,11 +303,17 @@ class IndicatorEngine:
 
 
 
-        return float(
+        value = atr.iloc[-1]
 
-            atr.iloc[-1]
 
-        )
+
+        if pd.isna(value):
+
+            return None
+
+
+
+        return float(value)
 
 
 
@@ -288,11 +324,16 @@ class IndicatorEngine:
     # =====================================
 
     def calculate_supertrend(
-        self
+        self,
+        symbol
     ):
 
 
-        df = self.dataframe()
+        df = self.dataframe(
+
+            symbol
+
+        )
 
 
 
@@ -302,22 +343,17 @@ class IndicatorEngine:
 
 
 
-        if len(df) < self.period:
+        atr = self.calculate_atr(
 
+            symbol
 
-            return None
-
-
-
-
-
-        atr = self.calculate_atr()
+        )
 
 
 
         if atr is None:
 
-            return None
+            return "FLAT"
 
 
 
@@ -337,7 +373,7 @@ class IndicatorEngine:
 
 
 
-        upper_band = (
+        upper = (
 
             hl2
 
@@ -352,7 +388,7 @@ class IndicatorEngine:
         )
 
 
-        lower_band = (
+        lower = (
 
             hl2
 
@@ -372,36 +408,19 @@ class IndicatorEngine:
 
 
 
-        previous = self.supertrend_direction
+        if close > upper:
+
+            return "UP"
 
 
 
+        elif close < lower:
 
-
-        if close > upper_band:
-
-
-            self.supertrend_direction = "UP"
+            return "DOWN"
 
 
 
-        elif close < lower_band:
-
-
-            self.supertrend_direction = "DOWN"
-
-
-
-        else:
-
-
-            self.supertrend_direction = previous
-
-
-
-
-
-        return self.supertrend_direction
+        return "FLAT"
 
 
 
@@ -412,8 +431,26 @@ class IndicatorEngine:
     # =====================================
 
     def calculate(
-        self
+        self,
+        symbol=None
     ):
+
+
+        if symbol is None:
+
+
+            if len(self.history)==0:
+
+                return {}
+
+
+
+            symbol = list(
+
+                self.history.keys()
+
+            )[0]
+
 
 
         return {
@@ -421,18 +458,51 @@ class IndicatorEngine:
 
             "vwap":
 
-                self.calculate_vwap(),
+                self.calculate_vwap(
+
+                    symbol
+
+                ),
+
 
 
             "supertrend":
 
-                self.calculate_supertrend(),
+                self.calculate_supertrend(
+
+                    symbol
+
+                )
+
+        }
 
 
-            "atr":
 
-                self.calculate_atr()
 
+
+    # =====================================
+    # MARKET DATA
+    # =====================================
+
+    def get_market_data(
+        self,
+        candle
+    ):
+
+
+        indicators = self.calculate(
+
+            candle["symbol"]
+
+        )
+
+
+        return {
+
+
+            **candle,
+
+            **indicators
 
         }
 
@@ -444,13 +514,25 @@ class IndicatorEngine:
     # RESET
     # =====================================
 
-    def reset(self):
+    def reset(
+        self,
+        symbol=None
+    ):
 
 
-        self.history.clear()
+        if symbol:
 
+            self.history.pop(
 
-        self.supertrend_direction = "UP"
+                symbol,
+
+                None
+
+            )
+
+        else:
+
+            self.history.clear()
 
 
 
@@ -460,20 +542,32 @@ class IndicatorEngine:
     # STATUS
     # =====================================
 
-    def status(self):
+    def status(
+        self
+    ):
 
 
         return {
 
 
-            "history":
+            "symbols":
 
-                len(self.history),
+                list(
+
+                    self.history.keys()
+
+                ),
 
 
-            "supertrend":
+            "count":
 
-                self.supertrend_direction
+                sum(
+
+                    len(x)
+
+                    for x in self.history.values()
+
+                )
 
         }
 
