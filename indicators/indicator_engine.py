@@ -1,29 +1,65 @@
+# indicators/indicator_engine.py
+
+import os
 import pandas as pd
-import threading
+import numpy as np
+
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 
 class IndicatorEngine:
-    """
-    Indicator Engine
-
-    기능:
-    - Candle 저장
-    - VWAP 계산
-    - ATR 계산
-    - Supertrend 계산
-    - Strategy Engine용 market_data 생성
-    """
-
 
 
     def __init__(self):
 
-        self.lock = threading.Lock()
 
         self.history = []
 
-        self.max_history = 200
+
+        self.supertrend_direction = "UP"
+
+
+        self.period = int(
+
+            os.getenv(
+
+                "SUPER_TREND_PERIOD",
+
+                "10"
+
+            )
+
+        )
+
+
+        self.multiplier = float(
+
+            os.getenv(
+
+                "SUPER_TREND_MULTIPLIER",
+
+                "3"
+
+            )
+
+        )
+
+
+        self.max_history = int(
+
+            os.getenv(
+
+                "MAX_HISTORY",
+
+                "200"
+
+            )
+
+        )
 
 
 
@@ -41,57 +77,45 @@ class IndicatorEngine:
 
         if not candle:
 
+            return
+
+
+
+        self.history.append(
+
+            candle
+
+        )
+
+
+
+        if len(self.history) > self.max_history:
+
+
+            self.history.pop(0)
+
+
+
+
+
+    # =====================================
+    # DATAFRAME
+    # =====================================
+
+    def dataframe(self):
+
+
+        if not self.history:
+
             return None
 
 
 
-        with self.lock:
+        return pd.DataFrame(
 
+            self.history
 
-            self.history.append(
-
-                candle
-
-            )
-
-
-            if len(self.history) > self.max_history:
-
-                self.history.pop(0)
-
-
-
-            result = {
-
-
-                "symbol":
-
-                    candle.get(
-                        "symbol"
-                    ),
-
-
-                "close":
-
-                    candle.get(
-                        "close"
-                    ),
-
-
-                "vwap":
-
-                    self.calculate_vwap(),
-
-
-                "supertrend":
-
-                    self.calculate_supertrend()
-
-            }
-
-
-
-            return result
+        )
 
 
 
@@ -106,17 +130,13 @@ class IndicatorEngine:
     ):
 
 
-        if not self.history:
+        df = self.dataframe()
+
+
+
+        if df is None:
 
             return None
-
-
-
-        df = pd.DataFrame(
-
-            self.history
-
-        )
 
 
 
@@ -148,7 +168,7 @@ class IndicatorEngine:
 
             return float(
 
-                df["close"].iloc[-1]
+                typical_price.iloc[-1]
 
             )
 
@@ -158,7 +178,11 @@ class IndicatorEngine:
 
             (
 
-                typical_price * volume
+                typical_price
+
+                *
+
+                volume
 
             ).sum()
 
@@ -176,21 +200,22 @@ class IndicatorEngine:
     # ATR
     # =====================================
 
-    def atr(
-        self,
-        period=10
+    def calculate_atr(
+        self
     ):
 
 
-        df = pd.DataFrame(
-
-            self.history
-
-        )
+        df = self.dataframe()
 
 
 
-        if len(df) < period + 1:
+        if df is None:
+
+            return None
+
+
+
+        if len(df) < self.period:
 
             return None
 
@@ -204,21 +229,33 @@ class IndicatorEngine:
 
 
 
+        tr1 = high - low
+
+
+        tr2 = abs(
+
+            high - close.shift()
+
+        )
+
+
+        tr3 = abs(
+
+            low - close.shift()
+
+        )
+
+
+
         tr = pd.concat(
 
             [
 
-                high - low,
+                tr1,
 
+                tr2,
 
-                abs(
-                    high - close.shift()
-                ),
-
-
-                abs(
-                    low - close.shift()
-                )
+                tr3
 
             ],
 
@@ -228,13 +265,17 @@ class IndicatorEngine:
 
 
 
+        atr = tr.rolling(
+
+            self.period
+
+        ).mean()
+
+
+
         return float(
 
-            tr.rolling(
-
-                period
-
-            ).mean().iloc[-1]
+            atr.iloc[-1]
 
         )
 
@@ -247,37 +288,36 @@ class IndicatorEngine:
     # =====================================
 
     def calculate_supertrend(
-        self,
-        period=10,
-        multiplier=3
+        self
     ):
 
 
-        if len(self.history) < period:
-
-            return "FLAT"
+        df = self.dataframe()
 
 
 
-        df = pd.DataFrame(
+        if df is None:
 
-            self.history
-
-        )
+            return None
 
 
 
-        atr = self.atr(
+        if len(df) < self.period:
 
-            period
 
-        )
+            return None
+
+
+
+
+
+        atr = self.calculate_atr()
 
 
 
         if atr is None:
 
-            return "FLAT"
+            return None
 
 
 
@@ -297,25 +337,32 @@ class IndicatorEngine:
 
 
 
-        upper = (
+        upper_band = (
 
             hl2
 
             +
 
-            multiplier * atr
+            self.multiplier
+
+            *
+
+            atr
 
         )
 
 
-
-        lower = (
+        lower_band = (
 
             hl2
 
             -
 
-            multiplier * atr
+            self.multiplier
+
+            *
+
+            atr
 
         )
 
@@ -325,21 +372,85 @@ class IndicatorEngine:
 
 
 
-        if close > upper:
-
-            return "UP"
+        previous = self.supertrend_direction
 
 
 
-        if close < lower:
-
-            return "DOWN"
 
 
+        if close > upper_band:
 
-        # 기존 전략과 호환
 
-        return "UP"
+            self.supertrend_direction = "UP"
+
+
+
+        elif close < lower_band:
+
+
+            self.supertrend_direction = "DOWN"
+
+
+
+        else:
+
+
+            self.supertrend_direction = previous
+
+
+
+
+
+        return self.supertrend_direction
+
+
+
+
+
+    # =====================================
+    # ALL INDICATORS
+    # =====================================
+
+    def calculate(
+        self
+    ):
+
+
+        return {
+
+
+            "vwap":
+
+                self.calculate_vwap(),
+
+
+            "supertrend":
+
+                self.calculate_supertrend(),
+
+
+            "atr":
+
+                self.calculate_atr()
+
+
+        }
+
+
+
+
+
+    # =====================================
+    # RESET
+    # =====================================
+
+    def reset(self):
+
+
+        self.history.clear()
+
+
+        self.supertrend_direction = "UP"
 
 
 
@@ -349,36 +460,25 @@ class IndicatorEngine:
     # STATUS
     # =====================================
 
-    def status(
-        self
-    ):
+    def status(self):
 
 
-        with self.lock:
+        return {
 
 
-            return {
+            "history":
+
+                len(self.history),
 
 
-                "history":
+            "supertrend":
 
-                    len(self.history),
+                self.supertrend_direction
 
-
-                "latest":
-
-                    self.history[-1]
-
-                    if self.history
-
-                    else None
-
-            }
+        }
 
 
 
 
-
-# singleton
 
 indicator_engine = IndicatorEngine()
