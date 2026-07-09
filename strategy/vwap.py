@@ -1,16 +1,28 @@
-def calculate_vwap(candles):
+import pandas as pd
 
-    if not candles:
+
+
+def calculate_vwap(df):
+
+
+    if len(df) == 0:
+
         return None
 
-    tpv = 0
-    vol = 0
 
-    for c in candles:
-        tp = (c["high"] + c["low"] + c["close"]) / 3
-        v = 1
 
-        tpv += tp * v
-        vol += v
+    pv = (
+        df["close"]
+        *
+        df["volume"]
+    )
 
-    return tpv / vol if vol else None
+
+    vwap = (
+        pv.sum()
+        /
+        df["volume"].sum()
+    )
+
+
+    return float(vwap)
