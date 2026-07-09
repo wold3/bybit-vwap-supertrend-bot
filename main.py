@@ -1,12 +1,28 @@
-import os
+# main.py
+
 import time
 import signal
-import threading
 
 from dotenv import load_dotenv
 
 
+# =====================================
+# LOAD ENV FIRST
+# =====================================
+
 load_dotenv()
+
+
+
+# =====================================
+# CONFIG
+# =====================================
+
+from config import (
+    DEFAULT_SYMBOL,
+    LIVE_TRADING,
+    BYBIT_BASE_URL,
+)
 
 
 
@@ -18,6 +34,7 @@ from services.ws_client import (
     ws_client
 )
 
+
 from services.private_ws_client import (
     private_ws_client
 )
@@ -25,7 +42,7 @@ from services.private_ws_client import (
 
 
 # =====================================
-# WALLET
+# PORTFOLIO
 # =====================================
 
 from portfolio.bybit_wallet import (
@@ -44,109 +61,11 @@ from watchdog.watchdog import (
 
 
 
-
 # =====================================
-# GLOBAL
-# =====================================
-
-running = True
-
-
-
-
-
-# =====================================
-# STRATEGY LOOP
+# GLOBAL STATE
 # =====================================
 
-def strategy_loop():
-
-
-    print(
-        "[START] STRATEGY LOOP"
-    )
-
-
-    while running:
-
-
-        try:
-
-
-            data = ws_client.get_latest_data()
-
-
-            if data:
-
-                pass
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[STRATEGY LOOP ERROR]",
-                e
-            )
-
-
-
-        time.sleep(1)
-
-
-
-
-
-
-
-# =====================================
-# EQUITY LOOP
-# =====================================
-
-def equity_loop():
-
-
-    print(
-        "[START] EQUITY LOOP"
-    )
-
-
-    while running:
-
-
-        try:
-
-
-            equity = wallet.get_equity()
-
-
-
-            if equity:
-
-
-                print(
-                    "[EQUITY]",
-                    equity
-                )
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[EQUITY ERROR]",
-                e
-            )
-
-
-
-        time.sleep(30)
-
-
-
-
+RUNNING = True
 
 
 
@@ -155,50 +74,75 @@ def equity_loop():
 # =====================================
 
 def shutdown(
-    sig=None,
+    signum=None,
     frame=None
 ):
 
+    global RUNNING
 
-    global running
 
+    if not RUNNING:
+        return
+
+
+
+    RUNNING = False
+
+
+
+    print()
 
     print(
-        "\n[BOT STOPPING]"
+        "[BOT STOPPING]"
     )
 
 
-    running = False
 
-
+    # public ws stop
 
     try:
 
         ws_client.stop()
 
-    except Exception:
 
-        pass
+    except Exception as e:
+
+        print(
+            "[PUBLIC STOP ERROR]",
+            e
+        )
 
 
+
+    # private ws stop
 
     try:
 
         private_ws_client.stop()
 
-    except Exception:
 
-        pass
+    except Exception as e:
+
+        print(
+            "[PRIVATE STOP ERROR]",
+            e
+        )
 
 
+
+    # watchdog stop
 
     try:
 
         watchdog.stop()
 
-    except Exception:
 
-        pass
+    except Exception as e:
+
+        print(
+            "[WATCHDOG STOP ERROR]",
+            e
+        )
 
 
 
@@ -209,43 +153,53 @@ def shutdown(
 
 
 
+# =====================================
+# SIGNAL
+# =====================================
+
+signal.signal(
+    signal.SIGINT,
+    shutdown
+)
+
+
+signal.signal(
+    signal.SIGTERM,
+    shutdown
+)
+
 
 
 
 # =====================================
-# START
+# MAIN
 # =====================================
 
-def start():
+def main():
 
 
     print(
         "===================================="
     )
-
 
     print(
         "VWAP SUPERTREND BOT START"
     )
 
-
     print(
         "LIVE :",
-        os.getenv(
-            "LIVE_TRADING",
-            "false"
-        )
+        LIVE_TRADING
     )
-
 
     print(
         "SYMBOL :",
-        os.getenv(
-            "DEFAULT_SYMBOL",
-            "BTCUSDT"
-        )
+        DEFAULT_SYMBOL
     )
 
+    print(
+        "BASE :",
+        BYBIT_BASE_URL
+    )
 
     print(
         "===================================="
@@ -253,79 +207,121 @@ def start():
 
 
 
-    signal.signal(
-        signal.SIGINT,
-        shutdown
-    )
+    # -----------------------------
+    # WATCHDOG
+    # -----------------------------
+
+    try:
+
+        watchdog.start()
 
 
-    signal.signal(
-        signal.SIGTERM,
-        shutdown
-    )
+        print(
+            "[WATCHDOG START]"
+        )
+
+
+    except Exception as e:
+
+        print(
+            "[WATCHDOG ERROR]",
+            e
+        )
 
 
 
-    # watchdog
-
-    watchdog.start()
-
-
-
-    # public websocket
+    # -----------------------------
+    # PUBLIC WS
+    # -----------------------------
 
     print(
         "[START] PUBLIC WS"
     )
 
 
-    ws_client.start()
+    try:
+
+        ws_client.start()
+
+
+    except Exception as e:
+
+        print(
+            "[PUBLIC WS ERROR]",
+            e
+        )
 
 
 
-    # private websocket
+    time.sleep(2)
+
+
+
+    # -----------------------------
+    # PRIVATE WS
+    # -----------------------------
 
     print(
         "[START] PRIVATE WS"
     )
 
 
-    private_ws_client.start()
+    try:
+
+        private_ws_client.start()
+
+
+    except Exception as e:
+
+        print(
+            "[PRIVATE WS ERROR]",
+            e
+        )
 
 
 
-    # strategy thread
-
-    threading.Thread(
-
-        target=strategy_loop,
-
-        daemon=True
-
-    ).start()
+    time.sleep(3)
 
 
 
-    # equity thread
+    # -----------------------------
+    # WALLET CHECK
+    # -----------------------------
 
-    threading.Thread(
+    try:
 
-        target=equity_loop,
-
-        daemon=True
-
-    ).start()
+        equity = wallet.get_equity()
 
 
+        print(
+            "[ACCOUNT EQUITY]",
+            equity
+        )
 
 
-    while running:
+    except Exception as e:
+
+        print(
+            "[WALLET ERROR]",
+            e
+        )
+
+
+
+    # -----------------------------
+    # STRATEGY LOOP
+    # -----------------------------
+
+    print(
+        "[START] STRATEGY LOOP"
+    )
+
+
+
+    while RUNNING:
 
 
         time.sleep(1)
-
-
-
 
 
 
@@ -336,5 +332,4 @@ def start():
 
 if __name__ == "__main__":
 
-
-    start()
+    main()
