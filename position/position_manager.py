@@ -1,35 +1,36 @@
 import time
-import json
-import hmac
-import hashlib
-import requests
 
 
 from config import (
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
-    BYBIT_BASE_URL,
     DEFAULT_SYMBOL
 )
+
+
+from api.bybit_client import bybit_client
+
+
 
 
 
 class PositionManager:
 
 
+
     def __init__(self):
 
-
-        self.base = BYBIT_BASE_URL
 
         self.symbol = DEFAULT_SYMBOL
 
 
         self.current = {
 
+
             "side": None,
 
-            "size": 0
+            "size": 0,
+
+            "avg_price": 0
+
 
         }
 
@@ -43,235 +44,192 @@ class PositionManager:
 
 
 
-    # ============================
-    # SIGN
-    # ============================
-
-    def _sign(
-            self,
-            timestamp,
-            query
-    ):
 
 
-        recv = "5000"
-
-
-        origin = (
-
-            timestamp
-
-            +
-
-            BYBIT_API_KEY
-
-            +
-
-            recv
-
-            +
-
-            query
-
-        )
-
-
-
-        return hmac.new(
-
-            BYBIT_API_SECRET.encode(),
-
-            origin.encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-
-
-
-    # ============================
-    # GET POSITION
-    # ============================
+    # =================================
+    # SYNC POSITION
+    # =================================
 
 
     def sync(self):
 
 
-        endpoint = (
-            "/v5/position/list"
-        )
-
-
-
-        params = (
-
-            "category=linear"
-
-            "&symbol="
-
-            +
-
-            self.symbol
-
-        )
-
-
-
-        timestamp = str(
-
-            int(
-
-                time.time()*1000
-
-            )
-
-        )
-
-
-
-        sign = self._sign(
-
-            timestamp,
-
-            params
-
-        )
-
-
-
-        headers = {
-
-
-            "X-BAPI-API-KEY":
-
-                BYBIT_API_KEY,
-
-
-            "X-BAPI-SIGN":
-
-                sign,
-
-
-            "X-BAPI-TIMESTAMP":
-
-                timestamp,
-
-
-            "X-BAPI-RECV-WINDOW":
-
-                "5000"
-
-        }
-
-
-
-
         try:
 
 
-            r = requests.get(
+            params = {
 
-                self.base + endpoint,
 
-                params={
+                "category":
 
-                    "category":
+                "linear",
 
-                    "linear",
 
-                    "symbol":
 
-                    self.symbol
+                "symbol":
 
-                },
+                self.symbol
 
-                headers=headers,
 
-                timeout=10
+            }
+
+
+
+
+
+            result = bybit_client.get(
+
+                "/v5/position/list",
+
+                params
 
             )
 
 
-
-            data = r.json()
 
 
 
             print(
-
                 "[POSITION RESPONSE]",
+                result
+            )
 
-                data
+
+
+
+
+            if not result:
+
+
+                return self.current
+
+
+
+
+
+            if result.get(
+                "retCode"
+            ) != 0:
+
+
+                return self.current
+
+
+
+
+
+
+            data = result["result"]["list"]
+
+
+
+
+
+
+            if len(data) == 0:
+
+
+                self.clear()
+
+
+                return self.current
+
+
+
+
+
+
+            pos = data[0]
+
+
+
+
+
+            size = float(
+
+                pos.get(
+
+                    "size",
+
+                    0
+
+                )
 
             )
 
 
 
-            if data.get(
-                "retCode"
-            ) != 0:
 
 
-                return None
-
-
-
-
-            rows = data["result"]["list"]
+            side = pos.get(
+                "side"
+            )
 
 
 
-            if rows:
+            avg = float(
 
+                pos.get(
 
+                    "avgPrice",
 
-                pos = rows[0]
-
-
-
-                size = float(
-
-                    pos.get(
-
-                        "size",
-
-                        0
-
-                    )
+                    0
 
                 )
 
-
-
-                side = pos.get(
-                    "side"
-                )
+            )
 
 
 
-                if size == 0:
 
 
-                    side = None
 
+
+            if size == 0:
+
+
+
+                self.clear()
+
+
+
+            else:
 
 
 
                 self.current = {
+
 
                     "side":
 
                     side,
 
 
+
                     "size":
 
-                    size
+                    size,
+
+
+
+                    "avg_price":
+
+                    avg
+
 
                 }
 
+
+
+
+
+            print(
+
+                "[CURRENT POSITION]",
+
+                self.current
+
+            )
 
 
 
@@ -280,7 +238,9 @@ class PositionManager:
 
 
 
+
         except Exception as e:
+
 
 
             print(
@@ -292,16 +252,46 @@ class PositionManager:
             )
 
 
-            return None
+
+            return self.current
 
 
 
 
 
 
-    # ============================
+
+    # =================================
+    # CLEAR
+    # =================================
+
+
+    def clear(self):
+
+
+        self.current = {
+
+
+            "side": None,
+
+
+            "size": 0,
+
+
+            "avg_price": 0
+
+
+        }
+
+
+
+
+
+
+
+    # =================================
     # CHECK
-    # ============================
+    # =================================
 
 
     def has_position(self):
@@ -311,11 +301,12 @@ class PositionManager:
 
             self.current["size"]
 
-            !=
+            >
 
             0
 
         )
+
 
 
 
@@ -329,10 +320,48 @@ class PositionManager:
 
 
 
+
+
+
     def size(self):
 
 
         return self.current["size"]
+
+
+
+
+
+
+
+    def price(self):
+
+
+        return self.current["avg_price"]
+
+
+
+
+
+
+
+    # =================================
+    # REFRESH LOOP
+    # =================================
+
+
+    def monitor(self):
+
+
+        while True:
+
+
+            self.sync()
+
+
+            time.sleep(5)
+
+
 
 
 
