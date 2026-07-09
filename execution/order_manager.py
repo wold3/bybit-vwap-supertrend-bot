@@ -14,6 +14,7 @@ from api.bybit_client import (
 
 
 
+
 class OrderManager:
 
 
@@ -27,42 +28,17 @@ class OrderManager:
 
         self.last_order_time = 0
 
-        self.cooldown = 3
+
+        self.duplicate_seconds = 3
 
 
 
         print("==============================")
         print("[ORDER MANAGER INIT]")
-        print("SYMBOL :", self.symbol)
         print("LIVE :", self.live)
+        print("SYMBOL :", self.symbol)
         print("==============================")
 
-
-
-    # =====================================================
-    # PLACE ORDER
-    # =====================================================
-
-    def place_order(
-        self,
-        side,
-        qty,
-        take_profit=None,
-        stop_loss=None,
-    ):
-
-
-        return self.create_order(
-
-            side,
-
-            qty,
-
-            take_profit,
-
-            stop_loss
-
-        )
 
 
 
@@ -82,45 +58,36 @@ class OrderManager:
         now = time.time()
 
 
+
         if (
 
             now - self.last_order_time
 
             <
 
-            self.cooldown
+            self.duplicate_seconds
 
         ):
 
 
             print(
-                "[ORDER BLOCK] COOLDOWN"
+                "[ORDER BLOCK] DUPLICATE"
             )
+
 
             return None
 
 
-
-        if not self.live:
-
-
-            print(
-                "[ORDER BLOCK] LIVE_TRADING=False"
-            )
-
-            return None
 
 
 
         order_id = (
-
             "VWAP_"
-
             +
-
-            uuid.uuid4().hex[:8]
-
+            uuid.uuid4().hex[:10]
         )
+
+
 
 
 
@@ -128,46 +95,45 @@ class OrderManager:
 
 
             "category":
-
                 "linear",
 
 
             "symbol":
-
                 self.symbol,
 
 
             "side":
-
                 side,
 
 
             "positionIdx":
-
                 0,
 
 
             "orderType":
-
                 "Market",
 
 
             "qty":
-
                 str(qty),
 
 
             "orderLinkId":
-
                 order_id
 
         }
 
 
 
+
+
+
         if take_profit is not None:
 
-            params["takeProfit"] = str(
+
+            params[
+                "takeProfit"
+            ] = str(
                 take_profit
             )
 
@@ -175,9 +141,14 @@ class OrderManager:
 
         if stop_loss is not None:
 
-            params["stopLoss"] = str(
+
+            params[
+                "stopLoss"
+            ] = str(
                 stop_loss
             )
+
+
 
 
 
@@ -188,57 +159,145 @@ class OrderManager:
 
 
 
-        result = bybit_client.post(
-
-            "/v5/order/create",
-
-            params
-
-        )
 
 
-
-        print(
-            "[ORDER RESULT]",
-            result
-        )
+        try:
 
 
-
-        if result is None:
-
-            return None
+            if not self.live:
 
 
+                print(
+                    "[PAPER MODE] ORDER BLOCKED"
+                )
 
-        if result.get(
-            "retCode"
-        ) != 0:
+
+                return {
+
+                    "retCode":0,
+
+                    "retMsg":
+                    "PAPER MODE",
+
+                    "result":
+                    {}
+
+                }
+
+
+
+
+
+
+
+            result = bybit_client.post(
+
+                "/v5/order/create",
+
+                params
+
+            )
+
+
+
 
 
             print(
-                "[ORDER FAILED]",
-                result.get(
-                    "retMsg"
-                )
+                "[ORDER RESPONSE]",
+                result
             )
+
+
+
+
+
+            if result is None:
+
+
+                return None
+
+
+
+
+
+            if result.get(
+                "retCode"
+            ) != 0:
+
+
+                print(
+                    "[ORDER FAILED]",
+                    result
+                )
+
+
+                return result
+
+
+
+
+
+
+            self.last_order_time = time.time()
+
+
+
+
+
+            print(
+                "[ORDER SUCCESS]",
+                order_id
+            )
+
 
 
             return result
 
 
 
-        self.last_order_time = time.time()
 
 
 
-        print(
-            "[ORDER SUCCESS]",
-            order_id
+        except Exception as e:
+
+
+            print(
+                "[ORDER ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+
+
+    # =====================================================
+    # COMPATIBILITY
+    # =====================================================
+
+    def place_order(
+        self,
+        side,
+        qty
+    ):
+
+
+        return self.create_order(
+
+            side,
+
+            qty
+
         )
 
 
-        return result
+
+
+
 
 
 
@@ -253,15 +312,14 @@ class OrderManager:
     ):
 
 
+
         close_side = (
 
             "Sell"
 
             if side == "Buy"
 
-            else
-
-            "Buy"
+            else "Buy"
 
         )
 
@@ -271,50 +329,72 @@ class OrderManager:
 
 
             "category":
-
                 "linear",
 
 
             "symbol":
-
                 self.symbol,
 
 
             "side":
-
                 close_side,
 
 
             "positionIdx":
-
                 0,
 
 
             "orderType":
-
                 "Market",
 
 
             "qty":
-
                 str(qty),
 
 
             "reduceOnly":
-
                 True
 
         }
 
 
 
-        return bybit_client.post(
 
-            "/v5/order/create",
 
+        print(
+            "[CLOSE REQUEST]",
             params
-
         )
+
+
+
+
+        try:
+
+
+            return bybit_client.post(
+
+                "/v5/order/create",
+
+                params
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[CLOSE ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
 
 
 
@@ -329,24 +409,42 @@ class OrderManager:
 
 
             "category":
-
                 "linear",
 
 
             "symbol":
-
                 self.symbol
 
         }
 
 
-        return bybit_client.post(
 
-            "/v5/order/cancel-all",
 
-            params
+        try:
 
-        )
+
+            return bybit_client.post(
+
+                "/v5/order/cancel-all",
+
+                params
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[CANCEL ERROR]",
+                e
+            )
+
+
+            return None
+
+
 
 
 
