@@ -1,124 +1,68 @@
-from feature_engine import get_feature_vector
-from market_regime import get_market_score
+# ==================================
+# BYBIT API
+# ==================================
+
+BYBIT_API_KEY=l08aZU2yPwJ1rFuKVj
+BYBIT_API_SECRET=여기에_현재_Demo_API_SECRET
 
 
-class TradingEnv:
-    """
-    Reinforcement Learning Trading Environment
-    """
+# ==================================
+# BYBIT SERVER
+# ==================================
 
-    def __init__(self):
+# Demo Trading REST API
+BYBIT_BASE_URL=https://api-demo.bybit.com
 
-        self.initial_balance = 1000.0
 
-        self.balance = self.initial_balance
+# Public Market Data WS
+# (Public 데이터는 일반 V5 WS 사용)
+BYBIT_PUBLIC_WS=wss://stream.bybit.com/v5/public/linear
 
-        self.position = 0
 
-        self.entry_price = 0.0
+# Demo Trading Private WS
+BYBIT_PRIVATE_WS=wss://stream-demo.bybit.com/v5/private
 
-        self.current_price = 0.0
 
-    # ---------------------------------------------
 
-    def reset(self):
+# ==================================
+# TRADING MODE
+# ==================================
 
-        self.balance = self.initial_balance
+# 테스트 단계
+LIVE_TRADING=false
 
-        self.position = 0
 
-        self.entry_price = 0.0
+# Demo Trading 구분
+BYBIT_TESTNET=false
 
-        self.current_price = 0.0
 
-        return self.state()
 
-    # ---------------------------------------------
+# ==================================
+# SYMBOL
+# ==================================
 
-    def state(self):
-        """
-        DQN 입력 State
+DEFAULT_SYMBOL=BTCUSDT
 
-        price
-        sma
-        momentum
-        volatility
-        trend
-        market_score
-        """
 
-        features = get_feature_vector(
-            self.current_price
-        )
 
-        market_score = get_market_score(
-            self.current_price
-        )
+# ==================================
+# ACCOUNT
+# ==================================
 
-        return features + [market_score]
+ACCOUNT_TYPE=UNIFIED
 
-    # ---------------------------------------------
 
-    def step(
-        self,
-        action,
-        price,
-    ):
 
-        self.current_price = float(price)
+# ==================================
+# ORDER
+# ==================================
 
-        reward = 0.0
+ORDER_RETRY=3
 
-        # BUY
-        if action == 1:
 
-            if self.position == 0:
 
-                self.position = 1
+# ==================================
+# LOG
+# ==================================
 
-                self.entry_price = price
-
-        # SELL
-        elif action == 2:
-
-            if self.position == 1:
-
-                reward = (
-                    price
-                    - self.entry_price
-                )
-
-                self.balance += reward
-
-                self.position = 0
-
-                self.entry_price = 0.0
-
-        # HOLD
-        else:
-
-            reward = -0.01
-
-        done = self.balance <= 0
-
-        return (
-            self.state(),
-            reward,
-            done,
-        )
-
-    # ---------------------------------------------
-
-    def info(self):
-
-        return {
-
-            "balance": round(self.balance, 2),
-
-            "position": self.position,
-
-            "entry_price": self.entry_price,
-
-            "current_price": self.current_price,
-
-        }
+LOG_LEVEL=INFO
