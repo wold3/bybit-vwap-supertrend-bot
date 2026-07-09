@@ -1,14 +1,18 @@
-import os
+# execution/order_manager.py
+
 import time
-import json
-import hmac
-import hashlib
 import requests
 
-from dotenv import load_dotenv
+
+from config import (
+    BYBIT_BASE_URL,
+    DEFAULT_SYMBOL,
+    LIVE_TRADING,
+    ORDER_RETRY
+)
 
 
-load_dotenv()
+from portfolio.bybit_wallet import wallet
 
 
 
@@ -17,228 +21,21 @@ class OrderManager:
 
     def __init__(self):
 
+        self.base_url = BYBIT_BASE_URL
 
-        self.live = (
-            os.getenv(
-                "LIVE_TRADING",
-                "false"
-            ).lower()
-            ==
-            "true"
-        )
+        self.symbol = DEFAULT_SYMBOL
 
+        self.live = LIVE_TRADING
 
-        if self.live:
+        self.retry = ORDER_RETRY
 
-            self.base_url = os.getenv(
-                "BYBIT_LIVE_API",
-                "https://api.bybit.com"
-            )
 
-        else:
-
-            self.base_url = os.getenv(
-                "BYBIT_DEMO_API",
-                "https://api-demo.bybit.com"
-            )
-
-
-
-        self.api_key = os.getenv(
-            "BYBIT_API_KEY",
-            ""
-        )
-
-
-        self.api_secret = os.getenv(
-            "BYBIT_API_SECRET",
-            ""
-        )
-
-
-
-        self.symbol = os.getenv(
-            "DEFAULT_SYMBOL",
-            "BTCUSDT"
-        )
-
-
-        self.category = "linear"
-
-
-        self.qty = os.getenv(
-            "ORDER_QTY",
-            "0.001"
-        )
-
-
-        self.position = None
-
-
-
-
-
-    # =====================================
-    # SIGN
-    # =====================================
-
-    def _sign(
-        self,
-        timestamp,
-        recv_window,
-        body
-    ):
-
-
-        param = (
-
-            str(timestamp)
-
-            +
-
-            self.api_key
-
-            +
-
-            str(recv_window)
-
-            +
-
-            body
-
-        )
-
-
-        return hmac.new(
-
-            self.api_secret.encode(),
-
-            param.encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-
-
-
-    # =====================================
-    # REQUEST
-    # =====================================
-
-    def _request(
-        self,
-        endpoint,
-        payload
-    ):
-
-
-        body = json.dumps(
-            payload
-        )
-
-
-        timestamp = int(
-            time.time()*1000
-        )
-
-
-        recv_window = 5000
-
-
-        headers = {
-
-
-            "X-BAPI-API-KEY":
-
-                self.api_key,
-
-
-            "X-BAPI-TIMESTAMP":
-
-                str(timestamp),
-
-
-            "X-BAPI-RECV-WINDOW":
-
-                str(recv_window),
-
-
-            "X-BAPI-SIGN":
-
-                self._sign(
-
-                    timestamp,
-
-                    recv_window,
-
-                    body
-
-                ),
-
-
-            "Content-Type":
-
-                "application/json"
-
-        }
-
-
-
-        url = (
-
-            self.base_url
-
-            +
-
-            endpoint
-
-        )
-
-
-
-        try:
-
-
-            r = requests.post(
-
-                url,
-
-                headers=headers,
-
-                data=body,
-
-                timeout=10
-
-            )
-
-
-            result = r.json()
-
-
-            print(
-                "[ORDER RESPONSE]",
-                result
-            )
-
-
-            return result
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[ORDER ERROR]",
-                e
-            )
-
-
-            return None
-
-
+        print("==============================")
+        print("[ORDER MANAGER INIT]")
+        print("BASE :", self.base_url)
+        print("LIVE :", self.live)
+        print("SYMBOL :", self.symbol)
+        print("==============================")
 
 
 
@@ -252,261 +49,217 @@ class OrderManager:
     ):
 
 
-        if signal is None:
+        if not signal:
 
-            return
+            return False
 
 
 
         print(
-            "[SIGNAL]",
+            "[ORDER SIGNAL]",
             signal
         )
 
 
 
-        if signal["type"] == "EXIT":
-
-
-            self.close_position()
-
-
-            return
-
-
-
-        if signal["type"] != "ENTRY":
-
-            return
-
-
-
-        side = signal["side"]
-
-
-
-        # 중복 포지션 방지
-
-        if self.position == side:
-
+        if not self.live:
 
             print(
-                "[SKIP SAME POSITION]",
-                side
+                "[PAPER ORDER]",
+                signal
             )
 
-
-            return
-
+            return True
 
 
 
+        side = signal.get(
+            "side",
+            ""
+        )
 
-        order_side = side
+
+
+        qty = signal.get(
+            "qty",
+            None
+        )
+
+
+
+        if not qty:
+
+            print(
+                "[ORDER ERROR] qty missing"
+            )
+
+            return False
+
+
+
+        return self.place_order(
+            side,
+            qty
+        )
+
+
+
+    # =====================================
+    # PLACE ORDER
+    # =====================================
+
+    def place_order(
+        self,
+        side,
+        qty
+    ):
+
+
+        url = (
+            self.base_url
+            +
+            "/v5/order/create"
+        )
 
 
 
         payload = {
 
-
             "category":
-
-                self.category,
-
+                "linear",
 
             "symbol":
-
                 self.symbol,
 
-
             "side":
-
-                order_side,
-
+                side,
 
             "orderType":
-
                 "Market",
 
-
             "qty":
-
-                str(self.qty),
-
-
-            "timeInForce":
-
-                "IOC"
+                str(qty),
 
         }
 
 
 
-        print(
-            "[ORDER SEND]",
-            payload
-        )
+        for attempt in range(
+            self.retry
+        ):
+
+
+            try:
+
+
+                print(
+                    "[ORDER REQUEST]",
+                    payload
+                )
+
+
+                result = wallet.private_request(
+
+                    method="POST",
+
+                    endpoint="/v5/order/create",
+
+                    body=payload
+
+                )
 
 
 
-        result = self._request(
-
-            "/v5/order/create",
-
-            payload
-
-        )
+                print(
+                    "[ORDER RESPONSE]",
+                    result
+                )
 
 
 
-        if result and result.get(
-            "retCode"
-        ) == 0:
+                if result.get(
+                    "retCode"
+                ) == 0:
 
 
-            self.position = side
+                    print(
+                        "[ORDER SUCCESS]"
+                    )
+
+                    return True
 
 
-            print(
-                "[POSITION OPEN]",
-                side
-            )
 
+                else:
+
+
+                    print(
+                        "[ORDER FAILED]",
+                        result
+                    )
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[ORDER EXCEPTION]",
+                    e
+                )
+
+
+
+            time.sleep(1)
+
+
+
+        return False
 
 
 
 
     # =====================================
-    # CLOSE
+    # CANCEL ORDER
     # =====================================
 
-    def close_position(
+    def cancel_all(
         self
     ):
 
 
-        if self.position is None:
-
-
-            print(
-                "[NO POSITION]"
-            )
-
-
-            return
-
-
-
-        close_side = (
-
-            "Sell"
-
-            if self.position == "Buy"
-
-            else
-
-            "Buy"
-
-        )
-
-
-
         payload = {
 
 
             "category":
-
-                self.category,
+                "linear",
 
 
             "symbol":
-
-                self.symbol,
-
-
-            "side":
-
-                close_side,
-
-
-            "orderType":
-
-                "Market",
-
-
-            "qty":
-
-                str(self.qty),
-
-
-            "reduceOnly":
-
-                True
-
+                self.symbol
 
         }
 
+
+
+        result = wallet.private_request(
+
+            method="POST",
+
+            endpoint="/v5/order/cancel-all",
+
+            body=payload
+
+        )
 
 
         print(
-            "[CLOSE ORDER]",
-            payload
+            "[CANCEL ALL]",
+            result
         )
 
 
-
-        result = self._request(
-
-            "/v5/order/create",
-
-            payload
-
-        )
-
-
-
-        if result and result.get(
-            "retCode"
-        ) == 0:
-
-
-            self.position = None
-
-
-            print(
-                "[POSITION CLOSED]"
-            )
-
-
-
-
-
-    # =====================================
-    # STATUS
-    # =====================================
-
-    def status(self):
-
-
-        return {
-
-
-            "live":
-
-                self.live,
-
-
-            "symbol":
-
-                self.symbol,
-
-
-            "position":
-
-                self.position
-
-        }
-
+        return result
 
 
 
