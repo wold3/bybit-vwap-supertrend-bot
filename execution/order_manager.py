@@ -1,7 +1,8 @@
 import time
+import json
+import uuid
 import hmac
 import hashlib
-import json
 import requests
 
 
@@ -9,8 +10,7 @@ from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
     BYBIT_BASE_URL,
-    DEFAULT_SYMBOL,
-    LIVE_TRADING
+    DEFAULT_SYMBOL
 )
 
 
@@ -23,99 +23,241 @@ class OrderManager:
         self.base = BYBIT_BASE_URL
         self.symbol = DEFAULT_SYMBOL
 
+
         print("==============================")
-        print("[ORDER MANAGER INIT]")
+        print("[ORDER MANAGER READY]")
         print("BASE :", self.base)
-        print("LIVE :", LIVE_TRADING)
         print("SYMBOL :", self.symbol)
         print("==============================")
 
 
 
 
-    # =================================
-    # SIGN
-    # =================================
 
-    def sign(
-        self,
-        timestamp,
-        body
-    ):
+    # ===================================
+    # SIGN
+    # ===================================
+
+    def _sign(self, timestamp, body):
 
 
         recv_window = "5000"
 
 
-        origin = (
+        payload = (
+
             timestamp
+
             +
+
             BYBIT_API_KEY
+
             +
+
             recv_window
+
             +
+
             body
+
         )
 
 
+
         return hmac.new(
+
             BYBIT_API_SECRET.encode(),
-            origin.encode(),
+
+            payload.encode(),
+
             hashlib.sha256
+
         ).hexdigest()
 
 
 
 
 
-    # =================================
-    # CREATE ORDER
-    # =================================
 
-    def create_order(
-            self,
-            side,
-            qty,
-            take_profit=None,
-            stop_loss=None
-    ):
+    # ===================================
+    # REQUEST
+    # ===================================
+
+    def _request(self, path, data):
 
 
-        url = (
-            self.base
-            +
-            "/v5/order/create"
+        url = self.base + path
+
+
+        body = json.dumps(
+            data,
+            separators=(",", ":")
+        )
+
+
+        timestamp = str(
+            int(time.time()*1000)
         )
 
 
 
-        data = {
+        sign = self._sign(
 
-            "category":
-                "linear",
+            timestamp,
 
-            "symbol":
-                self.symbol,
+            body
 
-            "side":
-                side,
+        )
 
-            "positionIdx":
-                0,
 
-            "orderType":
-                "Market",
 
-            "qty":
-                str(qty)
+        headers = {
+
+            "X-BAPI-API-KEY":
+                BYBIT_API_KEY,
+
+
+            "X-BAPI-SIGN":
+                sign,
+
+
+            "X-BAPI-TIMESTAMP":
+                timestamp,
+
+
+            "X-BAPI-RECV-WINDOW":
+                "5000",
+
+
+            "Content-Type":
+                "application/json"
 
         }
 
 
 
-        # ==========================
-        # TP / SL 자동 설정
-        # ==========================
+
+
+        for retry in range(3):
+
+
+            try:
+
+
+                r = requests.post(
+
+                    url,
+
+                    headers=headers,
+
+                    data=body,
+
+                    timeout=10
+
+                )
+
+
+                result = r.json()
+
+
+
+                print(
+                    "[BYBIT RESPONSE]",
+                    result
+                )
+
+
+
+                return result
+
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[ORDER RETRY]",
+                    retry + 1,
+                    e
+                )
+
+
+                time.sleep(1)
+
+
+
+        return None
+
+
+
+
+
+
+    # ===================================
+    # CREATE MARKET ORDER
+    # ===================================
+
+    def create_order(
+
+            self,
+
+            side,
+
+            qty,
+
+            take_profit=None,
+
+            stop_loss=None
+
+
+    ):
+
+
+
+        data = {
+
+
+            "category":
+
+                "linear",
+
+
+            "symbol":
+
+                self.symbol,
+
+
+            "side":
+
+                side,
+
+
+            "positionIdx":
+
+                0,
+
+
+            "orderType":
+
+                "Market",
+
+
+            "qty":
+
+                str(qty),
+
+
+
+            "orderLinkId":
+
+                "vwap-" + uuid.uuid4().hex[:12]
+
+        }
+
+
+
+
 
         if take_profit:
 
@@ -137,158 +279,120 @@ class OrderManager:
 
 
 
-        body = json.dumps(
-            data
-        )
-
-
-
         print("==============================")
-        print("[ORDER REQUEST]")
-        print(url)
+        print("[ORDER CREATE]")
         print(data)
         print("==============================")
 
 
 
+        return self._request(
 
+            "/v5/order/create",
 
-        # ==========================
-        # DEMO MODE
-        # ==========================
-
-        if not LIVE_TRADING:
-
-
-            print(
-                "[DEMO ORDER MODE]"
-            )
-
-
-
-
-
-        timestamp = str(
-            int(
-                time.time()*1000
-            )
-        )
-
-
-
-        signature = self.sign(
-
-            timestamp,
-
-            body
+            data
 
         )
 
 
 
-        headers = {
 
 
-            "X-BAPI-API-KEY":
-                BYBIT_API_KEY,
+
+    # ===================================
+    # CLOSE POSITION
+    # ===================================
+
+    def close_position(
+
+            self,
+
+            side,
+
+            qty
 
 
-            "X-BAPI-SIGN":
-                signature,
+    ):
 
 
-            "X-BAPI-TIMESTAMP":
-                timestamp,
+
+        close_side = (
+
+            "Sell"
+
+            if side == "Buy"
+
+            else
+
+            "Buy"
+
+        )
 
 
-            "X-BAPI-RECV-WINDOW":
-                "5000",
 
 
-            "Content-Type":
-                "application/json"
+        data = {
+
+
+            "category":
+
+                "linear",
+
+
+            "symbol":
+
+                self.symbol,
+
+
+            "side":
+
+                close_side,
+
+
+            "positionIdx":
+
+                0,
+
+
+            "orderType":
+
+                "Market",
+
+
+            "qty":
+
+                str(qty),
+
+
+
+            "reduceOnly":
+
+                True,
+
+
+            "orderLinkId":
+
+                "close-" + uuid.uuid4().hex[:12]
 
         }
 
 
 
 
-
-        try:
-
-
-            r = requests.post(
-
-                url,
-
-                headers=headers,
-
-                data=body,
-
-                timeout=10
-
-            )
-
-
-            result = r.json()
-
-
-
-            print(
-                "[ORDER RESPONSE]",
-                result
-            )
-
-
-
-            return result
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[ORDER ERROR]",
-                e
-            )
-
-
-            return None
-
-
-
-
-
-
-
-    # =================================
-    # MARKET CLOSE
-    # =================================
-
-    def close_position(
-            self,
-            side,
-            qty
-    ):
-
-
-        close_side = (
-            "Sell"
-            if side=="Buy"
-            else
-            "Buy"
+        print(
+            "[POSITION CLOSE]"
         )
 
 
 
-        return self.create_order(
+        return self._request(
 
-            side=close_side,
+            "/v5/order/create",
 
-            qty=qty
+            data
 
         )
+
 
 
 
