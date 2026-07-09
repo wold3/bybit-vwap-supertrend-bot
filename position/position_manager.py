@@ -1,12 +1,11 @@
 import time
 
 
-from config import (
-    DEFAULT_SYMBOL
-)
+from config import DEFAULT_SYMBOL
 
 
 from api.bybit_client import bybit_client
+
 
 
 
@@ -22,6 +21,7 @@ class PositionManager:
         self.symbol = DEFAULT_SYMBOL
 
 
+
         self.current = {
 
 
@@ -29,16 +29,18 @@ class PositionManager:
 
             "size": 0,
 
-            "avg_price": 0
+            "avg_price": 0,
 
+            "unrealised_pnl": 0
 
         }
 
 
 
-        print(
-            "[POSITION MANAGER READY]"
-        )
+        print("==============================")
+        print("[POSITION MANAGER READY]")
+        print("SYMBOL :", self.symbol)
+        print("==============================")
 
 
 
@@ -46,9 +48,9 @@ class PositionManager:
 
 
 
-    # =================================
-    # SYNC POSITION
-    # =================================
+    # =====================================
+    # SYNC POSITION FROM BYBIT
+    # =====================================
 
 
     def sync(self):
@@ -60,15 +62,10 @@ class PositionManager:
             params = {
 
 
-                "category":
-
-                "linear",
+                "category": "linear",
 
 
-
-                "symbol":
-
-                self.symbol
+                "symbol": self.symbol
 
 
             }
@@ -77,7 +74,7 @@ class PositionManager:
 
 
 
-            result = bybit_client.get(
+            response = bybit_client.get(
 
                 "/v5/position/list",
 
@@ -89,27 +86,8 @@ class PositionManager:
 
 
 
-            print(
-                "[POSITION RESPONSE]",
-                result
-            )
 
-
-
-
-
-            if not result:
-
-
-                return self.current
-
-
-
-
-
-            if result.get(
-                "retCode"
-            ) != 0:
+            if not response:
 
 
                 return self.current
@@ -119,14 +97,29 @@ class PositionManager:
 
 
 
-            data = result["result"]["list"]
+            if response.get("retCode") != 0:
+
+
+                print(
+                    "[POSITION API ERROR]",
+                    response
+                )
+
+
+                return self.current
 
 
 
 
 
 
-            if len(data) == 0:
+            positions = response["result"]["list"]
+
+
+
+
+
+            if len(positions) == 0:
 
 
                 self.clear()
@@ -139,7 +132,9 @@ class PositionManager:
 
 
 
-            pos = data[0]
+
+
+            pos = positions[0]
 
 
 
@@ -161,79 +156,84 @@ class PositionManager:
 
 
 
-            side = pos.get(
-                "side"
-            )
 
-
-
-            avg = float(
-
-                pos.get(
-
-                    "avgPrice",
-
-                    0
-
-                )
-
-            )
-
-
-
-
-
-
-
-            if size == 0:
-
+            if size <= 0:
 
 
                 self.clear()
 
 
-
-            else:
-
-
-
-                self.current = {
-
-
-                    "side":
-
-                    side,
+                return self.current
 
 
 
-                    "size":
-
-                    size,
 
 
 
-                    "avg_price":
-
-                    avg
 
 
-                }
+            self.current = {
+
+
+                "side":
+
+                pos.get(
+                    "side"
+                ),
+
+
+
+                "size":
+
+                size,
+
+
+
+                "avg_price":
+
+                float(
+
+                    pos.get(
+
+                        "avgPrice",
+
+                        0
+
+                    )
+
+                ),
+
+
+
+                "unrealised_pnl":
+
+                float(
+
+                    pos.get(
+
+                        "unrealisedPnl",
+
+                        0
+
+                    )
+
+                )
+
+            }
 
 
 
 
 
             print(
-
-                "[CURRENT POSITION]",
-
+                "[POSITION UPDATE]",
                 self.current
-
             )
 
 
 
             return self.current
+
 
 
 
@@ -242,15 +242,10 @@ class PositionManager:
         except Exception as e:
 
 
-
             print(
-
-                "[POSITION ERROR]",
-
+                "[POSITION SYNC ERROR]",
                 e
-
             )
-
 
 
             return self.current
@@ -261,9 +256,9 @@ class PositionManager:
 
 
 
-    # =================================
+    # =====================================
     # CLEAR
-    # =================================
+    # =====================================
 
 
     def clear(self):
@@ -278,7 +273,10 @@ class PositionManager:
             "size": 0,
 
 
-            "avg_price": 0
+            "avg_price": 0,
+
+
+            "unrealised_pnl": 0
 
 
         }
@@ -289,9 +287,9 @@ class PositionManager:
 
 
 
-    # =================================
+    # =====================================
     # CHECK
-    # =================================
+    # =====================================
 
 
     def has_position(self):
@@ -312,7 +310,9 @@ class PositionManager:
 
 
 
-    def side(self):
+
+
+    def get_side(self):
 
 
         return self.current["side"]
@@ -323,7 +323,7 @@ class PositionManager:
 
 
 
-    def size(self):
+    def get_size(self):
 
 
         return self.current["size"]
@@ -334,7 +334,7 @@ class PositionManager:
 
 
 
-    def price(self):
+    def get_avg_price(self):
 
 
         return self.current["avg_price"]
@@ -345,12 +345,29 @@ class PositionManager:
 
 
 
-    # =================================
-    # REFRESH LOOP
-    # =================================
+    def get_pnl(self):
+
+
+        return self.current["unrealised_pnl"]
+
+
+
+
+
+
+
+    # =====================================
+    # MONITOR LOOP
+    # =====================================
 
 
     def monitor(self):
+
+
+        print(
+            "[POSITION MONITOR START]"
+        )
+
 
 
         while True:
@@ -360,7 +377,6 @@ class PositionManager:
 
 
             time.sleep(5)
-
 
 
 
