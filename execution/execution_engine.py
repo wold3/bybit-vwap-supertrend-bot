@@ -5,14 +5,13 @@ from config import (
     LIVE_TRADING,
     DEFAULT_SYMBOL,
     BYBIT_BASE_URL,
+    DEFAULT_QTY,
 )
 
 
 from execution.order_manager import (
-    order_manager,
+    order_manager
 )
-
-
 
 
 
@@ -21,13 +20,11 @@ class ExecutionEngine:
 
     def __init__(self):
 
-
         self.live = LIVE_TRADING
 
         self.symbol = DEFAULT_SYMBOL
 
         self.base = BYBIT_BASE_URL
-
 
 
         print("==============================")
@@ -39,86 +36,35 @@ class ExecutionEngine:
 
 
 
-
-
-
-    # =====================================================
-    # EXECUTE SIGNAL
-    # =====================================================
-
+    # =================================
+    # SIGNAL EXECUTION
+    # =================================
 
     def execute(
         self,
-        strategy_result
+        signal
     ):
 
 
         print(
-            "[EXECUTION INPUT]",
-            strategy_result
+            "[EXECUTION SIGNAL]",
+            signal
         )
-
-
-
-        if strategy_result is None:
-
-
-            return None
-
-
-
-
-
-        signal = strategy_result.get(
-            "signal"
-        )
-
-
-        qty = strategy_result.get(
-            "qty",
-            0
-        )
-
-
-        take_profit = strategy_result.get(
-            "take_profit"
-        )
-
-
-        stop_loss = strategy_result.get(
-            "stop_loss"
-        )
-
-
-
 
 
 
         if signal not in (
-
             "BUY",
-
             "SELL"
-
         ):
-
-
-            print(
-                "[EXECUTION INVALID SIGNAL]"
-            )
-
 
             return None
 
 
 
-
-
-
-        # ---------------------------------
+        # -----------------------------
         # LIVE CHECK
-        # ---------------------------------
-
+        # -----------------------------
 
         if not self.live:
 
@@ -138,49 +84,24 @@ class ExecutionEngine:
 
 
 
-
-
-        side = (
-
-            "Buy"
-
-            if signal == "BUY"
-
-            else
-
-            "Sell"
-
-        )
+        qty = DEFAULT_QTY
 
 
 
+        # -----------------------------
+        # BUY
+        # -----------------------------
 
-
-
-
-        try:
-
+        if signal == "BUY":
 
 
             result = order_manager.create_order(
 
-                side=side,
+                side="Buy",
 
-                qty=qty,
-
-                take_profit=take_profit,
-
-                stop_loss=stop_loss,
+                qty=qty
 
             )
-
-
-
-            print(
-                "[EXECUTION RESULT]",
-                result
-            )
-
 
 
             return result
@@ -188,105 +109,63 @@ class ExecutionEngine:
 
 
 
+        # -----------------------------
+        # SELL
+        # -----------------------------
 
-        except Exception as e:
+        if signal == "SELL":
 
 
-            print(
-                "[EXECUTION ERROR]",
-                e
+            result = order_manager.create_order(
+
+                side="Sell",
+
+                qty=qty
+
             )
 
 
-            return None
+            return result
+
+
+
+
+        return None
 
 
 
 
 
-
-
-    # =====================================================
-    # TEST BUY
-    # =====================================================
-
+    # =================================
+    # TEST
+    # =================================
 
     def test_buy(self):
 
 
-        return self.execute(
-
-
-            {
-
-                "signal":
-
-                    "BUY",
-
-
-                "qty":
-
-                    0.001,
-
-
-                "take_profit":
-
-                    None,
-
-
-                "stop_loss":
-
-                    None,
-
-            }
-
-
+        print(
+            "[TEST BUY]"
         )
 
 
+        return self.execute(
+            "BUY"
+        )
 
 
-
-
-
-    # =====================================================
-    # TEST SELL
-    # =====================================================
 
 
     def test_sell(self):
 
 
-        return self.execute(
-
-
-            {
-
-                "signal":
-
-                    "SELL",
-
-
-                "qty":
-
-                    0.001,
-
-
-                "take_profit":
-
-                    None,
-
-
-                "stop_loss":
-
-                    None,
-
-            }
-
-
+        print(
+            "[TEST SELL]"
         )
 
 
+        return self.execute(
+            "SELL"
+        )
 
 
 
