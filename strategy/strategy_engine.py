@@ -1,189 +1,54 @@
-import pandas as pd
-import time
-
-
-from strategy.vwap import calculate_vwap
-from strategy.supertrend import calculate_supertrend
-
-from execution.order_manager import order_manager
-
-
+from config import DEFAULT_SYMBOL
 
 
 class StrategyEngine:
 
-
     def __init__(self):
+        self.last_signal = None
 
-        self.candles = []
-
-        self.position = None
-
-        self.last_order_time = 0
-
+        print("==============================")
+        print("[STRATEGY ENGINE READY]")
+        print("==============================")
 
 
-        print(
-            "[STRATEGY ENGINE READY]"
-        )
+    def on_candle(self, candle, indicator):
+
+        price = candle["close"]
+
+        vwap = indicator.get("vwap")
+        trend = indicator.get("trend")
 
 
+        signal = "HOLD"
 
 
-    def on_candle(
-        self,
-        candle
-    ):
-
-
-        self.candles.append(
-            candle
-        )
-
-
-        if len(self.candles) > 200:
-
-            self.candles.pop(0)
-
-
-
-        if len(self.candles) < 20:
-
-            return
-
-
-
-
-
-        df = pd.DataFrame(
-            self.candles
-        )
-
-
-
-        vwap = calculate_vwap(
-            df
-        )
-
-
-        trend = calculate_supertrend(
-            df
-        )
-
-
-
-        close = candle["close"]
-
-
-
-        print(
-            "[INDICATOR]",
-            "PRICE:",
-            close,
-            "VWAP:",
-            vwap,
-            "TREND:",
-            trend
-        )
-
-
-
-        signal = None
-
-
-
-        if trend and close > vwap:
-
-
+        # BUY 조건
+        if trend is True and price > vwap:
             signal = "BUY"
 
 
-
-        elif trend is False and close < vwap:
-
-
+        # SELL 조건
+        elif trend is False and price < vwap:
             signal = "SELL"
 
 
 
+        if signal != self.last_signal:
+
+            print("==============================")
+            print("[SIGNAL]")
+            print("SYMBOL :", DEFAULT_SYMBOL)
+            print("PRICE  :", price)
+            print("VWAP   :", vwap)
+            print("TREND  :", trend)
+            print("ACTION :", signal)
+            print("==============================")
 
 
-        if signal:
+            self.last_signal = signal
 
 
-            self.execute(
-                signal
-            )
-
-
-
-
-
-
-
-    def execute(
-        self,
-        signal
-    ):
-
-
-        now=time.time()
-
-
-
-        if now-self.last_order_time < 60:
-
-            return
-
-
-
-        print(
-            "[SIGNAL]",
-            signal
-        )
-
-
-
-        if signal=="BUY":
-
-
-            result = order_manager.create_order(
-
-                "Buy",
-
-                "0.001"
-
-            )
-
-
-
-            print(
-                result
-            )
-
-
-
-        elif signal=="SELL":
-
-
-            result = order_manager.create_order(
-
-                "Sell",
-
-                "0.001"
-
-            )
-
-
-            print(
-                result
-            )
-
-
-
-        self.last_order_time=now
-
-
+        return signal
 
 
 
