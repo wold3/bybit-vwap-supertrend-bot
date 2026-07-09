@@ -1,29 +1,49 @@
 import os
 from dotenv import load_dotenv
 
+
+# ==========================================================
+# ENV LOAD
+# ==========================================================
+
 load_dotenv()
 
-# =====================================================
-# MODE
-# =====================================================
 
-LIVE_TRADING = (
-    os.getenv("LIVE_TRADING", "False").lower() == "true"
+
+# ==========================================================
+# BYBIT MODE
+# ==========================================================
+
+BYBIT_TESTNET = (
+    os.getenv(
+        "BYBIT_TESTNET",
+        "False"
+    ).lower()
+    == "true"
 )
 
-TESTNET = (
-    os.getenv("TESTNET", "False").lower() == "true"
+
+
+# Demo Trading 사용 여부
+BYBIT_DEMO = (
+    os.getenv(
+        "BYBIT_DEMO",
+        "True"
+    ).lower()
+    == "true"
 )
 
 
-# =====================================================
-# API
-# =====================================================
+
+# ==========================================================
+# API KEY
+# ==========================================================
 
 BYBIT_API_KEY = os.getenv(
     "BYBIT_API_KEY",
     ""
 )
+
 
 BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
@@ -31,14 +51,91 @@ BYBIT_API_SECRET = os.getenv(
 )
 
 
-# =====================================================
-# ACCOUNT
-# =====================================================
 
-ACCOUNT_TYPE = os.getenv(
-    "ACCOUNT_TYPE",
-    "UNIFIED"
-)
+# ==========================================================
+# REST URL
+# ==========================================================
+
+if BYBIT_DEMO:
+
+
+    BYBIT_BASE_URL = (
+        "https://api-demo.bybit.com"
+    )
+
+
+elif BYBIT_TESTNET:
+
+
+    BYBIT_BASE_URL = (
+        "https://api-testnet.bybit.com"
+    )
+
+
+else:
+
+
+    BYBIT_BASE_URL = (
+        "https://api.bybit.com"
+    )
+
+
+
+
+
+# ==========================================================
+# WEBSOCKET URL
+# ==========================================================
+
+
+if BYBIT_DEMO:
+
+
+    BYBIT_PUBLIC_WS = (
+        "wss://stream-demo.bybit.com/v5/public/linear"
+    )
+
+
+    BYBIT_PRIVATE_WS = (
+        "wss://stream-demo.bybit.com/v5/private"
+    )
+
+
+
+elif BYBIT_TESTNET:
+
+
+    BYBIT_PUBLIC_WS = (
+        "wss://stream-testnet.bybit.com/v5/public/linear"
+    )
+
+
+    BYBIT_PRIVATE_WS = (
+        "wss://stream-testnet.bybit.com/v5/private"
+    )
+
+
+
+else:
+
+
+    BYBIT_PUBLIC_WS = (
+        "wss://stream.bybit.com/v5/public/linear"
+    )
+
+
+    BYBIT_PRIVATE_WS = (
+        "wss://stream.bybit.com/v5/private"
+    )
+
+
+
+
+
+# ==========================================================
+# TRADING CONFIG
+# ==========================================================
+
 
 DEFAULT_SYMBOL = os.getenv(
     "DEFAULT_SYMBOL",
@@ -46,55 +143,16 @@ DEFAULT_SYMBOL = os.getenv(
 )
 
 
-# =====================================================
-# REST API URL
-# =====================================================
 
-if LIVE_TRADING:
-
-    BYBIT_BASE_URL = (
-        "https://api.bybit.com"
-    )
-
-else:
-
-    BYBIT_BASE_URL = (
-        "https://api-demo.bybit.com"
-    )
+LIVE_TRADING = (
+    os.getenv(
+        "LIVE_TRADING",
+        "False"
+    ).lower()
+    == "true"
+)
 
 
-# =====================================================
-# WEBSOCKET URL
-# =====================================================
-
-if LIVE_TRADING:
-
-    PUBLIC_WS = (
-        "wss://stream.bybit.com/v5/public/linear"
-    )
-
-    PRIVATE_WS = (
-        "wss://stream.bybit.com/v5/private"
-    )
-
-else:
-
-    PUBLIC_WS = (
-        "wss://stream-demo.bybit.com/v5/public/linear"
-    )
-
-    PRIVATE_WS = (
-        "wss://stream-demo.bybit.com/v5/private"
-    )
-
-
-BYBIT_PUBLIC_WS = PUBLIC_WS
-BYBIT_PRIVATE_WS = PRIVATE_WS
-
-
-# =====================================================
-# ORDER SETTINGS
-# =====================================================
 
 DEFAULT_QTY = float(
     os.getenv(
@@ -102,6 +160,47 @@ DEFAULT_QTY = float(
         "0.001"
     )
 )
+
+
+
+
+# ==========================================================
+# STRATEGY CONFIG
+# ==========================================================
+
+
+VWAP_LENGTH = int(
+    os.getenv(
+        "VWAP_LENGTH",
+        "20"
+    )
+)
+
+
+
+SUPERTREND_PERIOD = int(
+    os.getenv(
+        "SUPERTREND_PERIOD",
+        "10"
+    )
+)
+
+
+
+SUPERTREND_MULTIPLIER = float(
+    os.getenv(
+        "SUPERTREND_MULTIPLIER",
+        "3"
+    )
+)
+
+
+
+
+# ==========================================================
+# RISK CONFIG
+# ==========================================================
+
 
 MAX_POSITION_SIZE = float(
     os.getenv(
@@ -111,9 +210,6 @@ MAX_POSITION_SIZE = float(
 )
 
 
-# =====================================================
-# RISK MANAGEMENT
-# =====================================================
 
 DAILY_LOSS_LIMIT = float(
     os.getenv(
@@ -121,6 +217,8 @@ DAILY_LOSS_LIMIT = float(
         "-100"
     )
 )
+
+
 
 ORDER_COOLDOWN = int(
     os.getenv(
@@ -130,50 +228,20 @@ ORDER_COOLDOWN = int(
 )
 
 
-# =====================================================
-# STRATEGY SETTINGS
-# =====================================================
-
-TIMEFRAME = os.getenv(
-    "TIMEFRAME",
-    "5"
-)
-
-VWAP_ENABLED = True
-
-SUPERTREND_ENABLED = True
 
 
-# =====================================================
+# ==========================================================
 # LOG
-# =====================================================
+# ==========================================================
 
-LOG_LEVEL = os.getenv(
-    "LOG_LEVEL",
-    "INFO"
-)
-
-
-# =====================================================
-# CONFIG CHECK
-# =====================================================
 
 print("==============================")
-print("[CONFIG LOAD]")
-print("------------------------------")
-print("LIVE_TRADING :", LIVE_TRADING)
-print("TESTNET      :", TESTNET)
-print("BASE URL     :", BYBIT_BASE_URL)
-print("------------------------------")
-print("PUBLIC WS    :", BYBIT_PUBLIC_WS)
-print("PRIVATE WS   :", BYBIT_PRIVATE_WS)
-print("------------------------------")
-print("SYMBOL       :", DEFAULT_SYMBOL)
-print("ACCOUNT      :", ACCOUNT_TYPE)
-print("TIMEFRAME    :", TIMEFRAME)
-print("------------------------------")
-print(
-    "API KEY      :",
-    BYBIT_API_KEY[:6] if BYBIT_API_KEY else "EMPTY"
-)
+print("[CONFIG LOADED]")
+print("DEMO :", BYBIT_DEMO)
+print("TESTNET :", BYBIT_TESTNET)
+print("LIVE :", LIVE_TRADING)
+print("BASE :", BYBIT_BASE_URL)
+print("PUBLIC WS :", BYBIT_PUBLIC_WS)
+print("PRIVATE WS :", BYBIT_PRIVATE_WS)
+print("SYMBOL :", DEFAULT_SYMBOL)
 print("==============================")
