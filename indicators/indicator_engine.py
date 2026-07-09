@@ -1,5 +1,8 @@
-import collections
-import math
+import pandas as pd
+import numpy as np
+
+
+from config import DEFAULT_SYMBOL
 
 
 
@@ -8,30 +11,24 @@ class IndicatorEngine:
 
     def __init__(self):
 
-
-        self.max_history = 200
-
-
-        self.candles = collections.deque(
-            maxlen=self.max_history
-        )
+        self.symbol = DEFAULT_SYMBOL
 
 
-        self.vwap = None
-
-        self.supertrend = None
+        self.candles = []
 
 
-        self.last_close = None
+        self.max_length = 200
 
 
+        self.last = {
 
-        # Supertrend 설정
+            "vwap": None,
 
-        self.atr_period = 10
+            "supertrend": None,
 
-        self.multiplier = 3
+            "atr": None,
 
+        }
 
 
         print(
@@ -40,9 +37,11 @@ class IndicatorEngine:
 
 
 
+
     # =====================================================
     # UPDATE CANDLE
     # =====================================================
+
 
     def update(
         self,
@@ -53,41 +52,42 @@ class IndicatorEngine:
         try:
 
 
-            if not candle.get(
-                "confirm",
-                False
-            ):
-
-                return None
-
-
-
             self.candles.append(
-                candle
+
+                {
+
+                    "timestamp":
+                        candle["timestamp"],
+
+                    "open":
+                        float(candle["open"]),
+
+                    "high":
+                        float(candle["high"]),
+
+                    "low":
+                        float(candle["low"]),
+
+                    "close":
+                        float(candle["close"]),
+
+                    "volume":
+                        float(candle["volume"]),
+
+                }
+
             )
 
 
 
-            if len(self.candles) < self.atr_period + 2:
-
-                return None
+            if len(self.candles) > self.max_length:
 
 
-
-            self.calculate_vwap()
-
-
-            self.calculate_supertrend()
+                self.candles.pop(0)
 
 
 
-            self.last_close = float(
-                candle["close"]
-            )
-
-
-
-            return True
+            self.calculate()
 
 
 
@@ -100,292 +100,301 @@ class IndicatorEngine:
             )
 
 
-            return None
-
-
-
-
-
-    # =====================================================
-    # VWAP
-    # =====================================================
-
-    def calculate_vwap(self):
-
-
-        try:
-
-
-            total_volume = 0
-
-            total_price_volume = 0
-
-
-
-            for c in self.candles:
-
-
-                high = float(
-                    c["high"]
-                )
-
-
-                low = float(
-                    c["low"]
-                )
-
-
-                close = float(
-                    c["close"]
-                )
-
-
-                volume = float(
-                    c["volume"]
-                )
-
-
-                typical_price = (
-                    high
-                    +
-                    low
-                    +
-                    close
-                ) / 3
-
-
-
-                total_price_volume += (
-                    typical_price
-                    *
-                    volume
-                )
-
-
-                total_volume += volume
-
-
-
-            if total_volume > 0:
-
-
-                self.vwap = (
-                    total_price_volume
-                    /
-                    total_volume
-                )
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[VWAP ERROR]",
-                e
-            )
-
-
-
 
 
 
     # =====================================================
-    # ATR
+    # CALCULATE
     # =====================================================
 
-    def calculate_atr(self):
+
+    def calculate(self):
 
 
-        trs = []
+        if len(self.candles) < 20:
+
+
+            return
 
 
 
-        candles = list(
+        df = pd.DataFrame(
             self.candles
         )
 
 
 
-        for i in range(
-            1,
-            len(candles)
-        ):
+        # -------------------------
+        # VWAP
+        # -------------------------
 
 
-            current = candles[i]
+        price = (
 
-            previous = candles[i-1]
+            df["high"]
 
+            +
 
+            df["low"]
 
-            high = float(
-                current["high"]
-            )
+            +
 
-            low = float(
-                current["low"]
-            )
+            df["close"]
 
-            prev_close = float(
-                previous["close"]
-            )
+        ) / 3
 
 
 
-            tr = max(
+        volume = df["volume"]
 
-                high - low,
 
-                abs(
-                    high - prev_close
-                ),
 
-                abs(
-                    low - prev_close
-                )
+        cumulative_volume = volume.cumsum()
 
-            )
 
 
-            trs.append(
-                tr
-            )
+        cumulative_price_volume = (
 
+            price * volume
 
+        ).cumsum()
 
-        if len(trs) < self.atr_period:
 
 
-            return None
+        vwap = (
 
+            cumulative_price_volume
 
+            /
 
-        recent = trs[
-            -self.atr_period:
-        ]
+            cumulative_volume
 
+        )
 
 
-        return sum(recent) / self.atr_period
 
+        current_vwap = float(
+            vwap.iloc[-1]
+        )
 
 
 
+        # -------------------------
+        # ATR
+        # -------------------------
 
 
+        high_low = (
 
-    # =====================================================
-    # SUPERTREND
-    # =====================================================
+            df["high"]
 
-    def calculate_supertrend(self):
+            -
 
+            df["low"]
 
-        try:
+        )
 
 
-            atr = self.calculate_atr()
+        high_close = (
 
+            abs(
 
+                df["high"]
 
-            if atr is None:
-
-                return None
-
-
-
-
-            candle = self.candles[-1]
-
-
-
-            high = float(
-                candle["high"]
-            )
-
-
-            low = float(
-                candle["low"]
-            )
-
-
-            close = float(
-                candle["close"]
-            )
-
-
-
-            middle = (
-                high
-                +
-                low
-            ) / 2
-
-
-
-
-            upper = (
-                middle
-                +
-                self.multiplier
-                *
-                atr
-            )
-
-
-
-            lower = (
-                middle
                 -
-                self.multiplier
-                *
-                atr
+
+                df["close"].shift()
+
+            )
+
+        )
+
+
+        low_close = (
+
+            abs(
+
+                df["low"]
+
+                -
+
+                df["close"].shift()
+
+            )
+
+        )
+
+
+
+        tr = pd.concat(
+
+            [
+
+                high_low,
+
+                high_close,
+
+                low_close,
+
+            ],
+
+            axis=1
+
+        ).max(axis=1)
+
+
+
+        atr = (
+
+            tr.rolling(14)
+
+            .mean()
+
+        )
+
+
+
+        current_atr = float(
+            atr.iloc[-1]
+        )
+
+
+
+        if np.isnan(current_atr):
+
+            return
+
+
+
+
+        # -------------------------
+        # Supertrend
+        # -------------------------
+
+
+        multiplier = 3
+
+
+
+        hl2 = (
+
+            df["high"]
+
+            +
+
+            df["low"]
+
+        ) / 2
+
+
+
+        upper = (
+
+            hl2
+
+            +
+
+            multiplier
+
+            *
+
+            atr
+
+        )
+
+
+
+        lower = (
+
+            hl2
+
+            -
+
+            multiplier
+
+            *
+
+            atr
+
+        )
+
+
+
+        close = df["close"]
+
+
+
+        trend = "UP"
+
+
+
+        if close.iloc[-1] < lower.iloc[-1]:
+
+
+            trend = "DOWN"
+
+
+
+        elif close.iloc[-1] > upper.iloc[-1]:
+
+
+            trend = "UP"
+
+
+
+        else:
+
+
+            previous = self.last.get(
+                "supertrend"
             )
 
 
+            if previous:
 
-            if close > upper:
-
-
-                self.supertrend = "UP"
-
-
-
-            elif close < lower:
-
-
-                self.supertrend = "DOWN"
-
-
-
-            else:
-
-
-                if self.supertrend is None:
-
-                    self.supertrend = "UP"
+                trend = previous
 
 
 
 
-        except Exception as e:
+        self.last = {
 
 
-            print(
-                "[SUPERTREND ERROR]",
-                e
-            )
+            "vwap":
+
+                current_vwap,
 
 
+            "supertrend":
+
+                trend,
+
+
+            "atr":
+
+                current_atr,
+
+
+        }
+
+
+
+        print(
+
+            "[INDICATORS]",
+
+            self.last
+
+        )
 
 
 
 
 
     # =====================================================
-    # MARKET DATA
+    # GET DATA
     # =====================================================
+
 
     def get_market_data(
         self,
@@ -393,13 +402,8 @@ class IndicatorEngine:
     ):
 
 
-        if self.vwap is None:
+        if self.last["vwap"] is None:
 
-            return None
-
-
-
-        if self.supertrend is None:
 
             return None
 
@@ -408,38 +412,65 @@ class IndicatorEngine:
         return {
 
 
+            "symbol":
+
+                self.symbol,
+
+
+            "price":
+
+                candle["close"]
+                if candle
+                else None,
+
+
             "vwap":
 
-                round(
-                    self.vwap,
-                    4
-                ),
-
+                self.last["vwap"],
 
 
             "supertrend":
 
-                self.supertrend,
+                self.last["supertrend"],
 
 
+            "atr":
 
-            "close":
-
-                float(
-                    candle["close"]
-                )
-                if candle
-                else self.last_close,
-
-
-
-            "count":
-
-                len(
-                    self.candles
-                )
+                self.last["atr"],
 
         }
+
+
+
+
+
+
+    # =====================================================
+    # RESET
+    # =====================================================
+
+
+    def reset(self):
+
+
+        self.candles.clear()
+
+
+        self.last = {
+
+
+            "vwap": None,
+
+            "supertrend": None,
+
+            "atr": None,
+
+        }
+
+
+        print(
+            "[INDICATOR RESET]"
+        )
 
 
 
