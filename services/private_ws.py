@@ -1,21 +1,18 @@
-import os
-import time
+# services/private_ws.py
+
 import json
+import time
 import hmac
 import hashlib
 import threading
-
 import websocket
 
-from dotenv import load_dotenv
 
-
-from watchdog.watchdog import watchdog
-
-from position.position_manager import position_manager
-
-
-load_dotenv()
+from config import (
+    BYBIT_PRIVATE_WS,
+    BYBIT_API_KEY,
+    BYBIT_API_SECRET
+)
 
 
 
@@ -25,55 +22,30 @@ class PrivateWS:
     def __init__(self):
 
 
-        self.api_key = os.getenv(
-
-            "BYBIT_API_KEY",
-
-            ""
-
-        )
+        self.url = BYBIT_PRIVATE_WS
 
 
-        self.api_secret = os.getenv(
-
-            "BYBIT_API_SECRET",
-
-            ""
-
-        )
+        self.api_key = BYBIT_API_KEY
 
 
-        live = os.getenv(
-            "LIVE_TRADING",
-            "false"
-        ).lower() == "true"
-
-
-        if live:
-
-            self.url = os.getenv(
-                "BYBIT_LIVE_PRIVATE_WS",
-                "wss://stream.bybit.com/v5/private"
-            )
-
-        else:
-
-            self.url = os.getenv(
-                "BYBIT_DEMO_PRIVATE_WS",
-                "wss://stream-demo.bybit.com/v5/private"
-            )
-
-
-        self.running = False
-
-        self.connected = False
+        self.api_secret = BYBIT_API_SECRET
 
 
         self.ws = None
 
+
+        self.running = False
+
+
         self.thread = None
 
 
+
+        print("==============================")
+        print("[PRIVATE WS INIT]")
+        print("URL :", self.url)
+        print("KEY :", self.api_key[:6] if self.api_key else None)
+        print("==============================")
 
 
 
@@ -96,7 +68,7 @@ class PrivateWS:
 
         self.thread = threading.Thread(
 
-            target=self._run,
+            target=self.run,
 
             daemon=True
 
@@ -107,21 +79,41 @@ class PrivateWS:
 
 
 
+    # =====================================
+    # STOP
+    # =====================================
+
+    def stop(self):
+
+
+        self.running = False
+
+
+
+        try:
+
+            if self.ws:
+
+                self.ws.close()
+
+
+        except Exception:
+
+            pass
+
+
+
         print(
-
-            "[PRIVATE WS START]"
-
+            "[PRIVATE WS STOPPED]"
         )
 
 
 
-
-
     # =====================================
-    # MAIN LOOP
+    # RUN
     # =====================================
 
-    def _run(self):
+    def run(self):
 
 
         while self.running:
@@ -145,13 +137,7 @@ class PrivateWS:
                 )
 
 
-                self.ws.run_forever(
-
-                    ping_interval=20,
-
-                    ping_timeout=10
-
-                )
+                self.ws.run_forever()
 
 
 
@@ -159,11 +145,8 @@ class PrivateWS:
 
 
                 print(
-
-                    "[PRIVATE WS LOOP ERROR]",
-
+                    "[PRIVATE WS ERROR]",
                     e
-
                 )
 
 
@@ -172,41 +155,29 @@ class PrivateWS:
 
 
                 print(
-
                     "[PRIVATE WS RECONNECT]"
-
                 )
 
 
-                time.sleep(5)
-
+                time.sleep(3)
 
 
 
 
     # =====================================
-    # AUTH
+    # AUTH SIGN
     # =====================================
 
-    def create_auth_message(self):
+    def generate_signature(
+        self,
+        expires
+    ):
 
 
-        expires = int(
-
-            time.time()*1000
-
-        ) + 10000
-
-
-
-        signature_payload = (
-
+        payload = (
             "GET/realtime"
-
             +
-
             str(expires)
-
         )
 
 
@@ -215,7 +186,7 @@ class PrivateWS:
 
             self.api_secret.encode(),
 
-            signature_payload.encode(),
+            payload.encode(),
 
             hashlib.sha256
 
@@ -223,29 +194,7 @@ class PrivateWS:
 
 
 
-        return {
-
-
-            "op":
-
-                "auth",
-
-
-            "args":
-
-                [
-
-                    self.api_key,
-
-                    expires,
-
-                    signature
-
-                ]
-
-        }
-
-
+        return signature
 
 
 
@@ -259,26 +208,50 @@ class PrivateWS:
     ):
 
 
-        self.connected = True
-
-
-
         print(
-
             "[PRIVATE CONNECTED]"
-
         )
 
 
 
+        expires = (
+            int(time.time() * 1000)
+            +
+            10000
+        )
+
+
+
+        sign = self.generate_signature(
+            expires
+        )
+
+
+
+        auth = {
+
+
+            "op":
+                "auth",
+
+
+            "args":
+            [
+
+                self.api_key,
+
+                expires,
+
+                sign
+
+            ]
+
+        }
+
+
+
         ws.send(
-
-            json.dumps(
-
-                self.create_auth_message()
-
-            )
-
+            json.dumps(auth)
         )
 
 
@@ -291,45 +264,27 @@ class PrivateWS:
 
 
             "op":
-
                 "subscribe",
 
 
             "args":
+            [
 
-                [
+                "position",
 
-                    "execution",
+                "execution",
 
-                    "position",
+                "order"
 
-                    "wallet"
-
-                ]
+            ]
 
         }
 
 
 
         ws.send(
-
-            json.dumps(
-
-                subscribe
-
-            )
-
+            json.dumps(subscribe)
         )
-
-
-
-        print(
-
-            "[PRIVATE SUBSCRIBED]"
-
-        )
-
-
 
 
 
@@ -348,72 +303,38 @@ class PrivateWS:
 
 
             data = json.loads(
-
                 message
-
             )
 
 
 
-            watchdog.heartbeat()
+            if data.get(
+                "success"
+            ):
 
 
-
-            if "success" in data:
-
-
-                if data.get("success"):
-
-                    print(
-
-                        "[PRIVATE AUTH SUCCESS]"
-
-                    )
+                print(
+                    "[PRIVATE AUTH SUCCESS]"
+                )
 
 
                 return
 
 
 
-
-
             topic = data.get(
-
-                "topic"
-
+                "topic",
+                ""
             )
 
 
 
-            if topic == "execution":
+            if topic:
 
 
-                self.handle_execution(
-
-                    data.get("data")
-
-                )
-
-
-
-            elif topic == "position":
-
-
-                self.handle_position(
-
-                    data.get("data")
-
-                )
-
-
-
-            elif topic == "wallet":
-
-
-                self.handle_wallet(
-
-                    data.get("data")
-
+                print(
+                    "[PRIVATE DATA]",
+                    topic
                 )
 
 
@@ -422,252 +343,9 @@ class PrivateWS:
 
 
             print(
-
                 "[PRIVATE MESSAGE ERROR]",
-
                 e
-
             )
-
-
-
-
-
-    # =====================================
-    # EXECUTION EVENT
-    # =====================================
-
-    def handle_execution(
-        self,
-        data
-    ):
-
-
-        if not data:
-
-            return
-
-
-
-        from execution.execution_engine import execution_engine
-
-
-
-        for item in data:
-
-
-            symbol = item.get(
-
-                "symbol"
-
-            )
-
-
-            side = item.get(
-
-                "side"
-
-            )
-
-
-            qty = float(
-
-                item.get(
-
-                    "execQty",
-
-                    0
-
-                )
-
-            )
-
-
-            price = float(
-
-                item.get(
-
-                    "execPrice",
-
-                    0
-
-                )
-
-            )
-
-
-
-            print(
-
-                "[EXECUTION]",
-
-                symbol,
-
-                side,
-
-                qty,
-
-                price
-
-            )
-
-
-
-            execution_engine.on_fill(
-
-                symbol,
-
-                side,
-
-                qty,
-
-                price
-
-            )
-
-
-
-
-
-    # =====================================
-    # POSITION EVENT
-    # =====================================
-
-    def handle_position(
-        self,
-        data
-    ):
-
-
-        if not data:
-
-            return
-
-
-
-        for item in data:
-
-
-            symbol = item.get(
-
-                "symbol"
-
-            )
-
-
-            size = float(
-
-                item.get(
-
-                    "size",
-
-                    0
-
-                )
-
-            )
-
-
-
-            side = item.get(
-
-                "side"
-
-            )
-
-
-
-            entry = float(
-
-                item.get(
-
-                    "avgPrice",
-
-                    0
-
-                )
-
-            )
-
-
-
-            if size > 0:
-
-
-                position_manager.set_position(
-
-                    symbol,
-
-                    side,
-
-                    size,
-
-                    entry
-
-                )
-
-
-
-                print(
-
-                    "[POSITION UPDATE]",
-
-                    symbol,
-
-                    side,
-
-                    size
-
-                )
-
-
-
-            else:
-
-
-                position_manager.remove_position(
-
-                    symbol
-
-                )
-
-
-
-                print(
-
-                    "[POSITION CLOSED]",
-
-                    symbol
-
-                )
-
-
-
-
-
-    # =====================================
-    # WALLET EVENT
-    # =====================================
-
-    def handle_wallet(
-        self,
-        data
-    ):
-
-
-        if not data:
-
-            return
-
-
-
-        print(
-
-            "[WALLET UPDATE]"
-
-        )
-
-
 
 
 
@@ -683,14 +361,9 @@ class PrivateWS:
 
 
         print(
-
             "[PRIVATE WS ERROR]",
-
             error
-
         )
-
-
 
 
 
@@ -706,84 +379,9 @@ class PrivateWS:
     ):
 
 
-        self.connected = False
-
-
         print(
-
             "[PRIVATE WS CLOSED]"
-
         )
-
-
-
-
-
-    # =====================================
-    # STOP
-    # =====================================
-
-    def stop(self):
-
-
-        self.running = False
-
-
-        self.connected = False
-
-
-
-        try:
-
-
-            if self.ws:
-
-                self.ws.close()
-
-
-
-        except:
-
-
-            pass
-
-
-
-        print(
-
-            "[PRIVATE WS STOPPED]"
-
-        )
-
-
-
-
-
-    # =====================================
-    # STATUS
-    # =====================================
-
-    def status(self):
-
-
-        return {
-
-
-            "running":
-
-                self.running,
-
-
-            "connected":
-
-                self.connected,
-
-
-            "url":
-
-                self.url
-
-        }
 
 
 
