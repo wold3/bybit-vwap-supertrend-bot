@@ -1,296 +1,177 @@
-import os
 import time
 import hmac
 import hashlib
 import requests
 
-from urllib.parse import urlencode
-from dotenv import load_dotenv
-
-
-# =====================================
-# ENV LOAD
-# =====================================
-
-load_dotenv()
-
-
-# =====================================
-# CONFIG
-# =====================================
-
-API_KEY = os.getenv(
-    "BYBIT_API_KEY"
+from config import (
+    BYBIT_BASE_URL,
+    BYBIT_API_KEY,
+    BYBIT_API_SECRET,
+    ACCOUNT_TYPE
 )
 
-API_SECRET = os.getenv(
-    "BYBIT_API_SECRET"
-)
-
-BASE_URL = os.getenv(
-    "BYBIT_BASE_URL",
-    "https://api.bybit.com"
-)
-
-ACCOUNT_TYPE = os.getenv(
-    "ACCOUNT_TYPE",
-    "UNIFIED"
-)
-
-
-# =====================================
-# WALLET
-# =====================================
 
 class BybitWallet:
 
-
     def __init__(self):
 
-        self.api_key = API_KEY
+        self.api_key = BYBIT_API_KEY
+        self.api_secret = BYBIT_API_SECRET
 
-        self.api_secret = API_SECRET
+        self.base_url = BYBIT_BASE_URL
 
-        self.base_url = BASE_URL
-
+        self.account_type = ACCOUNT_TYPE
 
         print("==============================")
         print("[WALLET INIT]")
-        print(
-            "KEY:",
-            self.api_key[:6]
-            if self.api_key
-            else None
-        )
-
-        print(
-            "BASE:",
-            self.base_url
-        )
-
+        print("KEY:", self.api_key[:6])
+        print("BASE:", self.base_url)
+        print("ACCOUNT:", self.account_type)
         print("==============================")
 
 
-    # =================================
-    # SIGN
-    # =================================
-
-    def _sign(
-        self,
-        timestamp,
-        recv_window,
-        query_string
-    ):
-
-
-        origin = (
-            timestamp
-            +
-            self.api_key
-            +
-            recv_window
-            +
-            query_string
-        )
-
-
-        signature = hmac.new(
-            self.api_secret.encode(
-                "utf-8"
-            ),
-            origin.encode(
-                "utf-8"
-            ),
-            hashlib.sha256
-        ).hexdigest()
-
-
-        return signature
-
-
-
-    # =================================
-    # REQUEST
-    # =================================
-
-    def _get(
-        self,
-        endpoint,
-        params
-    ):
-
+    def _sign(self, params):
 
         timestamp = str(
-            int(
-                time.time()*1000
-            )
+            int(time.time() * 1000)
         )
-
 
         recv_window = "5000"
 
 
-        query_string = urlencode(
-            params
+        param_string = "&".join(
+            [
+                f"{k}={params[k]}"
+                for k in sorted(params)
+            ]
         )
 
 
-        sign = self._sign(
+        origin = (
+            timestamp
+            + self.api_key
+            + recv_window
+            + param_string
+        )
+
+
+        signature = hmac.new(
+            self.api_secret.encode("utf-8"),
+            origin.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+
+
+        return (
             timestamp,
             recv_window,
-            query_string
+            signature
         )
 
 
-        headers = {
-
-            "X-BAPI-API-KEY":
-                self.api_key,
-
-            "X-BAPI-SIGN":
-                sign,
-
-            "X-BAPI-TIMESTAMP":
-                timestamp,
-
-            "X-BAPI-RECV-WINDOW":
-                recv_window,
-
-            "Content-Type":
-                "application/json"
-
-        }
-
-
-        url = (
-            self.base_url
-            +
-            endpoint
-        )
-
+    def get_equity(self):
 
         try:
 
+            endpoint = (
+                "/v5/account/wallet-balance"
+            )
+
+
+            params = {
+                "accountType":
+                    self.account_type
+            }
+
+
+            timestamp, recv_window, sign = (
+                self._sign(params)
+            )
+
+
+            headers = {
+
+                "X-BAPI-API-KEY":
+                    self.api_key,
+
+                "X-BAPI-SIGN":
+                    sign,
+
+                "X-BAPI-TIMESTAMP":
+                    timestamp,
+
+                "X-BAPI-RECV-WINDOW":
+                    recv_window,
+
+                "Content-Type":
+                    "application/json"
+            }
+
+
+            url = (
+                self.base_url
+                +
+                endpoint
+            )
+
 
             response = requests.get(
-
                 url,
-
-                params=params,
-
                 headers=headers,
-
+                params=params,
                 timeout=10
-
             )
 
 
             data = response.json()
 
 
-            print(
-                "[BYBIT RESPONSE]",
-                data
+            print("[BYBIT RESPONSE]")
+            print(data)
+
+
+            if data.get("retCode") != 0:
+
+                return 0
+
+
+            result = data.get(
+                "result",
+                {}
             )
 
 
-            return data
+            list_data = result.get(
+                "list",
+                []
+            )
 
+
+            if not list_data:
+                return 0
+
+
+            account = list_data[0]
+
+
+            equity = account.get(
+                "totalEquity",
+                0
+            )
+
+
+            return float(equity)
 
 
         except Exception as e:
 
-
             print(
-                "[WALLET REQUEST ERROR]",
+                "[WALLET ERROR]",
                 e
             )
 
-
-            return None
-
-
-
-    # =================================
-    # EQUITY
-    # =================================
-
-    def get_equity(self):
-
-
-        params = {
-
-            "accountType":
-                ACCOUNT_TYPE
-
-        }
-
-
-        result = self._get(
-
-            "/v5/account/wallet-balance",
-
-            params
-
-        )
-
-
-        if not result:
-
             return 0
 
 
-
-        if result.get(
-            "retCode"
-        ) != 0:
-
-
-            return 0
-
-
-
-        try:
-
-
-            account = (
-                result
-                ["result"]
-                ["list"]
-                [0]
-            )
-
-
-            equity = float(
-                account["totalEquity"]
-            )
-
-
-            print(
-                "[ACCOUNT EQUITY]",
-                equity
-            )
-
-
-            return equity
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[EQUITY PARSE ERROR]",
-                e
-            )
-
-
-            return 0
-
-
-
-# =====================================
-# INSTANCE
-# =====================================
 
 wallet = BybitWallet()
