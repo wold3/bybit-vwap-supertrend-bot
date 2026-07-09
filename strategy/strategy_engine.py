@@ -1,329 +1,99 @@
-import time
-
-
-
 from indicators.vwap import calculate_vwap
-
 from indicators.supertrend import supertrend
-
-
-
-
 
 
 class StrategyEngine:
 
-
-
     def __init__(self):
 
-
         self.last_signal = None
-
-
         self.last_timestamp = None
 
-
-
-        self.ready = False
-
-
-
-        print(
-            "[STRATEGY ENGINE READY]"
-        )
-
-
-
-
-
-
-
+        print("[STRATEGY ENGINE READY]")
 
     # ==================================
-    # CANDLE INPUT
+    # CANDLE
     # ==================================
 
-
-    def on_candle(
-            self,
-            candle
-    ):
-
-
+    def on_candle(self, candle):
 
         try:
 
+            # --------------------------
+            # 완성된 캔들만 사용
+            # --------------------------
 
-
-            timestamp = candle["timestamp"]
-
-
-
-            close = float(
-
-                candle["close"]
-
-            )
-
-
-
-            high = float(
-
-                candle["high"]
-
-            )
-
-
-            low = float(
-
-                candle["low"]
-
-            )
-
-
-            volume = float(
-
-                candle["volume"]
-
-            )
-
-
-
-
-
-
-
-
-            # 중복 캔들 방지
-
-            if timestamp == self.last_timestamp:
-
-
+            if not candle.get("confirm", False):
                 return None
 
+            timestamp = int(candle["timestamp"])
 
-
+            # 이미 처리한 봉이면 무시
+            if timestamp == self.last_timestamp:
+                return None
 
             self.last_timestamp = timestamp
 
+            close = float(candle["close"])
+            high = float(candle["high"])
+            low = float(candle["low"])
 
+            # --------------------------
+            # Indicator
+            # --------------------------
 
-
-
-
-
-
-            # ==========================
-            # VWAP
-            # ==========================
-
-
-            vwap = calculate_vwap(
-
-                candle
-
-            )
-
-
-
-
-
-
-
-            # ==========================
-            # SUPERTREND
-            # ==========================
-
+            vwap = calculate_vwap(candle)
 
             trend = supertrend.update(
-
-
                 high,
-
-
                 low,
-
-
                 close
-
-
-
             )
-
-
-
-
-
-
-
 
             print(
-
                 "[INDICATOR]",
-
-                "PRICE:",
-
-                close,
-
-                "VWAP:",
-
-                vwap,
-
-                "TREND:",
-
-                trend
-
+                f"PRICE={close}",
+                f"VWAP={vwap}",
+                f"TREND={trend}"
             )
 
+            # --------------------------
+            # Signal
+            # --------------------------
 
+            signal = None
 
-
-
-
-
-
-
-            signal = "HOLD"
-
-
-
-
-
-
-
-
-            # ==========================
-            # LONG CONDITION
-            # ==========================
-
-
-            if (
-
-
-                close > vwap
-
-                and
-
-                trend is True
-
-
-            ):
-
-
-
+            if close > vwap and trend:
                 signal = "BUY"
 
-
-
-
-
-
-
-            # ==========================
-            # SHORT CONDITION
-            # ==========================
-
-
-            elif (
-
-
-                close < vwap
-
-                and
-
-                trend is False
-
-
-            ):
-
-
-
+            elif close < vwap and not trend:
                 signal = "SELL"
 
+            # --------------------------
+            # HOLD
+            # --------------------------
 
-
-
-
-
-
-            else:
-
-
-                signal = "HOLD"
-
-
-
-
-
-
-
-
-            # 같은 신호 반복 방지
-
-            if signal == self.last_signal:
-
-
+            if signal is None:
                 return None
 
+            # --------------------------
+            # 같은 신호 반복 방지
+            # --------------------------
 
-
-
+            if signal == self.last_signal:
+                return None
 
             self.last_signal = signal
 
+            print("[TRADE SIGNAL]", signal)
 
-
-
-
-            if signal != "HOLD":
-
-
-                print(
-
-                    "[TRADE SIGNAL]",
-
-                    signal
-
-                )
-
-
-                return signal
-
-
-
-
-
-            return None
-
-
-
-
-
+            return signal
 
         except Exception as e:
 
-
-            print(
-
-                "[STRATEGY ERROR]",
-
-                e
-
-            )
-
+            print("[STRATEGY ERROR]", e)
 
             return None
-
-
-
-
-
-
-
-
-
-
 
 
 strategy_engine = StrategyEngine()
