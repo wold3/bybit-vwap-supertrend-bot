@@ -1,32 +1,42 @@
 import time
-import json
 import uuid
-import hmac
-import hashlib
-import requests
 
 
 from config import (
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
     BYBIT_BASE_URL,
-    DEFAULT_SYMBOL
+    DEFAULT_SYMBOL,
+    LIVE_TRADING
 )
+
+
+from api.bybit_client import bybit_client
+
+
 
 
 
 class OrderManager:
 
 
+
     def __init__(self):
 
+
         self.base = BYBIT_BASE_URL
+
         self.symbol = DEFAULT_SYMBOL
 
 
+        self.live = LIVE_TRADING
+
+
+        self.last_order = None
+
+
         print("==============================")
-        print("[ORDER MANAGER READY]")
+        print("[ORDER MANAGER INIT]")
         print("BASE :", self.base)
+        print("LIVE :", self.live)
         print("SYMBOL :", self.symbol)
         print("==============================")
 
@@ -34,224 +44,111 @@ class OrderManager:
 
 
 
-    # ===================================
-    # SIGN
-    # ===================================
 
-    def _sign(self, timestamp, body):
 
+    # =================================
+    # CREATE ORDER
+    # =================================
 
-        recv_window = "5000"
-
-
-        payload = (
-
-            timestamp
-
-            +
-
-            BYBIT_API_KEY
-
-            +
-
-            recv_window
-
-            +
-
-            body
-
-        )
-
-
-
-        return hmac.new(
-
-            BYBIT_API_SECRET.encode(),
-
-            payload.encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-
-
-
-
-    # ===================================
-    # REQUEST
-    # ===================================
-
-    def _request(self, path, data):
-
-
-        url = self.base + path
-
-
-        body = json.dumps(
-            data,
-            separators=(",", ":")
-        )
-
-
-        timestamp = str(
-            int(time.time()*1000)
-        )
-
-
-
-        sign = self._sign(
-
-            timestamp,
-
-            body
-
-        )
-
-
-
-        headers = {
-
-            "X-BAPI-API-KEY":
-                BYBIT_API_KEY,
-
-
-            "X-BAPI-SIGN":
-                sign,
-
-
-            "X-BAPI-TIMESTAMP":
-                timestamp,
-
-
-            "X-BAPI-RECV-WINDOW":
-                "5000",
-
-
-            "Content-Type":
-                "application/json"
-
-        }
-
-
-
-
-
-        for retry in range(3):
-
-
-            try:
-
-
-                r = requests.post(
-
-                    url,
-
-                    headers=headers,
-
-                    data=body,
-
-                    timeout=10
-
-                )
-
-
-                result = r.json()
-
-
-
-                print(
-                    "[BYBIT RESPONSE]",
-                    result
-                )
-
-
-
-                return result
-
-
-
-
-            except Exception as e:
-
-
-                print(
-                    "[ORDER RETRY]",
-                    retry + 1,
-                    e
-                )
-
-
-                time.sleep(1)
-
-
-
-        return None
-
-
-
-
-
-
-    # ===================================
-    # CREATE MARKET ORDER
-    # ===================================
 
     def create_order(
-
             self,
-
             side,
-
             qty,
-
             take_profit=None,
-
             stop_loss=None
-
-
     ):
 
 
+        # -----------------------------
+        # duplicate protection
+        # -----------------------------
 
-        data = {
+
+        now = time.time()
+
+
+
+        if self.last_order:
+
+
+            if now - self.last_order < 3:
+
+
+                print(
+                    "[ORDER BLOCK] DUPLICATE"
+                )
+
+
+                return None
+
+
+
+
+        self.last_order = now
+
+
+
+
+
+
+        order_link_id = (
+
+            "VWAP_"
+
+            + str(uuid.uuid4())[:8]
+
+        )
+
+
+
+
+
+
+
+        params = {
 
 
             "category":
 
-                "linear",
+            "linear",
+
 
 
             "symbol":
 
-                self.symbol,
+            self.symbol,
+
 
 
             "side":
 
-                side,
+            side,
+
 
 
             "positionIdx":
 
-                0,
+            0,
+
 
 
             "orderType":
 
-                "Market",
+            "Market",
+
 
 
             "qty":
 
-                str(qty),
+            str(qty),
 
 
 
             "orderLinkId":
 
-                "vwap-" + uuid.uuid4().hex[:12]
+            order_link_id
+
 
         }
 
@@ -259,10 +156,26 @@ class OrderManager:
 
 
 
+
+        print("==============================")
+        print("[ORDER REQUEST]")
+        print(params)
+        print("==============================")
+
+
+
+
+
+
+        # -----------------------------
+        # TP SL
+        # -----------------------------
+
+
         if take_profit:
 
 
-            data["takeProfit"] = str(
+            params["takeProfit"] = str(
                 take_profit
             )
 
@@ -271,7 +184,7 @@ class OrderManager:
         if stop_loss:
 
 
-            data["stopLoss"] = str(
+            params["stopLoss"] = str(
                 stop_loss
             )
 
@@ -279,39 +192,63 @@ class OrderManager:
 
 
 
-        print("==============================")
-        print("[ORDER CREATE]")
-        print(data)
-        print("==============================")
+
+
+        try:
 
 
 
-        return self._request(
+            result = bybit_client.post(
 
-            "/v5/order/create",
+                "/v5/order/create",
 
-            data
+                params
 
-        )
-
+            )
 
 
 
 
+            print(
+                "[ORDER RESPONSE]",
+                result
+            )
 
-    # ===================================
+
+
+            return result
+
+
+
+
+
+        except Exception as e:
+
+
+
+            print(
+                "[ORDER ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+
+
+    # =================================
     # CLOSE POSITION
-    # ===================================
+    # =================================
+
 
     def close_position(
-
             self,
-
             side,
-
             qty
-
-
     ):
 
 
@@ -322,76 +259,190 @@ class OrderManager:
 
             if side == "Buy"
 
-            else
-
-            "Buy"
+            else "Buy"
 
         )
 
 
 
 
-        data = {
+
+        params = {
 
 
             "category":
 
-                "linear",
+            "linear",
+
 
 
             "symbol":
 
-                self.symbol,
+            self.symbol,
+
 
 
             "side":
 
-                close_side,
+            close_side,
+
 
 
             "positionIdx":
 
-                0,
+            0,
+
 
 
             "orderType":
 
-                "Market",
+            "Market",
+
 
 
             "qty":
 
-                str(qty),
+            str(qty),
 
 
 
             "reduceOnly":
 
-                True,
+            True
 
-
-            "orderLinkId":
-
-                "close-" + uuid.uuid4().hex[:12]
 
         }
 
 
 
 
+
         print(
-            "[POSITION CLOSE]"
+            "[CLOSE POSITION]",
+            params
         )
 
 
 
-        return self._request(
 
-            "/v5/order/create",
 
-            data
+        try:
 
-        )
+
+
+            result = bybit_client.post(
+
+                "/v5/order/create",
+
+                params
+
+            )
+
+
+
+            print(
+
+                "[CLOSE RESPONSE]",
+
+                result
+
+            )
+
+
+
+            return result
+
+
+
+
+        except Exception as e:
+
+
+
+            print(
+                "[CLOSE ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+
+
+    # =================================
+    # CANCEL ALL
+    # =================================
+
+
+    def cancel_all(self):
+
+
+        params = {
+
+
+            "category":
+
+            "linear",
+
+
+
+            "symbol":
+
+            self.symbol
+
+
+        }
+
+
+
+
+
+        try:
+
+
+            result = bybit_client.post(
+
+                "/v5/order/cancel-all",
+
+                params
+
+            )
+
+
+            print(
+
+                "[CANCEL ALL]",
+
+                result
+
+            )
+
+
+
+            return result
+
+
+
+
+        except Exception as e:
+
+
+
+            print(
+                "[CANCEL ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
 
 
 
