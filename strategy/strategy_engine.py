@@ -1,8 +1,5 @@
 from indicators.indicator_engine import indicator_engine
 
-from execution.execution_engine import execution_engine
-
-
 
 class StrategyEngine:
 
@@ -53,7 +50,7 @@ class StrategyEngine:
 
 
 
-            # 중복 캔들 방지
+            # 동일 캔들 중복 방지
 
             if timestamp == self.last_timestamp:
 
@@ -65,9 +62,9 @@ class StrategyEngine:
 
 
 
-            # ==============================
+            # ==================================
             # INDICATOR UPDATE
-            # ==============================
+            # ==================================
 
             indicator_engine.update(
                 candle
@@ -108,7 +105,6 @@ class StrategyEngine:
                 return None
 
 
-
             if trend is None:
 
                 return None
@@ -128,10 +124,9 @@ class StrategyEngine:
 
 
 
-            # ==============================
+            # ==================================
             # STRATEGY RULE
-            # ==============================
-
+            # ==================================
 
             if close > vwap and trend == "UP":
 
@@ -145,6 +140,11 @@ class StrategyEngine:
 
 
 
+            else:
+
+                signal = None
+
+
 
             if signal is None:
 
@@ -152,13 +152,14 @@ class StrategyEngine:
 
 
 
-
-            # 같은 방향 반복 진입 방지
+            # ==================================
+            # DUPLICATE SIGNAL FILTER
+            # ==================================
 
             if signal == self.last_signal:
 
                 print(
-                    "[SIGNAL SKIP] SAME SIGNAL",
+                    "[SIGNAL SKIP]",
                     signal
                 )
 
@@ -177,17 +178,8 @@ class StrategyEngine:
 
 
 
-            # ==============================
-            # EXECUTION
-            # ==============================
-
-            result = execution_engine.execute(
-                signal
-            )
-
-
-
-            return result
+            # main.py에서 실행 처리
+            return signal
 
 
 
