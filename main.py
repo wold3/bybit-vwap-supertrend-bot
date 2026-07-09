@@ -3,6 +3,7 @@ import signal
 import sys
 
 
+
 from config import (
     LIVE_TRADING,
     DEFAULT_SYMBOL,
@@ -10,9 +11,11 @@ from config import (
 )
 
 
+
 from market.websocket_client import (
     ws_client
 )
+
 
 
 from services.private_ws_client import (
@@ -20,9 +23,11 @@ from services.private_ws_client import (
 )
 
 
+
 from portfolio.bybit_wallet import (
     wallet
 )
+
 
 
 from watchdog import (
@@ -31,18 +36,61 @@ from watchdog import (
 
 
 
+from strategy.strategy_engine import (
+    strategy_engine
+)
+
+
+
+
+
 running = True
 
 
 
+
+
 # ==================================
-# STOP HANDLER
+# CANDLE CALLBACK
+# ==================================
+
+def candle_handler(candle):
+
+
+    print(
+        "[CANDLE]",
+        candle
+    )
+
+
+    try:
+
+        strategy_engine.on_candle(
+            candle
+        )
+
+
+    except Exception as e:
+
+
+        print(
+            "[STRATEGY ERROR]",
+            e
+        )
+
+
+
+
+
+# ==================================
+# STOP
 # ==================================
 
 def shutdown(
     signum=None,
     frame=None
 ):
+
 
     global running
 
@@ -62,12 +110,9 @@ def shutdown(
 
         ws_client.stop()
 
-    except Exception as e:
+    except:
 
-        print(
-            "[PUBLIC STOP ERROR]",
-            e
-        )
+        pass
 
 
 
@@ -75,12 +120,9 @@ def shutdown(
 
         private_ws_client.stop()
 
-    except Exception as e:
+    except:
 
-        print(
-            "[PRIVATE STOP ERROR]",
-            e
-        )
+        pass
 
 
 
@@ -88,7 +130,7 @@ def shutdown(
 
         watchdog.stop()
 
-    except Exception:
+    except:
 
         pass
 
@@ -100,6 +142,7 @@ def shutdown(
 
 
     sys.exit(0)
+
 
 
 
@@ -120,8 +163,9 @@ signal.signal(
 
 
 
+
 # ==================================
-# START
+# MAIN
 # ==================================
 
 def main():
@@ -136,22 +180,32 @@ def main():
 
 
 
-    # watchdog 1회
+    #
+    # candle callback 연결
+    #
 
     try:
 
-        watchdog.start()
+        ws_client.set_callback(
+            candle_handler
+        )
+
 
     except Exception as e:
 
+
         print(
-            "[WATCHDOG ERROR]",
+            "[CALLBACK ERROR]",
             e
         )
 
 
 
-    # public market websocket
+
+
+    watchdog.start()
+
+
 
     print(
         "[START] PUBLIC WS"
@@ -166,8 +220,6 @@ def main():
 
 
 
-    # private account websocket
-
     print(
         "[START] PRIVATE WS"
     )
@@ -181,7 +233,7 @@ def main():
 
 
 
-    # wallet check
+
 
     try:
 
@@ -205,6 +257,8 @@ def main():
 
 
 
+
+
     print(
         "[START] STRATEGY LOOP"
     )
@@ -216,18 +270,13 @@ def main():
 
 
 
+
+
     while running:
 
 
-        try:
+        time.sleep(1)
 
-            time.sleep(1)
-
-
-        except KeyboardInterrupt:
-
-
-            shutdown()
 
 
 
