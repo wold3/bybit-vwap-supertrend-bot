@@ -1,16 +1,16 @@
-# execution/execution_engine.py
-
 import time
+import hmac
+import hashlib
+import requests
 
 
 from config import (
     BYBIT_BASE_URL,
+    BYBIT_API_KEY,
+    BYBIT_API_SECRET,
     DEFAULT_SYMBOL,
-    LIVE_TRADING
+    LIVE_TRADING,
 )
-
-
-from portfolio.bybit_wallet import wallet
 
 
 
@@ -22,9 +22,11 @@ class ExecutionEngine:
 
         self.base_url = BYBIT_BASE_URL
 
+        self.api_key = BYBIT_API_KEY
+
+        self.api_secret = BYBIT_API_SECRET
 
         self.symbol = DEFAULT_SYMBOL
-
 
         self.live = LIVE_TRADING
 
@@ -40,72 +42,89 @@ class ExecutionEngine:
 
 
     # =====================================
-    # EXECUTE
+    # SIGN
     # =====================================
 
-    def execute(
+    def _sign(
         self,
-        signal
+        params
     ):
 
 
-        if not signal:
-
-
-            return False
-
-
-
-        print(
-            "[EXECUTION SIGNAL]",
-            signal
-        )
-
-
-
-        if not self.live:
-
-
-            print(
-                "[SIMULATION MODE]",
-                signal
+        timestamp = str(
+            int(
+                time.time()*1000
             )
-
-
-            return True
-
-
-
-        side = signal.get(
-            "side"
         )
 
 
-        qty = signal.get(
-            "qty"
+        recv_window = "5000"
+
+
+        query_string = "&".join(
+            [
+                f"{k}={params[k]}"
+                for k in sorted(params)
+            ]
+        )
+
+
+        origin = (
+            timestamp
+            +
+            self.api_key
+            +
+            recv_window
+            +
+            query_string
+        )
+
+
+        sign = hmac.new(
+            self.api_secret.encode(),
+            origin.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+
+        return (
+            timestamp,
+            recv_window,
+            sign
         )
 
 
 
-        if not side or not qty:
+    # =====================================
+    # HEADER
+    # =====================================
+
+    def _headers(
+        self,
+        timestamp,
+        recv_window,
+        sign
+    ):
 
 
-            print(
-                "[EXECUTION ERROR] Invalid signal"
-            )
+        return {
 
+            "X-BAPI-API-KEY":
+                self.api_key,
 
-            return False
+            "X-BAPI-SIGN":
+                sign,
 
+            "X-BAPI-TIMESTAMP":
+                timestamp,
 
+            "X-BAPI-RECV-WINDOW":
+                recv_window,
 
-        return self.market_order(
+            "Content-Type":
+                "application/json"
 
-            side,
-
-            qty
-
-        )
+        }
 
 
 
@@ -120,14 +139,22 @@ class ExecutionEngine:
     ):
 
 
+        if not self.live:
+
+            print(
+                "[EXECUTION BLOCKED] LIVE=False"
+            )
+
+            return None
+
+
 
         endpoint = (
             "/v5/order/create"
         )
 
 
-
-        body = {
+        params = {
 
 
             "category":
@@ -149,14 +176,27 @@ class ExecutionEngine:
             "qty":
                 str(qty)
 
-
         }
 
 
 
-        print(
-            "[MARKET ORDER]",
-            body
+        timestamp, recv_window, sign = (
+            self._sign(params)
+        )
+
+
+
+        headers = self._headers(
+            timestamp,
+            recv_window,
+            sign
+        )
+
+
+        url = (
+            self.base_url
+            +
+            endpoint
         )
 
 
@@ -164,49 +204,37 @@ class ExecutionEngine:
         try:
 
 
-            response = wallet.private_request(
+            print("[EXECUTION ORDER]")
+            print(url)
+            print(params)
 
-                method="POST",
 
-                endpoint=endpoint,
 
-                body=body
+            response = requests.post(
+
+                url,
+
+                headers=headers,
+
+                json=params,
+
+                timeout=10
 
             )
+
+
+
+            data = response.json()
 
 
 
             print(
-                "[BYBIT ORDER RESPONSE]",
-                response
+                "[EXECUTION RESPONSE]",
+                data
             )
 
 
-
-            if response.get(
-                "retCode"
-            ) == 0:
-
-
-                print(
-                    "[ORDER SUCCESS]"
-                )
-
-
-                return True
-
-
-
-            else:
-
-
-                print(
-                    "[ORDER FAILED]",
-                    response
-                )
-
-
-                return False
+            return data
 
 
 
@@ -219,57 +247,61 @@ class ExecutionEngine:
             )
 
 
-            return False
-
+            return None
 
 
 
     # =====================================
-    # CANCEL ALL
+    # CLOSE POSITION
     # =====================================
 
-    def cancel_all_orders(
-        self
+    def close_position(
+        self,
+        side,
+        qty
     ):
 
 
-        body = {
+        close_side = (
+            "Sell"
+            if side == "Buy"
+            else
+            "Buy"
+        )
 
 
-            "category":
-                "linear",
+        return self.market_order(
+            close_side,
+            qty
+        )
 
 
-            "symbol":
-                self.symbol
 
+    # =====================================
+    # TEST CONNECTION
+    # =====================================
 
-        }
-
+    def ping(self):
 
 
         try:
 
 
-            result = wallet.private_request(
-
-                method="POST",
-
-                endpoint="/v5/order/cancel-all",
-
-                body=body
-
+            r = requests.get(
+                self.base_url
+                +
+                "/v5/market/time",
+                timeout=5
             )
-
 
 
             print(
-                "[CANCEL RESULT]",
-                result
+                "[BYBIT TIME]",
+                r.json()
             )
 
 
-            return result
+            return True
 
 
 
@@ -277,31 +309,12 @@ class ExecutionEngine:
 
 
             print(
-                "[CANCEL ERROR]",
+                "[PING ERROR]",
                 e
             )
 
 
-            return None
-
-
-
-
-    # =====================================
-    # POSITION CLOSE
-    # =====================================
-
-    def close_position(
-        self
-    ):
-
-
-        print(
-            "[CLOSE POSITION REQUEST]"
-        )
-
-
-        return self.cancel_all_orders()
+            return False
 
 
 
