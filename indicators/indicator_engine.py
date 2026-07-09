@@ -1,160 +1,149 @@
-import os
-from collections import defaultdict, deque
-
 import pandas as pd
-from dotenv import load_dotenv
-
-
-load_dotenv()
+import numpy as np
 
 
 class IndicatorEngine:
 
+
     def __init__(self):
 
-        self.max_history = int(
-            os.getenv(
-                "MAX_HISTORY",
-                "500"
-            )
+        self.data = pd.DataFrame(
+            columns=[
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
+            ]
         )
 
-        self.period = int(
-            os.getenv(
-                "SUPER_TREND_PERIOD",
-                "10"
-            )
+
+        self.max_candles = 300
+
+
+        self.last_result = None
+
+
+        # Supertrend 설정
+
+        self.atr_period = 10
+        self.multiplier = 3
+
+
+
+        print(
+            "[INDICATOR ENGINE READY]"
         )
 
-        self.multiplier = float(
-            os.getenv(
-                "SUPER_TREND_MULTIPLIER",
-                "3.0"
-            )
-        )
-
-        self.history = defaultdict(
-            lambda: deque(
-                maxlen=self.max_history
-            )
-        )
-
-        print("[INDICATOR ENGINE READY]")
 
 
-    # =====================================
+    # =====================================================
     # UPDATE CANDLE
-    # =====================================
+    # =====================================================
 
-    def update(self, candle):
-
-        if not candle:
-            return
-
-
-        symbol = candle.get("symbol")
-
-        if not symbol:
-            return
+    def update(
+        self,
+        candle
+    ):
 
 
-        normalized = {
+        try:
 
-            "symbol": symbol,
 
-            "timestamp": int(
-                candle.get(
-                    "timestamp",
-                    0
-                )
-            ),
+            row = {
 
-            "open": float(
-                candle.get(
-                    "open",
-                    0
-                )
-            ),
 
-            "high": float(
-                candle.get(
-                    "high",
-                    0
-                )
-            ),
+                "timestamp":
+                int(candle["timestamp"]),
 
-            "low": float(
-                candle.get(
-                    "low",
-                    0
-                )
-            ),
 
-            "close": float(
-                candle.get(
-                    "close",
-                    0
-                )
-            ),
+                "open":
+                float(candle["open"]),
 
-            "volume": float(
-                candle.get(
-                    "volume",
-                    0
-                )
-            ),
 
-            "confirm": candle.get(
-                "confirm",
-                False
+                "high":
+                float(candle["high"]),
+
+
+                "low":
+                float(candle["low"]),
+
+
+                "close":
+                float(candle["close"]),
+
+
+                "volume":
+                float(candle["volume"])
+
+            }
+
+
+
+            self.data = pd.concat(
+
+                [
+
+                    self.data,
+
+                    pd.DataFrame(
+                        [row]
+                    )
+
+                ],
+
+                ignore_index=True
+
             )
 
-        }
 
 
-        self.history[symbol].append(
-            normalized
-        )
+            # 중복 제거
+
+            self.data.drop_duplicates(
+
+                subset=[
+                    "timestamp"
+                ],
+
+                keep="last",
+
+                inplace=True
+
+            )
 
 
-    # =====================================
-    # DATAFRAME
-    # =====================================
-
-    def dataframe(self, symbol):
-
-        data = self.history.get(
-            symbol
-        )
+            self.data = self.data.tail(
+                self.max_candles
+            ).reset_index(
+                drop=True
+            )
 
 
-        if not data:
 
-            return None
-
-
-        return pd.DataFrame(
-            list(data)
-        )
+            self.calculate()
 
 
-    # =====================================
+
+        except Exception as e:
+
+
+            print(
+                "[INDICATOR UPDATE ERROR]",
+                e
+            )
+
+
+
+    # =====================================================
     # VWAP
-    # =====================================
+    # =====================================================
 
-    def calculate_vwap(self, symbol):
-
-        df = self.dataframe(
-            symbol
-        )
+    def calculate_vwap(self, df):
 
 
-        if df is None or len(df) == 0:
-
-            return None
-
-
-        typical_price = (
+        typical = (
 
             df["high"]
 
@@ -169,49 +158,35 @@ class IndicatorEngine:
         ) / 3
 
 
+
         volume = df["volume"]
 
 
-        total_volume = volume.sum()
 
+        vwap = (
 
-        if total_volume <= 0:
-
-            return None
-
-
-        return float(
-
-            (
-                typical_price * volume
-            ).sum()
+            (typical * volume).cumsum()
 
             /
 
-            total_volume
+            volume.cumsum()
 
         )
 
 
-    # =====================================
+
+        return vwap
+
+
+
+    # =====================================================
     # ATR
-    # =====================================
+    # =====================================================
 
-    def calculate_atr(self, symbol):
-
-        df = self.dataframe(
-            symbol
-        )
-
-
-        if df is None:
-
-            return None
-
-
-        if len(df) < self.period:
-
-            return None
+    def calculate_atr(
+        self,
+        df
+    ):
 
 
         high = df["high"]
@@ -221,214 +196,221 @@ class IndicatorEngine:
         close = df["close"]
 
 
-        tr1 = high - low
 
-        tr2 = (
-            high - close.shift()
-        ).abs()
+        prev_close = close.shift(1)
 
-        tr3 = (
-            low - close.shift()
-        ).abs()
 
 
         tr = pd.concat(
+
             [
-                tr1,
-                tr2,
-                tr3
+
+                high-low,
+
+                (high-prev_close).abs(),
+
+                (low-prev_close).abs()
+
             ],
+
             axis=1
-        ).max(axis=1)
+
+        ).max(
+            axis=1
+        )
+
 
 
         atr = tr.rolling(
-            self.period
+
+            self.atr_period
+
         ).mean()
 
 
-        value = atr.iloc[-1]
+
+        return atr
 
 
-        if pd.isna(value):
 
-            return None
+    # =====================================================
+    # SUPERTREND
+    # =====================================================
 
-
-        return float(value)
-
-
-    # =====================================
-    # SUPER TREND
-    # =====================================
-
-    def calculate_supertrend(self, symbol):
-
-        df = self.dataframe(
-            symbol
-        )
-
-
-        if df is None:
-
-            return "FLAT"
+    def calculate_supertrend(
+        self,
+        df
+    ):
 
 
         atr = self.calculate_atr(
-            symbol
+            df
         )
-
-
-        if atr is None:
-
-            return "FLAT"
-
-
-        current = df.iloc[-1]
 
 
         hl2 = (
 
-            current["high"]
+            df["high"]
 
             +
 
-            current["low"]
+            df["low"]
 
         ) / 2
 
 
-        upper_band = (
+
+        upper = (
+
             hl2
+
             +
+
             self.multiplier * atr
+
         )
 
 
-        lower_band = (
+        lower = (
+
             hl2
+
             -
+
             self.multiplier * atr
+
         )
 
 
-        close = current["close"]
+
+        trend = []
+
+        direction = "DOWN"
 
 
-        if close > upper_band:
 
-            return "UP"
-
-
-        elif close < lower_band:
-
-            return "DOWN"
+        for i in range(len(df)):
 
 
-        return "FLAT"
+            close = df["close"].iloc[i]
 
 
-    # =====================================
+
+            if close > upper.iloc[i]:
+
+
+                direction = "UP"
+
+
+            elif close < lower.iloc[i]:
+
+
+                direction = "DOWN"
+
+
+
+            trend.append(
+                direction
+            )
+
+
+
+        return trend
+
+
+
+    # =====================================================
     # CALCULATE ALL
-    # =====================================
+    # =====================================================
 
-    def calculate(self, symbol):
+    def calculate(self):
 
-        return {
+
+        if len(self.data) < 20:
+
+
+            return None
+
+
+
+        df = self.data.copy()
+
+
+
+        df["vwap"] = self.calculate_vwap(
+            df
+        )
+
+
+        df["atr"] = self.calculate_atr(
+            df
+        )
+
+
+
+        df["trend"] = self.calculate_supertrend(
+            df
+        )
+
+
+
+        last = df.iloc[-1]
+
+
+
+        self.last_result = {
+
 
             "vwap":
-                self.calculate_vwap(
-                    symbol
-                ),
+
+            float(
+                last["vwap"]
+            ),
 
 
             "supertrend":
-                self.calculate_supertrend(
-                    symbol
-                )
 
-        }
+            last["trend"],
 
 
-    # =====================================
-    # MARKET DATA
-    # =====================================
+            "atr":
 
-    def get_market_data(self, candle):
-
-        if not candle:
-
-            return None
-
-
-        symbol = candle.get(
-            "symbol"
-        )
-
-
-        if not symbol:
-
-            return None
-
-
-        indicators = self.calculate(
-            symbol
-        )
-
-
-        return {
-
-            **candle,
-
-            **indicators
-
-        }
-
-
-    # =====================================
-    # RESET
-    # =====================================
-
-    def reset(self, symbol=None):
-
-        if symbol:
-
-            self.history.pop(
-                symbol,
-                None
+            float(
+                last["atr"]
             )
 
-        else:
+            if not np.isnan(last["atr"])
 
-            self.history.clear()
+            else None,
 
 
-    # =====================================
-    # STATUS
-    # =====================================
+            "close":
 
-    def status(self):
-
-        return {
-
-            "symbols":
-                list(
-                    self.history.keys()
-                ),
-
-            "count":
-                sum(
-                    len(v)
-                    for v in self.history.values()
-                ),
-
-            "period":
-                self.period,
-
-            "multiplier":
-                self.multiplier
+            float(
+                last["close"]
+            )
 
         }
+
+
+
+        return self.last_result
+
+
+
+    # =====================================================
+    # GET MARKET DATA
+    # =====================================================
+
+    def get_market_data(
+        self,
+        candle=None
+    ):
+
+
+        return self.last_result
+
+
 
 
 
