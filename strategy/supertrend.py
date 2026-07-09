@@ -1,45 +1,93 @@
-def atr(candles, period=10):
+import pandas as pd
+import numpy as np
 
-    trs = []
 
-    for i in range(1, len(candles)):
-        c = candles[i]
-        p = candles[i - 1]
 
-        tr = max(
-            c["high"] - c["low"],
-            abs(c["high"] - p["close"]),
-            abs(c["low"] - p["close"])
-        )
 
-        trs.append(tr)
+def calculate_supertrend(
+    df,
+    period=10,
+    multiplier=3
+):
 
-    if len(trs) < period:
+
+    if len(df) < period + 2:
+
         return None
 
-    return sum(trs[-period:]) / period
 
 
-def supertrend(candles, period=10, multiplier=3):
+    high = df["high"]
 
-    if len(candles) < period + 1:
-        return None
+    low = df["low"]
 
-    a = atr(candles, period)
-    if a is None:
-        return None
+    close = df["close"]
 
-    last = candles[-1]
 
-    hl2 = (last["high"] + last["low"]) / 2
 
-    upper = hl2 + multiplier * a
-    lower = hl2 - multiplier * a
+    tr = pd.concat(
 
-    close = last["close"]
+        [
 
-    if close > upper:
-        return "BUY"
-    elif close < lower:
-        return "SELL"
-    return "HOLD"
+            high-low,
+
+            abs(high-close.shift()),
+
+            abs(low-close.shift())
+
+        ],
+
+        axis=1
+
+    ).max(axis=1)
+
+
+
+    atr = (
+        tr.rolling(period)
+        .mean()
+    )
+
+
+
+    hl2 = (
+        high+low
+    )/2
+
+
+
+    upper = (
+        hl2
+        +
+        multiplier
+        *
+        atr
+    )
+
+
+    lower = (
+        hl2
+        -
+        multiplier
+        *
+        atr
+    )
+
+
+
+    trend = True
+
+
+
+    if close.iloc[-1] > upper.iloc[-2]:
+
+        trend = True
+
+
+    elif close.iloc[-1] < lower.iloc[-2]:
+
+        trend = False
+
+
+
+    return trend
