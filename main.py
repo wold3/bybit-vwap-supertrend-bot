@@ -1,6 +1,8 @@
 import time
 import threading
 
+from position.position_manager import position_manager
+
 from config import (
     LIVE_TRADING,
     DEFAULT_SYMBOL,
@@ -44,6 +46,63 @@ def heartbeat_loop():
 
         time.sleep(60)
 
+
+# ==========================================================
+# HANDLE CANDLE
+# ==========================================================
+
+def handle_candle(candle):
+
+    try:
+
+        signal = strategy_engine.on_candle(candle)
+
+        if signal is None:
+            return
+
+        qty = 0.001
+
+        if not risk_manager.allow_order(qty):
+            return
+
+        if signal == "BUY":
+
+            result = order_manager.create_order(
+                side="Buy",
+                qty=qty
+            )
+
+        elif signal == "SELL":
+
+            result = order_manager.create_order(
+                side="Sell",
+                qty=qty
+            )
+
+        else:
+            return
+
+        if result and result.get("retCode") == 0:
+
+            print("[ORDER SUCCESS]", signal)
+
+            bot_logger.info(f"ORDER {signal}")
+
+            risk_manager.record_order()
+
+            position_manager.sync()
+
+        else:
+
+            print("[ORDER FAILED]", result)
+
+            bot_logger.warning(str(result))
+
+    except Exception as e:
+
+        print("[HANDLE CANDLE ERROR]", e)
+
+        error_logger.exception(str(e))
 
 # ==========================================================
 # STRATEGY LOOP
@@ -113,7 +172,8 @@ def start_bot():
     # RISK INIT
     # -----------------------------
     risk_manager.initialize()
-
+    ws_client.set_callback(handle_candle)
+    
     # -----------------------------
     # PUBLIC WS
     # -----------------------------
