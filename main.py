@@ -1,36 +1,16 @@
-# main.py
-
 import time
 import signal
+import threading
 
-from dotenv import load_dotenv
-
-
-# =====================================
-# LOAD ENV FIRST
-# =====================================
-
-load_dotenv()
-
-
-
-# =====================================
-# CONFIG
-# =====================================
 
 from config import (
-    DEFAULT_SYMBOL,
     LIVE_TRADING,
-    BYBIT_BASE_URL,
+    DEFAULT_SYMBOL,
+    BYBIT_BASE_URL
 )
 
 
-
-# =====================================
-# SERVICES
-# =====================================
-
-from services.ws_client import (
+from market.websocket_client import (
     ws_client
 )
 
@@ -40,109 +20,67 @@ from services.private_ws_client import (
 )
 
 
-
-# =====================================
-# PORTFOLIO
-# =====================================
-
 from portfolio.bybit_wallet import (
     wallet
 )
 
 
-
-# =====================================
-# WATCHDOG
-# =====================================
-
-from watchdog.watchdog import (
+from watchdog import (
     watchdog
 )
 
 
 
-# =====================================
-# GLOBAL STATE
-# =====================================
-
-RUNNING = True
+running = True
 
 
-
-# =====================================
-# SHUTDOWN
-# =====================================
 
 def shutdown(
-    signum=None,
+    sig=None,
     frame=None
 ):
 
-    global RUNNING
-
-
-    if not RUNNING:
-        return
-
-
-
-    RUNNING = False
-
+    global running
 
 
     print()
-
-    print(
-        "[BOT STOPPING]"
-    )
+    print("[BOT STOPPING]")
 
 
+    running = False
 
-    # public ws stop
+
 
     try:
 
         ws_client.stop()
 
 
-    except Exception as e:
+    except Exception:
 
-        print(
-            "[PUBLIC STOP ERROR]",
-            e
-        )
+        pass
 
 
-
-    # private ws stop
 
     try:
 
         private_ws_client.stop()
 
 
-    except Exception as e:
+    except Exception:
 
-        print(
-            "[PRIVATE STOP ERROR]",
-            e
-        )
+        pass
 
 
-
-    # watchdog stop
 
     try:
 
         watchdog.stop()
 
 
-    except Exception as e:
+    except Exception:
 
-        print(
-            "[WATCHDOG STOP ERROR]",
-            e
-        )
+        pass
 
 
 
@@ -152,10 +90,10 @@ def shutdown(
 
 
 
+    raise SystemExit
 
-# =====================================
-# SIGNAL
-# =====================================
+
+
 
 signal.signal(
     signal.SIGINT,
@@ -171,55 +109,83 @@ signal.signal(
 
 
 
-# =====================================
-# MAIN
-# =====================================
+def equity_loop():
+
+
+    while running:
+
+
+        try:
+
+
+            equity = (
+                wallet.get_equity()
+            )
+
+
+            print(
+                "[ACCOUNT EQUITY]",
+                equity
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[EQUITY ERROR]",
+                e
+            )
+
+
+
+        time.sleep(
+            30
+        )
+
+
+
+
+def strategy_loop():
+
+
+    print(
+        "[START] STRATEGY LOOP"
+    )
+
+
+    while running:
+
+
+        time.sleep(
+            1
+        )
+
+
+
 
 def main():
 
 
-    print(
-        "===================================="
-    )
-
-    print(
-        "VWAP SUPERTREND BOT START"
-    )
-
-    print(
-        "LIVE :",
-        LIVE_TRADING
-    )
-
-    print(
-        "SYMBOL :",
-        DEFAULT_SYMBOL
-    )
-
-    print(
-        "BASE :",
-        BYBIT_BASE_URL
-    )
-
-    print(
-        "===================================="
-    )
+    print("====================================")
+    print("VWAP SUPERTREND BOT START")
+    print("LIVE :", LIVE_TRADING)
+    print("SYMBOL :", DEFAULT_SYMBOL)
+    print("BASE :", BYBIT_BASE_URL)
+    print("====================================")
 
 
 
-    # -----------------------------
-    # WATCHDOG
-    # -----------------------------
+    # watchdog
 
     try:
 
         watchdog.start()
 
-
         print(
             "[WATCHDOG START]"
         )
-
 
     except Exception as e:
 
@@ -230,106 +196,82 @@ def main():
 
 
 
-    # -----------------------------
-    # PUBLIC WS
-    # -----------------------------
+    # public websocket
 
     print(
         "[START] PUBLIC WS"
     )
 
 
-    try:
-
-        ws_client.start()
-
-
-    except Exception as e:
-
-        print(
-            "[PUBLIC WS ERROR]",
-            e
-        )
+    ws_client.start()
 
 
 
-    time.sleep(2)
+    time.sleep(
+        2
+    )
 
 
 
-    # -----------------------------
-    # PRIVATE WS
-    # -----------------------------
+    # private websocket
 
     print(
         "[START] PRIVATE WS"
     )
 
 
-    try:
-
-        private_ws_client.start()
-
-
-    except Exception as e:
-
-        print(
-            "[PRIVATE WS ERROR]",
-            e
-        )
+    private_ws_client.start()
 
 
 
-    time.sleep(3)
-
-
-
-    # -----------------------------
-    # WALLET CHECK
-    # -----------------------------
-
-    try:
-
-        equity = wallet.get_equity()
-
-
-        print(
-            "[ACCOUNT EQUITY]",
-            equity
-        )
-
-
-    except Exception as e:
-
-        print(
-            "[WALLET ERROR]",
-            e
-        )
-
-
-
-    # -----------------------------
-    # STRATEGY LOOP
-    # -----------------------------
-
-    print(
-        "[START] STRATEGY LOOP"
+    time.sleep(
+        2
     )
 
 
 
-    while RUNNING:
+    # equity thread
+
+    threading.Thread(
+
+        target=equity_loop,
+
+        daemon=True
+
+    ).start()
 
 
-        time.sleep(1)
+
+    # strategy thread
+
+    threading.Thread(
+
+        target=strategy_loop,
+
+        daemon=True
+
+    ).start()
+
+
+
+    print(
+        "[BOT RUNNING]"
+    )
+
+
+
+    while running:
+
+
+        time.sleep(
+            1
+        )
 
 
 
 
-# =====================================
-# ENTRY
-# =====================================
 
 if __name__ == "__main__":
+
 
     main()
