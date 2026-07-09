@@ -1,104 +1,123 @@
 import time
+import signal
 import threading
 
 
 from config import (
     LIVE_TRADING,
-    DEFAULT_SYMBOL
+    DEFAULT_SYMBOL,
+    BYBIT_BASE_URL
 )
 
 
-from market.websocket_client import public_ws
+from market.websocket_client import websocket_client
+
 from services.private_ws_client import private_ws_client
 
+
 from portfolio.bybit_wallet import wallet
+
 
 from execution.order_manager import order_manager
 
 
-from strategy.strategy_engine import (
-    strategy_engine
-)
+from position.position_manager import position_manager
+
+
+from strategy.strategy_engine import strategy_engine
 
 
 
-# ======================================
-# BOT STATE
-# ======================================
 
-running = True
-
-
-position = {
-
-    "side": None,
-
-    "qty": 0
-
-}
+RUNNING = True
 
 
 
-# ======================================
+# ==============================
 # RISK SETTINGS
-# ======================================
-
-TP_PERCENT = 0.003     # +0.3%
-SL_PERCENT = 0.002     # -0.2%
-
+# ==============================
 
 ORDER_QTY = "0.001"
 
 
+TP_PERCENT = 0.003     # 0.3%
 
-
-# ======================================
-# POSITION CHECK
-# ======================================
-
-
-def has_position():
-
-
-    if position["side"]:
-
-        return True
-
-
-    return False
+SL_PERCENT = 0.002     # 0.2%
 
 
 
 
-# ======================================
+
+# ==============================
+# SHUTDOWN
+# ==============================
+
+
+def shutdown(sig=None, frame=None):
+
+    global RUNNING
+
+
+    print()
+
+    print("==============================")
+    print("[BOT STOPPING]")
+    print("==============================")
+
+
+    RUNNING = False
+
+
+
+
+
+signal.signal(
+    signal.SIGINT,
+    shutdown
+)
+
+
+
+
+
+# ==============================
 # ORDER EXECUTION
-# ======================================
+# ==============================
 
 
-def execute_signal(signal, price):
+def execute_signal(
+        signal,
+        price
+):
 
 
-    global position
+    if not signal:
+
+        return
+
 
 
 
     print("==============================")
-    print("[SIGNAL]")
-    print(signal)
-    print("PRICE :", price)
+    print("[SIGNAL]", signal)
+    print("[PRICE]", price)
     print("==============================")
 
 
 
 
-    # ----------------------------
-    # 중복 진입 방지
-    # ----------------------------
+    # 실제 Bybit 포지션 동기화
 
-    if has_position():
+    position_manager.sync()
+
+
+
+    if position_manager.has_position():
 
         print(
-            "[SKIP] POSITION EXISTS"
+            "[ORDER BLOCK] POSITION EXISTS",
+            position_manager.side(),
+            position_manager.size()
         )
 
         return
@@ -107,17 +126,19 @@ def execute_signal(signal, price):
 
 
 
-    # ----------------------------
-    # LONG ENTRY
-    # ----------------------------
+
+    # ==========================
+    # BUY
+    # ==========================
 
     if signal == "BUY":
 
 
 
-        tp = round(
+        take_profit = round(
 
             price *
+
             (1 + TP_PERCENT),
 
             1
@@ -126,9 +147,10 @@ def execute_signal(signal, price):
 
 
 
-        sl = round(
+        stop_loss = round(
 
             price *
+
             (1 - SL_PERCENT),
 
             1
@@ -144,13 +166,13 @@ def execute_signal(signal, price):
 
         print(
             "TP:",
-            tp
+            take_profit
         )
 
 
         print(
             "SL:",
-            sl
+            stop_loss
         )
 
 
@@ -161,45 +183,37 @@ def execute_signal(signal, price):
 
             qty=ORDER_QTY,
 
-            take_profit=tp,
+            take_profit=take_profit,
 
-            stop_loss=sl
+            stop_loss=stop_loss
 
         )
 
 
 
-
-        if result and result.get(
-            "retCode"
-        ) == 0:
-
-
-            position["side"] = "Buy"
-
-            position["qty"] = ORDER_QTY
-
-
-            print(
-                "[POSITION OPEN]"
-            )
+        print(
+            "[ORDER RESULT]",
+            result
+        )
 
 
 
 
 
 
-    # ----------------------------
-    # SHORT ENTRY
-    # ----------------------------
+
+    # ==========================
+    # SELL
+    # ==========================
 
     elif signal == "SELL":
 
 
 
-        tp = round(
+        take_profit = round(
 
             price *
+
             (1 - TP_PERCENT),
 
             1
@@ -208,9 +222,10 @@ def execute_signal(signal, price):
 
 
 
-        sl = round(
+        stop_loss = round(
 
             price *
+
             (1 + SL_PERCENT),
 
             1
@@ -225,78 +240,97 @@ def execute_signal(signal, price):
         )
 
 
+        print(
+            "TP:",
+            take_profit
+        )
+
+
+        print(
+            "SL:",
+            stop_loss
+        )
+
+
+
         result = order_manager.create_order(
 
             side="Sell",
 
             qty=ORDER_QTY,
 
-            take_profit=tp,
+            take_profit=take_profit,
 
-            stop_loss=sl
+            stop_loss=stop_loss
 
+        )
+
+
+
+        print(
+            "[ORDER RESULT]",
+            result
         )
 
 
 
 
 
-        if result and result.get(
-            "retCode"
-        ) == 0:
 
-
-            position["side"] = "Sell"
-
-            position["qty"] = ORDER_QTY
-
-
-            print(
-                "[POSITION OPEN]"
-            )
-
-
-
-
-
-# ======================================
+# ==============================
 # CANDLE CALLBACK
-# ======================================
+# ==============================
 
 
 def on_candle(candle):
 
 
-    price = candle["close"]
+    try:
+
+
+        print(
+            "[CANDLE]",
+            candle
+        )
 
 
 
-    signal = strategy_engine.on_candle(
+        signal = strategy_engine.on_candle(
 
-        candle
+            candle
 
-    )
+        )
 
-
-
-    if signal:
 
 
         execute_signal(
 
             signal,
 
-            price
+            candle["close"]
 
         )
 
 
 
 
+    except Exception as e:
 
-# ======================================
+
+        print(
+            "[CANDLE ERROR]",
+            e
+        )
+
+
+
+
+
+
+
+# ==============================
 # STRATEGY LOOP
-# ======================================
+# ==============================
 
 
 def strategy_loop():
@@ -307,7 +341,8 @@ def strategy_loop():
     )
 
 
-    while running:
+
+    while RUNNING:
 
 
         time.sleep(1)
@@ -316,42 +351,132 @@ def strategy_loop():
 
 
 
-# ======================================
-# START
-# ======================================
+# ==============================
+# MAIN
+# ==============================
 
 
 def main():
 
 
 
-    print("====================================")
+    print("==============================")
     print("VWAP SUPERTREND BOT START")
-    print("LIVE :", LIVE_TRADING)
-    print("SYMBOL :", DEFAULT_SYMBOL)
-    print("====================================")
+    print("==============================")
 
 
 
     print(
-        "[WATCHDOG START]"
+        "LIVE :",
+        LIVE_TRADING
     )
 
 
-
-    # public websocket
-
-    public_ws.start(
-
-        callback=on_candle
-
+    print(
+        "SYMBOL :",
+        DEFAULT_SYMBOL
     )
 
 
+    print(
+        "BASE :",
+        BYBIT_BASE_URL
+    )
 
-    # private websocket
 
-    private_ws_client.start()
+    print("==============================")
+
+
+
+
+
+    # Wallet
+
+    try:
+
+
+        equity = wallet.get_equity()
+
+
+        print(
+            "[ACCOUNT EQUITY]",
+            equity
+        )
+
+
+    except Exception as e:
+
+
+        print(
+            "[WALLET ERROR]",
+            e
+        )
+
+
+
+
+
+    # 초기 포지션 동기화
+
+    try:
+
+
+        position_manager.sync()
+
+
+
+        print(
+            "[CURRENT POSITION]",
+            position_manager.current
+        )
+
+
+
+    except Exception as e:
+
+
+        print(
+            "[POSITION INIT ERROR]",
+            e
+        )
+
+
+
+
+
+
+
+    # Public WS
+
+    websocket_client.callback = on_candle
+
+
+
+    threading.Thread(
+
+        target=websocket_client.start,
+
+        daemon=True
+
+    ).start()
+
+
+
+
+
+
+    # Private WS
+
+    threading.Thread(
+
+        target=private_ws_client.start,
+
+        daemon=True
+
+    ).start()
+
+
+
 
 
 
@@ -367,33 +492,49 @@ def main():
 
 
 
+    print(
+        "[BOT RUNNING]"
+    )
+
+
+
+
+
+    while RUNNING:
+
+
+        time.sleep(1)
+
+
+
+
+
+    # STOP
+
     try:
 
+        websocket_client.stop()
 
-        while True:
+    except:
 
-            time.sleep(1)
-
-
-
-    except KeyboardInterrupt:
-
-
-        print(
-            "\n[BOT STOPPING]"
-        )
+        pass
 
 
 
-        public_ws.stop()
+    try:
 
         private_ws_client.stop()
 
+    except:
+
+        pass
 
 
-        print(
-            "[BOT STOPPED]"
-        )
+
+
+    print(
+        "[BOT STOPPED]"
+    )
 
 
 
