@@ -4,7 +4,7 @@ import time
 from config import (
     LIVE_TRADING,
     DEFAULT_SYMBOL,
-    BYBIT_BASE_URL
+    BYBIT_BASE_URL,
 )
 
 
@@ -19,11 +19,18 @@ class ExecutionEngine:
 
     def __init__(self):
 
+
         self.live = LIVE_TRADING
 
         self.symbol = DEFAULT_SYMBOL
 
         self.base = BYBIT_BASE_URL
+
+
+        self.last_signal_time = 0
+
+        self.signal_cooldown = 5
+
 
 
         print("==============================")
@@ -34,13 +41,15 @@ class ExecutionEngine:
         print("==============================")
 
 
-    # =================================
-    # SIGNAL EXECUTION
-    # =================================
+
+    # =====================================================
+    # EXECUTE SIGNAL
+    # =====================================================
 
     def execute(
         self,
-        signal
+        signal,
+        qty=0.001
     ):
 
 
@@ -50,55 +59,161 @@ class ExecutionEngine:
         )
 
 
+
         if signal not in (
+
             "BUY",
+
             "SELL"
+
         ):
+
+
+            print(
+                "[EXECUTION BLOCK] INVALID SIGNAL"
+            )
 
             return None
 
 
 
-        if signal == "BUY":
 
-            return order_manager.create_order(
+        # ---------------------------------
+        # SIGNAL COOLDOWN
+        # ---------------------------------
 
-                "Buy",
+        now = time.time()
 
-                0.001
 
+        if now - self.last_signal_time < self.signal_cooldown:
+
+
+            print(
+                "[EXECUTION BLOCK] COOLDOWN"
+            )
+
+            return None
+
+
+
+        self.last_signal_time = now
+
+
+
+
+        # ---------------------------------
+        # PAPER MODE
+        # ---------------------------------
+
+        if not self.live:
+
+
+            print(
+                "[PAPER MODE]",
+                signal,
+                qty
             )
 
 
+            return {
 
-        if signal == "SELL":
+                "retCode":0,
 
-            return order_manager.create_order(
+                "retMsg":
+                "PAPER MODE"
 
-                "Sell",
+            }
 
-                0.001
 
+
+
+        # ---------------------------------
+        # LIVE ORDER
+        # ---------------------------------
+
+        try:
+
+
+            if signal == "BUY":
+
+
+                result = order_manager.create_order(
+
+                    side="Buy",
+
+                    qty=qty
+
+                )
+
+
+
+            elif signal == "SELL":
+
+
+                result = order_manager.create_order(
+
+                    side="Sell",
+
+                    qty=qty
+
+                )
+
+
+
+            print(
+                "[EXECUTION RESULT]",
+                result
             )
 
 
+            return result
 
-    # =================================
-    # TEST ORDER
-    # =================================
+
+
+        except Exception as e:
+
+
+            print(
+                "[EXECUTION ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+    # =====================================================
+    # TEST BUY
+    # =====================================================
 
     def test_buy(self):
 
+
         return self.execute(
+
             "BUY"
+
         )
 
+
+
+
+    # =====================================================
+    # TEST SELL
+    # =====================================================
 
     def test_sell(self):
 
+
         return self.execute(
+
             "SELL"
+
         )
+
 
 
 
