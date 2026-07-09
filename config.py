@@ -1,49 +1,69 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv(".env")
+
+# ==================================
+# LOAD ENV
+# ==================================
+
+load_dotenv(
+    ".env"
+)
 
 
-# ================================
-# API
-# ================================
+
+# ==================================
+# BYBIT API
+# ==================================
 
 BYBIT_API_KEY = os.getenv(
-    "BYBIT_API_KEY",
-    ""
+    "BYBIT_API_KEY"
 )
+
 
 BYBIT_API_SECRET = os.getenv(
-    "BYBIT_API_SECRET",
-    ""
+    "BYBIT_API_SECRET"
 )
 
 
-# ================================
-# MODE
-# ================================
+
+# ==================================
+# SERVER MODE
+# ==================================
 
 LIVE_TRADING = (
+
     os.getenv(
         "LIVE_TRADING",
         "false"
     ).lower()
-    == "true"
+
+    ==
+
+    "true"
+
 )
 
 
+
 BYBIT_TESTNET = (
+
     os.getenv(
         "BYBIT_TESTNET",
         "false"
     ).lower()
-    == "true"
+
+    ==
+
+    "true"
+
 )
 
 
-# ================================
-# SERVER
-# ================================
+
+# ==================================
+# REST URL
+# ==================================
 
 BYBIT_BASE_URL = os.getenv(
     "BYBIT_BASE_URL",
@@ -51,14 +71,16 @@ BYBIT_BASE_URL = os.getenv(
 )
 
 
-# ================================
-# WS
-# ================================
+
+# ==================================
+# WEBSOCKET
+# ==================================
 
 BYBIT_PUBLIC_WS = os.getenv(
     "BYBIT_PUBLIC_WS",
-    "wss://stream-demo.bybit.com/v5/public/linear"
+    "wss://stream.bybit.com/v5/public/linear"
 )
+
 
 
 BYBIT_PRIVATE_WS = os.getenv(
@@ -67,9 +89,10 @@ BYBIT_PRIVATE_WS = os.getenv(
 )
 
 
-# ================================
-# TRADING
-# ================================
+
+# ==================================
+# SYMBOL
+# ==================================
 
 DEFAULT_SYMBOL = os.getenv(
     "DEFAULT_SYMBOL",
@@ -77,19 +100,36 @@ DEFAULT_SYMBOL = os.getenv(
 )
 
 
+
+# ==================================
+# ACCOUNT
+# ==================================
+
 ACCOUNT_TYPE = os.getenv(
     "ACCOUNT_TYPE",
     "UNIFIED"
 )
 
 
+
+# ==================================
+# ORDER
+# ==================================
+
 ORDER_RETRY = int(
+
     os.getenv(
         "ORDER_RETRY",
         "3"
     )
+
 )
 
+
+
+# ==================================
+# LOG
+# ==================================
 
 LOG_LEVEL = os.getenv(
     "LOG_LEVEL",
@@ -97,9 +137,10 @@ LOG_LEVEL = os.getenv(
 )
 
 
-# ================================
-# DEBUG
-# ================================
+
+# ==================================
+# DEBUG PRINT
+# ==================================
 
 print("==============================")
 print("[CONFIG LOAD]")
@@ -110,8 +151,15 @@ print("PUBLIC WS    :", BYBIT_PUBLIC_WS)
 print("PRIVATE WS   :", BYBIT_PRIVATE_WS)
 print("SYMBOL       :", DEFAULT_SYMBOL)
 print("ACCOUNT      :", ACCOUNT_TYPE)
-print(
-    "API KEY      :",
-    BYBIT_API_KEY[:6]
-)
+
+if BYBIT_API_KEY:
+    print(
+        "API KEY      :",
+        BYBIT_API_KEY[:6]
+    )
+else:
+    print(
+        "API KEY      : NONE"
+    )
+
 print("==============================")
