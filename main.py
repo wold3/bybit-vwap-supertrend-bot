@@ -27,6 +27,9 @@ from position.position_manager import position_manager
 from strategy.strategy_engine import strategy_engine
 
 
+from risk.risk_manager import risk_manager
+
+
 
 
 RUNNING = True
@@ -34,22 +37,23 @@ RUNNING = True
 
 
 # ==============================
-# RISK SETTINGS
+# ORDER SETTINGS
 # ==============================
+
 
 ORDER_QTY = "0.001"
 
 
-TP_PERCENT = 0.003     # 0.3%
+TP_PERCENT = 0.003
 
-SL_PERCENT = 0.002     # 0.2%
+SL_PERCENT = 0.002
 
 
 
 
 
 # ==============================
-# SHUTDOWN
+# SIGNAL STOP
 # ==============================
 
 
@@ -81,17 +85,17 @@ signal.signal(
 
 
 # ==============================
-# ORDER EXECUTION
+# ORDER PROCESS
 # ==============================
 
 
 def execute_signal(
-        signal,
+        trade_signal,
         price
 ):
 
 
-    if not signal:
+    if trade_signal is None:
 
         return
 
@@ -99,26 +103,41 @@ def execute_signal(
 
 
     print("==============================")
-    print("[SIGNAL]", signal)
+    print("[SIGNAL]", trade_signal)
     print("[PRICE]", price)
     print("==============================")
 
 
 
 
-    # 실제 Bybit 포지션 동기화
 
-    position_manager.sync()
+    # --------------------------
+    # Position check
+    # --------------------------
+
+
+    try:
+
+        position_manager.sync()
+
+
+    except Exception as e:
+
+        print(
+            "[POSITION SYNC ERROR]",
+            e
+        )
+
 
 
 
     if position_manager.has_position():
 
+
         print(
-            "[ORDER BLOCK] POSITION EXISTS",
-            position_manager.side(),
-            position_manager.size()
+            "[ORDER BLOCK] POSITION EXISTS"
         )
+
 
         return
 
@@ -126,16 +145,37 @@ def execute_signal(
 
 
 
+    # --------------------------
+    # Risk check
+    # --------------------------
 
-    # ==========================
+
+    if not risk_manager.allow_order(
+            ORDER_QTY
+    ):
+
+
+        print(
+            "[ORDER BLOCK] RISK"
+        )
+
+
+        return
+
+
+
+
+
+    # --------------------------
     # BUY
-    # ==========================
-
-    if signal == "BUY":
+    # --------------------------
 
 
+    if trade_signal == "BUY":
 
-        take_profit = round(
+
+
+        tp = round(
 
             price *
 
@@ -146,8 +186,7 @@ def execute_signal(
         )
 
 
-
-        stop_loss = round(
+        sl = round(
 
             price *
 
@@ -164,18 +203,6 @@ def execute_signal(
         )
 
 
-        print(
-            "TP:",
-            take_profit
-        )
-
-
-        print(
-            "SL:",
-            stop_loss
-        )
-
-
 
         result = order_manager.create_order(
 
@@ -183,9 +210,9 @@ def execute_signal(
 
             qty=ORDER_QTY,
 
-            take_profit=take_profit,
+            take_profit=tp,
 
-            stop_loss=stop_loss
+            stop_loss=sl
 
         )
 
@@ -202,15 +229,16 @@ def execute_signal(
 
 
 
-    # ==========================
+    # --------------------------
     # SELL
-    # ==========================
-
-    elif signal == "SELL":
+    # --------------------------
 
 
+    elif trade_signal == "SELL":
 
-        take_profit = round(
+
+
+        tp = round(
 
             price *
 
@@ -221,8 +249,7 @@ def execute_signal(
         )
 
 
-
-        stop_loss = round(
+        sl = round(
 
             price *
 
@@ -234,21 +261,8 @@ def execute_signal(
 
 
 
-
         print(
             "[SHORT ENTRY]"
-        )
-
-
-        print(
-            "TP:",
-            take_profit
-        )
-
-
-        print(
-            "SL:",
-            stop_loss
         )
 
 
@@ -259,9 +273,9 @@ def execute_signal(
 
             qty=ORDER_QTY,
 
-            take_profit=take_profit,
+            take_profit=tp,
 
-            stop_loss=stop_loss
+            stop_loss=sl
 
         )
 
@@ -277,8 +291,9 @@ def execute_signal(
 
 
 
+
 # ==============================
-# CANDLE CALLBACK
+# MARKET CALLBACK
 # ==============================
 
 
@@ -286,6 +301,7 @@ def on_candle(candle):
 
 
     try:
+
 
 
         print(
@@ -318,7 +334,7 @@ def on_candle(candle):
 
 
         print(
-            "[CANDLE ERROR]",
+            "[STRATEGY ERROR]",
             e
         )
 
@@ -329,7 +345,7 @@ def on_candle(candle):
 
 
 # ==============================
-# STRATEGY LOOP
+# LOOP
 # ==============================
 
 
@@ -346,6 +362,7 @@ def strategy_loop():
 
 
         time.sleep(1)
+
 
 
 
@@ -390,12 +407,16 @@ def main():
 
 
 
+    # --------------------------
     # Wallet
+    # --------------------------
+
 
     try:
 
 
         equity = wallet.get_equity()
+
 
 
         print(
@@ -416,7 +437,12 @@ def main():
 
 
 
-    # 초기 포지션 동기화
+
+
+    # --------------------------
+    # Position
+    # --------------------------
+
 
     try:
 
@@ -426,7 +452,7 @@ def main():
 
 
         print(
-            "[CURRENT POSITION]",
+            "[POSITION]",
             position_manager.current
         )
 
@@ -446,7 +472,29 @@ def main():
 
 
 
-    # Public WS
+    # --------------------------
+    # Risk
+    # --------------------------
+
+
+    print(
+
+        "[RISK STATUS]",
+
+        risk_manager.status()
+
+    )
+
+
+
+
+
+
+
+    # --------------------------
+    # PUBLIC WS
+    # --------------------------
+
 
     websocket_client.callback = on_candle
 
@@ -465,7 +513,11 @@ def main():
 
 
 
-    # Private WS
+
+    # --------------------------
+    # PRIVATE WS
+    # --------------------------
+
 
     threading.Thread(
 
@@ -480,6 +532,11 @@ def main():
 
 
 
+    # --------------------------
+    # Strategy
+    # --------------------------
+
+
     threading.Thread(
 
         target=strategy_loop,
@@ -492,9 +549,11 @@ def main():
 
 
 
+
     print(
         "[BOT RUNNING]"
     )
+
 
 
 
@@ -509,7 +568,9 @@ def main():
 
 
 
-    # STOP
+
+    # shutdown
+
 
     try:
 
@@ -541,7 +602,7 @@ def main():
 
 
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
 
     main()
