@@ -1,6 +1,5 @@
 import time
 import threading
-import signal
 
 
 from config import (
@@ -20,13 +19,18 @@ from services.private_ws_client import (
 )
 
 
-from strategy.strategy_engine import (
-    strategy_engine,
+from portfolio.bybit_wallet import (
+    wallet,
 )
 
 
 from execution.order_manager import (
     order_manager,
+)
+
+
+from strategy.strategy_engine import (
+    strategy_engine,
 )
 
 
@@ -37,11 +41,6 @@ from risk.risk_manager import (
 
 from position.position_manager import (
     position_manager,
-)
-
-
-from portfolio.bybit_wallet import (
-    wallet,
 )
 
 
@@ -62,12 +61,13 @@ from utils.logger import (
 
 
 
-# =====================================================
-# HEARTBEAT
-# =====================================================
+# ==========================================================
+# HEARTBEAT LOOP
+# ==========================================================
 
 def heartbeat_loop():
 
+    print("[HEARTBEAT LOOP START]")
 
     while bot_guard.is_running():
 
@@ -75,31 +75,28 @@ def heartbeat_loop():
 
             bot_guard.heartbeat()
 
-
         except Exception as e:
 
-
-            error_logger.error(
-                str(e)
+            print(
+                "[HEARTBEAT ERROR]",
+                e
             )
 
+            error_logger.exception(
+                str(e)
+            )
 
         time.sleep(60)
 
 
 
-
-# =====================================================
+# ==========================================================
 # CANDLE HANDLER
-# =====================================================
+# ==========================================================
 
-def handle_candle(
-    candle
-):
-
+def handle_candle(candle):
 
     try:
-
 
         signal = strategy_engine.on_candle(
             candle
@@ -113,14 +110,100 @@ def handle_candle(
 
 
         print(
-            "[STRATEGY SIGNAL]",
+            "[SIGNAL]",
             signal
         )
 
 
 
-        # main에서는 주문하지 않음
-        # strategy → execution 분리
+        qty = 0.001
+
+
+
+        if not risk_manager.allow_order(
+            qty
+        ):
+
+            print(
+                "[ORDER BLOCKED BY RISK]"
+            )
+
+            return
+
+
+
+
+        if signal == "BUY":
+
+
+            result = order_manager.create_order(
+
+                side="Buy",
+
+                qty=qty
+
+            )
+
+
+        elif signal == "SELL":
+
+
+            result = order_manager.create_order(
+
+                side="Sell",
+
+                qty=qty
+
+            )
+
+
+        else:
+
+            return
+
+
+
+
+        if result is None:
+
+            return
+
+
+
+        if result.get(
+            "retCode"
+        ) == 0:
+
+
+            print(
+                "[ORDER SUCCESS]"
+            )
+
+
+            bot_logger.info(
+                f"ORDER SUCCESS {signal}"
+            )
+
+
+            risk_manager.record_order()
+
+
+            position_manager.sync()
+
+
+
+        else:
+
+
+            print(
+                "[ORDER FAILED]",
+                result
+            )
+
+
+            bot_logger.warning(
+                str(result)
+            )
 
 
 
@@ -128,7 +211,7 @@ def handle_candle(
 
 
         print(
-            "[CANDLE ERROR]",
+            "[HANDLE CANDLE ERROR]",
             e
         )
 
@@ -140,39 +223,16 @@ def handle_candle(
 
 
 
+# ==========================================================
+# STRATEGY MONITOR LOOP
+# ==========================================================
 
-# =====================================================
-# POSITION MONITOR
-# =====================================================
-
-def position_loop():
-
-
-    while bot_guard.is_running():
+def strategy_loop():
 
 
-        try:
-
-            position_manager.sync()
-
-
-        except Exception as e:
-
-            error_logger.error(
-                str(e)
-            )
-
-
-        time.sleep(10)
-
-
-
-
-# =====================================================
-# RISK MONITOR
-# =====================================================
-
-def risk_loop():
+    print(
+        "[STRATEGY LOOP START]"
+    )
 
 
     while bot_guard.is_running():
@@ -185,7 +245,12 @@ def risk_loop():
 
 
                 print(
-                    "[RISK STOP]"
+                    "[BOT STOP] DAILY LOSS"
+                )
+
+
+                bot_logger.warning(
+                    "DAILY LOSS LIMIT"
                 )
 
 
@@ -196,34 +261,42 @@ def risk_loop():
 
 
 
+            time.sleep(5)
+
+
+
         except Exception as e:
 
 
-            error_logger.error(
+            print(
+                "[STRATEGY LOOP ERROR]",
+                e
+            )
+
+
+            error_logger.exception(
                 str(e)
             )
 
 
-
-        time.sleep(30)
-
+            time.sleep(5)
 
 
 
 
-# =====================================================
-# START
-# =====================================================
+# ==========================================================
+# START BOT
+# ==========================================================
 
 def start_bot():
 
 
-    print("====================================")
+    print("==============================")
     print("VWAP SUPERTREND BOT START")
     print("LIVE :", LIVE_TRADING)
     print("SYMBOL :", DEFAULT_SYMBOL)
     print("BASE :", BYBIT_BASE_URL)
-    print("====================================")
+    print("==============================")
 
 
 
@@ -233,31 +306,59 @@ def start_bot():
 
 
 
-    # watchdog
+    # -------------------------
+    # WATCHDOG
+    # -------------------------
 
     watchdog.start()
 
 
 
-    # wallet
+    # -------------------------
+    # ACCOUNT
+    # -------------------------
 
-    equity = wallet.get_equity()
+    try:
 
-
-    print(
-        "[ACCOUNT EQUITY]",
-        equity
-    )
+        equity = wallet.get_equity()
 
 
+        print(
+            "[ACCOUNT EQUITY]",
+            equity
+        )
 
-    # risk
+
+    except Exception as e:
+
+
+        print(
+            "[WALLET ERROR]",
+            e
+        )
+
+
+
+
+    # -------------------------
+    # RISK INIT
+    # -------------------------
 
     risk_manager.initialize()
 
 
 
-    # websocket callback
+    # -------------------------
+    # POSITION SYNC
+    # -------------------------
+
+    position_manager.sync()
+
+
+
+    # -------------------------
+    # PUBLIC WS CALLBACK
+    # -------------------------
 
     ws_client.set_callback(
         handle_candle
@@ -265,63 +366,72 @@ def start_bot():
 
 
 
-    # public websocket
+    # -------------------------
+    # PUBLIC WS
+    # -------------------------
 
-    threading.Thread(
+    public_thread = threading.Thread(
 
         target=ws_client.start,
 
         daemon=True
 
-    ).start()
+    )
+
+    public_thread.start()
 
 
 
-    # private websocket
 
-    threading.Thread(
+    # -------------------------
+    # PRIVATE WS
+    # -------------------------
+
+    private_thread = threading.Thread(
 
         target=private_ws_client.start,
 
         daemon=True
 
-    ).start()
+    )
+
+    private_thread.start()
 
 
 
-    # heartbeat
 
-    threading.Thread(
+    # -------------------------
+    # STRATEGY
+    # -------------------------
+
+    strategy_thread = threading.Thread(
+
+        target=strategy_loop,
+
+        daemon=True
+
+    )
+
+
+    strategy_thread.start()
+
+
+
+
+    # -------------------------
+    # HEARTBEAT
+    # -------------------------
+
+    heartbeat_thread = threading.Thread(
 
         target=heartbeat_loop,
 
         daemon=True
 
-    ).start()
+    )
 
 
-
-    # position
-
-    threading.Thread(
-
-        target=position_loop,
-
-        daemon=True
-
-    ).start()
-
-
-
-    # risk
-
-    threading.Thread(
-
-        target=risk_loop,
-
-        daemon=True
-
-    ).start()
+    heartbeat_thread.start()
 
 
 
@@ -337,10 +447,9 @@ def start_bot():
 
 
 
-
-# =====================================================
-# STOP
-# =====================================================
+# ==========================================================
+# STOP BOT
+# ==========================================================
 
 def stop_bot():
 
@@ -348,7 +457,6 @@ def stop_bot():
     print(
         "[BOT STOPPING]"
     )
-
 
 
     bot_logger.info(
@@ -365,9 +473,11 @@ def stop_bot():
 
         ws_client.stop()
 
-    except Exception:
+    except Exception as e:
 
-        pass
+        error_logger.exception(
+            str(e)
+        )
 
 
 
@@ -375,9 +485,11 @@ def stop_bot():
 
         private_ws_client.stop()
 
-    except Exception:
+    except Exception as e:
 
-        pass
+        error_logger.exception(
+            str(e)
+        )
 
 
 
@@ -385,9 +497,11 @@ def stop_bot():
 
         watchdog.stop()
 
-    except Exception:
+    except Exception as e:
 
-        pass
+        error_logger.exception(
+            str(e)
+        )
 
 
 
@@ -403,40 +517,9 @@ def stop_bot():
 
 
 
-
-# =====================================================
-# SIGNAL
-# =====================================================
-
-def shutdown_handler(
-    sig,
-    frame
-):
-
-    stop_bot()
-
-
-
-
-
-signal.signal(
-    signal.SIGINT,
-    shutdown_handler
-)
-
-
-signal.signal(
-    signal.SIGTERM,
-    shutdown_handler
-)
-
-
-
-
-
-# =====================================================
+# ==========================================================
 # MAIN
-# =====================================================
+# ==========================================================
 
 if __name__ == "__main__":
 
@@ -452,6 +535,13 @@ if __name__ == "__main__":
 
 
             time.sleep(1)
+
+
+
+    except KeyboardInterrupt:
+
+
+        stop_bot()
 
 
 
