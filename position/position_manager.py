@@ -1,16 +1,4 @@
-import time
-import hmac
-import hashlib
-import requests
-
-
-from config import (
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
-    BYBIT_BASE_URL,
-    DEFAULT_SYMBOL
-)
-
+from portfolio.bybit_wallet import wallet
 
 
 class PositionManager:
@@ -18,154 +6,77 @@ class PositionManager:
 
     def __init__(self):
 
-        self.base_url = BYBIT_BASE_URL
-        self.symbol = DEFAULT_SYMBOL
-
         self.position = None
 
 
-        print("==============================")
-        print("[POSITION MANAGER INIT]")
-        print("BASE :", self.base_url)
-        print("SYMBOL :", self.symbol)
-        print("==============================")
-
-
-
-    def _sign(self, query):
-
-        ts = str(
-            int(time.time()*1000)
-        )
-
-        recv = "5000"
-
-
-        origin = (
-            ts
-            +
-            BYBIT_API_KEY
-            +
-            recv
-            +
-            query
+        print(
+            "[POSITION MANAGER READY]"
         )
 
 
-        sign = hmac.new(
 
-            BYBIT_API_SECRET.encode(),
-
-            origin.encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-        return ts, recv, sign
-
-
-
-    def get_position(self):
-
-
-        endpoint = "/v5/position/list"
-
-
-        query = (
-            "category=linear"
-            +
-            "&symbol="
-            +
-            self.symbol
-        )
-
-
-        ts, recv, sign = self._sign(query)
-
-
-
-        headers = {
-
-            "X-BAPI-API-KEY":
-            BYBIT_API_KEY,
-
-            "X-BAPI-TIMESTAMP":
-            ts,
-
-            "X-BAPI-RECV-WINDOW":
-            recv,
-
-            "X-BAPI-SIGN":
-            sign
-
-        }
-
-
-
-        url = (
-            self.base_url
-            +
-            endpoint
-            +
-            "?"
-            +
-            query
-        )
-
+    def update(self):
 
         try:
 
+            data = wallet.get_position()
 
-            r = requests.get(
-
-                url,
-
-                headers=headers,
-
-                timeout=10
-
-            )
+            self.position = data
 
 
-            data = r.json()
-
-
-            print(
-                "[POSITION RESPONSE]",
-                data
-            )
-
-
-
-            if data.get("retCode") == 0:
-
-
-                self.position = (
-
-                    data["result"]
-                    ["list"]
-
-                )
-
-
-            return self.position
-
+            return data
 
 
         except Exception as e:
-
 
             print(
                 "[POSITION ERROR]",
                 e
             )
 
+            return None
+
+
+
+    def has_position(self):
+
+
+        if not self.position:
+
+            return False
+
+
+
+        try:
+
+            size = float(
+                self.position.get(
+                    "size",
+                    0
+                )
+            )
+
+
+            return size != 0
+
+
+        except:
+
+
+            return False
+
+
+
+    def side(self):
+
+        if not self.position:
 
             return None
 
 
+        return self.position.get(
+            "side"
+        )
 
 
 
