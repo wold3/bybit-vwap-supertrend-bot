@@ -1,23 +1,31 @@
-from indicators.vwap import VWAP
-from indicators.supertrend import SuperTrend
+import time
+
+
+
+from indicators.vwap import calculate_vwap
+
+from indicators.supertrend import supertrend
+
+
+
+
 
 
 class StrategyEngine:
 
 
+
     def __init__(self):
-
-
-        self.vwap = VWAP()
-
-
-        self.supertrend = SuperTrend()
 
 
         self.last_signal = None
 
 
-        self.last_candle_time = None
+        self.last_timestamp = None
+
+
+
+        self.ready = False
 
 
 
@@ -29,171 +37,289 @@ class StrategyEngine:
 
 
 
+
+
+
     # ==================================
-    # CANDLE PROCESS
+    # CANDLE INPUT
     # ==================================
 
 
-    def on_candle(self, candle):
+    def on_candle(
+            self,
+            candle
+    ):
 
 
-        timestamp = candle["timestamp"]
 
+        try:
 
 
-        # -------------------------------
-        # 같은 봉 중복 제거
-        # -------------------------------
 
-        if timestamp == self.last_candle_time:
+            timestamp = candle["timestamp"]
 
-            return None
 
 
+            close = float(
 
-        self.last_candle_time = timestamp
+                candle["close"]
 
+            )
 
 
 
+            high = float(
 
-        close = candle["close"]
+                candle["high"]
 
+            )
 
-        high = candle["high"]
 
+            low = float(
 
-        low = candle["low"]
+                candle["low"]
 
+            )
 
-        volume = candle["volume"]
 
+            volume = float(
 
+                candle["volume"]
 
+            )
 
-        # -------------------------------
-        # INDICATORS
-        # -------------------------------
 
 
-        vwap_value = self.vwap.update(
 
-            price=close,
 
-            volume=volume
 
-        )
 
 
+            # 중복 캔들 방지
 
-        trend = self.supertrend.update(
+            if timestamp == self.last_timestamp:
 
-            high,
 
-            low,
+                return None
 
-            close
 
-        )
 
 
+            self.last_timestamp = timestamp
 
 
 
-        print(
-            "[INDICATOR]",
-            "PRICE:",
-            close,
-            "VWAP:",
-            vwap_value,
-            "TREND:",
-            trend
-        )
 
 
 
 
 
+            # ==========================
+            # VWAP
+            # ==========================
 
-        # -------------------------------
-        # SIGNAL LOGIC
-        # -------------------------------
 
+            vwap = calculate_vwap(
 
-        signal = None
+                candle
 
+            )
 
 
 
-        # LONG
 
-        if (
 
-            close > vwap_value
 
-            and trend is True
 
-        ):
+            # ==========================
+            # SUPERTREND
+            # ==========================
 
 
-            signal = "BUY"
+            trend = supertrend.update(
 
 
+                high,
 
 
+                low,
 
-        # SHORT
 
-        elif (
+                close
 
-            close < vwap_value
 
-            and trend is False
 
-        ):
+            )
 
 
-            signal = "SELL"
 
 
 
 
-
-
-        # -------------------------------
-        # duplicate signal block
-        # -------------------------------
-
-
-        if signal == self.last_signal:
-
-
-            return None
-
-
-
-
-
-        if signal:
 
 
             print(
-                "[NEW SIGNAL]",
-                signal
+
+                "[INDICATOR]",
+
+                "PRICE:",
+
+                close,
+
+                "VWAP:",
+
+                vwap,
+
+                "TREND:",
+
+                trend
+
             )
+
+
+
+
+
+
+
+
+
+            signal = "HOLD"
+
+
+
+
+
+
+
+
+            # ==========================
+            # LONG CONDITION
+            # ==========================
+
+
+            if (
+
+
+                close > vwap
+
+                and
+
+                trend is True
+
+
+            ):
+
+
+
+                signal = "BUY"
+
+
+
+
+
+
+
+            # ==========================
+            # SHORT CONDITION
+            # ==========================
+
+
+            elif (
+
+
+                close < vwap
+
+                and
+
+                trend is False
+
+
+            ):
+
+
+
+                signal = "SELL"
+
+
+
+
+
+
+
+            else:
+
+
+                signal = "HOLD"
+
+
+
+
+
+
+
+
+            # 같은 신호 반복 방지
+
+            if signal == self.last_signal:
+
+
+                return None
+
+
+
 
 
             self.last_signal = signal
 
 
 
-            return signal
+
+
+            if signal != "HOLD":
+
+
+                print(
+
+                    "[TRADE SIGNAL]",
+
+                    signal
+
+                )
+
+
+                return signal
 
 
 
 
 
-        return None
+            return None
+
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[STRATEGY ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
+
+
+
+
+
 
 
 
