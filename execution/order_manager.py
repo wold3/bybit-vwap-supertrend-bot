@@ -8,7 +8,9 @@ from config import (
 )
 
 
-from api.bybit_client import bybit_client
+from api.bybit_client import (
+    bybit_client
+)
 
 
 
@@ -25,18 +27,42 @@ class OrderManager:
 
         self.last_order_time = 0
 
-        self.order_cooldown = 3
-
-
-        self.active_orders = {}
+        self.cooldown = 3
 
 
 
         print("==============================")
         print("[ORDER MANAGER INIT]")
-        print("LIVE :", self.live)
         print("SYMBOL :", self.symbol)
+        print("LIVE :", self.live)
         print("==============================")
+
+
+
+    # =====================================================
+    # PLACE ORDER
+    # =====================================================
+
+    def place_order(
+        self,
+        side,
+        qty,
+        take_profit=None,
+        stop_loss=None,
+    ):
+
+
+        return self.create_order(
+
+            side,
+
+            qty,
+
+            take_profit,
+
+            stop_loss
+
+        )
 
 
 
@@ -49,127 +75,42 @@ class OrderManager:
         side,
         qty,
         take_profit=None,
-        stop_loss=None
+        stop_loss=None,
     ):
 
-
-
-        print(
-            "[CREATE ORDER]",
-            side,
-            qty
-        )
-
-
-
-        # ---------------------------------
-        # PAPER MODE
-        # ---------------------------------
-
-        if not self.live:
-
-
-            print(
-                "[ORDER BLOCK]",
-                "LIVE_TRADING=False"
-            )
-
-
-            return {
-
-
-                "retCode":0,
-
-
-                "retMsg":
-
-                "PAPER MODE"
-
-
-
-            }
-
-
-
-
-        # ---------------------------------
-        # VALIDATE
-        # ---------------------------------
-
-        if side not in (
-
-            "Buy",
-
-            "Sell"
-
-        ):
-
-
-            print(
-                "[ORDER ERROR] INVALID SIDE"
-            )
-
-
-            return None
-
-
-
-
-        try:
-
-            qty = float(qty)
-
-
-        except:
-
-
-            print(
-                "[ORDER ERROR] INVALID QTY"
-            )
-
-            return None
-
-
-
-        if qty <= 0:
-
-
-            print(
-                "[ORDER ERROR] ZERO QTY"
-            )
-
-
-            return None
-
-
-
-
-
-        # ---------------------------------
-        # COOLDOWN
-        # ---------------------------------
 
         now = time.time()
 
 
-        if now - self.last_order_time < self.order_cooldown:
+        if (
+
+            now - self.last_order_time
+
+            <
+
+            self.cooldown
+
+        ):
 
 
             print(
                 "[ORDER BLOCK] COOLDOWN"
             )
 
-
             return None
 
 
 
+        if not self.live:
 
 
+            print(
+                "[ORDER BLOCK] LIVE_TRADING=False"
+            )
 
-        # ---------------------------------
-        # ORDER ID
-        # ---------------------------------
+            return None
+
+
 
         order_id = (
 
@@ -177,11 +118,9 @@ class OrderManager:
 
             +
 
-            uuid.uuid4().hex[:10]
+            uuid.uuid4().hex[:8]
 
         )
-
-
 
 
 
@@ -190,58 +129,43 @@ class OrderManager:
 
             "category":
 
-            "linear",
-
+                "linear",
 
 
             "symbol":
 
-            self.symbol,
-
+                self.symbol,
 
 
             "side":
 
-            side,
-
+                side,
 
 
             "positionIdx":
 
-            0,
-
+                0,
 
 
             "orderType":
 
-            "Market",
-
+                "Market",
 
 
             "qty":
 
-            str(qty),
-
+                str(qty),
 
 
             "orderLinkId":
 
-            order_id
-
-
+                order_id
 
         }
 
 
 
-
-
-        # ---------------------------------
-        # TP SL
-        # ---------------------------------
-
         if take_profit is not None:
-
 
             params["takeProfit"] = str(
                 take_profit
@@ -251,140 +175,70 @@ class OrderManager:
 
         if stop_loss is not None:
 
-
             params["stopLoss"] = str(
                 stop_loss
             )
 
 
 
-
-
         print("==============================")
-        print("[BYBIT ORDER REQUEST]")
+        print("[ORDER REQUEST]")
         print(params)
         print("==============================")
 
 
 
+        result = bybit_client.post(
 
+            "/v5/order/create",
 
-        try:
+            params
 
-
-
-            result = bybit_client.post(
-
-                "/v5/order/create",
-
-                params
-
-            )
+        )
 
 
 
-
-
-            print(
-                "[BYBIT ORDER RESPONSE]",
-                result
-            )
-
+        print(
+            "[ORDER RESULT]",
+            result
+        )
 
 
 
+        if result is None:
 
-            if result is None:
-
-
-                print(
-                    "[ORDER FAILED] NO RESPONSE"
-                )
-
-
-                return None
+            return None
 
 
 
-
-
-
-            if result.get(
-                "retCode"
-            ) != 0:
-
-
-
-                print(
-                    "[ORDER FAILED]",
-                    result.get("retCode"),
-                    result.get("retMsg")
-                )
-
-
-                return result
-
-
-
-
-
-            self.last_order_time = time.time()
-
-
-
-            self.active_orders[order_id] = {
-
-
-                "side":
-
-                side,
-
-
-                "qty":
-
-                qty,
-
-
-                "time":
-
-                time.time()
-
-
-
-            }
-
-
-
+        if result.get(
+            "retCode"
+        ) != 0:
 
 
             print(
-                "[ORDER SUCCESS]",
-                order_id
+                "[ORDER FAILED]",
+                result.get(
+                    "retMsg"
+                )
             )
-
 
 
             return result
 
 
 
+        self.last_order_time = time.time()
 
 
 
-        except Exception as e:
+        print(
+            "[ORDER SUCCESS]",
+            order_id
+        )
 
 
-
-            print(
-                "[ORDER EXCEPTION]",
-                e
-            )
-
-
-
-            return None
-
-
+        return result
 
 
 
@@ -397,7 +251,6 @@ class OrderManager:
         side,
         qty
     ):
-
 
 
         close_side = (
@@ -419,83 +272,49 @@ class OrderManager:
 
             "category":
 
-            "linear",
-
+                "linear",
 
 
             "symbol":
 
-            self.symbol,
-
+                self.symbol,
 
 
             "side":
 
-            close_side,
-
+                close_side,
 
 
             "positionIdx":
 
-            0,
-
+                0,
 
 
             "orderType":
 
-            "Market",
-
+                "Market",
 
 
             "qty":
 
-            str(qty),
-
+                str(qty),
 
 
             "reduceOnly":
 
-            True
-
-
+                True
 
         }
 
 
 
+        return bybit_client.post(
 
-        print(
-            "[CLOSE POSITION]",
+            "/v5/order/create",
+
             params
+
         )
-
-
-
-        try:
-
-
-            return bybit_client.post(
-
-                "/v5/order/create",
-
-                params
-
-            )
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[CLOSE ERROR]",
-                e
-            )
-
-
-            return None
-
-
 
 
 
@@ -511,80 +330,23 @@ class OrderManager:
 
             "category":
 
-            "linear",
-
-
-
-            "symbol":
-
-            self.symbol
-
-
-
-        }
-
-
-
-
-        try:
-
-
-            return bybit_client.post(
-
-                "/v5/order/cancel-all",
-
-                params
-
-            )
-
-
-        except Exception as e:
-
-
-            print(
-                "[CANCEL ERROR]",
-                e
-            )
-
-
-            return None
-
-
-
-
-
-    # =====================================================
-    # STATUS
-    # =====================================================
-
-    def status(self):
-
-
-        return {
+                "linear",
 
 
             "symbol":
 
-            self.symbol,
-
-
-            "live":
-
-            self.live,
-
-
-            "active_orders":
-
-            self.active_orders,
-
-
-            "last_order":
-
-            self.last_order_time
-
+                self.symbol
 
         }
 
+
+        return bybit_client.post(
+
+            "/v5/order/cancel-all",
+
+            params
+
+        )
 
 
 
