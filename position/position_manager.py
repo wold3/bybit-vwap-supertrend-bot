@@ -1,8 +1,15 @@
 import time
 
-from config import DEFAULT_SYMBOL
 
-from api.bybit_client import bybit_client
+from config import (
+    DEFAULT_SYMBOL,
+)
+
+
+from api.bybit_client import (
+    bybit_client,
+)
+
 
 
 
@@ -11,10 +18,14 @@ class PositionManager:
 
     def __init__(self):
 
+
         self.symbol = DEFAULT_SYMBOL
 
 
+
         self.current = {
+
+            "symbol": self.symbol,
 
             "side": None,
 
@@ -22,9 +33,10 @@ class PositionManager:
 
             "avg_price": 0,
 
-            "unrealised_pnl": 0
+            "unrealised_pnl": 0,
 
         }
+
 
 
         print("==============================")
@@ -34,11 +46,14 @@ class PositionManager:
 
 
 
-    # =====================================
-    # SYNC POSITION
-    # =====================================
+
+
+    # =====================================================
+    # SYNC
+    # =====================================================
 
     def sync(self):
+
 
         try:
 
@@ -55,6 +70,7 @@ class PositionManager:
 
 
 
+
             response = bybit_client.get(
 
                 "/v5/position/list",
@@ -65,68 +81,80 @@ class PositionManager:
 
 
 
+
+
             if not response:
+
 
                 return self.current
 
 
 
-            if response.get("retCode") != 0:
+
+
+
+            if response.get(
+                "retCode"
+            ) != 0:
+
+
 
                 print(
                     "[POSITION API ERROR]",
                     response
                 )
 
+
                 return self.current
 
 
 
-            positions = response.get(
 
-                "result",
 
-                {}
+            positions = (
 
-            ).get(
-
-                "list",
-
-                []
+                response
+                .get(
+                    "result",
+                    {}
+                )
+                .get(
+                    "list",
+                    []
+                )
 
             )
 
 
 
-            active_position = None
+
+
+
+            target = None
+
+
 
 
 
             for pos in positions:
 
 
-                size = float(
-
-                    pos.get(
-
-                        "size",
-
-                        0
-
-                    )
-
-                )
+                if pos.get(
+                    "symbol"
+                ) == self.symbol:
 
 
-                if size > 0:
-
-                    active_position = pos
+                    target = pos
 
                     break
 
 
 
-            if active_position is None:
+
+
+
+            if target is None:
+
 
                 self.clear()
 
@@ -135,13 +163,11 @@ class PositionManager:
 
 
 
-            pos = active_position
-
 
 
             size = float(
 
-                pos.get(
+                target.get(
 
                     "size",
 
@@ -153,12 +179,33 @@ class PositionManager:
 
 
 
+
+
+
+            if size <= 0:
+
+
+                self.clear()
+
+                return self.current
+
+
+
+
+
+
             self.current = {
+
+
+                "symbol":
+
+                    self.symbol,
+
 
 
                 "side":
 
-                    pos.get(
+                    target.get(
                         "side"
                     ),
 
@@ -174,7 +221,7 @@ class PositionManager:
 
                     float(
 
-                        pos.get(
+                        target.get(
 
                             "avgPrice",
 
@@ -190,7 +237,7 @@ class PositionManager:
 
                     float(
 
-                        pos.get(
+                        target.get(
 
                             "unrealisedPnl",
 
@@ -204,6 +251,8 @@ class PositionManager:
 
 
 
+
+
             print(
 
                 "[POSITION UPDATE]",
@@ -213,7 +262,13 @@ class PositionManager:
             )
 
 
+
+
+
             return self.current
+
+
+
 
 
 
@@ -233,64 +288,118 @@ class PositionManager:
 
 
 
-    # =====================================
+
+
+
+
+    # =====================================================
     # CLEAR
-    # =====================================
+    # =====================================================
 
     def clear(self):
 
 
         self.current = {
 
-            "side": None,
 
-            "size": 0,
+            "symbol":
 
-            "avg_price": 0,
+                self.symbol,
 
-            "unrealised_pnl": 0
+
+            "side":
+
+                None,
+
+
+            "size":
+
+                0,
+
+
+            "avg_price":
+
+                0,
+
+
+            "unrealised_pnl":
+
+                0
 
         }
 
 
 
-    # =====================================
-    # GETTERS
-    # =====================================
+
+
+
+
+    # =====================================================
+    # STATUS
+    # =====================================================
 
     def has_position(self):
 
-        return self.current["size"] > 0
+
+        return (
+
+            self.current["size"]
+
+            >
+
+            0
+
+        )
+
+
+
 
 
 
     def get_side(self):
 
+
         return self.current["side"]
+
+
+
 
 
 
     def get_size(self):
 
+
         return self.current["size"]
+
+
+
 
 
 
     def get_avg_price(self):
 
+
         return self.current["avg_price"]
+
+
+
 
 
 
     def get_pnl(self):
 
+
         return self.current["unrealised_pnl"]
 
 
 
-    # =====================================
+
+
+
+
+    # =====================================================
     # MONITOR
-    # =====================================
+    # =====================================================
 
     def monitor(self):
 
@@ -300,13 +409,27 @@ class PositionManager:
         )
 
 
+
         while True:
 
 
-            self.sync()
+            try:
+
+                self.sync()
+
+
+            except Exception as e:
+
+                print(
+                    "[POSITION MONITOR ERROR]",
+                    e
+                )
+
 
 
             time.sleep(5)
+
+
 
 
 
