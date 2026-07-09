@@ -1,6 +1,6 @@
+import collections
 import math
-import time
-from collections import deque
+
 
 
 class IndicatorEngine:
@@ -8,57 +8,58 @@ class IndicatorEngine:
 
     def __init__(self):
 
-        self.max_length = 200
 
-        self.candles = deque(
-            maxlen=self.max_length
+        self.max_history = 200
+
+
+        self.candles = collections.deque(
+            maxlen=self.max_history
         )
 
-        self.last_timestamp = None
-
-        # VWAP
-        self.cumulative_volume = 0
-        self.cumulative_price_volume = 0
 
         self.vwap = None
 
+        self.supertrend = None
 
-        # Supertrend
+
+        self.last_close = None
+
+
+
+        # Supertrend 설정
+
         self.atr_period = 10
-        self.supertrend_multiplier = 3
 
-        self.atr_values = deque(
-            maxlen=self.atr_period
+        self.multiplier = 3
+
+
+
+        print(
+            "[INDICATOR ENGINE READY]"
         )
 
-        self.supertrend = None
-        self.trend = None
-
-
-        print("[INDICATOR ENGINE READY]")
-
 
 
     # =====================================================
-    # UPDATE
+    # UPDATE CANDLE
     # =====================================================
 
-    def update(self, candle):
+    def update(
+        self,
+        candle
+    ):
 
 
         try:
 
-            timestamp = int(
-                candle["timestamp"]
-            )
 
+            if not candle.get(
+                "confirm",
+                False
+            ):
 
-            if timestamp == self.last_timestamp:
+                return None
 
-                return
-
-
-            self.last_timestamp = timestamp
 
 
             self.candles.append(
@@ -66,13 +67,32 @@ class IndicatorEngine:
             )
 
 
-            self.update_vwap()
 
-            self.update_supertrend()
+            if len(self.candles) < self.atr_period + 2:
+
+                return None
+
+
+
+            self.calculate_vwap()
+
+
+            self.calculate_supertrend()
+
+
+
+            self.last_close = float(
+                candle["close"]
+            )
+
+
+
+            return True
 
 
 
         except Exception as e:
+
 
             print(
                 "[INDICATOR UPDATE ERROR]",
@@ -80,102 +100,93 @@ class IndicatorEngine:
             )
 
 
+            return None
+
+
+
+
 
     # =====================================================
     # VWAP
     # =====================================================
 
-    def update_vwap(self):
+    def calculate_vwap(self):
 
 
-        if len(self.candles) == 0:
-
-            return
+        try:
 
 
-        candle = self.candles[-1]
+            total_volume = 0
 
-
-        price = (
-
-            candle["high"]
-
-            +
-
-            candle["low"]
-
-            +
-
-            candle["close"]
-
-        ) / 3
-
-
-        volume = candle["volume"]
+            total_price_volume = 0
 
 
 
-        self.cumulative_price_volume += (
-            price * volume
-        )
-
-        self.cumulative_volume += volume
+            for c in self.candles:
 
 
+                high = float(
+                    c["high"]
+                )
 
-        if self.cumulative_volume > 0:
 
-            self.vwap = (
+                low = float(
+                    c["low"]
+                )
 
-                self.cumulative_price_volume
 
-                /
+                close = float(
+                    c["close"]
+                )
 
-                self.cumulative_volume
 
+                volume = float(
+                    c["volume"]
+                )
+
+
+                typical_price = (
+                    high
+                    +
+                    low
+                    +
+                    close
+                ) / 3
+
+
+
+                total_price_volume += (
+                    typical_price
+                    *
+                    volume
+                )
+
+
+                total_volume += volume
+
+
+
+            if total_volume > 0:
+
+
+                self.vwap = (
+                    total_price_volume
+                    /
+                    total_volume
+                )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[VWAP ERROR]",
+                e
             )
 
 
 
-    # =====================================================
-    # TRUE RANGE
-    # =====================================================
-
-    def true_range(self):
-
-
-        if len(self.candles) < 2:
-
-            return None
-
-
-
-        current = self.candles[-1]
-
-        previous = self.candles[-2]
-
-
-
-        high = current["high"]
-
-        low = current["low"]
-
-        prev_close = previous["close"]
-
-
-
-        tr = max(
-
-            high - low,
-
-            abs(high - prev_close),
-
-            abs(low - prev_close)
-
-        )
-
-
-        return tr
 
 
 
@@ -186,34 +197,81 @@ class IndicatorEngine:
     def calculate_atr(self):
 
 
-        tr = self.true_range()
+        trs = []
 
 
-        if tr is None:
+
+        candles = list(
+            self.candles
+        )
+
+
+
+        for i in range(
+            1,
+            len(candles)
+        ):
+
+
+            current = candles[i]
+
+            previous = candles[i-1]
+
+
+
+            high = float(
+                current["high"]
+            )
+
+            low = float(
+                current["low"]
+            )
+
+            prev_close = float(
+                previous["close"]
+            )
+
+
+
+            tr = max(
+
+                high - low,
+
+                abs(
+                    high - prev_close
+                ),
+
+                abs(
+                    low - prev_close
+                )
+
+            )
+
+
+            trs.append(
+                tr
+            )
+
+
+
+        if len(trs) < self.atr_period:
+
 
             return None
 
 
-        self.atr_values.append(
-            tr
-        )
 
-
-        if len(self.atr_values) < self.atr_period:
-
-            return None
+        recent = trs[
+            -self.atr_period:
+        ]
 
 
 
-        return (
+        return sum(recent) / self.atr_period
 
-            sum(self.atr_values)
 
-            /
 
-            len(self.atr_values)
 
-        )
 
 
 
@@ -221,87 +279,107 @@ class IndicatorEngine:
     # SUPERTREND
     # =====================================================
 
-    def update_supertrend(self):
+    def calculate_supertrend(self):
 
 
-        atr = self.calculate_atr()
+        try:
 
 
-        if atr is None:
-
-            return
-
-
-
-        candle = self.candles[-1]
-
-
-        hl2 = (
-
-            candle["high"]
-
-            +
-
-            candle["low"]
-
-        ) / 2
+            atr = self.calculate_atr()
 
 
 
-        upper_band = (
+            if atr is None:
 
-            hl2
-
-            +
-
-            self.supertrend_multiplier * atr
-
-        )
-
-
-        lower_band = (
-
-            hl2
-
-            -
-
-            self.supertrend_multiplier * atr
-
-        )
+                return None
 
 
 
-        close = candle["close"]
+
+            candle = self.candles[-1]
 
 
 
-        if self.trend is None:
-
-            self.trend = "UP"
-
-
-
-        if close > upper_band:
-
-            self.trend = "UP"
-
-            self.supertrend = lower_band
+            high = float(
+                candle["high"]
+            )
 
 
+            low = float(
+                candle["low"]
+            )
 
-        elif close < lower_band:
 
-            self.trend = "DOWN"
-
-            self.supertrend = upper_band
+            close = float(
+                candle["close"]
+            )
 
 
 
-        else:
+            middle = (
+                high
+                +
+                low
+            ) / 2
 
-            if self.supertrend is None:
 
-                self.supertrend = hl2
+
+
+            upper = (
+                middle
+                +
+                self.multiplier
+                *
+                atr
+            )
+
+
+
+            lower = (
+                middle
+                -
+                self.multiplier
+                *
+                atr
+            )
+
+
+
+            if close > upper:
+
+
+                self.supertrend = "UP"
+
+
+
+            elif close < lower:
+
+
+                self.supertrend = "DOWN"
+
+
+
+            else:
+
+
+                if self.supertrend is None:
+
+                    self.supertrend = "UP"
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[SUPERTREND ERROR]",
+                e
+            )
+
+
+
+
 
 
 
@@ -320,7 +398,8 @@ class IndicatorEngine:
             return None
 
 
-        if self.trend is None:
+
+        if self.supertrend is None:
 
             return None
 
@@ -329,76 +408,40 @@ class IndicatorEngine:
         return {
 
 
-            "timestamp":
-
-                candle.get("timestamp")
-                if candle
-                else None,
-
-
-            "close":
-
-                candle.get("close")
-                if candle
-                else None,
-
-
             "vwap":
 
-                self.vwap,
+                round(
+                    self.vwap,
+                    4
+                ),
+
 
 
             "supertrend":
 
-                self.trend,
-
-
-            "supertrend_value":
-
                 self.supertrend,
 
 
-            "candle_count":
 
-                len(self.candles)
+            "close":
+
+                float(
+                    candle["close"]
+                )
+                if candle
+                else self.last_close,
+
+
+
+            "count":
+
+                len(
+                    self.candles
+                )
 
         }
 
 
-
-    # =====================================================
-    # RESET
-    # =====================================================
-
-    def reset(self):
-
-
-        self.candles.clear()
-
-
-        self.last_timestamp = None
-
-
-        self.cumulative_volume = 0
-
-        self.cumulative_price_volume = 0
-
-
-        self.vwap = None
-
-
-        self.atr_values.clear()
-
-
-        self.supertrend = None
-
-        self.trend = None
-
-
-
-        print(
-            "[INDICATOR RESET]"
-        )
 
 
 
