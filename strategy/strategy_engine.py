@@ -1,4 +1,21 @@
-from indicators.indicator_engine import indicator_engine
+import time
+
+
+from indicators.indicator_engine import (
+    indicator_engine
+)
+
+
+from position.position_manager import (
+    position_manager
+)
+
+
+from config import (
+    DEFAULT_SYMBOL
+)
+
+
 
 
 class StrategyEngine:
@@ -6,9 +23,16 @@ class StrategyEngine:
 
     def __init__(self):
 
+
+        self.symbol = DEFAULT_SYMBOL
+
+
         self.last_signal = None
 
         self.last_timestamp = None
+
+
+        self.min_vwap_distance = 0.0015
 
 
         print(
@@ -17,9 +41,10 @@ class StrategyEngine:
 
 
 
-    # ==================================
-    # CANDLE
-    # ==================================
+
+    # =====================================================
+    # CANDLE PROCESS
+    # =====================================================
 
     def on_candle(
         self,
@@ -30,7 +55,8 @@ class StrategyEngine:
         try:
 
 
-            # 완성 캔들만 처리
+
+            # 완성봉만 처리
 
             if not candle.get(
                 "confirm",
@@ -41,16 +67,13 @@ class StrategyEngine:
 
 
 
+
+
             timestamp = int(
-                candle.get(
-                    "timestamp",
-                    0
-                )
+                candle["timestamp"]
             )
 
 
-
-            # 동일 캔들 중복 방지
 
             if timestamp == self.last_timestamp:
 
@@ -62,9 +85,10 @@ class StrategyEngine:
 
 
 
-            # ==================================
-            # INDICATOR UPDATE
-            # ==================================
+
+
+            # indicator update
+
 
             indicator_engine.update(
                 candle
@@ -72,8 +96,10 @@ class StrategyEngine:
 
 
 
-            market = indicator_engine.get_market_data(
-                candle
+            market = (
+                indicator_engine.get_market_data(
+                    candle
+                )
             )
 
 
@@ -84,39 +110,96 @@ class StrategyEngine:
 
 
 
+
+
             close = float(
                 candle["close"]
             )
 
 
-            vwap = market.get(
-                "vwap"
-            )
+            vwap = market["vwap"]
 
 
-            trend = market.get(
-                "supertrend"
-            )
+            trend = market["supertrend"]
 
 
-
-            if vwap is None:
-
-                return None
-
-
-            if trend is None:
-
-                return None
 
 
 
             print(
                 "[INDICATOR]",
-                f"PRICE={close}",
-                f"VWAP={vwap}",
-                f"TREND={trend}"
+                "PRICE=",
+                close,
+                "VWAP=",
+                vwap,
+                "TREND=",
+                trend
             )
+
+
+
+
+
+            # =================================================
+            # POSITION CHECK
+            # =================================================
+
+
+            try:
+
+
+                position_manager.sync()
+
+
+
+                if position_manager.has_position():
+
+                    print(
+                        "[STRATEGY BLOCK] POSITION EXISTS"
+                    )
+
+
+                    return None
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[POSITION CHECK ERROR]",
+                    e
+                )
+
+
+
+
+
+
+            # =================================================
+            # VWAP DISTANCE FILTER
+            # =================================================
+
+
+            distance = abs(
+                close - vwap
+            ) / vwap
+
+
+
+            if distance < self.min_vwap_distance:
+
+
+                print(
+                    "[STRATEGY BLOCK] VWAP TOO CLOSE",
+                    distance
+                )
+
+
+                return None
+
+
+
 
 
 
@@ -124,50 +207,83 @@ class StrategyEngine:
 
 
 
-            # ==================================
-            # STRATEGY RULE
-            # ==================================
 
-            if close > vwap and trend == "UP":
+
+            # =================================================
+            # ENTRY RULE
+            # =================================================
+
+
+            if (
+
+                close > vwap
+
+                and
+
+                trend == "UP"
+
+            ):
+
 
                 signal = "BUY"
 
 
 
-            elif close < vwap and trend == "DOWN":
+
+
+            elif (
+
+                close < vwap
+
+                and
+
+                trend == "DOWN"
+
+            ):
+
 
                 signal = "SELL"
 
 
 
-            else:
 
-                signal = None
+
 
 
 
             if signal is None:
 
+
                 return None
 
 
 
-            # ==================================
-            # DUPLICATE SIGNAL FILTER
-            # ==================================
+
+
+
+            # =================================================
+            # DUPLICATE SIGNAL
+            # =================================================
+
 
             if signal == self.last_signal:
 
+
                 print(
-                    "[SIGNAL SKIP]",
+                    "[SIGNAL BLOCK] DUPLICATE",
                     signal
                 )
 
+
                 return None
+
+
 
 
 
             self.last_signal = signal
+
+
 
 
 
@@ -178,8 +294,9 @@ class StrategyEngine:
 
 
 
-            # main.py에서 실행 처리
             return signal
+
+
 
 
 
@@ -193,6 +310,8 @@ class StrategyEngine:
 
 
             return None
+
+
 
 
 
