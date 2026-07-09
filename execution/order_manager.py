@@ -1,14 +1,14 @@
 import time
 import hmac
 import hashlib
-import requests
 import json
+import requests
 
 
 from config import (
-    BYBIT_BASE_URL,
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
+    BYBIT_BASE_URL,
     DEFAULT_SYMBOL,
     LIVE_TRADING
 )
@@ -21,15 +21,8 @@ class OrderManager:
     def __init__(self):
 
         self.base_url = BYBIT_BASE_URL
-
-        self.api_key = BYBIT_API_KEY
-
-        self.api_secret = BYBIT_API_SECRET
-
         self.symbol = DEFAULT_SYMBOL
-
         self.live = LIVE_TRADING
-
 
 
         print("==============================")
@@ -45,65 +38,38 @@ class OrderManager:
     # SIGN
     # ==================================
 
-    def sign(
+    def _sign(
         self,
-        params
+        payload
     ):
 
-
         timestamp = str(
-            int(time.time()*1000)
+            int(time.time() * 1000)
         )
-
 
         recv_window = "5000"
 
 
-
-        query = "&".join(
-
-            [
-
-                f"{k}={params[k]}"
-
-                for k in sorted(params)
-
-            ]
-
-        )
-
-
-
         origin = (
-
             timestamp
-
             +
-
-            self.api_key
-
+            BYBIT_API_KEY
             +
-
             recv_window
-
             +
-
-            query
-
+            payload
         )
-
 
 
         signature = hmac.new(
 
-            self.api_secret.encode(),
+            BYBIT_API_SECRET.encode(),
 
             origin.encode(),
 
             hashlib.sha256
 
         ).hexdigest()
-
 
 
         return (
@@ -114,74 +80,50 @@ class OrderManager:
 
 
 
-
     # ==================================
-    # PLACE ORDER
+    # ORDER CREATE
     # ==================================
 
-    def place_order(
+    def create_order(
         self,
-        side,
-        qty
+        side="Buy",
+        qty="0.001",
+        order_type="Market"
     ):
 
 
-        if not self.live:
-
-
-            print(
-                "[ORDER BLOCKED] LIVE_TRADING=False"
-            )
-
-
-            return None
-
-
-
-
-        endpoint = (
-            "/v5/order/create"
-        )
-
+        endpoint = "/v5/order/create"
 
 
         body = {
 
+            "category": "linear",
 
-            "category":
-                "linear",
+            "symbol": self.symbol,
 
+            "side": side,
 
-            "symbol":
-                self.symbol,
+            "positionIdx": 0,
 
+            "orderType": order_type,
 
-            "side":
-                side,
-
-
-            "orderType":
-                "Market",
-
-
-            "qty":
-                str(qty),
-
-
-            "timeInForce":
-                "IOC"
+            "qty": str(qty)
 
         }
 
 
-
-
-        timestamp, recv_window, sign = (
-
-            self.sign(body)
-
+        payload = json.dumps(
+            body,
+            separators=(
+                ",",
+                ":"
+            )
         )
 
+
+        ts, recv, sign = self._sign(
+            payload
+        )
 
 
         headers = {
@@ -189,138 +131,86 @@ class OrderManager:
 
             "X-BAPI-API-KEY":
 
-                self.api_key,
-
-
-            "X-BAPI-SIGN":
-
-                sign,
+            BYBIT_API_KEY,
 
 
             "X-BAPI-TIMESTAMP":
 
-                timestamp,
+            ts,
 
 
             "X-BAPI-RECV-WINDOW":
 
-                recv_window,
+            recv,
+
+
+            "X-BAPI-SIGN":
+
+            sign,
 
 
             "Content-Type":
 
-                "application/json"
+            "application/json"
 
         }
 
 
 
         url = (
-
             self.base_url
-
             +
-
             endpoint
+        )
+
+
+
+        print("==============================")
+        print("[ORDER REQUEST]")
+        print(url)
+        print(body)
+        print("==============================")
+
+
+
+        if not self.live:
+
+
+            print(
+                "[DEMO ORDER MODE]"
+            )
+
+
+
+        response = requests.post(
+
+            url,
+
+            headers=headers,
+
+            data=payload,
+
+            timeout=10
 
         )
 
+
+        result = response.json()
 
 
         print(
-            "[ORDER REQUEST]",
-            body
+            "[ORDER RESPONSE]",
+            result
         )
 
 
 
-        try:
-
-
-            r = requests.post(
-
-                url,
-
-                headers=headers,
-
-                json=body,
-
-                timeout=10
-
-            )
-
-
-
-            data = r.json()
-
-
-
-            print(
-                "[ORDER RESPONSE]",
-                data
-            )
-
-
-
-            return data
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[ORDER ERROR]",
-                e
-            )
-
-
-            return None
+        return result
 
 
 
 
-    # ==================================
-    # STRATEGY CONNECT
-    # ==================================
 
-    def execute(
-        self,
-        signal
-    ):
-
-
-
-        if signal == "BUY":
-
-
-            return self.place_order(
-
-                "Buy",
-
-                0.001
-
-            )
-
-
-
-        elif signal == "SELL":
-
-
-            return self.place_order(
-
-                "Sell",
-
-                0.001
-
-            )
-
-
-
-        return None
-
-
-
-
+# singleton
 
 order_manager = OrderManager()
