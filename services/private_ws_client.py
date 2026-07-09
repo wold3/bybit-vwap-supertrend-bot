@@ -1,5 +1,5 @@
-import json
 import time
+import json
 import hmac
 import hashlib
 import threading
@@ -9,124 +9,97 @@ import websocket
 from config import (
     BYBIT_PRIVATE_WS,
     BYBIT_API_KEY,
-    BYBIT_API_SECRET
+    BYBIT_API_SECRET,
+    DEFAULT_SYMBOL
 )
+
+
+from position.position_manager import position_manager
+
+
 
 
 
 class PrivateWSClient:
 
 
+
     def __init__(self):
+
 
         self.url = BYBIT_PRIVATE_WS
 
+        self.api_key = BYBIT_API_KEY
+
+        self.api_secret = BYBIT_API_SECRET
+
+
         self.ws = None
 
-        self.running = False
 
-        self.thread = None
+        self.running = True
+
+
+        self.authenticated = False
+
+
+
 
 
         print("==============================")
         print("[PRIVATE WS CLIENT INIT]")
         print("URL :", self.url)
-        print("KEY :", BYBIT_API_KEY[:6])
+        print("KEY :", self.api_key[:6])
         print("==============================")
 
 
 
-    # ==================================
+
+
+
+
+    # ==============================
     # SIGN
-    # ==================================
-
-    def _auth_sign(self):
-
-        expires = int(
-            (time.time()+10)*1000
-        )
+    # ==============================
 
 
-        origin = (
+    def sign(self, expires):
+
+
+        payload = (
             "GET/realtime"
             +
             str(expires)
         )
 
 
-        sign = hmac.new(
+        return hmac.new(
 
-            BYBIT_API_SECRET.encode(),
+            bytes(
+                self.api_secret,
+                "utf-8"
+            ),
 
-            origin.encode(),
+            payload.encode(
+                "utf-8"
+            ),
 
             hashlib.sha256
 
         ).hexdigest()
 
 
-        return expires, sign
 
 
 
-    # ==================================
-    # START
-    # ==================================
-
-    def start(self):
-
-        if self.running:
-            return
 
 
-        self.running = True
-
-
-        self.thread = threading.Thread(
-
-            target=self._run,
-
-            daemon=True
-
-        )
-
-
-        self.thread.start()
-
-
-
-    def _run(self):
-
-
-        print(
-            "[PRIVATE WS START]"
-        )
-
-
-        self.ws = websocket.WebSocketApp(
-
-            self.url,
-
-            on_open=self._on_open,
-
-            on_message=self._on_message,
-
-            on_error=self._on_error,
-
-            on_close=self._on_close
-
-        )
-
-
-        self.ws.run_forever()
-
-
-
-    # ==================================
+    # ==============================
     # OPEN
-    # ==================================
+    # ==============================
 
-    def _on_open(self, ws):
+
+    def on_open(self, ws):
 
 
         print(
@@ -134,41 +107,70 @@ class PrivateWSClient:
         )
 
 
-        expires, sign = self._auth_sign()
+
+        expires = int(
+
+            time.time()*1000
+
+        ) + 10000
+
+
+
+
+
+
+        signature = self.sign(
+            expires
+        )
 
 
 
         auth = {
 
-            "op":"auth",
+            "op":
 
-            "args":[
+            "auth",
 
-                BYBIT_API_KEY,
+
+            "args":
+
+            [
+
+                self.api_key,
 
                 expires,
 
-                sign
+                signature
 
             ]
 
         }
 
 
+
         ws.send(
+
             json.dumps(auth)
+
         )
 
 
 
-    # ==================================
-    # MESSAGE
-    # ==================================
 
-    def _on_message(
-        self,
-        ws,
-        message
+
+
+
+
+
+    # ==============================
+    # MESSAGE
+    # ==============================
+
+
+    def on_message(
+            self,
+            ws,
+            message
     ):
 
 
@@ -181,14 +183,32 @@ class PrivateWSClient:
 
 
 
+            print(
+                "[PRIVATE DATA]",
+                data.get("topic")
+            )
+
+
+
+
+
+
+
+            # AUTH
+
             if data.get("op") == "auth":
 
 
                 if data.get("success"):
 
+
+                    self.authenticated = True
+
+
                     print(
                         "[PRIVATE AUTH SUCCESS]"
                     )
+
 
 
                     self.subscribe(ws)
@@ -200,57 +220,58 @@ class PrivateWSClient:
 
 
 
+
+
+
             topic = data.get(
-                "topic"
+                "topic",
+                ""
             )
 
 
-            if topic:
+
+
+
+
+            # ORDER UPDATE
+
+
+            if topic.startswith(
+                "order"
+            ):
 
 
                 print(
-                    "[PRIVATE EVENT]",
-                    topic
+                    "[ORDER UPDATE]",
+                    data
                 )
 
 
-                if topic == "order":
 
-
-                    print(
-                        "[ORDER EVENT]",
-                        data["data"]
-                    )
+                position_manager.sync()
 
 
 
-                elif topic == "execution":
-
-
-                    print(
-                        "[EXECUTION EVENT]",
-                        data["data"]
-                    )
 
 
 
-                elif topic == "position":
+            # POSITION UPDATE
 
 
-                    print(
-                        "[POSITION EVENT]",
-                        data["data"]
-                    )
+            if topic.startswith(
+                "position"
+            ):
+
+
+                print(
+                    "[POSITION UPDATE]"
+                )
 
 
 
-                elif topic == "wallet":
+                position_manager.sync()
 
 
-                    print(
-                        "[WALLET EVENT]",
-                        data["data"]
-                    )
 
 
 
@@ -258,7 +279,7 @@ class PrivateWSClient:
 
 
             print(
-                "[PRIVATE PARSE ERROR]",
+                "[PRIVATE MESSAGE ERROR]",
                 e
             )
 
@@ -266,14 +287,32 @@ class PrivateWSClient:
 
 
 
-    # ==================================
+
+
+    # ==============================
     # SUBSCRIBE
-    # ==================================
-
-    def subscribe(self, ws):
+    # ==============================
 
 
-        payload = {
+    def subscribe(
+            self,
+            ws
+    ):
+
+
+        args = [
+
+
+            "order",
+
+
+            "position"
+
+        ]
+
+
+
+        msg = {
 
 
             "op":
@@ -283,26 +322,18 @@ class PrivateWSClient:
 
             "args":
 
-            [
-
-                "order",
-
-                "execution",
-
-                "position",
-
-                "wallet"
-
-            ]
+            args
 
         }
 
 
+
         ws.send(
 
-            json.dumps(payload)
+            json.dumps(msg)
 
         )
+
 
 
         print(
@@ -313,15 +344,42 @@ class PrivateWSClient:
 
 
 
-    # ==================================
-    # ERROR
-    # ==================================
 
-    def _on_error(
-        self,
-        ws,
-        error
+
+    # ==============================
+    # CLOSE
+    # ==============================
+
+
+    def on_close(
+            self,
+            ws,
+            code,
+            msg
     ):
+
+
+        print(
+            "[PRIVATE WS CLOSED]",
+            code,
+            msg
+        )
+
+
+        self.authenticated = False
+
+
+
+
+
+
+
+    def on_error(
+            self,
+            ws,
+            error
+    ):
+
 
         print(
             "[PRIVATE WS ERROR]",
@@ -332,33 +390,72 @@ class PrivateWSClient:
 
 
 
-    # ==================================
-    # CLOSE
-    # ==================================
 
-    def _on_close(
-        self,
-        ws,
-        code,
-        msg
-    ):
+
+    # ==============================
+    # START
+    # ==============================
+
+
+    def start(self):
 
 
         print(
-            "[PRIVATE WS CLOSED]"
+            "[PRIVATE WS START]"
         )
 
 
 
+        while self.running:
 
 
-    # ==================================
-    # STOP
-    # ==================================
+
+            try:
+
+
+                self.ws = websocket.WebSocketApp(
+
+                    self.url,
+
+                    on_open=self.on_open,
+
+                    on_message=self.on_message,
+
+                    on_close=self.on_close,
+
+                    on_error=self.on_error
+
+                )
+
+
+
+                self.ws.run_forever()
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[PRIVATE RECONNECT ERROR]",
+                    e
+                )
+
+
+
+            time.sleep(5)
+
+
+
+
+
+
 
     def stop(self):
 
+
         self.running = False
+
 
 
         try:
@@ -366,7 +463,6 @@ class PrivateWSClient:
             if self.ws:
 
                 self.ws.close()
-
 
         except:
 
@@ -377,6 +473,8 @@ class PrivateWSClient:
         print(
             "[PRIVATE WS CLIENT STOPPED]"
         )
+
+
 
 
 
