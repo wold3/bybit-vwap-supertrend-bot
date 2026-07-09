@@ -1,34 +1,190 @@
-import numpy as np
+from collections import deque
 
 
-# =================================================
-# VWAP 계산
-# =================================================
-def calculate_vwap(prices, volumes):
-
-    prices = np.array(prices)
-    volumes = np.array(volumes)
-
-    return np.sum(prices * volumes) / np.sum(volumes)
 
 
-# =================================================
-# SUPER TREND (단순 버전)
-# =================================================
-def supertrend(prices, period=10):
 
-    prices = np.array(prices)
+class VWAP:
 
-    atr = np.mean(np.abs(np.diff(prices)))
 
-    hl2 = (prices[-1] + prices[-2]) / 2
 
-    upper = hl2 + atr
-    lower = hl2 - atr
+    def __init__(self, max_length=500):
 
-    if prices[-1] > upper:
-        return "UP"
-    elif prices[-1] < lower:
-        return "DOWN"
-    else:
-        return "FLAT"
+
+        self.prices = deque(
+
+            maxlen=max_length
+
+        )
+
+
+        self.volumes = deque(
+
+            maxlen=max_length
+
+        )
+
+
+
+        self.vwap = 0
+
+
+
+        print(
+            "[VWAP INIT]"
+        )
+
+
+
+
+
+
+
+    # =============================
+    # UPDATE
+    # =============================
+
+
+    def update(
+            self,
+            price,
+            volume
+    ):
+
+
+        try:
+
+
+            price = float(price)
+
+            volume = float(volume)
+
+
+
+
+
+            self.prices.append(
+                price
+            )
+
+
+            self.volumes.append(
+                volume
+            )
+
+
+
+
+
+            total_volume = sum(
+
+                self.volumes
+
+            )
+
+
+
+
+
+            if total_volume <= 0:
+
+
+                return price
+
+
+
+
+
+
+            total_value = sum(
+
+                p * v
+
+                for p, v
+
+                in zip(
+
+                    self.prices,
+
+                    self.volumes
+
+                )
+
+            )
+
+
+
+
+
+
+            self.vwap = (
+
+                total_value
+
+                /
+
+                total_volume
+
+            )
+
+
+
+            return self.vwap
+
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[VWAP ERROR]",
+                e
+            )
+
+
+            return 0
+
+
+
+
+
+
+
+    def value(self):
+
+
+        return self.vwap
+
+
+
+
+
+
+
+
+vwap = VWAP()
+
+
+
+
+
+
+
+# =================================
+# Strategy 호환 함수
+# =================================
+
+
+def calculate_vwap(candle):
+
+
+    return vwap.update(
+
+        candle["close"],
+
+        candle["volume"]
+
+    )
