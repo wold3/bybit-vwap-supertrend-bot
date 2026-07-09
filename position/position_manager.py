@@ -1,327 +1,172 @@
-import threading
+import time
+import hmac
+import hashlib
+import requests
+
+
+from config import (
+    BYBIT_API_KEY,
+    BYBIT_API_SECRET,
+    BYBIT_BASE_URL,
+    DEFAULT_SYMBOL
+)
 
 
 
 class PositionManager:
-    """
-    Position Manager
-
-    기능:
-    - 현재 포지션 관리
-    - Private WS 동기화
-    - Entry / Exit 상태 관리
-    """
-
 
 
     def __init__(self):
 
+        self.base_url = BYBIT_BASE_URL
+        self.symbol = DEFAULT_SYMBOL
 
-        self.lock = threading.Lock()
-
-
-        self.positions = {}
-
+        self.position = None
 
 
-
-
-    # =====================================
-    # SET POSITION
-    # =====================================
-
-    def set_position(
-        self,
-        symbol,
-        side,
-        size,
-        entry_price=0
-    ):
-
-
-        with self.lock:
-
-
-            self.positions[symbol] = {
-
-
-                "symbol":
-
-                    symbol,
-
-
-                "side":
-
-                    side,
-
-
-                "size":
-
-                    float(size),
-
-
-                "entry_price":
-
-                    float(entry_price)
-
-
-            }
+        print("==============================")
+        print("[POSITION MANAGER INIT]")
+        print("BASE :", self.base_url)
+        print("SYMBOL :", self.symbol)
+        print("==============================")
 
 
 
-        return True
+    def _sign(self, query):
+
+        ts = str(
+            int(time.time()*1000)
+        )
+
+        recv = "5000"
 
 
-
-
-
-    # =====================================
-    # OPEN POSITION
-    # 호환 함수
-    # =====================================
-
-    def open_position(
-        self,
-        symbol,
-        side,
-        size,
-        entry_price=0
-    ):
-
-
-        return self.set_position(
-
-            symbol,
-
-            side,
-
-            size,
-
-            entry_price
-
+        origin = (
+            ts
+            +
+            BYBIT_API_KEY
+            +
+            recv
+            +
+            query
         )
 
 
+        sign = hmac.new(
+
+            BYBIT_API_SECRET.encode(),
+
+            origin.encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+        return ts, recv, sign
 
 
 
-    # =====================================
-    # GET POSITION
-    # =====================================
-
-    def get_position(
-        self,
-        symbol
-    ):
+    def get_position(self):
 
 
-        with self.lock:
+        endpoint = "/v5/position/list"
 
 
-            return self.positions.get(
-
-                symbol
-
-            )
-
-
-
-
-
-    # =====================================
-    # HAS POSITION
-    # =====================================
-
-    def has_position(
-        self,
-        symbol
-    ):
-
-
-        with self.lock:
-
-
-            position = self.positions.get(
-
-                symbol
-
-            )
-
-
-            if not position:
-
-                return False
-
-
-
-            return (
-
-                float(position["size"])
-
-                >
-
-                0
-
-            )
-
-
-
-
-
-    # =====================================
-    # REMOVE POSITION
-    # =====================================
-
-    def remove_position(
-        self,
-        symbol
-    ):
-
-
-        with self.lock:
-
-
-            if symbol in self.positions:
-
-
-                del self.positions[symbol]
-
-
-
-        return True
-
-
-
-
-
-    # =====================================
-    # CLOSE POSITION
-    # 호환 함수
-    # =====================================
-
-    def close_position(
-        self,
-        symbol
-    ):
-
-
-        return self.remove_position(
-
-            symbol
-
+        query = (
+            "category=linear"
+            +
+            "&symbol="
+            +
+            self.symbol
         )
 
 
+        ts, recv, sign = self._sign(query)
 
 
 
-    # =====================================
-    # UPDATE SIZE
-    # =====================================
+        headers = {
 
-    def update_size(
-        self,
-        symbol,
-        size
-    ):
+            "X-BAPI-API-KEY":
+            BYBIT_API_KEY,
+
+            "X-BAPI-TIMESTAMP":
+            ts,
+
+            "X-BAPI-RECV-WINDOW":
+            recv,
+
+            "X-BAPI-SIGN":
+            sign
+
+        }
 
 
-        with self.lock:
+
+        url = (
+            self.base_url
+            +
+            endpoint
+            +
+            "?"
+            +
+            query
+        )
 
 
-            if symbol in self.positions:
+        try:
 
 
-                self.positions[symbol]["size"] = float(
+            r = requests.get(
 
-                    size
+                url,
+
+                headers=headers,
+
+                timeout=10
+
+            )
+
+
+            data = r.json()
+
+
+            print(
+                "[POSITION RESPONSE]",
+                data
+            )
+
+
+
+            if data.get("retCode") == 0:
+
+
+                self.position = (
+
+                    data["result"]
+                    ["list"]
 
                 )
 
 
-                if float(size) <= 0:
-
-
-                    del self.positions[symbol]
+            return self.position
 
 
 
-        return True
+        except Exception as e:
 
 
-
-
-
-    # =====================================
-    # ALL POSITIONS
-    # =====================================
-
-    def get_all_positions(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            return list(
-
-                self.positions.values()
-
+            print(
+                "[POSITION ERROR]",
+                e
             )
 
 
-
-
-
-    # =====================================
-    # CLEAR
-    # =====================================
-
-    def clear(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            self.positions.clear()
+            return None
 
 
 
 
-
-    # =====================================
-    # STATUS
-    # =====================================
-
-    def status(
-        self
-    ):
-
-
-        with self.lock:
-
-
-            return {
-
-
-                "count":
-
-                    len(self.positions),
-
-
-                "positions":
-
-                    self.positions
-
-            }
-
-
-
-
-
-# singleton
 
 position_manager = PositionManager()
