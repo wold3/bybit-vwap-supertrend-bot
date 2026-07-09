@@ -4,10 +4,8 @@ import threading
 import websocket
 
 
-from config import (
-    BYBIT_PUBLIC_WS,
-    DEFAULT_SYMBOL
-)
+from config import DEFAULT_SYMBOL
+
 
 
 
@@ -18,16 +16,19 @@ class PublicWebSocketClient:
 
         self.symbol = DEFAULT_SYMBOL
 
-        # Linear Public WS
         self.url = (
             "wss://stream.bybit.com/v5/public/linear"
         )
+
 
         self.ws = None
 
         self.running = False
 
         self.thread = None
+
+
+        self.callback = None
 
 
 
@@ -41,16 +42,35 @@ class PublicWebSocketClient:
 
 
     # ==================================
-    # CONNECT
+    # CALLBACK
+    # ==================================
+
+    def set_callback(
+        self,
+        callback
+    ):
+
+        self.callback = callback
+
+
+
+
+
+    # ==================================
+    # START
     # ==================================
 
     def start(self):
 
+
         if self.running:
+
             return
 
 
+
         self.running = True
+
 
 
         self.thread = threading.Thread(
@@ -61,7 +81,9 @@ class PublicWebSocketClient:
 
         )
 
+
         self.thread.start()
+
 
 
 
@@ -93,6 +115,7 @@ class PublicWebSocketClient:
                 self.ws.run_forever()
 
 
+
             except Exception as e:
 
 
@@ -117,6 +140,8 @@ class PublicWebSocketClient:
 
 
 
+
+
     # ==================================
     # OPEN
     # ==================================
@@ -132,7 +157,8 @@ class PublicWebSocketClient:
         )
 
 
-        payload = {
+
+        subscribe = {
 
 
             "op":
@@ -151,16 +177,17 @@ class PublicWebSocketClient:
         }
 
 
+
         ws.send(
-
-            json.dumps(payload)
-
+            json.dumps(subscribe)
         )
+
 
 
         print(
             "[PUBLIC SUBSCRIBED]"
         )
+
 
 
 
@@ -185,22 +212,110 @@ class PublicWebSocketClient:
             )
 
 
-            if "topic" in data:
+
+            topic = data.get(
+                "topic"
+            )
+
+
+
+            if not topic:
+
+                return
+
+
+
+            if not topic.startswith(
+                "kline"
+            ):
+
+                return
+
+
+
+
+
+            candles = data.get(
+                "data",
+                []
+            )
+
+
+
+            for c in candles:
+
+
+
+                candle = {
+
+
+                    "symbol":
+
+                    self.symbol,
+
+
+                    "timestamp":
+
+                    c.get("start"),
+
+
+                    "open":
+
+                    float(c.get("open")),
+
+
+                    "high":
+
+                    float(c.get("high")),
+
+
+                    "low":
+
+                    float(c.get("low")),
+
+
+                    "close":
+
+                    float(c.get("close")),
+
+
+                    "volume":
+
+                    float(c.get("volume"))
+
+                }
+
+
 
 
                 print(
-
-                    "[PUBLIC DATA]",
-
-                    data["topic"]
-
+                    "[CANDLE]",
+                    candle
                 )
 
 
-        except Exception:
 
 
-            pass
+
+                if self.callback:
+
+
+                    self.callback(
+                        candle
+                    )
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[PUBLIC PARSE ERROR]",
+                e
+            )
+
+
 
 
 
@@ -221,6 +336,8 @@ class PublicWebSocketClient:
             "[PUBLIC WS ERROR]",
             error
         )
+
+
 
 
 
@@ -248,6 +365,8 @@ class PublicWebSocketClient:
 
 
 
+
+
     # ==================================
     # STOP
     # ==================================
@@ -258,14 +377,18 @@ class PublicWebSocketClient:
         self.running = False
 
 
+
         try:
+
 
             if self.ws:
 
                 self.ws.close()
 
 
-        except Exception:
+
+        except:
+
 
             pass
 
@@ -279,7 +402,5 @@ class PublicWebSocketClient:
 
 
 
-
-# singleton
 
 ws_client = PublicWebSocketClient()
