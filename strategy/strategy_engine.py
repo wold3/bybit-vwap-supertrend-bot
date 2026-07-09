@@ -1,5 +1,4 @@
-from indicators.vwap import calculate_vwap
-from indicators.supertrend import supertrend
+from indicators.indicator_engine import indicator_engine
 
 
 class StrategyEngine:
@@ -19,66 +18,50 @@ class StrategyEngine:
 
         try:
 
-            # --------------------------
             # 완성된 캔들만 사용
-            # --------------------------
-
             if not candle.get("confirm", False):
                 return None
 
             timestamp = int(candle["timestamp"])
 
-            # 이미 처리한 봉이면 무시
             if timestamp == self.last_timestamp:
                 return None
 
             self.last_timestamp = timestamp
 
+            # Indicator Engine 업데이트
+            indicator_engine.update(candle)
+
+            market = indicator_engine.get_market_data(candle)
+
+            if market is None:
+                return None
+
+            vwap = market.get("vwap")
+            trend = market.get("supertrend")
+
+            if vwap is None:
+                return None
+
             close = float(candle["close"])
-            high = float(candle["high"])
-            low = float(candle["low"])
-
-            # --------------------------
-            # Indicator
-            # --------------------------
-
-            vwap = calculate_vwap(candle)
-
-            trend = supertrend.update(
-                high,
-                low,
-                close
-            )
 
             print(
                 "[INDICATOR]",
                 f"PRICE={close}",
                 f"VWAP={vwap}",
-                f"TREND={trend}"
+                f"TREND={trend}",
             )
-
-            # --------------------------
-            # Signal
-            # --------------------------
 
             signal = None
 
-            if close > vwap and trend:
+            if close > vwap and trend == "UP":
                 signal = "BUY"
 
-            elif close < vwap and not trend:
+            elif close < vwap and trend == "DOWN":
                 signal = "SELL"
-
-            # --------------------------
-            # HOLD
-            # --------------------------
 
             if signal is None:
                 return None
-
-            # --------------------------
-            # 같은 신호 반복 방지
-            # --------------------------
 
             if signal == self.last_signal:
                 return None
