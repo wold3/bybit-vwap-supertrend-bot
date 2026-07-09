@@ -14,21 +14,15 @@ from market.websocket_client import websocket_client
 
 from services.private_ws_client import private_ws_client
 
-
 from portfolio.bybit_wallet import wallet
-
 
 from execution.order_manager import order_manager
 
-
 from position.position_manager import position_manager
-
 
 from strategy.strategy_engine import strategy_engine
 
-
 from risk.risk_manager import risk_manager
-
 
 
 
@@ -37,12 +31,10 @@ RUNNING = True
 
 
 # ==============================
-# ORDER SETTINGS
+# SETTINGS
 # ==============================
 
-
 ORDER_QTY = "0.001"
-
 
 TP_PERCENT = 0.003
 
@@ -53,7 +45,7 @@ SL_PERCENT = 0.002
 
 
 # ==============================
-# SIGNAL STOP
+# STOP
 # ==============================
 
 
@@ -75,6 +67,7 @@ def shutdown(sig=None, frame=None):
 
 
 
+
 signal.signal(
     signal.SIGINT,
     shutdown
@@ -84,26 +77,28 @@ signal.signal(
 
 
 
+
 # ==============================
-# ORDER PROCESS
+# ORDER HANDLER
 # ==============================
 
 
 def execute_signal(
-        trade_signal,
+        signal_type,
         price
 ):
 
 
-    if trade_signal is None:
+    if signal_type is None:
 
         return
 
 
 
 
+
     print("==============================")
-    print("[SIGNAL]", trade_signal)
+    print("[SIGNAL]", signal_type)
     print("[PRICE]", price)
     print("==============================")
 
@@ -112,30 +107,18 @@ def execute_signal(
 
 
     # --------------------------
-    # Position check
+    # POSITION SYNC
     # --------------------------
 
-
-    try:
-
-        position_manager.sync()
-
-
-    except Exception as e:
-
-        print(
-            "[POSITION SYNC ERROR]",
-            e
-        )
-
+    position_manager.sync()
 
 
 
     if position_manager.has_position():
 
-
         print(
-            "[ORDER BLOCK] POSITION EXISTS"
+            "[ORDER BLOCK] POSITION EXISTS",
+            position_manager.current
         )
 
 
@@ -145,10 +128,10 @@ def execute_signal(
 
 
 
-    # --------------------------
-    # Risk check
-    # --------------------------
 
+    # --------------------------
+    # RISK CHECK
+    # --------------------------
 
     if not risk_manager.allow_order(
             ORDER_QTY
@@ -166,12 +149,14 @@ def execute_signal(
 
 
 
-    # --------------------------
+
+
+    # ==========================
     # BUY
-    # --------------------------
+    # ==========================
 
 
-    if trade_signal == "BUY":
+    if signal_type == "BUY":
 
 
 
@@ -198,10 +183,7 @@ def execute_signal(
 
 
 
-        print(
-            "[LONG ENTRY]"
-        )
-
+        print("[LONG ENTRY]")
 
 
         result = order_manager.create_order(
@@ -229,12 +211,12 @@ def execute_signal(
 
 
 
-    # --------------------------
+    # ==========================
     # SELL
-    # --------------------------
+    # ==========================
 
 
-    elif trade_signal == "SELL":
+    elif signal_type == "SELL":
 
 
 
@@ -261,9 +243,7 @@ def execute_signal(
 
 
 
-        print(
-            "[SHORT ENTRY]"
-        )
+        print("[SHORT ENTRY]")
 
 
 
@@ -292,6 +272,7 @@ def execute_signal(
 
 
 
+
 # ==============================
 # MARKET CALLBACK
 # ==============================
@@ -303,7 +284,6 @@ def on_candle(candle):
     try:
 
 
-
         print(
             "[CANDLE]",
             candle
@@ -311,7 +291,7 @@ def on_candle(candle):
 
 
 
-        signal = strategy_engine.on_candle(
+        signal_type = strategy_engine.on_candle(
 
             candle
 
@@ -321,7 +301,7 @@ def on_candle(candle):
 
         execute_signal(
 
-            signal,
+            signal_type,
 
             candle["close"]
 
@@ -334,7 +314,7 @@ def on_candle(candle):
 
 
         print(
-            "[STRATEGY ERROR]",
+            "[CANDLE ERROR]",
             e
         )
 
@@ -345,11 +325,55 @@ def on_candle(candle):
 
 
 # ==============================
-# LOOP
+# POSITION MONITOR
+# ==============================
+
+
+def position_monitor():
+
+
+
+    print(
+        "[POSITION MONITOR START]"
+    )
+
+
+
+    while RUNNING:
+
+
+        try:
+
+
+            position_manager.sync()
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[POSITION MONITOR ERROR]",
+                e
+            )
+
+
+
+        time.sleep(5)
+
+
+
+
+
+
+
+# ==============================
+# STRATEGY LOOP
 # ==============================
 
 
 def strategy_loop():
+
 
 
     print(
@@ -362,6 +386,8 @@ def strategy_loop():
 
 
         time.sleep(1)
+
+
 
 
 
@@ -407,8 +433,10 @@ def main():
 
 
 
+
+
     # --------------------------
-    # Wallet
+    # WALLET
     # --------------------------
 
 
@@ -416,7 +444,6 @@ def main():
 
 
         equity = wallet.get_equity()
-
 
 
         print(
@@ -440,49 +467,17 @@ def main():
 
 
     # --------------------------
-    # Position
+    # INITIAL POSITION
     # --------------------------
 
 
-    try:
+    position_manager.sync()
 
-
-        position_manager.sync()
-
-
-
-        print(
-            "[POSITION]",
-            position_manager.current
-        )
-
-
-
-    except Exception as e:
-
-
-        print(
-            "[POSITION INIT ERROR]",
-            e
-        )
-
-
-
-
-
-
-
-    # --------------------------
-    # Risk
-    # --------------------------
 
 
     print(
-
-        "[RISK STATUS]",
-
-        risk_manager.status()
-
+        "[POSITION INIT]",
+        position_manager.current
     )
 
 
@@ -492,12 +487,37 @@ def main():
 
 
     # --------------------------
-    # PUBLIC WS
+    # RISK
+    # --------------------------
+
+
+    print(
+        "[RISK STATUS]",
+        risk_manager.status()
+    )
+
+
+
+
+
+
+
+    # --------------------------
+    # CALLBACK
     # --------------------------
 
 
     websocket_client.callback = on_candle
 
+
+
+
+
+
+
+    # --------------------------
+    # THREADS
+    # --------------------------
 
 
     threading.Thread(
@@ -510,15 +530,6 @@ def main():
 
 
 
-
-
-
-
-    # --------------------------
-    # PRIVATE WS
-    # --------------------------
-
-
     threading.Thread(
 
         target=private_ws_client.start,
@@ -529,12 +540,14 @@ def main():
 
 
 
+    threading.Thread(
 
+        target=position_monitor,
 
+        daemon=True
 
-    # --------------------------
-    # Strategy
-    # --------------------------
+    ).start()
+
 
 
     threading.Thread(
@@ -559,6 +572,7 @@ def main():
 
 
 
+
     while RUNNING:
 
 
@@ -569,7 +583,11 @@ def main():
 
 
 
-    # shutdown
+
+
+    # --------------------------
+    # CLEAN STOP
+    # --------------------------
 
 
     try:
@@ -592,10 +610,10 @@ def main():
 
 
 
-
     print(
         "[BOT STOPPED]"
     )
+
 
 
 
