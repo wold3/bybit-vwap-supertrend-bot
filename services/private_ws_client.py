@@ -1,15 +1,18 @@
-import os
+# services/private_ws_client.py
+
 import json
 import time
+import hmac
+import hashlib
 import threading
 import websocket
 
-from dotenv import load_dotenv
 
-from watchdog.watchdog import watchdog
-
-
-load_dotenv()
+from config import (
+    BYBIT_PRIVATE_WS,
+    BYBIT_API_KEY,
+    BYBIT_API_SECRET
+)
 
 
 
@@ -19,43 +22,38 @@ class PrivateWSClient:
     def __init__(self):
 
 
-        live = os.getenv(
-            "LIVE_TRADING",
-            "false"
-        ).lower() == "true"
+        self.url = BYBIT_PRIVATE_WS
 
 
-
-        if live:
-
-            self.url = os.getenv(
-                "BYBIT_LIVE_PRIVATE_WS",
-                "wss://stream.bybit.com/v5/private"
-            )
-
-        else:
-
-            self.url = os.getenv(
-                "BYBIT_DEMO_PRIVATE_WS",
-                "wss://stream-demo.bybit.com/v5/private"
-            )
+        self.api_key = BYBIT_API_KEY
 
 
+        self.api_secret = BYBIT_API_SECRET
 
-        self.api_key = os.getenv(
-            "BYBIT_API_KEY"
-        )
 
-        self.api_secret = os.getenv(
-            "BYBIT_API_SECRET"
-        )
+        self.ws = None
 
 
         self.running = False
 
-        self.ws = None
 
         self.thread = None
+
+
+        self.authenticated = False
+
+
+
+        print("==============================")
+        print("[PRIVATE WS CLIENT INIT]")
+        print("URL :", self.url)
+        print(
+            "KEY :",
+            self.api_key[:6]
+            if self.api_key
+            else None
+        )
+        print("==============================")
 
 
 
@@ -71,12 +69,14 @@ class PrivateWSClient:
             return
 
 
+
         self.running = True
+
 
 
         self.thread = threading.Thread(
 
-            target=self._run,
+            target=self.run,
 
             daemon=True
 
@@ -86,19 +86,44 @@ class PrivateWSClient:
         self.thread.start()
 
 
+
+    # =====================================
+    # STOP
+    # =====================================
+
+    def stop(self):
+
+
+        self.running = False
+
+
+
+        try:
+
+
+            if self.ws:
+
+                self.ws.close()
+
+
+        except Exception:
+
+
+            pass
+
+
+
         print(
-            "[PRIVATE WS START]"
+            "[PRIVATE WS CLIENT STOPPED]"
         )
 
 
 
-
-
     # =====================================
-    # CONNECT LOOP
+    # RUN
     # =====================================
 
-    def _run(self):
+    def run(self):
 
 
         while self.running:
@@ -122,32 +147,78 @@ class PrivateWSClient:
                 )
 
 
-                self.ws.run_forever(
 
-                    ping_interval=20,
+                self.ws.run_forever()
 
-                    ping_timeout=10
-
-                )
 
 
             except Exception as e:
 
 
                 print(
-                    "[PRIVATE LOOP ERROR]",
+                    "[PRIVATE CLIENT ERROR]",
                     e
                 )
 
 
-            time.sleep(5)
 
+            if self.running:
+
+
+                print(
+                    "[PRIVATE WS RECONNECT]"
+                )
+
+
+                time.sleep(3)
 
 
 
 
     # =====================================
-    # AUTH
+    # SIGN
+    # =====================================
+
+    def create_signature(
+        self,
+        expires
+    ):
+
+
+        payload = (
+
+            "GET/realtime"
+
+            +
+
+            str(expires)
+
+        )
+
+
+
+        signature = hmac.new(
+
+            self.api_secret.encode(
+                "utf-8"
+            ),
+
+            payload.encode(
+                "utf-8"
+            ),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+
+        return signature
+
+
+
+    # =====================================
+    # OPEN
     # =====================================
 
     def on_open(
@@ -161,63 +232,51 @@ class PrivateWSClient:
         )
 
 
-        if not self.api_key or not self.api_secret:
 
-            print(
-                "[PRIVATE AUTH SKIP]"
+        expires = (
+
+            int(
+                time.time() * 1000
             )
 
-            return
+            +
+
+            10000
+
+        )
 
 
 
-        expires = int(
-            time.time()*1000
-        ) + 10000
+        signature = self.create_signature(
+            expires
+        )
 
 
 
-        import hmac
-        import hashlib
+        auth_message = {
 
-
-
-        sign = hmac.new(
-
-            self.api_secret.encode(),
-
-            f"GET/realtime{expires}".encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-
-        payload = {
 
             "op":
                 "auth",
 
+
             "args":
-                [
+            [
 
-                    self.api_key,
+                self.api_key,
 
-                    expires,
+                expires,
 
-                    sign
+                signature
 
-                ]
+            ]
 
         }
 
 
 
         ws.send(
-
-            json.dumps(payload)
-
+            json.dumps(auth_message)
         )
 
 
@@ -241,18 +300,23 @@ class PrivateWSClient:
             )
 
 
-            watchdog.heartbeat()
+
+            if data.get(
+                "success"
+            ):
+
+
+                self.authenticated = True
+
+
+                print(
+                    "[PRIVATE AUTH SUCCESS]"
+                )
 
 
 
-            if data.get("op") == "auth":
+                self.subscribe(ws)
 
-
-                if data.get("success"):
-
-                    print(
-                        "[PRIVATE AUTH SUCCESS]"
-                    )
 
 
                 return
@@ -262,6 +326,7 @@ class PrivateWSClient:
             topic = data.get(
                 "topic"
             )
+
 
 
             if topic:
@@ -284,6 +349,48 @@ class PrivateWSClient:
 
 
 
+    # =====================================
+    # SUBSCRIBE
+    # =====================================
+
+    def subscribe(
+        self,
+        ws
+    ):
+
+
+        payload = {
+
+
+            "op":
+                "subscribe",
+
+
+            "args":
+            [
+
+                "order",
+
+                "execution",
+
+                "position"
+
+            ]
+
+        }
+
+
+
+        ws.send(
+            json.dumps(payload)
+        )
+
+
+
+        print(
+            "[PRIVATE SUBSCRIBED]"
+        )
+
 
 
     # =====================================
@@ -304,8 +411,6 @@ class PrivateWSClient:
 
 
 
-
-
     # =====================================
     # CLOSE
     # =====================================
@@ -318,38 +423,11 @@ class PrivateWSClient:
     ):
 
 
+        self.authenticated = False
+
+
         print(
             "[PRIVATE WS CLOSED]"
-        )
-
-
-
-
-
-    # =====================================
-    # STOP
-    # =====================================
-
-    def stop(self):
-
-
-        self.running = False
-
-
-        if self.ws:
-
-
-            try:
-
-                self.ws.close()
-
-            except:
-
-                pass
-
-
-        print(
-            "[PRIVATE WS STOPPED]"
         )
 
 
