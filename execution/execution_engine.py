@@ -19,13 +19,11 @@ class ExecutionEngine:
 
     def __init__(self):
 
-
         self.live = LIVE_TRADING
 
         self.symbol = DEFAULT_SYMBOL
 
         self.base = BYBIT_BASE_URL
-
 
 
         print("==============================")
@@ -34,7 +32,6 @@ class ExecutionEngine:
         print("LIVE :", self.live)
         print("SYMBOL :", self.symbol)
         print("==============================")
-
 
 
     # =================================
@@ -53,43 +50,18 @@ class ExecutionEngine:
         )
 
 
-
         if signal not in (
-
             "BUY",
-
             "SELL"
-
         ):
 
-
             return None
-
-
-
-
-        if not self.live:
-
-
-            print(
-                "[EXECUTION BLOCKED]"
-            )
-
-
-            print(
-                "LIVE_TRADING=False"
-            )
-
-
-            return None
-
 
 
 
         if signal == "BUY":
 
-
-            return order_manager.place_order(
+            return order_manager.create_order(
 
                 "Buy",
 
@@ -101,8 +73,7 @@ class ExecutionEngine:
 
         if signal == "SELL":
 
-
-            return order_manager.place_order(
+            return order_manager.create_order(
 
                 "Sell",
 
@@ -118,31 +89,16 @@ class ExecutionEngine:
 
     def test_buy(self):
 
-
-        print(
-            "[TEST BUY]"
-        )
-
-
         return self.execute(
             "BUY"
         )
 
 
-
     def test_sell(self):
-
-
-        print(
-            "[TEST SELL]"
-        )
-
 
         return self.execute(
             "SELL"
         )
-
-
 
 
 
