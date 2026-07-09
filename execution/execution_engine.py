@@ -1,15 +1,15 @@
 import time
-import hmac
-import hashlib
-import requests
 
 
 from config import (
-    BYBIT_BASE_URL,
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
-    DEFAULT_SYMBOL,
     LIVE_TRADING,
+    DEFAULT_SYMBOL,
+    BYBIT_BASE_URL
+)
+
+
+from execution.order_manager import (
+    order_manager
 )
 
 
@@ -20,230 +20,64 @@ class ExecutionEngine:
     def __init__(self):
 
 
-        self.base_url = BYBIT_BASE_URL
-
-        self.api_key = BYBIT_API_KEY
-
-        self.api_secret = BYBIT_API_SECRET
+        self.live = LIVE_TRADING
 
         self.symbol = DEFAULT_SYMBOL
 
-        self.live = LIVE_TRADING
+        self.base = BYBIT_BASE_URL
 
 
 
         print("==============================")
         print("[EXECUTION ENGINE INIT]")
-        print("BASE :", self.base_url)
+        print("BASE :", self.base)
         print("LIVE :", self.live)
         print("SYMBOL :", self.symbol)
         print("==============================")
 
 
 
-    # =====================================
-    # SIGN
-    # =====================================
+    # =================================
+    # SIGNAL EXECUTION
+    # =================================
 
-    def _sign(
+    def execute(
         self,
-        params
+        signal
     ):
 
 
-        timestamp = str(
-            int(
-                time.time()*1000
-            )
-        )
-
-
-        recv_window = "5000"
-
-
-        query_string = "&".join(
-            [
-                f"{k}={params[k]}"
-                for k in sorted(params)
-            ]
-        )
-
-
-        origin = (
-            timestamp
-            +
-            self.api_key
-            +
-            recv_window
-            +
-            query_string
-        )
-
-
-        sign = hmac.new(
-            self.api_secret.encode(),
-            origin.encode(),
-            hashlib.sha256
-        ).hexdigest()
-
-
-        return (
-            timestamp,
-            recv_window,
-            sign
+        print(
+            "[EXECUTION SIGNAL]",
+            signal
         )
 
 
 
-    # =====================================
-    # HEADER
-    # =====================================
+        if signal not in (
 
-    def _headers(
-        self,
-        timestamp,
-        recv_window,
-        sign
-    ):
+            "BUY",
+
+            "SELL"
+
+        ):
 
 
-        return {
-
-            "X-BAPI-API-KEY":
-                self.api_key,
-
-            "X-BAPI-SIGN":
-                sign,
-
-            "X-BAPI-TIMESTAMP":
-                timestamp,
-
-            "X-BAPI-RECV-WINDOW":
-                recv_window,
-
-            "Content-Type":
-                "application/json"
-
-        }
+            return None
 
 
-
-    # =====================================
-    # MARKET ORDER
-    # =====================================
-
-    def market_order(
-        self,
-        side,
-        qty
-    ):
 
 
         if not self.live:
 
+
             print(
-                "[EXECUTION BLOCKED] LIVE=False"
-            )
-
-            return None
-
-
-
-        endpoint = (
-            "/v5/order/create"
-        )
-
-
-        params = {
-
-
-            "category":
-                "linear",
-
-
-            "symbol":
-                self.symbol,
-
-
-            "side":
-                side,
-
-
-            "orderType":
-                "Market",
-
-
-            "qty":
-                str(qty)
-
-        }
-
-
-
-        timestamp, recv_window, sign = (
-            self._sign(params)
-        )
-
-
-
-        headers = self._headers(
-            timestamp,
-            recv_window,
-            sign
-        )
-
-
-        url = (
-            self.base_url
-            +
-            endpoint
-        )
-
-
-
-        try:
-
-
-            print("[EXECUTION ORDER]")
-            print(url)
-            print(params)
-
-
-
-            response = requests.post(
-
-                url,
-
-                headers=headers,
-
-                json=params,
-
-                timeout=10
-
+                "[EXECUTION BLOCKED]"
             )
 
 
-
-            data = response.json()
-
-
-
             print(
-                "[EXECUTION RESPONSE]",
-                data
-            )
-
-
-            return data
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[EXECUTION ERROR]",
-                e
+                "LIVE_TRADING=False"
             )
 
 
@@ -251,70 +85,63 @@ class ExecutionEngine:
 
 
 
-    # =====================================
-    # CLOSE POSITION
-    # =====================================
 
-    def close_position(
-        self,
-        side,
-        qty
-    ):
+        if signal == "BUY":
 
 
-        close_side = (
-            "Sell"
-            if side == "Buy"
-            else
-            "Buy"
+            return order_manager.place_order(
+
+                "Buy",
+
+                0.001
+
+            )
+
+
+
+        if signal == "SELL":
+
+
+            return order_manager.place_order(
+
+                "Sell",
+
+                0.001
+
+            )
+
+
+
+    # =================================
+    # TEST ORDER
+    # =================================
+
+    def test_buy(self):
+
+
+        print(
+            "[TEST BUY]"
         )
 
 
-        return self.market_order(
-            close_side,
-            qty
+        return self.execute(
+            "BUY"
         )
 
 
 
-    # =====================================
-    # TEST CONNECTION
-    # =====================================
-
-    def ping(self):
+    def test_sell(self):
 
 
-        try:
+        print(
+            "[TEST SELL]"
+        )
 
 
-            r = requests.get(
-                self.base_url
-                +
-                "/v5/market/time",
-                timeout=5
-            )
+        return self.execute(
+            "SELL"
+        )
 
-
-            print(
-                "[BYBIT TIME]",
-                r.json()
-            )
-
-
-            return True
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[PING ERROR]",
-                e
-            )
-
-
-            return False
 
 
 
