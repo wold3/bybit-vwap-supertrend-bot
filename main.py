@@ -12,13 +12,14 @@ from config import (
 
 from market.websocket_client import websocket_client
 from services.private_ws_client import private_ws_client
+
 from portfolio.bybit_wallet import wallet
 
 from execution.order_manager import order_manager
 
-from strategy.strategy_engine import (
-    strategy_engine
-)
+from strategy.strategy_engine import strategy_engine
+
+from position.position_manager import position_manager
 
 
 from indicators.vwap import calculate_vwap
@@ -29,9 +30,10 @@ from indicators.supertrend import calculate_supertrend
 RUNNING = True
 
 
-latest_candle = None
 
-
+# ===============================
+# STOP HANDLER
+# ===============================
 
 def shutdown(sig=None, frame=None):
 
@@ -41,6 +43,7 @@ def shutdown(sig=None, frame=None):
     print("==============================")
     print("[BOT STOPPING]")
     print("==============================")
+
 
     RUNNING = False
 
@@ -53,36 +56,31 @@ signal.signal(
 
 
 
-# ============================
+# ===============================
 # CANDLE CALLBACK
-# ============================
+# ===============================
 
 def on_candle(candle):
 
-    global latest_candle
 
-    latest_candle = candle
-
-
-    print("[CANDLE]", candle)
+    print(
+        "[CANDLE]",
+        candle
+    )
 
 
 
     try:
 
-        indicator = {
 
-            "vwap":
-                calculate_vwap(
-                    candle
-                ),
+        vwap = calculate_vwap(
+            candle
+        )
 
-            "trend":
-                calculate_supertrend(
-                    candle
-                )
 
-        }
+        trend = calculate_supertrend(
+            candle
+        )
 
 
 
@@ -91,16 +89,29 @@ def on_candle(candle):
             "PRICE:",
             candle["close"],
             "VWAP:",
-            indicator["vwap"],
+            vwap,
             "TREND:",
-            indicator["trend"]
+            trend
         )
 
 
 
+        indicator = {
+
+            "vwap": vwap,
+
+            "trend": trend
+
+        }
+
+
+
         signal = strategy_engine.on_candle(
+
             candle,
+
             indicator
+
         )
 
 
@@ -113,6 +124,7 @@ def on_candle(candle):
 
     except Exception as e:
 
+
         print(
             "[STRATEGY ERROR]",
             e
@@ -121,10 +133,10 @@ def on_candle(candle):
 
 
 
-# ============================
-# ORDER EXECUTION
-# ============================
 
+# ===============================
+# ORDER CONTROL
+# ===============================
 
 def execute_signal(signal):
 
@@ -133,7 +145,55 @@ def execute_signal(signal):
 
 
 
+    if not signal:
+
+        return
+
+
+
+    print(
+        "[SIGNAL]",
+        signal
+    )
+
+
+
+    # 최신 포지션 갱신
+
+    position_manager.update()
+
+
+
+    has_position = (
+        position_manager.has_position()
+    )
+
+
+    current_side = (
+        position_manager.side()
+    )
+
+
+
+    # ===========================
+    # BUY
+    # ===========================
+
     if signal == "BUY":
+
+
+        if has_position:
+
+
+            print(
+                "[ORDER BLOCK]",
+                "Existing position:",
+                current_side
+            )
+
+
+            return
+
 
 
         print(
@@ -141,12 +201,15 @@ def execute_signal(signal):
         )
 
 
+
         result = order_manager.create_order(
 
             side="Buy",
+
             qty=qty
 
         )
+
 
 
         print(
@@ -156,7 +219,28 @@ def execute_signal(signal):
 
 
 
+
+
+    # ===========================
+    # SELL
+    # ===========================
+
     elif signal == "SELL":
+
+
+
+        if has_position:
+
+
+            print(
+                "[ORDER BLOCK]",
+                "Existing position:",
+                current_side
+            )
+
+
+            return
+
 
 
         print(
@@ -164,12 +248,15 @@ def execute_signal(signal):
         )
 
 
+
         result = order_manager.create_order(
 
             side="Sell",
+
             qty=qty
 
         )
+
 
 
         print(
@@ -179,44 +266,81 @@ def execute_signal(signal):
 
 
 
-# ============================
-# MAIN
-# ============================
 
+
+
+# ===============================
+# MAIN
+# ===============================
 
 def main():
 
 
     print("==============================")
     print("VWAP SUPERTREND BOT START")
-    print("LIVE :", LIVE_TRADING)
-    print("SYMBOL :", DEFAULT_SYMBOL)
-    print("BASE :", BYBIT_BASE_URL)
     print("==============================")
+
+    print(
+        "LIVE :",
+        LIVE_TRADING
+    )
+
+    print(
+        "SYMBOL :",
+        DEFAULT_SYMBOL
+    )
+
+    print(
+        "BASE :",
+        BYBIT_BASE_URL
+    )
+
+    print("==============================")
+
+
+
+
+    # Wallet Check
+
+    equity = wallet.get_equity()
 
 
     print(
         "[ACCOUNT EQUITY]",
-        wallet.get_equity()
+        equity
     )
 
 
+
+
+
+    # Public WS callback
 
     websocket_client.callback = on_candle
 
 
 
+
     threading.Thread(
+
         target=websocket_client.start,
+
         daemon=True
+
     ).start()
+
 
 
 
     threading.Thread(
+
         target=private_ws_client.start,
+
         daemon=True
+
     ).start()
+
+
 
 
 
@@ -233,9 +357,26 @@ def main():
 
 
 
-    websocket_client.stop()
 
-    private_ws_client.stop()
+    try:
+
+        websocket_client.stop()
+
+    except:
+
+        pass
+
+
+
+    try:
+
+        private_ws_client.stop()
+
+    except:
+
+        pass
+
+
 
 
     print(
@@ -245,6 +386,8 @@ def main():
 
 
 
+
 if __name__ == "__main__":
+
 
     main()
