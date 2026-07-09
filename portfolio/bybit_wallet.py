@@ -1,61 +1,74 @@
-import time
-import hmac
-import hashlib
-import requests
-
 from config import (
-    BYBIT_BASE_URL,
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
     ACCOUNT_TYPE,
+    CATEGORY,
+    SETTLE_COIN,
 )
+
+from api.bybit_client import bybit_client
+
 
 
 class BybitWallet:
 
+
     def __init__(self):
-
-        self.base_url = BYBIT_BASE_URL
-        self.api_key = BYBIT_API_KEY
-        self.api_secret = BYBIT_API_SECRET
-        self.account_type = ACCOUNT_TYPE
-
-        self.session = requests.Session()
 
         print("==============================")
         print("[WALLET INIT]")
-        print("KEY :", self.api_key[:6])
-        print("BASE:", self.base_url)
+        print("ACCOUNT :", ACCOUNT_TYPE)
+        print("CATEGORY :", CATEGORY)
+        print("SETTLE :", SETTLE_COIN)
         print("==============================")
 
+
+
     # =====================================================
-    # SIGN
+    # ACCOUNT BALANCE
     # =====================================================
 
-    def sign(self, params):
+    def get_balance(self):
 
-        timestamp = str(int(time.time() * 1000))
-        recv_window = "5000"
+        params = {
 
-        query = "&".join(
-            f"{k}={params[k]}"
-            for k in sorted(params)
-        )
+            "accountType": ACCOUNT_TYPE,
 
-        payload = (
-            timestamp
-            + self.api_key
-            + recv_window
-            + query
-        )
+        }
 
-        sign = hmac.new(
-            self.api_secret.encode(),
-            payload.encode(),
-            hashlib.sha256,
-        ).hexdigest()
 
-        return timestamp, recv_window, sign
+        try:
+
+            result = bybit_client.get(
+
+                "/v5/account/wallet-balance",
+
+                params
+
+            )
+
+
+            print(
+                "[BALANCE RESPONSE]",
+                result
+            )
+
+
+            return result
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[BALANCE ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
 
     # =====================================================
     # EQUITY
@@ -63,77 +76,167 @@ class BybitWallet:
 
     def get_equity(self):
 
-        endpoint = "/v5/account/wallet-balance"
+        try:
 
-        params = {
-            "accountType": self.account_type
-        }
+            data = self.get_balance()
 
-        timestamp, recv_window, sign = self.sign(params)
 
-        headers = {
-            "X-BAPI-API-KEY": self.api_key,
-            "X-BAPI-SIGN": sign,
-            "X-BAPI-TIMESTAMP": timestamp,
-            "X-BAPI-RECV-WINDOW": recv_window,
-            "Content-Type": "application/json",
-        }
+            if not data:
 
-        # 최대 3회 재시도
-        for attempt in range(3):
+                return 0
 
-            try:
 
-                response = self.session.get(
-                    self.base_url + endpoint,
-                    headers=headers,
-                    params=params,
-                    timeout=10,
+
+            if data.get("retCode") != 0:
+
+                print(
+                    "[BALANCE API ERROR]",
+                    data
                 )
 
-                response.raise_for_status()
+                return 0
 
-                data = response.json()
 
-                print("[BYBIT RESPONSE]", data)
 
-                if data.get("retCode") != 0:
 
-                    print(
-                        "[WALLET API ERROR]",
-                        data.get("retMsg"),
-                    )
+            account = (
 
-                    time.sleep(1)
-                    continue
+                data
+                .get("result", {})
+                .get("list", [])
 
-                account = data["result"]["list"][0]
+            )
 
-                equity = float(
-                    account.get(
-                        "totalEquity",
-                        0,
-                    )
-                )
 
-                return equity
+            if not account:
 
-            except requests.exceptions.Timeout:
+                return 0
 
-                print("[WALLET TIMEOUT]")
 
-            except requests.exceptions.ConnectionError:
 
-                print("[WALLET CONNECTION ERROR]")
+            equity = account[0].get(
+                "totalEquity",
+                0
+            )
 
-            except Exception as e:
 
-                print("[WALLET ERROR]", e)
 
-            time.sleep(1)
+            return float(equity)
 
-        # 실패 시 안전하게 0 반환
-        return 0.0
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[EQUITY ERROR]",
+                e
+            )
+
+
+            return 0
+
+
+
+
+    # =====================================================
+    # AVAILABLE BALANCE
+    # =====================================================
+
+    def get_available_balance(self):
+
+
+        try:
+
+
+            data = self.get_balance()
+
+
+
+            if not data:
+
+                return 0
+
+
+
+            account = (
+
+                data
+                .get("result", {})
+                .get("list", [])
+
+            )
+
+
+            if not account:
+
+                return 0
+
+
+
+            balance = account[0].get(
+
+                "totalAvailableBalance",
+
+                0
+
+            )
+
+
+
+            return float(balance)
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[AVAILABLE BALANCE ERROR]",
+                e
+            )
+
+
+            return 0
+
+
+
+
+
+    # =====================================================
+    # STATUS
+    # =====================================================
+
+    def status(self):
+
+
+        return {
+
+
+            "account":
+
+                ACCOUNT_TYPE,
+
+
+            "equity":
+
+                self.get_equity(),
+
+
+            "available":
+
+                self.get_available_balance(),
+
+
+            "settle":
+
+                SETTLE_COIN,
+
+        }
+
+
+
 
 
 wallet = BybitWallet()
