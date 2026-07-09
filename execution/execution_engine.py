@@ -4,6 +4,7 @@ import time
 from config import (
     LIVE_TRADING,
     DEFAULT_SYMBOL,
+    DEFAULT_QTY,
 )
 
 
@@ -23,6 +24,7 @@ from risk.risk_manager import (
 
 
 
+
 class ExecutionEngine:
 
 
@@ -33,12 +35,17 @@ class ExecutionEngine:
 
         self.symbol = DEFAULT_SYMBOL
 
+        self.default_qty = DEFAULT_QTY
+
+
 
         print("==============================")
-        print("[EXECUTION ENGINE READY]")
+        print("[EXECUTION ENGINE INIT]")
         print("LIVE :", self.live)
         print("SYMBOL :", self.symbol)
         print("==============================")
+
+
 
 
 
@@ -48,8 +55,7 @@ class ExecutionEngine:
 
     def execute(
         self,
-        signal,
-        qty=0.001,
+        signal
     ):
 
 
@@ -73,37 +79,61 @@ class ExecutionEngine:
 
 
 
-        # ---------------------------------
+
+
+
+        # -------------------------
         # LIVE CHECK
-        # ---------------------------------
+        # -------------------------
 
         if not self.live:
 
 
             print(
-                "[EXECUTION BLOCK] LIVE=False"
+                "[EXECUTION BLOCKED]"
             )
 
-            return None
+            print(
+                "LIVE_TRADING=False"
+            )
+
+
+            return {
+
+                "retCode":0,
+
+                "retMsg":
+                "PAPER MODE"
+
+            }
 
 
 
-        # ---------------------------------
+
+
+
+
+        # -------------------------
         # POSITION CHECK
-        # ---------------------------------
+        # -------------------------
 
         try:
+
 
             position_manager.sync()
 
 
+
             if position_manager.has_position():
+
 
                 print(
                     "[EXECUTION BLOCK] POSITION EXISTS"
                 )
 
+
                 return None
+
 
 
         except Exception as e:
@@ -116,11 +146,21 @@ class ExecutionEngine:
 
 
 
-        # ---------------------------------
-        # RISK CHECK
-        # ---------------------------------
 
-        if not risk_manager.allow_order(qty):
+
+
+
+        # -------------------------
+        # RISK CHECK
+        # -------------------------
+
+        qty = self.default_qty
+
+
+
+        if not risk_manager.allow_order(
+            qty
+        ):
 
 
             print(
@@ -132,23 +172,28 @@ class ExecutionEngine:
 
 
 
+
+
+
+
+
+        # -------------------------
+        # ORDER
+        # -------------------------
+
         side = (
 
             "Buy"
 
             if signal == "BUY"
 
-            else
-
-            "Sell"
+            else "Sell"
 
         )
 
 
 
-        # ---------------------------------
-        # ORDER
-        # ---------------------------------
+
 
         result = order_manager.create_order(
 
@@ -160,7 +205,25 @@ class ExecutionEngine:
 
 
 
-        if result and result.get(
+
+
+
+        if result is None:
+
+
+            print(
+                "[EXECUTION FAILED]"
+            )
+
+
+            return None
+
+
+
+
+
+
+        if result.get(
             "retCode"
         ) == 0:
 
@@ -171,6 +234,7 @@ class ExecutionEngine:
             )
 
 
+
             risk_manager.record_order()
 
 
@@ -179,13 +243,18 @@ class ExecutionEngine:
 
 
             print(
-                "[EXECUTION FAILED]",
+                "[EXECUTION ERROR]",
                 result
             )
 
 
 
+
+
         return result
+
+
+
 
 
 
@@ -195,17 +264,22 @@ class ExecutionEngine:
 
     def test_buy(self):
 
+
         return self.execute(
             "BUY"
         )
 
 
 
+
     def test_sell(self):
+
 
         return self.execute(
             "SELL"
         )
+
+
 
 
 
