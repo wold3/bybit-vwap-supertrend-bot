@@ -17,7 +17,6 @@ class BybitClient:
 
     def __init__(self):
 
-
         self.base = BYBIT_BASE_URL
 
         self.api_key = BYBIT_API_KEY
@@ -25,37 +24,36 @@ class BybitClient:
         self.api_secret = BYBIT_API_SECRET
 
 
+        if not self.api_key or not self.api_secret:
+
+            raise Exception(
+                "BYBIT API KEY / SECRET missing"
+            )
+
 
         print("==============================")
         print("[BYBIT CLIENT INIT]")
         print("BASE :", self.base)
-        print("KEY :", self.api_key[:6])
+        print("KEY  :", self.api_key[:6])
         print("==============================")
 
 
 
     # ==================================
-    # SIGN
+    # QUERY BUILDER
     # ==================================
 
-    def sign(
+    def build_query(
         self,
         params
     ):
 
+        if not params:
 
-        timestamp = str(
-            int(
-                time.time()*1000
-            )
-        )
+            return ""
 
 
-        recv_window = "5000"
-
-
-
-        query = "&".join(
+        return "&".join(
 
             [
 
@@ -69,7 +67,43 @@ class BybitClient:
 
 
 
-        origin = (
+    # ==================================
+    # SIGN
+    # ==================================
+
+    def sign(
+        self,
+        params=None
+    ):
+
+
+        if params is None:
+
+            params = {}
+
+
+        timestamp = str(
+
+            int(
+
+                time.time() * 1000
+
+            )
+
+        )
+
+
+        recv_window = "5000"
+
+
+        query = self.build_query(
+
+            params
+
+        )
+
+
+        payload = (
 
             timestamp
 
@@ -88,12 +122,15 @@ class BybitClient:
         )
 
 
-
         signature = hmac.new(
 
-            self.api_secret.encode(),
+            self.api_secret.encode(
+                "utf-8"
+            ),
 
-            origin.encode(),
+            payload.encode(
+                "utf-8"
+            ),
 
             hashlib.sha256
 
@@ -110,7 +147,6 @@ class BybitClient:
             signature
 
         )
-
 
 
 
@@ -158,7 +194,7 @@ class BybitClient:
 
 
     # ==================================
-    # GET REQUEST
+    # GET
     # ==================================
 
     def get(
@@ -176,7 +212,9 @@ class BybitClient:
 
         timestamp, recv_window, signature = (
 
-            self.sign(params)
+            self.sign(
+                params
+            )
 
         )
 
@@ -225,8 +263,9 @@ class BybitClient:
             data = response.json()
 
 
+
             print(
-                "[BYBIT GET RESPONSE]",
+                "[BYBIT GET]",
                 data
             )
 
@@ -249,7 +288,7 @@ class BybitClient:
 
 
     # ==================================
-    # POST REQUEST
+    # POST
     # ==================================
 
     def post(
@@ -261,7 +300,9 @@ class BybitClient:
 
         timestamp, recv_window, signature = (
 
-            self.sign(params)
+            self.sign(
+                params
+            )
 
         )
 
@@ -312,7 +353,7 @@ class BybitClient:
 
 
             print(
-                "[BYBIT POST RESPONSE]",
+                "[BYBIT POST]",
                 data
             )
 
@@ -334,9 +375,8 @@ class BybitClient:
 
 
 
-
     # ==================================
-    # TIME TEST
+    # SERVER TIME
     # ==================================
 
     def server_time(self):
@@ -345,7 +385,7 @@ class BybitClient:
         try:
 
 
-            r = requests.get(
+            response = requests.get(
 
                 self.base
 
@@ -358,17 +398,123 @@ class BybitClient:
             )
 
 
-            return r.json()
+            return response.json()
 
 
 
         except Exception as e:
 
 
-            print(e)
+            print(
+                "[TIME ERROR]",
+                e
+            )
+
 
             return None
 
+
+
+    # ==================================
+    # WALLET BALANCE
+    # ==================================
+
+    def wallet_balance(self):
+
+
+        return self.get(
+
+            "/v5/account/wallet-balance",
+
+            {
+
+                "accountType":
+                    "UNIFIED"
+
+            }
+
+        )
+
+
+
+    # ==================================
+    # POSITION
+    # ==================================
+
+    def position(
+        self,
+        symbol
+    ):
+
+
+        return self.get(
+
+            "/v5/position/list",
+
+            {
+
+                "category":
+                    "linear",
+
+                "symbol":
+                    symbol
+
+            }
+
+        )
+
+
+
+    # ==================================
+    # ORDER
+    # ==================================
+
+    def create_order(
+        self,
+        symbol,
+        side,
+        qty
+    ):
+
+
+        params = {
+
+
+            "category":
+
+                "linear",
+
+
+            "symbol":
+
+                symbol,
+
+
+            "side":
+
+                side,
+
+
+            "orderType":
+
+                "Market",
+
+
+            "qty":
+
+                str(qty)
+
+        }
+
+
+
+        return self.post(
+
+            "/v5/order/create",
+
+            params
+
+        )
 
 
 
