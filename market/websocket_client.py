@@ -1,8 +1,8 @@
 import json
 import threading
 import time
-
 import websocket
+
 
 from config import (
     DEFAULT_SYMBOL,
@@ -16,9 +16,11 @@ class PublicWebSocketClient:
 
     def __init__(self):
 
+
         self.symbol = DEFAULT_SYMBOL
 
         self.url = BYBIT_PUBLIC_WS
+
 
         self.ws = None
 
@@ -41,7 +43,10 @@ class PublicWebSocketClient:
     # CALLBACK
     # =====================================================
 
-    def set_callback(self, callback):
+    def set_callback(
+        self,
+        callback
+    ):
 
         self.callback = callback
 
@@ -53,6 +58,7 @@ class PublicWebSocketClient:
 
     def start(self):
 
+
         if self.running:
 
             return
@@ -62,8 +68,11 @@ class PublicWebSocketClient:
 
 
         self.thread = threading.Thread(
-            target=self._run,
+
+            target=self._loop,
+
             daemon=True
+
         )
 
 
@@ -71,11 +80,12 @@ class PublicWebSocketClient:
 
 
 
+
     # =====================================================
     # LOOP
     # =====================================================
 
-    def _run(self):
+    def _loop(self):
 
 
         while self.running:
@@ -84,32 +94,36 @@ class PublicWebSocketClient:
             try:
 
 
-                print(
-                    "[PUBLIC WS CONNECTING]",
-                    self.url
-                )
-
-
                 self.ws = websocket.WebSocketApp(
+
 
                     self.url,
 
+
                     on_open=self._on_open,
+
 
                     on_message=self._on_message,
 
+
                     on_error=self._on_error,
 
-                    on_close=self._on_close
+
+                    on_close=self._on_close,
+
 
                 )
+
 
 
                 self.ws.run_forever(
 
+
                     ping_interval=20,
 
-                    ping_timeout=10
+
+                    ping_timeout=10,
+
 
                 )
 
@@ -119,7 +133,7 @@ class PublicWebSocketClient:
 
 
                 print(
-                    "[PUBLIC WS LOOP ERROR]",
+                    "[WS LOOP ERROR]",
                     e
                 )
 
@@ -129,11 +143,12 @@ class PublicWebSocketClient:
 
 
                 print(
-                    "[PUBLIC WS RECONNECT]"
+                    "[WS RECONNECT]"
                 )
 
 
                 time.sleep(5)
+
 
 
 
@@ -153,33 +168,40 @@ class PublicWebSocketClient:
         )
 
 
-        payload = {
+
+        subscribe = {
 
 
             "op":
-            "subscribe",
+
+                "subscribe",
 
 
             "args":
 
-            [
+                [
 
-                f"kline.1.{self.symbol}"
+                    f"kline.1.{self.symbol}"
 
-            ]
+                ]
 
         }
 
 
+
         ws.send(
-            json.dumps(payload)
+            json.dumps(
+                subscribe
+            )
         )
+
 
 
         print(
-            "[PUBLIC WS SUBSCRIBED]",
-            self.symbol
+            "[PUBLIC SUBSCRIBED]"
         )
+
+
 
 
 
@@ -202,24 +224,28 @@ class PublicWebSocketClient:
             )
 
 
-        except:
+        except Exception:
 
 
             return
 
 
 
-        if "topic" not in data:
 
-            return
+        topic = data.get(
+            "topic",
+            ""
+        )
 
 
 
-        if not data["topic"].startswith(
+        if not topic.startswith(
             "kline"
         ):
 
+
             return
+
 
 
 
@@ -240,40 +266,60 @@ class PublicWebSocketClient:
 
 
                     "symbol":
-                    self.symbol,
+
+                        self.symbol,
 
 
                     "timestamp":
-                    int(c["start"]),
+
+                        int(
+                            c["start"]
+                        ),
 
 
                     "open":
-                    float(c["open"]),
+
+                        float(
+                            c["open"]
+                        ),
 
 
                     "high":
-                    float(c["high"]),
+
+                        float(
+                            c["high"]
+                        ),
 
 
                     "low":
-                    float(c["low"]),
+
+                        float(
+                            c["low"]
+                        ),
 
 
                     "close":
-                    float(c["close"]),
+
+                        float(
+                            c["close"]
+                        ),
 
 
                     "volume":
-                    float(c["volume"]),
+
+                        float(
+                            c["volume"]
+                        ),
 
 
                     "confirm":
-                    bool(
-                        c.get(
-                            "confirm",
-                            False
+
+                        bool(
+                            c.get(
+                                "confirm",
+                                False
+                            )
                         )
-                    )
 
                 }
 
@@ -298,6 +344,8 @@ class PublicWebSocketClient:
 
 
 
+
+
     # =====================================================
     # ERROR
     # =====================================================
@@ -313,6 +361,8 @@ class PublicWebSocketClient:
             "[PUBLIC WS ERROR]",
             error
         )
+
+
 
 
 
@@ -336,6 +386,8 @@ class PublicWebSocketClient:
 
 
 
+
+
     # =====================================================
     # STOP
     # =====================================================
@@ -353,15 +405,15 @@ class PublicWebSocketClient:
                 self.ws.close()
 
 
-        except:
+        except Exception:
 
             pass
+
 
 
         print(
             "[PUBLIC WS STOPPED]"
         )
-
 
 
 
