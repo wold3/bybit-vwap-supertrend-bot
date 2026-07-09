@@ -20,32 +20,29 @@ class OrderManager:
 
     def __init__(self):
 
-        self.base_url = BYBIT_BASE_URL
+        self.base = BYBIT_BASE_URL
         self.symbol = DEFAULT_SYMBOL
-        self.live = LIVE_TRADING
-
 
         print("==============================")
         print("[ORDER MANAGER INIT]")
-        print("BASE :", self.base_url)
-        print("LIVE :", self.live)
+        print("BASE :", self.base)
+        print("LIVE :", LIVE_TRADING)
         print("SYMBOL :", self.symbol)
         print("==============================")
 
 
 
-    # ==================================
-    # SIGN
-    # ==================================
 
-    def _sign(
+    # =================================
+    # SIGN
+    # =================================
+
+    def sign(
         self,
-        payload
+        timestamp,
+        body
     ):
 
-        timestamp = str(
-            int(time.time() * 1000)
-        )
 
         recv_window = "5000"
 
@@ -57,110 +54,91 @@ class OrderManager:
             +
             recv_window
             +
-            payload
+            body
         )
 
 
-        signature = hmac.new(
-
+        return hmac.new(
             BYBIT_API_SECRET.encode(),
-
             origin.encode(),
-
             hashlib.sha256
-
         ).hexdigest()
 
 
-        return (
-            timestamp,
-            recv_window,
-            signature
-        )
 
 
 
-    # ==================================
-    # ORDER CREATE
-    # ==================================
+    # =================================
+    # CREATE ORDER
+    # =================================
 
     def create_order(
-        self,
-        side="Buy",
-        qty="0.001",
-        order_type="Market"
+            self,
+            side,
+            qty,
+            take_profit=None,
+            stop_loss=None
     ):
 
 
-        endpoint = "/v5/order/create"
-
-
-        body = {
-
-            "category": "linear",
-
-            "symbol": self.symbol,
-
-            "side": side,
-
-            "positionIdx": 0,
-
-            "orderType": order_type,
-
-            "qty": str(qty)
-
-        }
-
-
-        payload = json.dumps(
-            body,
-            separators=(
-                ",",
-                ":"
-            )
-        )
-
-
-        ts, recv, sign = self._sign(
-            payload
-        )
-
-
-        headers = {
-
-
-            "X-BAPI-API-KEY":
-
-            BYBIT_API_KEY,
-
-
-            "X-BAPI-TIMESTAMP":
-
-            ts,
-
-
-            "X-BAPI-RECV-WINDOW":
-
-            recv,
-
-
-            "X-BAPI-SIGN":
-
-            sign,
-
-
-            "Content-Type":
-
-            "application/json"
-
-        }
-
-
-
         url = (
-            self.base_url
+            self.base
             +
-            endpoint
+            "/v5/order/create"
+        )
+
+
+
+        data = {
+
+            "category":
+                "linear",
+
+            "symbol":
+                self.symbol,
+
+            "side":
+                side,
+
+            "positionIdx":
+                0,
+
+            "orderType":
+                "Market",
+
+            "qty":
+                str(qty)
+
+        }
+
+
+
+        # ==========================
+        # TP / SL 자동 설정
+        # ==========================
+
+        if take_profit:
+
+
+            data["takeProfit"] = str(
+                take_profit
+            )
+
+
+
+        if stop_loss:
+
+
+            data["stopLoss"] = str(
+                stop_loss
+            )
+
+
+
+
+
+        body = json.dumps(
+            data
         )
 
 
@@ -168,12 +146,18 @@ class OrderManager:
         print("==============================")
         print("[ORDER REQUEST]")
         print(url)
-        print(body)
+        print(data)
         print("==============================")
 
 
 
-        if not self.live:
+
+
+        # ==========================
+        # DEMO MODE
+        # ==========================
+
+        if not LIVE_TRADING:
 
 
             print(
@@ -182,35 +166,133 @@ class OrderManager:
 
 
 
-        response = requests.post(
-
-            url,
-
-            headers=headers,
-
-            data=payload,
-
-            timeout=10
-
-        )
 
 
-        result = response.json()
-
-
-        print(
-            "[ORDER RESPONSE]",
-            result
+        timestamp = str(
+            int(
+                time.time()*1000
+            )
         )
 
 
 
-        return result
+        signature = self.sign(
+
+            timestamp,
+
+            body
+
+        )
+
+
+
+        headers = {
+
+
+            "X-BAPI-API-KEY":
+                BYBIT_API_KEY,
+
+
+            "X-BAPI-SIGN":
+                signature,
+
+
+            "X-BAPI-TIMESTAMP":
+                timestamp,
+
+
+            "X-BAPI-RECV-WINDOW":
+                "5000",
+
+
+            "Content-Type":
+                "application/json"
+
+        }
 
 
 
 
 
-# singleton
+        try:
+
+
+            r = requests.post(
+
+                url,
+
+                headers=headers,
+
+                data=body,
+
+                timeout=10
+
+            )
+
+
+            result = r.json()
+
+
+
+            print(
+                "[ORDER RESPONSE]",
+                result
+            )
+
+
+
+            return result
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[ORDER ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+
+
+    # =================================
+    # MARKET CLOSE
+    # =================================
+
+    def close_position(
+            self,
+            side,
+            qty
+    ):
+
+
+        close_side = (
+            "Sell"
+            if side=="Buy"
+            else
+            "Buy"
+        )
+
+
+
+        return self.create_order(
+
+            side=close_side,
+
+            qty=qty
+
+        )
+
+
+
+
+
 
 order_manager = OrderManager()
