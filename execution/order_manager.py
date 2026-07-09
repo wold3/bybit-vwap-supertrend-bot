@@ -4,13 +4,13 @@ import uuid
 
 from config import (
     DEFAULT_SYMBOL,
-    LIVE_TRADING,
 )
 
 
 from api.bybit_client import (
-    bybit_client
+    bybit_client,
 )
+
 
 
 
@@ -23,21 +23,21 @@ class OrderManager:
 
         self.symbol = DEFAULT_SYMBOL
 
-        self.live = LIVE_TRADING
-
 
         self.last_order_time = 0
 
 
-        self.duplicate_seconds = 3
+        self.order_cooldown = 3
 
 
 
         print("==============================")
         print("[ORDER MANAGER INIT]")
-        print("LIVE :", self.live)
         print("SYMBOL :", self.symbol)
         print("==============================")
+
+
+
 
 
 
@@ -45,6 +45,7 @@ class OrderManager:
     # =====================================================
     # CREATE ORDER
     # =====================================================
+
 
     def create_order(
         self,
@@ -55,8 +56,14 @@ class OrderManager:
     ):
 
 
+
         now = time.time()
 
+
+
+        # ---------------------------------
+        # DUPLICATE PROTECTION
+        # ---------------------------------
 
 
         if (
@@ -65,13 +72,13 @@ class OrderManager:
 
             <
 
-            self.duplicate_seconds
+            self.order_cooldown
 
         ):
 
 
             print(
-                "[ORDER BLOCK] DUPLICATE"
+                "[ORDER BLOCK] COOLDOWN"
             )
 
 
@@ -81,10 +88,15 @@ class OrderManager:
 
 
 
+
         order_id = (
+
             "VWAP_"
+
             +
+
             uuid.uuid4().hex[:10]
+
         )
 
 
@@ -95,31 +107,38 @@ class OrderManager:
 
 
             "category":
+
                 "linear",
 
 
             "symbol":
+
                 self.symbol,
 
 
             "side":
+
                 side,
 
 
             "positionIdx":
+
                 0,
 
 
             "orderType":
+
                 "Market",
 
 
             "qty":
+
                 str(qty),
 
 
             "orderLinkId":
-                order_id
+
+                order_id,
 
         }
 
@@ -127,26 +146,29 @@ class OrderManager:
 
 
 
+        # ---------------------------------
+        # TP / SL
+        # ---------------------------------
+
 
         if take_profit is not None:
 
 
-            params[
-                "takeProfit"
-            ] = str(
+            params["takeProfit"] = str(
                 take_profit
             )
+
 
 
 
         if stop_loss is not None:
 
 
-            params[
-                "stopLoss"
-            ] = str(
+            params["stopLoss"] = str(
                 stop_loss
             )
+
+
 
 
 
@@ -161,36 +183,13 @@ class OrderManager:
 
 
 
+
+
         try:
 
 
-            if not self.live:
 
-
-                print(
-                    "[PAPER MODE] ORDER BLOCKED"
-                )
-
-
-                return {
-
-                    "retCode":0,
-
-                    "retMsg":
-                    "PAPER MODE",
-
-                    "result":
-                    {}
-
-                }
-
-
-
-
-
-
-
-            result = bybit_client.post(
+            response = bybit_client.post(
 
                 "/v5/order/create",
 
@@ -201,17 +200,16 @@ class OrderManager:
 
 
 
-
             print(
                 "[ORDER RESPONSE]",
-                result
+                response
             )
 
 
 
 
 
-            if result is None:
+            if response is None:
 
 
                 return None
@@ -220,18 +218,28 @@ class OrderManager:
 
 
 
-            if result.get(
+            if response.get(
                 "retCode"
             ) != 0:
 
 
+
                 print(
+
                     "[ORDER FAILED]",
-                    result
+
+                    response.get(
+                        "retCode"
+                    ),
+
+                    response.get(
+                        "retMsg"
+                    )
+
                 )
 
 
-                return result
+                return response
 
 
 
@@ -242,8 +250,6 @@ class OrderManager:
 
 
 
-
-
             print(
                 "[ORDER SUCCESS]",
                 order_id
@@ -251,8 +257,7 @@ class OrderManager:
 
 
 
-            return result
-
+            return response
 
 
 
@@ -275,53 +280,36 @@ class OrderManager:
 
 
 
-    # =====================================================
-    # COMPATIBILITY
-    # =====================================================
-
-    def place_order(
-        self,
-        side,
-        qty
-    ):
-
-
-        return self.create_order(
-
-            side,
-
-            qty
-
-        )
-
-
-
-
-
-
 
 
     # =====================================================
     # CLOSE POSITION
     # =====================================================
 
+
     def close_position(
         self,
         side,
-        qty
+        qty,
     ):
 
 
 
         close_side = (
 
+
             "Sell"
 
             if side == "Buy"
 
-            else "Buy"
+            else
+
+            "Buy"
+
 
         )
+
+
 
 
 
@@ -329,31 +317,38 @@ class OrderManager:
 
 
             "category":
+
                 "linear",
 
 
             "symbol":
+
                 self.symbol,
 
 
             "side":
+
                 close_side,
 
 
             "positionIdx":
+
                 0,
 
 
             "orderType":
+
                 "Market",
 
 
             "qty":
+
                 str(qty),
 
 
             "reduceOnly":
-                True
+
+                True,
 
         }
 
@@ -369,16 +364,32 @@ class OrderManager:
 
 
 
+
+
         try:
 
 
-            return bybit_client.post(
+
+            response = bybit_client.post(
 
                 "/v5/order/create",
 
                 params
 
             )
+
+
+
+            print(
+                "[CLOSE RESPONSE]",
+                response
+            )
+
+
+
+            return response
+
+
 
 
 
@@ -398,9 +409,13 @@ class OrderManager:
 
 
 
+
+
+
     # =====================================================
     # CANCEL ALL
     # =====================================================
+
 
     def cancel_all(self):
 
@@ -409,13 +424,16 @@ class OrderManager:
 
 
             "category":
+
                 "linear",
 
 
             "symbol":
-                self.symbol
+
+                self.symbol,
 
         }
+
 
 
 
@@ -423,13 +441,25 @@ class OrderManager:
         try:
 
 
-            return bybit_client.post(
+            response = bybit_client.post(
 
                 "/v5/order/cancel-all",
 
                 params
 
             )
+
+
+
+            print(
+                "[CANCEL ALL]",
+                response
+            )
+
+
+            return response
+
+
 
 
 
@@ -443,6 +473,9 @@ class OrderManager:
 
 
             return None
+
+
+
 
 
 
