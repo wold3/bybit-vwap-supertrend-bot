@@ -1,248 +1,101 @@
-# watchdog/watchdog.py
-
-import time
 import threading
+import time
 
+from utils.logger import (
+    bot_logger,
+    error_logger,
+)
 
 
 class Watchdog:
-    """
-    System Watchdog
-
-    기능:
-    - 서비스 heartbeat 기록
-    - 서비스 생존 확인
-    - 상태 조회
-    """
-
-
 
     def __init__(self):
 
-
         self.running = False
+        self.thread = None
 
+        self.interval = 30
 
-        self.lock = threading.RLock()
+        self.last_tick = time.time()
 
+    # =====================================================
+    # HEARTBEAT
+    # =====================================================
 
-        self.services = {}
+    def heartbeat(self):
 
+        self.last_tick = time.time()
 
-
-    # =====================================
+    # =====================================================
     # START
-    # =====================================
+    # =====================================================
 
     def start(self):
 
+        if self.running:
+            return
 
-        with self.lock:
+        self.running = True
 
-
-            self.running = True
-
-
-
-        print(
-
-            "[WATCHDOG START]"
-
+        self.thread = threading.Thread(
+            target=self._loop,
+            daemon=True,
         )
 
+        self.thread.start()
 
-        return True
+        print("[WATCHDOG START]")
 
+        bot_logger.info("WATCHDOG START")
 
+    # =====================================================
+    # LOOP
+    # =====================================================
 
+    def _loop(self):
 
+        while self.running:
 
-    # =====================================
+            try:
+
+                elapsed = time.time() - self.last_tick
+
+                if elapsed > self.interval * 2:
+
+                    print(
+                        "[WATCHDOG WARNING] No heartbeat "
+                        f"for {elapsed:.1f}s"
+                    )
+
+                    bot_logger.warning(
+                        f"No heartbeat for {elapsed:.1f}s"
+                    )
+
+                else:
+
+                    print("[WATCHDOG OK]")
+
+                time.sleep(self.interval)
+
+            except Exception as e:
+
+                print("[WATCHDOG ERROR]", e)
+
+                error_logger.exception(str(e))
+
+                time.sleep(5)
+
+    # =====================================================
     # STOP
-    # =====================================
+    # =====================================================
 
     def stop(self):
 
+        self.running = False
 
-        with self.lock:
+        print("[WATCHDOG STOP]")
 
-
-            self.running = False
-
-
-
-        print(
-
-            "[WATCHDOG STOP]"
-
-        )
-
-
-        return True
-
-
-
-
-
-    # =====================================
-    # HEARTBEAT
-    # =====================================
-
-    def heartbeat(
-        self,
-        service="default"
-    ):
-
-
-        with self.lock:
-
-
-            self.services[service] = {
-
-
-                "time":
-
-                    time.time(),
-
-
-                "alive":
-
-                    True
-
-            }
-
-
-
-        return True
-
-
-
-
-
-    # =====================================
-    # CHECK SERVICE
-    # =====================================
-
-    def is_alive(
-        self,
-        service,
-        timeout=60
-    ):
-
-
-        with self.lock:
-
-
-            data = self.services.get(
-
-                service
-
-            )
-
-
-
-            if not data:
-
-
-                return False
-
-
-
-            return (
-
-                time.time()
-
-                -
-
-                data["time"]
-
-            ) <= timeout
-
-
-
-
-
-    # =====================================
-    # ALL STATUS
-    # =====================================
-
-    def status(self):
-
-
-        with self.lock:
-
-
-            now = time.time()
-
-
-            result = {}
-
-
-
-            for name, data in self.services.items():
-
-
-                result[name] = {
-
-
-                    "alive":
-
-                        (
-
-                            now
-
-                            -
-
-                            data["time"]
-
-                        )
-
-                        <= 60,
-
-
-                    "last":
-
-                        data["time"]
-
-                }
-
-
-
-            return {
-
-
-                "running":
-
-                    self.running,
-
-
-                "services":
-
-                    result
-
-            }
-
-
-
-
-
-    # =====================================
-    # RESET
-    # =====================================
-
-    def reset(self):
-
-
-        with self.lock:
-
-
-            self.services.clear()
-
-
-            self.running = False
-
-
-
+        bot_logger.info("WATCHDOG STOP")
 
 
 watchdog = Watchdog()
