@@ -1,21 +1,7 @@
-import os
-
-from dotenv import load_dotenv
+import time
 
 
-from risk.risk_engine import risk_engine
-
-from risk.drawdown_guard import drawdown_guard
-
-from ml.ml_filter import ml_filter
-
-from position.position_manager import position_manager
-
-
-
-load_dotenv()
-
-
+from execution.order_manager import order_manager
 
 
 
@@ -24,437 +10,262 @@ class StrategyEngine:
 
     def __init__(self):
 
+        self.position = None
 
-        self.default_qty = float(
+        self.last_signal = None
 
-            os.getenv(
+        self.cooldown = 30
 
-                "DEFAULT_QTY",
-
-                "0.001"
-
-            )
-
-        )
+        self.last_order_time = 0
 
 
+        print("==============================")
+        print("[STRATEGY ENGINE INIT]")
+        print("==============================")
 
 
 
-    # =====================================
-    # MAIN CHECK
-    # =====================================
 
-    def check(
+    # ==================================
+    # SIGNAL CHECK
+    # ==================================
+
+    def process_signal(
         self,
-        market_data
+        signal
     ):
 
 
-        if not market_data:
+        if signal is None:
 
-            return None
-
-
-
-        symbol = market_data.get(
-
-            "symbol"
-
-        )
+            return
 
 
-        price = market_data.get(
 
-            "close"
-
-        )
+        signal = signal.upper()
 
 
-        vwap = market_data.get(
 
-            "vwap"
-
-        )
-
-
-        trend = market_data.get(
-
-            "supertrend"
-
+        print(
+            "[STRATEGY SIGNAL]",
+            signal
         )
 
 
 
-        if not symbol or price is None:
+        # 중복 신호 방지
 
-            return None
+        if signal == self.last_signal:
 
-
-
-
-
-        # =================================
-        # EXIT FIRST
-        # =================================
-
-        if position_manager.has_position(
-
-            symbol
-
-        ):
+            return
 
 
-            return self.check_exit(
 
-                market_data
 
+        # 주문 간격 제한
+
+        now = time.time()
+
+
+        if now - self.last_order_time < self.cooldown:
+
+            print(
+                "[ORDER COOLDOWN]"
             )
 
+            return
 
 
 
 
-        # =================================
-        # INDICATOR CHECK
-        # =================================
+        # ==================================
+        # BUY
+        # ==================================
 
-        if vwap is None:
-
-            return None
+        if signal == "BUY":
 
 
+            if self.position is not None:
 
-        if trend in (
 
-            None,
+                print(
+                    "[SKIP] POSITION EXISTS"
+                )
 
-            "FLAT"
 
-        ):
-
-            return None
+                return
 
 
 
+            result = order_manager.create_order(
 
+                side="Buy",
 
-        # =================================
-        # RISK CHECK
-        # =================================
+                qty="0.001",
 
-        if not risk_engine.can_trade():
+                order_type="Market"
+
+            )
 
 
             print(
-
-                "[RISK BLOCK]"
-
+                "[BUY ORDER RESULT]",
+                result
             )
 
 
-            return None
+
+            if result.get("retCode") == 0:
+
+
+                self.position = "LONG"
+
+                self.last_signal = signal
+
+                self.last_order_time = now
 
 
 
 
 
-        if not drawdown_guard.can_trade():
+
+        # ==================================
+        # SELL
+        # ==================================
+
+        elif signal == "SELL":
+
+
+
+            if self.position != "LONG":
+
+
+                print(
+                    "[SKIP] NO LONG POSITION"
+                )
+
+
+                return
+
+
+
+            result = order_manager.create_order(
+
+                side="Sell",
+
+                qty="0.001",
+
+                order_type="Market"
+
+            )
+
 
 
             print(
-
-                "[DRAWDOWN BLOCK]"
-
+                "[SELL ORDER RESULT]",
+                result
             )
 
 
-            return None
 
+            if result.get("retCode") == 0:
 
 
+                self.position = None
 
+                self.last_signal = signal
 
-        # =================================
-        # ML FILTER
-        # =================================
+                self.last_order_time = now
 
-        if not ml_filter.allow_trade(
 
-            market_data
 
-        ):
 
 
-            print(
 
-                "[ML BLOCK]"
 
-            )
+    # ==================================
+    # CANDLE INPUT
+    # ==================================
 
-
-            return None
-
-
-
-
-
-        # =================================
-        # LONG ENTRY
-        # =================================
-
-        if (
-
-            price > vwap
-
-            and
-
-            trend == "UP"
-
-        ):
-
-
-            return {
-
-
-                "type":
-
-                    "ENTRY",
-
-
-                "symbol":
-
-                    symbol,
-
-
-                "side":
-
-                    "Buy",
-
-
-                "qty":
-
-                    self.default_qty
-
-
-            }
-
-
-
-
-
-        # =================================
-        # SHORT ENTRY
-        # =================================
-
-        if (
-
-            price < vwap
-
-            and
-
-            trend == "DOWN"
-
-        ):
-
-
-            return {
-
-
-                "type":
-
-                    "ENTRY",
-
-
-                "symbol":
-
-                    symbol,
-
-
-                "side":
-
-                    "Sell",
-
-
-                "qty":
-
-                    self.default_qty
-
-
-            }
-
-
-
-        return None
-
-
-
-
-
-    # =====================================
-    # EXIT CHECK
-    # =====================================
-
-    def check_exit(
+    def on_candle(
         self,
-        market_data
+        candle
     ):
 
 
-        symbol = market_data.get(
-
-            "symbol"
-
-        )
-
-
-        trend = market_data.get(
-
-            "supertrend"
-
-        )
-
-
-
-        position = position_manager.get_position(
-
-            symbol
-
-        )
-
-
-
-        if not position:
-
-            return None
-
-
-
-        side = position.get(
-
-            "side"
-
-        )
-
-
-
-        size = position.get(
-
-            "size"
-
-        )
-
-
-
-
-
-        # LONG EXIT
-
-        if (
-
-            side == "Buy"
-
-            and
-
-            trend == "DOWN"
-
-        ):
-
-
-            return {
-
-
-                "type":
-
-                    "EXIT",
-
-
-                "symbol":
-
-                    symbol,
-
-
-                "side":
-
-                    "Sell",
-
-
-                "qty":
-
-                    size
-
-
-            }
-
-
-
-
-
-        # SHORT EXIT
-
-        if (
-
-            side == "Sell"
-
-            and
-
-            trend == "UP"
-
-        ):
-
-
-            return {
-
-
-                "type":
-
-                    "EXIT",
-
-
-                "symbol":
-
-                    symbol,
-
-
-                "side":
-
-                    "Buy",
-
-
-                "qty":
-
-                    size
-
-
-            }
-
-
-
-
-
-        return None
-
-
-
-
-
-    # =====================================
-    # STATUS
-    # =====================================
-
-    def status(
-        self
-    ):
-
-
-        return {
-
-
-            "default_qty":
-
-                self.default_qty
-
+        """
+        candle 예:
+
+        {
+            open,
+            high,
+            low,
+            close,
+            volume
         }
+
+        """
+
+
+        signal = self.calculate_signal(
+            candle
+        )
+
+
+        self.process_signal(
+            signal
+        )
+
+
+
+
+
+
+    # ==================================
+    # VWAP + SUPERTREND PLACEHOLDER
+    # ==================================
+
+    def calculate_signal(
+        self,
+        candle
+    ):
+
+
+        """
+        실제 VWAP / Supertrend 계산 위치
+
+        반환:
+            BUY
+            SELL
+            None
+
+        """
+
+
+        close = candle.get(
+            "close"
+        )
+
+
+        if close is None:
+
+            return None
+
+
+
+        # ==========================
+        # 테스트용
+        # ==========================
+        #
+        # 실제 적용 시:
+        #
+        # vwap_signal
+        # supertrend_signal
+        #
+        # 조합
+
+
+        return None
 
 
 
