@@ -13,20 +13,38 @@ class RiskManager:
         # 최대 주문 수량
         self.max_position_size = 0.01
 
-        # 주문 쿨다운(초)
+        # 주문 쿨다운
         self.cooldown_seconds = 30
 
         self.last_order_time = 0
 
-        # 일일 최대 손실(USDT)
+
+        # ==========================
+        # DAILY LOSS
+        # ==========================
+
         self.daily_loss_limit = -100
 
-        # 시작 자산
         self.start_equity = None
+
+
+        # ==========================
+        # LOSS CHECK CONTROL
+        # ==========================
+
+        self.last_loss_check = 0
+
+        self.loss_check_interval = 60
+
+
+        # Demo/Test 보호
+        self.demo_mode = True
+
 
         print("==============================")
         print("[RISK MANAGER READY]")
         print("==============================")
+
 
     # =====================================================
     # INITIALIZE
@@ -40,17 +58,20 @@ class RiskManager:
 
             self.start_equity = float(equity)
 
+
             print(
                 "[RISK INIT EQUITY]",
-                self.start_equity,
+                self.start_equity
             )
+
 
         except Exception as e:
 
             print(
                 "[RISK INIT ERROR]",
-                e,
+                e
             )
+
 
     # =====================================================
     # ORDER CHECK
@@ -58,79 +79,129 @@ class RiskManager:
 
     def allow_order(self, qty):
 
+
         if not self.enabled:
 
-            print("[RISK BLOCK] DISABLED")
+            print(
+                "[RISK BLOCK] DISABLED"
+            )
 
             return False
 
-        # -------------------------
-        # Quantity
-        # -------------------------
+
 
         try:
 
             qty = float(qty)
 
+
         except Exception:
 
-            print("[RISK BLOCK] INVALID QTY")
+
+            print(
+                "[RISK BLOCK] INVALID QTY"
+            )
 
             return False
+
+
+
 
         if qty <= 0:
 
-            print("[RISK BLOCK] INVALID SIZE")
+
+            print(
+                "[RISK BLOCK] INVALID SIZE"
+            )
 
             return False
+
+
+
 
         if qty > self.max_position_size:
 
-            print("[RISK BLOCK] MAX SIZE")
+
+            print(
+                "[RISK BLOCK] MAX SIZE"
+            )
 
             return False
 
-        # -------------------------
-        # Position Check
-        # -------------------------
+
+
+
+        # ==========================
+        # POSITION CHECK
+        # ==========================
 
         try:
 
             position_manager.sync()
 
+
             if position_manager.has_position():
 
-                print("[RISK BLOCK] POSITION EXISTS")
+
+                print(
+                    "[RISK BLOCK] POSITION EXISTS"
+                )
+
 
                 return False
 
+
+
         except Exception as e:
 
-            print("[POSITION CHECK ERROR]", e)
 
-        # -------------------------
-        # Cooldown
-        # -------------------------
+            print(
+                "[POSITION CHECK ERROR]",
+                e
+            )
+
+
+
+
+
+        # ==========================
+        # COOLDOWN
+        # ==========================
 
         now = time.time()
 
+
+
         if now - self.last_order_time < self.cooldown_seconds:
 
+
             remain = round(
+
                 self.cooldown_seconds
-                - (now - self.last_order_time),
-                1,
+                -
+                (now - self.last_order_time),
+
+                1
+
             )
+
 
             print(
                 "[RISK BLOCK] COOLDOWN",
                 remain,
-                "sec",
+                "sec"
             )
+
 
             return False
 
+
+
+
         return True
+
+
+
 
     # =====================================================
     # RECORD ORDER
@@ -140,46 +211,100 @@ class RiskManager:
 
         self.last_order_time = time.time()
 
+
+
+
     # =====================================================
     # DAILY LOSS CHECK
     # =====================================================
 
     def check_daily_loss(self):
 
+
         if self.start_equity is None:
 
             return True
 
+
+
+        now = time.time()
+
+
+
+        # API 과호출 방지
+
+        if (
+            now - self.last_loss_check
+            <
+            self.loss_check_interval
+        ):
+
+            return True
+
+
+
+        self.last_loss_check = now
+
+
+
         try:
 
-            current = float(wallet.get_equity())
 
-            pnl = current - self.start_equity
+            current = float(
+                wallet.get_equity()
+            )
+
+
+
+            pnl = (
+                current
+                -
+                self.start_equity
+            )
+
+
 
             print(
                 "[DAILY PNL]",
-                round(pnl, 2),
+                round(
+                    pnl,
+                    2
+                )
             )
+
+
 
             if pnl <= self.daily_loss_limit:
 
+
                 print(
                     "[RISK STOP] DAILY LOSS LIMIT",
-                    pnl,
+                    pnl
                 )
+
 
                 self.enabled = False
 
+
                 return False
+
+
+
 
         except Exception as e:
 
+
             print(
                 "[LOSS CHECK ERROR]",
-                e,
+                e
             )
 
+
+
         return True
+
+
+
 
     # =====================================================
     # RESET DAILY
@@ -187,13 +312,26 @@ class RiskManager:
 
     def reset_daily(self):
 
+
         self.initialize()
+
 
         self.last_order_time = 0
 
+
+        self.last_loss_check = 0
+
+
         self.enabled = True
 
-        print("[RISK RESET]")
+
+
+        print(
+            "[RISK RESET]"
+        )
+
+
+
 
     # =====================================================
     # STATUS
@@ -201,38 +339,75 @@ class RiskManager:
 
     def status(self):
 
+
         current_pnl = None
+
+
 
         try:
 
+
             if self.start_equity is not None:
 
+
                 current_pnl = (
-                    float(wallet.get_equity())
-                    - self.start_equity
+
+                    float(
+                        wallet.get_equity()
+                    )
+
+                    -
+
+                    self.start_equity
+
                 )
+
+
 
         except Exception:
 
+
             pass
+
+
+
 
         return {
 
-            "enabled": self.enabled,
 
-            "max_position": self.max_position_size,
+            "enabled":
+                self.enabled,
 
-            "cooldown": self.cooldown_seconds,
 
-            "last_order": self.last_order_time,
+            "max_position":
+                self.max_position_size,
 
-            "start_equity": self.start_equity,
 
-            "daily_loss_limit": self.daily_loss_limit,
+            "cooldown":
+                self.cooldown_seconds,
 
-            "current_pnl": current_pnl,
+
+            "last_order":
+                self.last_order_time,
+
+
+            "start_equity":
+                self.start_equity,
+
+
+            "daily_loss_limit":
+                self.daily_loss_limit,
+
+
+            "current_pnl":
+                current_pnl,
+
+
+            "loss_check_interval":
+                self.loss_check_interval,
 
         }
+
 
 
 risk_manager = RiskManager()
