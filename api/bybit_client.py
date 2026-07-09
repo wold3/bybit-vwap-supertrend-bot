@@ -1,5 +1,3 @@
-# api/bybit_client.py
-
 import time
 import hmac
 import hashlib
@@ -10,7 +8,6 @@ from config import (
     BYBIT_BASE_URL,
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
-    ACCOUNT_TYPE
 )
 
 
@@ -21,109 +18,35 @@ class BybitClient:
     def __init__(self):
 
 
-        self.base_url = BYBIT_BASE_URL
-
+        self.base = BYBIT_BASE_URL
 
         self.api_key = BYBIT_API_KEY
 
-
         self.api_secret = BYBIT_API_SECRET
-
-
-        self.account_type = ACCOUNT_TYPE
 
 
 
         print("==============================")
         print("[BYBIT CLIENT INIT]")
-        print("BASE :", self.base_url)
-        print(
-            "KEY :",
-            self.api_key[:6]
-            if self.api_key
-            else None
-        )
+        print("BASE :", self.base)
+        print("KEY :", self.api_key[:6])
         print("==============================")
 
 
 
-    # =====================================
+    # ==================================
     # SIGN
-    # =====================================
+    # ==================================
 
     def sign(
         self,
-        timestamp,
-        recv_window,
         params
     ):
 
 
-        param_str = params
-
-
-
-        origin = (
-
-            str(timestamp)
-
-            +
-
-            self.api_key
-
-            +
-
-            str(recv_window)
-
-            +
-
-            param_str
-
-        )
-
-
-
-        signature = hmac.new(
-
-            self.api_secret.encode(
-                "utf-8"
-            ),
-
-            origin.encode(
-                "utf-8"
-            ),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-
-        return signature
-
-
-
-    # =====================================
-    # PRIVATE REQUEST
-    # =====================================
-
-    def private_request(
-        self,
-        method,
-        endpoint,
-        params=None
-    ):
-
-
-        if params is None:
-
-            params = {}
-
-
-
         timestamp = str(
             int(
-                time.time() * 1000
+                time.time()*1000
             )
         )
 
@@ -132,55 +55,78 @@ class BybitClient:
 
 
 
-        if method.upper() == "GET":
+        query = "&".join(
 
+            [
 
-            query = "&".join(
+                f"{k}={params[k]}"
 
-                [
-                    f"{k}={v}"
-                    for k, v in sorted(params.items())
-                ]
+                for k in sorted(params)
 
-            )
-
-
-            sign_payload = query
-
-
-
-        else:
-
-
-            import json
-
-
-            sign_payload = json.dumps(
-
-                params,
-
-                separators=(
-                    ",",
-                    ":"
-                )
-
-            )
-
-
-
-        signature = self.sign(
-
-            timestamp,
-
-            recv_window,
-
-            sign_payload
+            ]
 
         )
 
 
 
-        headers = {
+        origin = (
+
+            timestamp
+
+            +
+
+            self.api_key
+
+            +
+
+            recv_window
+
+            +
+
+            query
+
+        )
+
+
+
+        signature = hmac.new(
+
+            self.api_secret.encode(),
+
+            origin.encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+
+        return (
+
+            timestamp,
+
+            recv_window,
+
+            signature
+
+        )
+
+
+
+
+    # ==================================
+    # HEADER
+    # ==================================
+
+    def headers(
+        self,
+        timestamp,
+        recv_window,
+        signature
+    ):
+
+
+        return {
 
 
             "X-BAPI-API-KEY":
@@ -211,9 +157,46 @@ class BybitClient:
 
 
 
+    # ==================================
+    # GET REQUEST
+    # ==================================
+
+    def get(
+        self,
+        endpoint,
+        params=None
+    ):
+
+
+        if params is None:
+
+            params = {}
+
+
+
+        timestamp, recv_window, signature = (
+
+            self.sign(params)
+
+        )
+
+
+
+        headers = self.headers(
+
+            timestamp,
+
+            recv_window,
+
+            signature
+
+        )
+
+
+
         url = (
 
-            self.base_url
+            self.base
 
             +
 
@@ -223,15 +206,7 @@ class BybitClient:
 
 
 
-        print(
-            "[REQUEST]",
-            method,
-            url
-        )
-
-
-
-        if method.upper() == "GET":
+        try:
 
 
             response = requests.get(
@@ -247,8 +222,76 @@ class BybitClient:
             )
 
 
+            data = response.json()
 
-        else:
+
+            print(
+                "[BYBIT GET RESPONSE]",
+                data
+            )
+
+
+            return data
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[BYBIT GET ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+    # ==================================
+    # POST REQUEST
+    # ==================================
+
+    def post(
+        self,
+        endpoint,
+        params
+    ):
+
+
+        timestamp, recv_window, signature = (
+
+            self.sign(params)
+
+        )
+
+
+
+        headers = self.headers(
+
+            timestamp,
+
+            recv_window,
+
+            signature
+
+        )
+
+
+
+        url = (
+
+            self.base
+
+            +
+
+            endpoint
+
+        )
+
+
+
+        try:
 
 
             response = requests.post(
@@ -264,49 +307,67 @@ class BybitClient:
             )
 
 
-
-        data = response.json()
-
-
-
-        print(
-            "[BYBIT RESPONSE]",
-            data
-        )
+            data = response.json()
 
 
 
-        return data
+            print(
+                "[BYBIT POST RESPONSE]",
+                data
+            )
+
+
+            return data
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[BYBIT POST ERROR]",
+                e
+            )
+
+
+            return None
 
 
 
 
-    # =====================================
-    # SERVER TIME
-    # =====================================
+    # ==================================
+    # TIME TEST
+    # ==================================
 
-    def server_time(
-        self
-    ):
+    def server_time(self):
 
 
-        url = (
-
-            self.base_url
-
-            +
-
-            "/v5/market/time"
-
-        )
+        try:
 
 
+            r = requests.get(
 
-        return requests.get(
-            url,
-            timeout=10
-        ).json()
+                self.base
 
+                +
+
+                "/v5/market/time",
+
+                timeout=5
+
+            )
+
+
+            return r.json()
+
+
+
+        except Exception as e:
+
+
+            print(e)
+
+            return None
 
 
 
