@@ -1,102 +1,77 @@
-import logging
 import os
+import logging
+from logging.handlers import RotatingFileHandler
 
-
+# =====================================================
+# LOG DIRECTORY
+# =====================================================
 
 LOG_DIR = "logs"
 
+os.makedirs(LOG_DIR, exist_ok=True)
 
+# =====================================================
+# FORMAT
+# =====================================================
 
-if not os.path.exists(LOG_DIR):
+formatter = logging.Formatter(
+    "%(asctime)s | %(levelname)s | %(message)s"
+)
 
-    os.makedirs(LOG_DIR)
+# =====================================================
+# BOT LOGGER
+# =====================================================
 
+bot_logger = logging.getLogger("BOT")
 
+bot_logger.setLevel(logging.INFO)
 
+if not bot_logger.handlers:
 
-
-
-def create_logger(
-        name,
-        filename
-):
-
-
-    logger = logging.getLogger(name)
-
-
-    logger.setLevel(
-        logging.INFO
+    file_handler = RotatingFileHandler(
+        os.path.join(LOG_DIR, "bot.log"),
+        maxBytes=5 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
     )
 
+    file_handler.setFormatter(formatter)
 
+    console_handler = logging.StreamHandler()
 
-    if not logger.handlers:
+    console_handler.setFormatter(formatter)
 
+    bot_logger.addHandler(file_handler)
+    bot_logger.addHandler(console_handler)
 
-        handler = logging.FileHandler(
+# =====================================================
+# ERROR LOGGER
+# =====================================================
 
-            os.path.join(
-                LOG_DIR,
-                filename
-            ),
+error_logger = logging.getLogger("ERROR")
 
-            encoding="utf-8"
+error_logger.setLevel(logging.ERROR)
 
-        )
+if not error_logger.handlers:
 
+    file_handler = RotatingFileHandler(
+        os.path.join(LOG_DIR, "error.log"),
+        maxBytes=5 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
+    )
 
+    file_handler.setFormatter(formatter)
 
-        formatter = logging.Formatter(
+    console_handler = logging.StreamHandler()
 
-            "%(asctime)s | %(levelname)s | %(message)s"
+    console_handler.setFormatter(formatter)
 
-        )
+    error_logger.addHandler(file_handler)
+    error_logger.addHandler(console_handler)
 
+# =====================================================
+# START LOG
+# =====================================================
 
-        handler.setFormatter(
-            formatter
-        )
-
-
-        logger.addHandler(
-            handler
-        )
-
-
-
-    return logger
-
-
-
-
-
-
-
-bot_logger = create_logger(
-
-    "bot",
-
-    "bot.log"
-
-)
-
-
-
-order_logger = create_logger(
-
-    "order",
-
-    "order.log"
-
-)
-
-
-
-error_logger = create_logger(
-
-    "error",
-
-    "error.log"
-
-)
+bot_logger.info("Logger initialized")
