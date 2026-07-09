@@ -1,6 +1,7 @@
 import json
-import time
 import threading
+import time
+
 import websocket
 
 from config import DEFAULT_SYMBOL
@@ -11,6 +12,7 @@ class PublicWebSocketClient:
     def __init__(self):
 
         self.symbol = DEFAULT_SYMBOL
+
         self.url = "wss://stream.bybit.com/v5/public/linear"
 
         self.ws = None
@@ -25,17 +27,17 @@ class PublicWebSocketClient:
         print("SYMBOL :", self.symbol)
         print("==============================")
 
-    # ==================================
+    # =====================================================
     # CALLBACK
-    # ==================================
+    # =====================================================
 
     def set_callback(self, callback):
 
         self.callback = callback
 
-    # ==================================
+    # =====================================================
     # START
-    # ==================================
+    # =====================================================
 
     def start(self):
 
@@ -46,14 +48,10 @@ class PublicWebSocketClient:
 
         self.thread = threading.Thread(
             target=self._run,
-            daemon=True
+            daemon=True,
         )
 
         self.thread.start()
-
-    # ==================================
-    # RUN
-    # ==================================
 
     def _run(self):
 
@@ -62,25 +60,16 @@ class PublicWebSocketClient:
             try:
 
                 self.ws = websocket.WebSocketApp(
-
                     self.url,
-
                     on_open=self._on_open,
-
                     on_message=self._on_message,
-
                     on_error=self._on_error,
-
-                    on_close=self._on_close
-
+                    on_close=self._on_close,
                 )
 
                 self.ws.run_forever(
-
                     ping_interval=20,
-
-                    ping_timeout=10
-
+                    ping_timeout=10,
                 )
 
             except Exception as e:
@@ -93,33 +82,28 @@ class PublicWebSocketClient:
 
                 time.sleep(3)
 
-    # ==================================
+    # =====================================================
     # OPEN
-    # ==================================
+    # =====================================================
 
     def _on_open(self, ws):
 
         print("[PUBLIC WS CONNECTED]")
 
         subscribe = {
-
             "op": "subscribe",
-
             "args": [
-
                 f"kline.1.{self.symbol}"
-
             ]
-
         }
 
         ws.send(json.dumps(subscribe))
 
         print("[PUBLIC SUBSCRIBED]")
 
-    # ==================================
+    # =====================================================
     # MESSAGE
-    # ==================================
+    # =====================================================
 
     def _on_message(self, ws, message):
 
@@ -127,17 +111,23 @@ class PublicWebSocketClient:
 
             data = json.loads(message)
 
-            topic = data.get("topic")
+        except Exception:
 
-            if not topic:
-                return
+            return
 
-            if not topic.startswith("kline"):
-                return
+        topic = data.get("topic")
 
-            candles = data.get("data", [])
+        if not topic:
+            return
 
-            for c in candles:
+        if not topic.startswith("kline"):
+            return
+
+        candles = data.get("data", [])
+
+        for c in candles:
+
+            try:
 
                 candle = {
 
@@ -155,66 +145,38 @@ class PublicWebSocketClient:
 
                     "volume": float(c["volume"]),
 
-                    # ★ 추가
                     "confirm": bool(c.get("confirm", False))
-
                 }
 
-                print(
-
-                    "[CANDLE]",
-
-                    candle
-
-                )
+                print("[CANDLE]", candle)
 
                 if self.callback:
 
                     self.callback(candle)
 
-        except Exception as e:
+            except Exception as e:
 
-            print(
+                print("[CANDLE PARSE ERROR]", e)
 
-                "[PUBLIC PARSE ERROR]",
-
-                e
-
-            )
-
-    # ==================================
+    # =====================================================
     # ERROR
-    # ==================================
+    # =====================================================
 
     def _on_error(self, ws, error):
 
-        print(
+        print("[PUBLIC WS ERROR]", error)
 
-            "[PUBLIC WS ERROR]",
-
-            error
-
-        )
-
-    # ==================================
+    # =====================================================
     # CLOSE
-    # ==================================
+    # =====================================================
 
     def _on_close(self, ws, code, msg):
 
-        print(
+        print("[PUBLIC WS CLOSED]", code, msg)
 
-            "[PUBLIC WS CLOSED]",
-
-            code,
-
-            msg
-
-        )
-
-    # ==================================
+    # =====================================================
     # STOP
-    # ==================================
+    # =====================================================
 
     def stop(self):
 
@@ -230,11 +192,7 @@ class PublicWebSocketClient:
 
             pass
 
-        print(
-
-            "[PUBLIC WS STOPPED]"
-
-        )
+        print("[PUBLIC WS STOPPED]")
 
 
 ws_client = PublicWebSocketClient()
