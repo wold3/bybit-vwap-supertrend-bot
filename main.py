@@ -1,6 +1,6 @@
 import time
 import signal
-import threading
+import sys
 
 
 from config import (
@@ -35,8 +35,12 @@ running = True
 
 
 
+# ==================================
+# STOP HANDLER
+# ==================================
+
 def shutdown(
-    sig=None,
+    signum=None,
     frame=None
 ):
 
@@ -44,7 +48,10 @@ def shutdown(
 
 
     print()
-    print("[BOT STOPPING]")
+
+    print(
+        "[BOT STOPPING]"
+    )
 
 
     running = False
@@ -55,10 +62,12 @@ def shutdown(
 
         ws_client.stop()
 
+    except Exception as e:
 
-    except Exception:
-
-        pass
+        print(
+            "[PUBLIC STOP ERROR]",
+            e
+        )
 
 
 
@@ -66,17 +75,18 @@ def shutdown(
 
         private_ws_client.stop()
 
+    except Exception as e:
 
-    except Exception:
-
-        pass
+        print(
+            "[PRIVATE STOP ERROR]",
+            e
+        )
 
 
 
     try:
 
         watchdog.stop()
-
 
     except Exception:
 
@@ -89,8 +99,8 @@ def shutdown(
     )
 
 
+    sys.exit(0)
 
-    raise SystemExit
 
 
 
@@ -109,61 +119,10 @@ signal.signal(
 
 
 
-def equity_loop():
 
-
-    while running:
-
-
-        try:
-
-
-            equity = (
-                wallet.get_equity()
-            )
-
-
-            print(
-                "[ACCOUNT EQUITY]",
-                equity
-            )
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[EQUITY ERROR]",
-                e
-            )
-
-
-
-        time.sleep(
-            30
-        )
-
-
-
-
-def strategy_loop():
-
-
-    print(
-        "[START] STRATEGY LOOP"
-    )
-
-
-    while running:
-
-
-        time.sleep(
-            1
-        )
-
-
-
+# ==================================
+# START
+# ==================================
 
 def main():
 
@@ -177,15 +136,11 @@ def main():
 
 
 
-    # watchdog
+    # watchdog 1회
 
     try:
 
         watchdog.start()
-
-        print(
-            "[WATCHDOG START]"
-        )
 
     except Exception as e:
 
@@ -196,7 +151,7 @@ def main():
 
 
 
-    # public websocket
+    # public market websocket
 
     print(
         "[START] PUBLIC WS"
@@ -207,13 +162,11 @@ def main():
 
 
 
-    time.sleep(
-        2
-    )
+    time.sleep(2)
 
 
 
-    # private websocket
+    # private account websocket
 
     print(
         "[START] PRIVATE WS"
@@ -224,34 +177,37 @@ def main():
 
 
 
-    time.sleep(
-        2
+    time.sleep(3)
+
+
+
+    # wallet check
+
+    try:
+
+
+        equity = wallet.get_equity()
+
+
+        print(
+            "[ACCOUNT EQUITY]",
+            equity
+        )
+
+
+    except Exception as e:
+
+
+        print(
+            "[WALLET ERROR]",
+            e
+        )
+
+
+
+    print(
+        "[START] STRATEGY LOOP"
     )
-
-
-
-    # equity thread
-
-    threading.Thread(
-
-        target=equity_loop,
-
-        daemon=True
-
-    ).start()
-
-
-
-    # strategy thread
-
-    threading.Thread(
-
-        target=strategy_loop,
-
-        daemon=True
-
-    ).start()
-
 
 
     print(
@@ -263,9 +219,15 @@ def main():
     while running:
 
 
-        time.sleep(
-            1
-        )
+        try:
+
+            time.sleep(1)
+
+
+        except KeyboardInterrupt:
+
+
+            shutdown()
 
 
 
