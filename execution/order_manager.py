@@ -2,28 +2,34 @@ import time
 import hmac
 import hashlib
 import requests
+import json
+
 
 from config import (
     BYBIT_BASE_URL,
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
     DEFAULT_SYMBOL,
-    LIVE_TRADING,
+    LIVE_TRADING
 )
 
 
+
 class OrderManager:
+
 
     def __init__(self):
 
         self.base_url = BYBIT_BASE_URL
 
         self.api_key = BYBIT_API_KEY
+
         self.api_secret = BYBIT_API_SECRET
 
         self.symbol = DEFAULT_SYMBOL
 
         self.live = LIVE_TRADING
+
 
 
         print("==============================")
@@ -34,85 +40,102 @@ class OrderManager:
         print("==============================")
 
 
-    def _sign(self, params):
+
+    # ==================================
+    # SIGN
+    # ==================================
+
+    def sign(
+        self,
+        params
+    ):
+
 
         timestamp = str(
-            int(time.time() * 1000)
+            int(time.time()*1000)
         )
+
 
         recv_window = "5000"
 
 
+
         query = "&".join(
+
             [
+
                 f"{k}={params[k]}"
+
                 for k in sorted(params)
+
             ]
+
         )
+
 
 
         origin = (
+
             timestamp
+
             +
+
             self.api_key
+
             +
+
             recv_window
+
             +
+
             query
+
         )
 
 
-        sign = hmac.new(
+
+        signature = hmac.new(
+
             self.api_secret.encode(),
+
             origin.encode(),
+
             hashlib.sha256
+
         ).hexdigest()
+
 
 
         return (
             timestamp,
             recv_window,
-            sign
+            signature
         )
 
 
-    def _headers(self, timestamp, recv_window, sign):
-
-        return {
-
-            "X-BAPI-API-KEY":
-                self.api_key,
-
-            "X-BAPI-SIGN":
-                sign,
-
-            "X-BAPI-TIMESTAMP":
-                timestamp,
-
-            "X-BAPI-RECV-WINDOW":
-                recv_window,
-
-            "Content-Type":
-                "application/json"
-        }
 
 
+    # ==================================
+    # PLACE ORDER
+    # ==================================
 
     def place_order(
         self,
         side,
-        qty,
-        order_type="Market"
+        qty
     ):
 
 
         if not self.live:
 
+
             print(
                 "[ORDER BLOCKED] LIVE_TRADING=False"
             )
 
+
             return None
+
 
 
 
@@ -121,65 +144,122 @@ class OrderManager:
         )
 
 
-        params = {
+
+        body = {
+
 
             "category":
                 "linear",
 
+
             "symbol":
                 self.symbol,
+
 
             "side":
                 side,
 
+
             "orderType":
-                order_type,
+                "Market",
+
 
             "qty":
                 str(qty),
 
+
+            "timeInForce":
+                "IOC"
+
         }
 
 
+
+
         timestamp, recv_window, sign = (
-            self._sign(params)
+
+            self.sign(body)
+
         )
 
 
-        headers = self._headers(
-            timestamp,
-            recv_window,
-            sign
-        )
+
+        headers = {
+
+
+            "X-BAPI-API-KEY":
+
+                self.api_key,
+
+
+            "X-BAPI-SIGN":
+
+                sign,
+
+
+            "X-BAPI-TIMESTAMP":
+
+                timestamp,
+
+
+            "X-BAPI-RECV-WINDOW":
+
+                recv_window,
+
+
+            "Content-Type":
+
+                "application/json"
+
+        }
+
 
 
         url = (
+
             self.base_url
+
             +
+
             endpoint
+
         )
+
+
+
+        print(
+            "[ORDER REQUEST]",
+            body
+        )
+
 
 
         try:
 
-            print("[ORDER REQUEST]")
-            print(url)
-            print(params)
-
 
             r = requests.post(
+
                 url,
+
                 headers=headers,
-                json=params,
+
+                json=body,
+
                 timeout=10
+
             )
+
 
 
             data = r.json()
 
 
-            print("[ORDER RESPONSE]")
-            print(data)
+
+            print(
+                "[ORDER RESPONSE]",
+                data
+            )
+
 
 
             return data
@@ -187,139 +267,59 @@ class OrderManager:
 
 
         except Exception as e:
+
 
             print(
                 "[ORDER ERROR]",
                 e
             )
 
+
             return None
 
 
 
-    def cancel_order(
+
+    # ==================================
+    # STRATEGY CONNECT
+    # ==================================
+
+    def execute(
         self,
-        order_id
+        signal
     ):
 
 
-        endpoint = (
-            "/v5/order/cancel"
-        )
+
+        if signal == "BUY":
 
 
-        params = {
+            return self.place_order(
 
-            "category":
-                "linear",
+                "Buy",
 
-            "symbol":
-                self.symbol,
+                0.001
 
-            "orderId":
-                order_id
-
-        }
-
-
-        timestamp, recv_window, sign = (
-            self._sign(params)
-        )
-
-
-        headers = self._headers(
-            timestamp,
-            recv_window,
-            sign
-        )
-
-
-        try:
-
-            r = requests.post(
-                self.base_url + endpoint,
-                headers=headers,
-                json=params,
-                timeout=10
             )
 
 
-            data = r.json()
 
-            print("[CANCEL RESPONSE]")
-            print(data)
-
-            return data
+        elif signal == "SELL":
 
 
-        except Exception as e:
+            return self.place_order(
 
-            print(
-                "[CANCEL ERROR]",
-                e
-            )
+                "Sell",
 
-            return None
+                0.001
 
-
-
-    def get_open_orders(self):
-
-
-        endpoint = (
-            "/v5/order/realtime"
-        )
-
-
-        params = {
-
-            "category":
-                "linear",
-
-            "symbol":
-                self.symbol
-
-        }
-
-
-        timestamp, recv_window, sign = (
-            self._sign(params)
-        )
-
-
-        headers = self._headers(
-            timestamp,
-            recv_window,
-            sign
-        )
-
-
-        try:
-
-            r = requests.get(
-                self.base_url + endpoint,
-                headers=headers,
-                params=params,
-                timeout=10
             )
 
 
-            data = r.json()
 
-            print("[OPEN ORDERS]")
-            print(data)
-
-            return data
+        return None
 
 
-        except Exception as e:
-
-            print(
-                "[OPEN ORDER ERROR]",
-                e
-            )
-
-            return None
 
 
 
