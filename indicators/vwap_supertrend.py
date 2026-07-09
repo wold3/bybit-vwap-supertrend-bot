@@ -4,35 +4,125 @@ from collections import deque
 
 
 
-class VWAP:
+
+class SuperTrend:
 
 
 
-    def __init__(self, max_length=500):
+    def __init__(
+            self,
+            period=10,
+            multiplier=3
+    ):
 
 
-        self.prices = deque(
+        self.period = period
 
-            maxlen=max_length
+        self.multiplier = multiplier
 
+
+
+        self.highs = deque(
+            maxlen=period + 2
+        )
+
+        self.lows = deque(
+            maxlen=period + 2
+        )
+
+        self.closes = deque(
+            maxlen=period + 2
         )
 
 
-        self.volumes = deque(
 
-            maxlen=max_length
-
-        )
+        self.direction = True
 
 
+        self.upper_band = None
 
-        self.vwap = 0
+        self.lower_band = None
 
 
 
         print(
-            "[VWAP INIT]"
+            "[SUPERTREND INIT]"
         )
+
+
+
+
+
+
+
+    # =============================
+    # ATR
+    # =============================
+
+
+    def atr(self):
+
+
+        if len(self.closes) < 2:
+
+
+            return 0
+
+
+
+
+
+        trs = []
+
+
+
+        for i in range(
+            1,
+            len(self.closes)
+        ):
+
+
+            high = self.highs[i]
+
+
+            low = self.lows[i]
+
+
+            prev_close = self.closes[i-1]
+
+
+
+            tr = max(
+
+                high - low,
+
+                abs(
+                    high - prev_close
+                ),
+
+                abs(
+                    low - prev_close
+                )
+
+            )
+
+
+            trs.append(tr)
+
+
+
+
+
+        if len(trs) == 0:
+
+
+            return 0
+
+
+
+
+
+        return sum(trs) / len(trs)
 
 
 
@@ -47,38 +137,81 @@ class VWAP:
 
     def update(
             self,
-            price,
-            volume
+            high,
+            low,
+            close
     ):
 
 
         try:
 
 
-            price = float(price)
+            high = float(high)
 
-            volume = float(volume)
+            low = float(low)
+
+            close = float(close)
 
 
 
 
 
-            self.prices.append(
-                price
+            self.highs.append(high)
+
+            self.lows.append(low)
+
+            self.closes.append(close)
+
+
+
+
+
+
+            atr = self.atr()
+
+
+
+
+
+            if atr == 0:
+
+
+                return self.direction
+
+
+
+
+
+
+            hl2 = (
+
+                high + low
+
+            ) / 2
+
+
+
+
+
+            basic_upper = (
+
+                hl2
+
+                +
+
+                self.multiplier * atr
+
             )
 
 
-            self.volumes.append(
-                volume
-            )
 
+            basic_lower = (
 
+                hl2
 
+                -
 
-
-            total_volume = sum(
-
-                self.volumes
+                self.multiplier * atr
 
             )
 
@@ -86,50 +219,70 @@ class VWAP:
 
 
 
-            if total_volume <= 0:
+
+            if self.upper_band is None:
 
 
-                return price
+                self.upper_band = basic_upper
+
+
+                self.lower_band = basic_lower
 
 
 
 
 
+            else:
 
-            total_value = sum(
 
-                p * v
 
-                for p, v
+                self.upper_band = min(
 
-                in zip(
+                    basic_upper,
 
-                    self.prices,
-
-                    self.volumes
+                    self.upper_band
 
                 )
 
-            )
+
+                self.lower_band = max(
+
+                    basic_lower,
+
+                    self.lower_band
+
+                )
 
 
 
 
 
 
-            self.vwap = (
 
-                total_value
+            # 상승 추세
 
-                /
+            if close > self.upper_band:
 
-                total_volume
 
-            )
+                self.direction = True
 
 
 
-            return self.vwap
+
+
+            # 하락 추세
+
+            elif close < self.lower_band:
+
+
+                self.direction = False
+
+
+
+
+
+
+            return self.direction
 
 
 
@@ -140,23 +293,16 @@ class VWAP:
 
 
             print(
-                "[VWAP ERROR]",
+
+                "[SUPERTREND ERROR]",
+
                 e
+
             )
 
 
-            return 0
 
-
-
-
-
-
-
-    def value(self):
-
-
-        return self.vwap
+            return self.direction
 
 
 
@@ -165,26 +311,6 @@ class VWAP:
 
 
 
-vwap = VWAP()
 
 
-
-
-
-
-
-# =================================
-# Strategy 호환 함수
-# =================================
-
-
-def calculate_vwap(candle):
-
-
-    return vwap.update(
-
-        candle["close"],
-
-        candle["volume"]
-
-    )
+supertrend = SuperTrend()
