@@ -5,47 +5,28 @@ import websocket
 
 
 from config import (
-    DEFAULT_SYMBOL,
-    BYBIT_PUBLIC_WS
-)
-
-
-from strategy.vwap_supertrend_strategy import (
-    vwap_supertrend_strategy
-)
-
-
-from execution.order_manager import (
-    order_manager
+    BYBIT_PUBLIC_WS,
+    DEFAULT_SYMBOL
 )
 
 
 
-class WebSocketClient:
+class MarketWebSocketClient:
 
 
     def __init__(self):
 
 
-        self.symbol = DEFAULT_SYMBOL
-
-
         self.url = BYBIT_PUBLIC_WS
+
+        self.symbol = DEFAULT_SYMBOL
 
 
         self.ws = None
 
-
-        self.running = False
-
-
         self.thread = None
 
-
-        self.latest_data = None
-
-
-        self.last_update = 0
+        self.running = False
 
 
         self.candles = []
@@ -60,19 +41,27 @@ class WebSocketClient:
 
 
 
-    # =====================================
+    # ===============================
     # START
-    # =====================================
+    # ===============================
 
     def start(self):
 
 
         if self.running:
 
+
+            print(
+                "[PUBLIC WS ALREADY RUNNING]"
+            )
+
+
             return
 
 
+
         self.running = True
+
 
 
         self.thread = threading.Thread(
@@ -88,9 +77,9 @@ class WebSocketClient:
 
 
 
-    # =====================================
+    # ===============================
     # STOP
-    # =====================================
+    # ===============================
 
     def stop(self):
 
@@ -98,17 +87,17 @@ class WebSocketClient:
         self.running = False
 
 
-        try:
 
-            if self.ws:
+        if self.ws:
+
+
+            try:
 
                 self.ws.close()
 
+            except:
 
-        except Exception:
-
-
-            pass
+                pass
 
 
 
@@ -118,39 +107,63 @@ class WebSocketClient:
 
 
 
-    # =====================================
-    # CONNECT
-    # =====================================
+    # ===============================
+    # RUN
+    # ===============================
 
     def run(self):
 
 
-        self.ws = websocket.WebSocketApp(
-
-            self.url,
+        while self.running:
 
 
-            on_open=self.on_open,
+            try:
 
 
-            on_message=self.on_message,
+                self.ws = websocket.WebSocketApp(
+
+                    self.url,
+
+                    on_open=self.on_open,
+
+                    on_message=self.on_message,
+
+                    on_error=self.on_error,
+
+                    on_close=self.on_close
+
+                )
 
 
-            on_error=self.on_error,
-
-
-            on_close=self.on_close
-
-        )
-
-
-        self.ws.run_forever()
+                self.ws.run_forever()
 
 
 
-    # =====================================
+            except Exception as e:
+
+
+                print(
+                    "[PUBLIC LOOP ERROR]",
+                    e
+                )
+
+
+
+            if self.running:
+
+
+                print(
+                    "[PUBLIC RECONNECT]"
+                )
+
+
+                time.sleep(3)
+
+
+
+    # ===============================
     # OPEN
-    # =====================================
+    # ===============================
 
     def on_open(
         self,
@@ -168,6 +181,7 @@ class WebSocketClient:
 
 
             "op":
+
                 "subscribe",
 
 
@@ -184,9 +198,9 @@ class WebSocketClient:
 
 
         ws.send(
-            json.dumps(
-                subscribe
-            )
+
+            json.dumps(subscribe)
+
         )
 
 
@@ -197,9 +211,9 @@ class WebSocketClient:
 
 
 
-    # =====================================
+    # ===============================
     # MESSAGE
-    # =====================================
+    # ===============================
 
     def on_message(
         self,
@@ -216,29 +230,87 @@ class WebSocketClient:
             )
 
 
-            if "data" not in data:
+
+            if "topic" not in data:
 
                 return
 
 
 
-            topic = data.get(
-                "topic",
-                ""
+            if not data["topic"].startswith(
+                "kline"
+            ):
+
+                return
+
+
+
+            rows = data.get(
+                "data",
+                []
             )
 
 
 
-            if "kline" not in topic:
-
-                return
+            for row in rows:
 
 
+                candle = {
 
-            for candle in data["data"]:
+
+                    "symbol":
+
+                        self.symbol,
 
 
-                self.process_candle(
+                    "timestamp":
+
+                        row["start"],
+
+
+                    "open":
+
+                        float(row["open"]),
+
+
+                    "high":
+
+                        float(row["high"]),
+
+
+                    "low":
+
+                        float(row["low"]),
+
+
+                    "close":
+
+                        float(row["close"]),
+
+
+                    "volume":
+
+                        float(row["volume"])
+
+                }
+
+
+
+                self.candles.append(
+                    candle
+                )
+
+
+
+                if len(self.candles) > 500:
+
+
+                    self.candles.pop(0)
+
+
+
+                print(
+                    "[LAST CANDLE]",
                     candle
                 )
 
@@ -248,158 +320,15 @@ class WebSocketClient:
 
 
             print(
-                "[PUBLIC WS MESSAGE ERROR]",
+                "[PUBLIC MESSAGE ERROR]",
                 e
             )
 
 
 
-    # =====================================
-    # CANDLE PROCESS
-    # =====================================
-
-    def process_candle(
-        self,
-        candle
-    ):
-
-
-
-        market = {
-
-
-            "symbol":
-                self.symbol,
-
-
-            "timestamp":
-                int(
-                    candle["start"]
-                ),
-
-
-            "open":
-                float(
-                    candle["open"]
-                ),
-
-
-            "high":
-                float(
-                    candle["high"]
-                ),
-
-
-            "low":
-                float(
-                    candle["low"]
-                ),
-
-
-            "close":
-                float(
-                    candle["close"]
-                ),
-
-
-            "volume":
-                float(
-                    candle["volume"]
-                )
-
-        }
-
-
-
-        self.latest_data = market
-
-
-        self.last_update = time.time()
-
-
-
-        # candle update
-
-        if self.candles:
-
-
-            if (
-                self.candles[-1]["timestamp"]
-                ==
-                market["timestamp"]
-            ):
-
-
-                self.candles[-1] = market
-
-
-
-            else:
-
-
-                self.candles.append(
-                    market
-                )
-
-
-        else:
-
-
-            self.candles.append(
-                market
-            )
-
-
-
-        # keep 500
-
-        if len(self.candles) > 500:
-
-            self.candles.pop(0)
-
-
-
-        print(
-            "[CANDLE COUNT]",
-            len(self.candles)
-        )
-
-
-
-        # strategy
-
-        signal = (
-            vwap_supertrend_strategy.analyze(
-                self.candles
-            )
-        )
-
-
-        if signal:
-
-
-            print(
-                "[SIGNAL]",
-                signal
-            )
-
-
-            order_manager.execute(
-                signal
-            )
-
-
-
-        print(
-            "[LAST CANDLE]",
-            market
-        )
-
-
-
-    # =====================================
+    # ===============================
     # ERROR
-    # =====================================
+    # ===============================
 
     def on_error(
         self,
@@ -415,9 +344,9 @@ class WebSocketClient:
 
 
 
-    # =====================================
+    # ===============================
     # CLOSE
-    # =====================================
+    # ===============================
 
     def on_close(
         self,
@@ -435,16 +364,6 @@ class WebSocketClient:
 
 
 
-    # =====================================
-    # DATA
-    # =====================================
-
-    def get_latest_data(self):
 
 
-        return self.latest_data
-
-
-
-
-ws_client = WebSocketClient()
+ws_client = MarketWebSocketClient()
