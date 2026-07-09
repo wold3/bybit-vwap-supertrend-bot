@@ -1,41 +1,79 @@
+import time
 import threading
+
+
 from pybit.unified_trading import WebSocket
 
-from state import sync_real_pnl
 
-ws = None
-
-
-def start_ws(symbol="BTCUSDT"):
-    """
-    Bybit WebSocket 실시간 PnL / Position sync
-    """
-
-    def handle_message(message):
-        try:
-            # 메시지 들어올 때마다 PnL sync
-            sync_real_pnl(symbol)
-
-        except Exception as e:
-            print("WS error:", e)
+from config import (
+    BYBIT_TESTNET,
+    DEFAULT_SYMBOL
+)
 
 
-    def run():
 
-        global ws
+class WebSocketStream:
 
-        ws = WebSocket(
-            testnet=False,
+
+    def __init__(self):
+
+
+        self.symbol = DEFAULT_SYMBOL
+
+
+        self.ws = None
+
+
+        print("==============================")
+        print("[WEBSOCKET STREAM INIT]")
+        print("TESTNET :", BYBIT_TESTNET)
+        print("SYMBOL :", self.symbol)
+        print("==============================")
+
+
+
+    def start(self):
+
+
+        self.ws = WebSocket(
+
+            testnet=BYBIT_TESTNET,
+
             channel_type="linear"
+
         )
 
-        # 포지션 스트림
-        ws.position_stream(callback=handle_message)
 
-        # 거래 스트림
-        ws.trade_stream(callback=handle_message)
+        self.ws.kline(
+
+            interval=1,
+
+            symbol=self.symbol,
+
+            callback=self.callback
+
+        )
 
 
-    t = threading.Thread(target=run)
-    t.daemon = True
-    t.start()
+
+        print(
+            "[STREAM STARTED]"
+        )
+
+
+
+    def callback(
+        self,
+        message
+    ):
+
+
+        print(
+            "[STREAM DATA]",
+            message
+        )
+
+
+
+
+stream = WebSocketStream()
