@@ -1,165 +1,84 @@
 import os
 from dotenv import load_dotenv
 
+load_dotenv()
 
-# ==================================
-# LOAD ENV
-# ==================================
+# =====================================================
+# MODE
+# =====================================================
 
-load_dotenv(
-    ".env"
-)
+LIVE_TRADING = os.getenv("LIVE_TRADING", "False").lower() == "true"
+TESTNET = os.getenv("TESTNET", "False").lower() == "true"
 
+# =====================================================
+# API
+# =====================================================
 
+BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
+BYBIT_API_SECRET = os.getenv("BYBIT_API_SECRET", "")
 
-# ==================================
-# BYBIT API
-# ==================================
-
-BYBIT_API_KEY = os.getenv(
-    "BYBIT_API_KEY"
-)
-
-
-BYBIT_API_SECRET = os.getenv(
-    "BYBIT_API_SECRET"
-)
-
-
-
-# ==================================
-# SERVER MODE
-# ==================================
-
-LIVE_TRADING = (
-
-    os.getenv(
-        "LIVE_TRADING",
-        "false"
-    ).lower()
-
-    ==
-
-    "true"
-
-)
-
-
-
-BYBIT_TESTNET = (
-
-    os.getenv(
-        "BYBIT_TESTNET",
-        "false"
-    ).lower()
-
-    ==
-
-    "true"
-
-)
-
-
-
-# ==================================
-# REST URL
-# ==================================
-
-BYBIT_BASE_URL = os.getenv(
-    "BYBIT_BASE_URL",
-    "https://api-demo.bybit.com"
-)
-
-
-
-# ==================================
-# WEBSOCKET
-# ==================================
-
-BYBIT_PUBLIC_WS = os.getenv(
-    "BYBIT_PUBLIC_WS",
-    "wss://stream.bybit.com/v5/public/linear"
-)
-
-
-
-BYBIT_PRIVATE_WS = os.getenv(
-    "BYBIT_PRIVATE_WS",
-    "wss://stream-demo.bybit.com/v5/private"
-)
-
-
-
-# ==================================
-# SYMBOL
-# ==================================
-
-DEFAULT_SYMBOL = os.getenv(
-    "DEFAULT_SYMBOL",
-    "BTCUSDT"
-)
-
-
-
-# ==================================
+# =====================================================
 # ACCOUNT
-# ==================================
+# =====================================================
 
-ACCOUNT_TYPE = os.getenv(
-    "ACCOUNT_TYPE",
-    "UNIFIED"
-)
+ACCOUNT_TYPE = os.getenv("ACCOUNT_TYPE", "UNIFIED")
+DEFAULT_SYMBOL = os.getenv("DEFAULT_SYMBOL", "BTCUSDT")
 
+# =====================================================
+# REST URL
+# =====================================================
 
+if LIVE_TRADING:
+    BYBIT_BASE_URL = "https://api.bybit.com"
+else:
+    BYBIT_BASE_URL = "https://api-demo.bybit.com"
 
-# ==================================
+# =====================================================
+# WEBSOCKET
+# =====================================================
+
+PUBLIC_WS = "wss://stream.bybit.com/v5/public/linear"
+
+if LIVE_TRADING:
+    PRIVATE_WS = "wss://stream.bybit.com/v5/private"
+else:
+    PRIVATE_WS = "wss://stream-demo.bybit.com/v5/private"
+
+BYBIT_PUBLIC_WS = PUBLIC_WS
+BYBIT_PRIVATE_WS = PRIVATE_WS
+
+# =====================================================
 # ORDER
-# ==================================
+# =====================================================
 
-ORDER_RETRY = int(
+DEFAULT_QTY = float(os.getenv("DEFAULT_QTY", "0.001"))
+MAX_POSITION_SIZE = float(os.getenv("MAX_POSITION_SIZE", "0.01"))
 
-    os.getenv(
-        "ORDER_RETRY",
-        "3"
-    )
+# =====================================================
+# RISK
+# =====================================================
 
-)
+DAILY_LOSS_LIMIT = float(os.getenv("DAILY_LOSS_LIMIT", "-100"))
+ORDER_COOLDOWN = int(os.getenv("ORDER_COOLDOWN", "30"))
 
-
-
-# ==================================
+# =====================================================
 # LOG
-# ==================================
+# =====================================================
 
-LOG_LEVEL = os.getenv(
-    "LOG_LEVEL",
-    "INFO"
-)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-
-
-# ==================================
-# DEBUG PRINT
-# ==================================
+# =====================================================
+# PRINT
+# =====================================================
 
 print("==============================")
 print("[CONFIG LOAD]")
 print("LIVE_TRADING :", LIVE_TRADING)
-print("TESTNET      :", BYBIT_TESTNET)
+print("TESTNET      :", TESTNET)
 print("BASE URL     :", BYBIT_BASE_URL)
 print("PUBLIC WS    :", BYBIT_PUBLIC_WS)
 print("PRIVATE WS   :", BYBIT_PRIVATE_WS)
 print("SYMBOL       :", DEFAULT_SYMBOL)
 print("ACCOUNT      :", ACCOUNT_TYPE)
-
-if BYBIT_API_KEY:
-    print(
-        "API KEY      :",
-        BYBIT_API_KEY[:6]
-    )
-else:
-    print(
-        "API KEY      : NONE"
-    )
-
+print("API KEY      :", BYBIT_API_KEY[:6] if BYBIT_API_KEY else "")
 print("==============================")
