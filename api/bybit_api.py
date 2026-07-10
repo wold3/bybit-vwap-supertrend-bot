@@ -1,6 +1,6 @@
 # =====================================================
 # api/bybit_api.py
-# Bybit V5 REST API
+# Bybit V5 API Manager
 # =====================================================
 
 import time
@@ -33,13 +33,11 @@ class BybitAPI:
 
     def __init__(self):
 
-        print("==============================")
-        print("[BYBIT API INIT]")
-        print("TESTNET :", False)
-        print("ACCOUNT :", ACCOUNT_TYPE)
-        print("CATEGORY:", CATEGORY)
-        print("SYMBOL  :", DEFAULT_SYMBOL)
-        print("==============================")
+        self.base_url = BYBIT_REST_URL
+
+        print(
+            "[BYBIT API READY]"
+        )
 
 
 
@@ -61,7 +59,6 @@ class BybitAPI:
         recv_window = "5000"
 
 
-
         param = (
 
             str(timestamp)
@@ -79,7 +76,6 @@ class BybitAPI:
             payload
 
         )
-
 
 
         return hmac.new(
@@ -110,108 +106,145 @@ class BybitAPI:
     ):
 
 
-        if params is None:
-
-            params = {}
-
-
-
-        timestamp = int(
-
-            time.time()*1000
-
-        )
-
-
-
-        recv_window = "5000"
-
-
-
-        if method == "GET":
-
-
-            payload = json.dumps(
-
-                params,
-
-                separators=(",", ":")
-
-            )
-
-        else:
-
-
-            payload = json.dumps(
-
-                params,
-
-                separators=(",", ":")
-
-            )
-
-
-
-
-
-        headers = {
-
-
-            "X-BAPI-API-KEY":
-
-                BYBIT_API_KEY,
-
-
-            "X-BAPI-SIGN":
-
-                self.generate_signature(
-
-                    timestamp,
-
-                    payload
-
-                ),
-
-
-            "X-BAPI-TIMESTAMP":
-
-                str(timestamp),
-
-
-            "X-BAPI-RECV-WINDOW":
-
-                recv_window,
-
-
-            "Content-Type":
-
-                "application/json"
-
-        }
-
-
-
-
-        url = (
-
-            BYBIT_REST_URL
-
-            +
-
-            endpoint
-
-        )
-
-
-
         try:
+
+
+            if params is None:
+
+                params = {}
+
+
+
+            timestamp = str(
+
+                int(
+
+                    time.time()*1000
+
+                )
+
+            )
+
+
+
+            recv_window = "5000"
+
 
 
 
             if method == "GET":
 
 
-                r = requests.get(
+                query = "&".join(
+
+                    [
+
+                        f"{k}={v}"
+
+                        for k,v in sorted(
+
+                            params.items()
+
+                        )
+
+                    ]
+
+                )
+
+
+                payload = query
+
+
+
+            else:
+
+
+                payload = json.dumps(
+
+                    params,
+
+                    separators=(
+
+                        ",",
+
+                        ":"
+
+                    )
+
+                )
+
+
+
+
+
+            signature = self.generate_signature(
+
+                timestamp,
+
+                payload
+
+            )
+
+
+
+
+            headers = {
+
+
+                "X-BAPI-API-KEY":
+
+                    BYBIT_API_KEY,
+
+
+                "X-BAPI-SIGN":
+
+                    signature,
+
+
+                "X-BAPI-SIGN-TYPE":
+
+                    "2",
+
+
+                "X-BAPI-TIMESTAMP":
+
+                    timestamp,
+
+
+                "X-BAPI-RECV-WINDOW":
+
+                    recv_window,
+
+
+                "Content-Type":
+
+                    "application/json"
+
+            }
+
+
+
+
+
+
+            url = (
+
+                self.base_url
+
+                +
+
+                endpoint
+
+            )
+
+
+
+
+
+            if method == "GET":
+
+
+                response = requests.get(
 
                     url,
 
@@ -224,10 +257,11 @@ class BybitAPI:
                 )
 
 
+
             else:
 
 
-                r = requests.post(
+                response = requests.post(
 
                     url,
 
@@ -241,17 +275,19 @@ class BybitAPI:
 
 
 
-            data = r.json()
+
+
+
+            data = response.json()
 
 
 
             if data.get(
 
-                "retCode",
-
-                -1
+                "retCode"
 
             ) != 0:
+
 
 
                 print(
@@ -263,7 +299,9 @@ class BybitAPI:
                 )
 
 
+
                 return None
+
 
 
 
@@ -271,7 +309,10 @@ class BybitAPI:
 
 
 
+
+
         except Exception as e:
+
 
 
             print(
@@ -303,7 +344,7 @@ class BybitAPI:
 
             r = requests.get(
 
-                BYBIT_REST_URL
+                self.base_url
 
                 +
 
@@ -348,226 +389,6 @@ class BybitAPI:
                 "accountType":
 
                     ACCOUNT_TYPE
-
-
-            }
-
-        )
-
-
-
-
-
-
-
-    # =====================================================
-    # KLINE
-    # =====================================================
-
-    def get_kline(self):
-
-
-        result = self.request(
-
-            "GET",
-
-            "/v5/market/kline",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL,
-
-
-                "interval":
-
-                    "1",
-
-
-                "limit":
-
-                    200
-
-            }
-
-        )
-
-
-
-        if not result:
-
-
-            return []
-
-
-
-        rows = (
-
-            result
-
-            .get("result", {})
-
-            .get("list", [])
-
-        )
-
-
-
-        candles = []
-
-
-
-        for x in reversed(rows):
-
-
-            candles.append(
-
-                {
-
-
-                    "timestamp":
-
-                        int(x[0]),
-
-
-                    "open":
-
-                        float(x[1]),
-
-
-                    "high":
-
-                        float(x[2]),
-
-
-                    "low":
-
-                        float(x[3]),
-
-
-                    "close":
-
-                        float(x[4]),
-
-
-                    "volume":
-
-                        float(x[5])
-
-
-                }
-
-            )
-
-
-
-        print(
-
-            "[KLINE]",
-
-            len(candles)
-
-        )
-
-
-        return candles
-
-
-
-
-
-
-
-    # =====================================================
-    # LAST PRICE
-    # =====================================================
-
-    def get_last_price(self):
-
-
-        result = self.request(
-
-            "GET",
-
-            "/v5/market/tickers",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL
-
-
-            }
-
-        )
-
-
-
-        try:
-
-
-            return float(
-
-                result
-
-                ["result"]
-
-                ["list"][0]
-
-                ["lastPrice"]
-
-            )
-
-
-        except:
-
-
-            return None
-
-
-
-
-
-
-
-    # =====================================================
-    # POSITION
-    # =====================================================
-
-    def get_position(self):
-
-
-        return self.request(
-
-            "GET",
-
-            "/v5/position/list",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL
 
 
             }
@@ -626,9 +447,7 @@ class BybitAPI:
 
             print(
 
-                "[LEVERAGE SET]",
-
-                LEVERAGE
+                "[LEVERAGE SET]"
 
             )
 
@@ -653,7 +472,203 @@ class BybitAPI:
 
 
     # =====================================================
-    # CREATE MARKET ORDER
+    # KLINE
+    # =====================================================
+
+    def get_kline(
+        self,
+        interval="60"
+    ):
+
+
+        result = self.request(
+
+            "GET",
+
+            "/v5/market/kline",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL,
+
+
+                "interval":
+
+                    interval,
+
+
+                "limit":
+
+                    200
+
+
+            }
+
+        )
+
+
+
+        if not result:
+
+
+            return []
+
+
+
+        rows = (
+
+            result
+
+            .get(
+
+                "result",
+
+                {}
+
+            )
+
+            .get(
+
+                "list",
+
+                []
+
+            )
+
+        )
+
+
+
+        candles = []
+
+
+
+        for x in reversed(rows):
+
+
+            candles.append(
+
+
+                {
+
+
+                    "timestamp":
+
+                        int(x[0]),
+
+
+                    "open":
+
+                        float(x[1]),
+
+
+                    "high":
+
+                        float(x[2]),
+
+
+                    "low":
+
+                        float(x[3]),
+
+
+                    "close":
+
+                        float(x[4]),
+
+
+                    "volume":
+
+                        float(x[5])
+
+                }
+
+            )
+
+
+
+        print(
+
+            "[KLINE]",
+
+            len(candles)
+
+        )
+
+
+
+        return candles
+
+
+
+
+
+
+
+    # =====================================================
+    # LAST PRICE
+    # =====================================================
+
+    def get_last_price(self):
+
+
+        result = self.request(
+
+            "GET",
+
+            "/v5/market/tickers",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+
+            }
+
+        )
+
+
+
+        try:
+
+
+            return float(
+
+                result["result"]["list"][0]["lastPrice"]
+
+            )
+
+
+
+        except:
+
+
+            return None
+
+
+
+
+
+
+
+    # =====================================================
+    # CREATE ORDER
     # =====================================================
 
     def create_order(
@@ -694,13 +709,7 @@ class BybitAPI:
 
                 "qty":
 
-                    str(qty),
-
-
-                "timeInForce":
-
-                    "IOC"
-
+                    str(qty)
 
             }
 
@@ -713,21 +722,17 @@ class BybitAPI:
 
 
     # =====================================================
-    # SET TP SL
+    # POSITION
     # =====================================================
 
-    def set_trading_stop(
-        self,
-        take_profit,
-        stop_loss
-    ):
+    def get_position(self):
 
 
         return self.request(
 
-            "POST",
+            "GET",
 
-            "/v5/position/trading-stop",
+            "/v5/position/list",
 
             {
 
@@ -739,27 +744,7 @@ class BybitAPI:
 
                 "symbol":
 
-                    DEFAULT_SYMBOL,
-
-
-                "tpslMode":
-
-                    "Full",
-
-
-                "positionIdx":
-
-                    0,
-
-
-                "takeProfit":
-
-                    str(take_profit),
-
-
-                "stopLoss":
-
-                    str(stop_loss)
+                    DEFAULT_SYMBOL
 
 
             }
@@ -794,9 +779,9 @@ class BybitAPI:
 
             position
 
-            .get("result", {})
+            .get("result",{})
 
-            .get("list", [])
+            .get("list",[])
 
         )
 
@@ -822,13 +807,23 @@ class BybitAPI:
             if size > 0:
 
 
+                side = p.get(
+
+                    "side"
+
+                )
+
+
+
                 close_side = (
 
                     "Sell"
 
-                    if p.get("side") == "Buy"
+                    if side == "Buy"
 
-                    else "Buy"
+                    else
+
+                    "Buy"
 
                 )
 
@@ -845,6 +840,56 @@ class BybitAPI:
 
 
         return False
+
+
+
+
+
+
+
+    # =====================================================
+    # TP / SL
+    # =====================================================
+
+    def set_trading_stop(
+        self,
+        tp,
+        sl
+    ):
+
+
+        return self.request(
+
+            "POST",
+
+            "/v5/position/trading-stop",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL,
+
+
+                "takeProfit":
+
+                    str(tp),
+
+
+                "stopLoss":
+
+                    str(sl)
+
+
+            }
+
+        )
 
 
 
