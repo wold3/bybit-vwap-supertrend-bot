@@ -1,5 +1,7 @@
 import time
-import signal as os_signal
+import signal
+import sys
+import threading
 
 
 from api.bybit_api import bybit_api
@@ -8,7 +10,7 @@ from risk.risk_manager import risk_manager
 
 from execution.order_manager import order_manager
 
-from execution.position_manager import position_manager
+from execution.position_manager import PositionManager
 
 from signals.vwap_supertrend import signal_engine
 
@@ -19,20 +21,217 @@ from ws.private_ws import private_ws
 
 
 # ==========================================
-# TRADING BOT
+# BOT APPLICATION
 # ==========================================
+
 
 class TradingBot:
 
 
     def __init__(self):
 
+
+        self.running = False
+
+
+        self.position_manager = PositionManager()
+
+
+        self.prices = []
+
+        self.volumes = []
+
+
+
         print("==============================")
         print("[APP INIT]")
         print("==============================")
 
 
-        self.running = True
+
+
+    # ======================================
+    # INITIALIZE
+    # ======================================
+
+    def initialize(self):
+
+
+        print("====================================")
+        print("VWAP SUPERTREND BOT START")
+        print("====================================")
+
+
+
+        wallet = bybit_api.get_wallet_balance()
+
+
+
+        equity = 0
+
+
+
+        try:
+
+            equity = float(
+
+                wallet["result"]
+                ["list"][0]
+                ["totalEquity"]
+
+            )
+
+
+        except Exception:
+
+            pass
+
+
+
+        risk_manager.initialize(
+
+            equity
+
+        )
+
+
+
+        public_ws.run_thread()
+
+        private_ws.run_thread()
+
+
+
+        time.sleep(2)
+
+
+
+
+    # ======================================
+    # MARKET UPDATE
+    # ======================================
+
+    def update_market(self):
+
+
+        price = public_ws.get_price()
+
+
+
+        if price:
+
+
+            self.prices.append(
+
+                price
+
+            )
+
+
+            self.volumes.append(
+
+                1
+
+            )
+
+
+
+            if len(self.prices) > 300:
+
+
+                self.prices = self.prices[-300:]
+
+                self.volumes = self.volumes[-300:]
+
+
+
+
+    # ======================================
+    # TRADING LOOP
+    # ======================================
+
+    def run_loop(self):
+
+
+        print(
+            "[BOT RUNNING]"
+        )
+
+
+
+        while self.running:
+
+
+            try:
+
+
+                self.update_market()
+
+
+
+                if len(self.prices) < 30:
+
+
+                    time.sleep(1)
+
+                    continue
+
+
+
+
+                signal = signal_engine.check_signal(
+
+                    self.prices,
+
+                    self.volumes
+
+                )
+
+
+
+
+                if signal == "Buy":
+
+
+                    print(
+                        "[SIGNAL] LONG"
+                    )
+
+
+                    order_manager.buy()
+
+
+
+
+                elif signal == "Sell":
+
+
+                    print(
+                        "[SIGNAL] SHORT"
+                    )
+
+
+                    order_manager.sell()
+
+
+
+
+                time.sleep(1)
+
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[MAIN LOOP ERROR]",
+                    e
+                )
+
+
+                time.sleep(2)
+
 
 
 
@@ -43,125 +242,13 @@ class TradingBot:
     def start(self):
 
 
-        print("====================================")
-        print("VWAP SUPERTREND BOT START")
-        print("====================================")
+        self.initialize()
 
 
-
-        # --------------------------
-        # Risk Initialize
-        # --------------------------
-
-        try:
-
-            risk_manager.initialize(
-                bybit_api.get_wallet_balance()
-            )
+        self.running = True
 
 
-        except Exception as e:
-
-            print(
-                "[RISK INIT ERROR]",
-                e
-            )
-
-
-
-        # --------------------------
-        # Websocket Start
-        # --------------------------
-
-        try:
-
-            public_ws.run_thread()
-
-            private_ws.run_thread()
-
-
-        except Exception as e:
-
-            print(
-                "[WS START ERROR]",
-                e
-            )
-
-
-
-        print("[BOT RUNNING]")
-
-
-
-        while self.running:
-
-
-            try:
-
-                self.loop()
-
-
-            except Exception as e:
-
-                print(
-                    "[MAIN LOOP ERROR]",
-                    e
-                )
-
-
-            time.sleep(1)
-
-
-
-    # ======================================
-    # MAIN LOOP
-    # ======================================
-
-    def loop(self):
-
-
-        candles = public_ws.get_candles()
-
-
-
-        if candles is None:
-
-            return
-
-
-
-        signal = signal_engine.check_signal(
-
-            candles
-
-        )
-
-
-
-        if signal is None:
-
-            return
-
-
-
-        print("==============================")
-        print("[TRADING SIGNAL]")
-        print(signal)
-        print("==============================")
-
-
-
-        if signal == "BUY":
-
-
-            order_manager.buy()
-
-
-
-        elif signal == "SELL":
-
-
-            order_manager.sell()
+        self.run_loop()
 
 
 
@@ -173,71 +260,63 @@ class TradingBot:
     def stop(self):
 
 
-        print("[BOT STOPPING]")
+        print(
+            "[BOT STOPPING]"
+        )
 
 
         self.running = False
 
 
+        public_ws.stop()
 
-        try:
-
-            public_ws.stop()
-
-            private_ws.stop()
-
-
-        except Exception as e:
-
-            print(
-                "[STOP ERROR]",
-                e
-            )
+        private_ws.stop()
 
 
 
-        print("[BOT STOPPED]")
+        print(
+            "[BOT STOPPED]"
+        )
+
 
 
 
 
 # ==========================================
-# INSTANCE
+# GLOBAL
 # ==========================================
+
 
 bot = TradingBot()
 
 
 
-# ==========================================
-# SYSTEM SIGNAL HANDLER
-# ==========================================
 
 def shutdown_handler(
-
-        signum,
-
-        frame
-
+    sig,
+    frame
 ):
+
 
     bot.stop()
 
+    sys.exit(0)
 
 
-os_signal.signal(
 
-    os_signal.SIGINT,
+
+signal.signal(
+
+    signal.SIGINT,
 
     shutdown_handler
 
 )
 
 
+signal.signal(
 
-os_signal.signal(
-
-    os_signal.SIGTERM,
+    signal.SIGTERM,
 
     shutdown_handler
 
@@ -250,6 +329,8 @@ os_signal.signal(
 # RUN
 # ==========================================
 
+
 if __name__ == "__main__":
+
 
     bot.start()
