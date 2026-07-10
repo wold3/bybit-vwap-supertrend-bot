@@ -6,55 +6,31 @@ import threading
 
 
 
-from config import (
-
-    DEFAULT_QTY,
-
-    ORDER_COOLDOWN,
-
-    TAKE_PROFIT_PERCENT,
-
-    STOP_LOSS_PERCENT,
-
-    USE_ATR_STOP,
-
-    ATR_STOP_MULTIPLIER,
-
-    ATR_TP_MULTIPLIER
-
-)
-
-
-
 from api.bybit_api import (
-
     bybit_api
-
 )
-
 
 
 from risk.risk_manager import (
-
     risk_manager
-
 )
-
 
 
 from portfolio.position_manager import (
-
     position_manager
-
 )
 
 
 
-from strategy.indicators import (
+try:
 
-    indicators
+    from database.database import (
+        database
+    )
 
-)
+except:
+
+    database = None
 
 
 
@@ -74,6 +50,16 @@ class OrderManager:
 
 
 
+        print(
+
+            "[ORDER MANAGER READY]"
+
+        )
+
+
+
+
+
     # =====================================
     # EXECUTE
     # =====================================
@@ -84,7 +70,6 @@ class OrderManager:
     ):
 
 
-
         with self.lock:
 
 
@@ -92,44 +77,38 @@ class OrderManager:
             try:
 
 
+                if not risk_manager.can_trade():
+
+                    print(
+                        "[ORDER BLOCK] RISK"
+                    )
+
+                    return None
+
+
+
 
                 if not self.cooldown_ok():
 
                     print(
-
                         "[ORDER BLOCK] COOLDOWN"
-
                     )
 
                     return None
 
-
-
-
-                if not risk_manager.can_trade():
-
-
-                    print(
-
-                        "[ORDER BLOCK] RISK"
-
-                    )
-
-                    return None
 
 
 
 
                 if position_manager.has_position():
 
-
                     print(
-
                         "[ORDER BLOCK] POSITION EXISTS"
-
                     )
 
                     return None
+
+
 
 
 
@@ -138,21 +117,11 @@ class OrderManager:
 
 
 
-                qty = DEFAULT_QTY
+                price = (
 
+                    bybit_api.get_price()
 
-
-
-                if not risk_manager.check_position_size(qty):
-
-
-                    return None
-
-
-
-
-
-                price = bybit_api.get_price()
+                )
 
 
 
@@ -164,46 +133,84 @@ class OrderManager:
 
 
 
-                tp, sl = self.calculate_tp_sl(
 
-                    side,
 
-                    price
+                qty = (
+
+                    self.calculate_qty()
+
+                )
+
+
+
+
+
+                if not risk_manager.check_position_size(
+                    qty
+                ):
+
+                    print(
+                        "[ORDER BLOCK] SIZE"
+                    )
+
+                    return None
+
+
+
+
+
+
+                tp, sl = (
+
+                    self.calculate_tp_sl(
+
+                        side,
+
+                        price
+
+                    )
 
                 )
 
 
 
 
-                result = bybit_api.create_order(
 
-                    side=side,
 
-                    qty=qty,
 
-                    take_profit=tp,
+                result = (
 
-                    stop_loss=sl
+                    self.send_order(
+
+                        side,
+
+                        qty,
+
+                        tp,
+
+                        sl
+
+                    )
 
                 )
+
 
 
 
                 if result:
 
 
-
                     self.last_order_time = time.time()
 
 
 
-                    print(
+                    if database:
 
-                        "[ORDER SUCCESS]",
+                        database.save_order(
 
-                        result
+                            result["result"]["order"]
 
-                    )
+                        )
 
 
 
@@ -212,13 +219,14 @@ class OrderManager:
 
 
 
-            except Exception as e:
 
+
+            except Exception as e:
 
 
                 print(
 
-                    "[EXECUTE ERROR]",
+                    "[EXECUTION ERROR]",
 
                     e
 
@@ -226,6 +234,94 @@ class OrderManager:
 
 
                 return None
+
+
+
+
+
+
+
+
+    # =====================================
+    # SEND ORDER RETRY
+    # =====================================
+
+    def send_order(
+        self,
+        side,
+        qty,
+        tp,
+        sl
+    ):
+
+
+        retry = 3
+
+
+
+        for i in range(retry):
+
+
+            try:
+
+
+                response = (
+
+                    bybit_api.create_order(
+
+                        side=side,
+
+                        qty=qty,
+
+                        take_profit=tp,
+
+                        stop_loss=sl
+
+                    )
+
+                )
+
+
+
+                if response:
+
+
+                    print(
+
+                        "[ORDER SUCCESS]"
+
+                    )
+
+
+                    return response
+
+
+
+
+
+            except Exception as e:
+
+
+                print(
+
+                    "[ORDER RETRY]",
+
+                    i,
+
+                    e
+
+                )
+
+
+
+                time.sleep(1)
+
+
+
+
+        return None
+
+
 
 
 
@@ -242,36 +338,51 @@ class OrderManager:
     ):
 
 
+        from config import (
+
+            TAKE_PROFIT_PERCENT,
+
+            STOP_LOSS_PERCENT
+
+        )
+
+
 
         if side == "Buy":
 
 
-
             tp = (
 
-                price *
+                price
+
+                *
 
                 (
 
-                1 +
+                    1
 
-                TAKE_PROFIT_PERCENT / 100
+                    +
+
+                    TAKE_PROFIT_PERCENT / 100
 
                 )
 
             )
 
 
-
             sl = (
 
-                price *
+                price
+
+                *
 
                 (
 
-                1 -
+                    1
 
-                STOP_LOSS_PERCENT / 100
+                    -
+
+                    STOP_LOSS_PERCENT / 100
 
                 )
 
@@ -283,32 +394,38 @@ class OrderManager:
         else:
 
 
-
             tp = (
 
-                price *
+                price
+
+                *
 
                 (
 
-                1 -
+                    1
 
-                TAKE_PROFIT_PERCENT / 100
+                    -
+
+                    TAKE_PROFIT_PERCENT / 100
 
                 )
 
             )
-
 
 
             sl = (
 
-                price *
+                price
+
+                *
 
                 (
 
-                1 +
+                    1
 
-                STOP_LOSS_PERCENT / 100
+                    +
+
+                    STOP_LOSS_PERCENT / 100
 
                 )
 
@@ -316,8 +433,62 @@ class OrderManager:
 
 
 
-
         return tp, sl
+
+
+
+
+
+
+    # =====================================
+    # QTY
+    # =====================================
+
+    def calculate_qty(self):
+
+
+        from config import (
+
+            DEFAULT_QTY
+
+        )
+
+
+        return DEFAULT_QTY
+
+
+
+
+
+
+
+
+    # =====================================
+    # COOLDOWN
+    # =====================================
+
+    def cooldown_ok(self):
+
+
+        from config import (
+
+            ORDER_COOLDOWN
+
+        )
+
+
+
+        return (
+
+            time.time()
+
+            -
+
+            self.last_order_time
+
+        ) >= ORDER_COOLDOWN
+
+
 
 
 
@@ -333,41 +504,45 @@ class OrderManager:
         try:
 
 
-
             position = (
 
-                position_manager.get()
+                position_manager.current
 
             )
 
 
-
             if not position:
-
-
-                print(
-
-                    "[NO POSITION]"
-
-                )
 
                 return None
 
 
 
 
-            return bybit_api.close_position(
 
-                position["side"],
+            side = position["side"]
 
-                position["size"]
+
+            qty = position["size"]
+
+
+
+
+
+            return (
+
+                bybit_api.close_position(
+
+                    side,
+
+                    qty
+
+                )
 
             )
 
 
 
         except Exception as e:
-
 
 
             print(
@@ -381,57 +556,6 @@ class OrderManager:
 
             return None
 
-
-
-
-
-    # =====================================
-    # COOLDOWN
-    # =====================================
-
-    def cooldown_ok(self):
-
-
-        if self.last_order_time == 0:
-
-
-            return True
-
-
-
-        elapsed = (
-
-            time.time()
-
-            -
-
-            self.last_order_time
-
-        )
-
-
-
-        return elapsed >= ORDER_COOLDOWN
-
-
-
-
-
-
-    # =====================================
-    # CANCEL
-    # =====================================
-
-    def cancel_all(self):
-
-
-        return (
-
-            bybit_api
-
-            .cancel_all_orders()
-
-        )
 
 
 
