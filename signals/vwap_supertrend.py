@@ -10,18 +10,22 @@ from config import (
 
 
 
+
+
+# ==========================================
+# VWAP + SUPERTREND SIGNAL
+# ==========================================
+
 class VWAPSupertrend:
 
 
 
     def __init__(self):
 
+
         print("==============================")
         print("[SIGNAL INIT]")
-        print(
-            "VWAP :",
-            VWAP_LENGTH
-        )
+        print("VWAP :", VWAP_LENGTH)
         print(
             "SUPERTREND :",
             SUPERTREND_PERIOD,
@@ -32,11 +36,12 @@ class VWAPSupertrend:
 
 
 
+
     # ======================================
     # VWAP
     # ======================================
 
-    def vwap(
+    def calculate_vwap(
 
         self,
 
@@ -47,19 +52,25 @@ class VWAPSupertrend:
     ):
 
 
-        close = np.array(close)
+        price_volume = (
 
-        volume = np.array(volume)
+            np.array(close)
+
+            *
+
+            np.array(volume)
+
+        )
 
 
 
         return (
 
-            (close * volume).sum()
+            price_volume.sum()
 
             /
 
-            volume.sum()
+            np.array(volume).sum()
 
         )
 
@@ -68,10 +79,10 @@ class VWAPSupertrend:
 
 
     # ======================================
-    # ATR
+    # SUPERTREND SIMPLE
     # ======================================
 
-    def atr(
+    def calculate_supertrend(
 
         self,
 
@@ -86,196 +97,118 @@ class VWAPSupertrend:
 
         df = pd.DataFrame({
 
-            "high":high,
 
-            "low":low,
+            "high": high,
 
-            "close":close
+
+            "low": low,
+
+
+            "close": close
+
 
         })
 
 
-        df["tr"] = np.maximum(
 
-            df.high - df.low,
+        df["atr"] = (
 
+            df["high"]
 
-            np.maximum(
+            -
 
-                abs(
-                    df.high -
-                    df.close.shift(1)
-                ),
+            df["low"]
 
+        ).rolling(
 
-                abs(
-                    df.low -
-                    df.close.shift(1)
-                )
+            SUPERTREND_PERIOD
 
-            )
-
-        )
-
-
-        return (
-
-            df["tr"]
-
-            .rolling(
-
-                SUPERTREND_PERIOD
-
-            )
-
-            .mean()
-
-            .fillna(0)
-
-            .values
-
-        )
+        ).mean()
 
 
 
+        df["upper"] = (
 
+            (
 
-    # ======================================
-    # SUPERTREND
-    # ======================================
-
-    def supertrend(
-
-        self,
-
-        high,
-
-        low,
-
-        close
-
-    ):
-
-
-        atr = self.atr(
-
-            high,
-
-            low,
-
-            close
-
-        )
-
-
-
-        upper = []
-
-        lower = []
-
-
-
-        trend = []
-
-
-
-
-        for i in range(len(close)):
-
-
-            mid = (
-
-                high[i]
+                df["high"]
 
                 +
 
-                low[i]
+                df["low"]
 
-            ) / 2
+            )
+
+            /
+
+            2
+
+            +
+
+            df["atr"]
+
+            *
+
+            SUPERTREND_MULTIPLIER
+
+        )
 
 
 
-            up = (
+        df["lower"] = (
 
-                mid
+            (
+
+                df["high"]
 
                 +
 
-                SUPERTREND_MULTIPLIER
-
-                *
-
-                atr[i]
+                df["low"]
 
             )
 
+            /
 
-            dn = (
+            2
 
-                mid
+            -
 
-                -
+            df["atr"]
 
-                SUPERTREND_MULTIPLIER
+            *
 
-                *
+            SUPERTREND_MULTIPLIER
 
-                atr[i]
-
-            )
-
-
-
-            upper.append(up)
-
-            lower.append(dn)
+        )
 
 
 
-            if close[i] > up:
-
-
-                trend.append(1)
+        last = df.iloc[-1]
 
 
 
-            elif close[i] < dn:
+        if close[-1] > last["upper"]:
 
 
-                trend.append(-1)
-
-
-
-            else:
-
-
-                if i > 0:
-
-
-                    trend.append(
-
-                        trend[i-1]
-
-                    )
-
-
-                else:
-
-
-                    trend.append(0)
+            return 1
 
 
 
+        elif close[-1] < last["lower"]:
 
 
-        return trend[-1]
+            return -1
+
+
+
+        return 0
 
 
 
 
 
     # ======================================
-    # SIGNAL
+    # SIGNAL CHECK
     # ======================================
 
     def check_signal(
@@ -288,9 +221,7 @@ class VWAPSupertrend:
 
         high,
 
-        low,
-
-        price=None
+        low
 
     ):
 
@@ -301,32 +232,35 @@ class VWAPSupertrend:
             if len(close) < VWAP_LENGTH:
 
 
+                print(
+                    "[SIGNAL WAIT]",
+                    len(close),
+                    "/",
+                    VWAP_LENGTH
+                )
+
+
                 return None
 
 
 
 
 
-            if price is None:
-
-
-                price = close[-1]
+            price = close[-1]
 
 
 
+            vwap = self.calculate_vwap(
 
+                close,
 
-            current_vwap = self.vwap(
-
-                close[-VWAP_LENGTH:],
-
-                volume[-VWAP_LENGTH:]
+                volume
 
             )
 
 
 
-            st = self.supertrend(
+            trend = self.calculate_supertrend(
 
                 high,
 
@@ -339,29 +273,27 @@ class VWAPSupertrend:
 
 
 
-            print(
-                "[SIGNAL CHECK]",
-                "PRICE:",
-                round(price,2),
-                "VWAP:",
-                round(current_vwap,2),
-                "ST:",
-                st
-            )
+
+            print("==============================")
+            print("[SIGNAL CHECK]")
+            print("PRICE :", price)
+            print("VWAP :", round(vwap,2))
+            print("SUPERTREND :", trend)
+            print("==============================")
 
 
 
 
 
-            # LONG
+            # BUY
 
             if (
 
-                price > current_vwap
+                price > vwap
 
                 and
 
-                st == 1
+                trend == 1
 
             ):
 
@@ -372,22 +304,20 @@ class VWAPSupertrend:
 
 
 
-
-            # SHORT
+            # SELL
 
             if (
 
-                price < current_vwap
+                price < vwap
 
                 and
 
-                st == -1
+                trend == -1
 
             ):
 
 
                 return "Sell"
-
 
 
 
@@ -413,5 +343,9 @@ class VWAPSupertrend:
 
 
 
+
+# ==========================================
+# SINGLETON
+# ==========================================
 
 signal_engine = VWAPSupertrend()
