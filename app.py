@@ -3,8 +3,15 @@
 # Trading Application Core
 # =====================================================
 
+
 import time
 import threading
+
+
+
+from config import (
+    DEFAULT_SYMBOL
+)
 
 
 
@@ -13,19 +20,17 @@ from api.bybit_api import (
 )
 
 
-from risk.risk_manager import (
-    risk_manager
-)
-
 
 from strategy.vwap_supertrend_strategy import (
     vwap_supertrend_strategy
 )
 
 
-from order.order_manager import (
+
+from execution.order_manager import (
     order_manager
 )
+
 
 
 from portfolio.position_manager import (
@@ -33,19 +38,23 @@ from portfolio.position_manager import (
 )
 
 
+
+from risk.risk_manager import (
+    risk_manager
+)
+
+
+
 from services.private_ws import (
     private_ws
 )
+
 
 
 from services.watchdog import (
     watchdog
 )
 
-
-from services.telegram_bot import (
-    telegram_bot
-)
 
 
 from database.database import (
@@ -84,6 +93,8 @@ class TradingApp:
 
 
 
+
+
     # =====================================================
     # START
     # =====================================================
@@ -91,36 +102,85 @@ class TradingApp:
     def start(self):
 
 
-        print("====================")
-        print("[BOT START]")
-        print("====================")
-
-
-
         try:
 
 
-            if not bybit_api.ping():
+
+            print("====================")
+
+            print("[BOT START]")
+
+            print("====================")
 
 
-                raise Exception(
 
-                    "BYBIT CONNECTION FAILED"
 
-                )
 
+
+
+            # -----------------------------
+            # WALLET
+            # -----------------------------
 
 
             wallet = (
 
                 bybit_api
+
                 .get_wallet_balance()
 
             )
 
 
 
-            if wallet is None:
+            if wallet:
+
+
+                try:
+
+
+                    equity = float(
+
+                        wallet["result"]
+
+                        ["list"][0]
+
+                        ["totalEquity"]
+
+                    )
+
+
+
+                    print(
+
+                        "[EQUITY]",
+
+                        equity
+
+                    )
+
+
+
+                    risk_manager.update_equity(
+
+                        equity
+
+                    )
+
+
+
+                except Exception:
+
+
+                    print(
+
+                        "[WALLET PARSE ERROR]"
+
+                    )
+
+
+
+            else:
 
 
                 raise Exception(
@@ -131,65 +191,69 @@ class TradingApp:
 
 
 
-            equity = self.parse_equity(
-
-                wallet
-
-            )
 
 
 
-            print(
 
-                "[EQUITY]",
 
-                equity
-
-            )
-
+            # -----------------------------
+            # POSITION
+            # -----------------------------
 
 
             position_manager.sync()
 
 
 
-            risk_manager.initialize(
-
-                equity
-
-            )
 
 
 
-            bybit_api.set_leverage()
 
-
-
-            database.event(
-
-                "BOT START"
-
-            )
-
-
-
-            telegram_bot.bot_start()
-
-
-
-            self.running = True
-
-
-
-            private_ws.start()
-
+            # -----------------------------
+            # WATCHDOG
+            # -----------------------------
 
 
             watchdog.start()
 
 
 
-            self.start_market_stream()
+
+
+
+
+            # -----------------------------
+            # PRIVATE WS
+            # -----------------------------
+
+
+            private_ws.start()
+
+
+
+
+
+
+
+            # -----------------------------
+            # MARKET LOOP
+            # -----------------------------
+
+
+            self.running = True
+
+
+
+            self.market_thread = threading.Thread(
+
+                target=self.market_loop,
+
+                daemon=True
+
+            )
+
+
+            self.market_thread.start()
 
 
 
@@ -201,7 +265,13 @@ class TradingApp:
 
 
 
+
+
+
+
+
         except Exception as e:
+
 
 
             print(
@@ -209,13 +279,6 @@ class TradingApp:
                 "[START ERROR]",
 
                 e
-
-            )
-
-
-            database.save_error(
-
-                str(e)
 
             )
 
@@ -232,11 +295,15 @@ class TradingApp:
 
 
 
+
+
+
+
     # =====================================================
-    # MARKET THREAD
+    # MARKET LOOP
     # =====================================================
 
-    def start_market_stream(self):
+    def market_loop(self):
 
 
         print(
@@ -247,285 +314,164 @@ class TradingApp:
 
 
 
-        def loop():
+        while self.running:
 
 
-            while self.running:
-
-
-                try:
-
-
-                    candles = (
-
-                        bybit_api
-                        .get_kline()
-
-                    )
+            try:
 
 
 
-                    if candles:
+                candles = (
 
+                    bybit_api
 
-                        print(
+                    .get_kline()
 
-                            "[CANDLE RECEIVED]",
-
-                            len(candles)
-
-                        )
+                )
 
 
 
-                        self.on_candle(
+                if candles:
 
-                            candles
-
-                        )
-
-
-
-                    watchdog.heartbeat()
-
-
-
-                except Exception as e:
 
 
                     print(
 
-                        "[MARKET ERROR]",
+                        "[KLINE]",
 
-                        e
-
-                    )
-
-
-                    database.save_error(
-
-                        str(e)
+                        len(candles)
 
                     )
 
 
 
-                time.sleep(60)
+                    normalized = []
+
+
+
+                    for c in candles:
+
+
+                        normalized.append(
+
+
+                            {
+
+
+                            "timestamp":
+
+                                c[0],
+
+
+                            "open":
+
+                                c[1],
+
+
+                            "high":
+
+                                c[2],
+
+
+                            "low":
+
+                                c[3],
+
+
+                            "close":
+
+                                c[4],
+
+
+                            "volume":
+
+                                c[5]
+
+                            }
+
+
+                        )
 
 
 
 
 
+                    print(
 
+                        "[CANDLE RECEIVED]",
 
-        self.market_thread = threading.Thread(
+                        len(normalized)
 
-            target=loop,
-
-            daemon=True
-
-        )
-
-
-        self.market_thread.start()
+                    )
 
 
 
 
 
+                    signal = (
 
+                        vwap_supertrend_strategy
 
-    # =====================================================
-    # CANDLE PROCESS
-    # =====================================================
+                        .analyze(
 
-    def on_candle(
-        self,
-        candles
-    ):
+                            normalized
 
+                        )
 
-        if not self.running:
-
-
-            return
+                    )
 
 
 
-        try:
 
 
-            signal = (
+                    if signal:
 
-                vwap_supertrend_strategy
-                .analyze(
 
-                    candles
+                        order_manager.execute(
+
+                            signal
+
+                        )
+
+
+
+
+
+                watchdog.heartbeat()
+
+
+
+
+
+            except Exception as e:
+
+
+
+                print(
+
+                    "[MARKET LOOP ERROR]",
+
+                    e
 
                 )
 
-            )
+
+                database.save_error(
+
+                    e
+
+                )
 
 
 
-        except Exception as e:
 
+            time.sleep(
 
-            print(
-
-                "[STRATEGY ERROR]",
-
-                e
-
-            )
-
-
-            database.save_error(
-
-                str(e)
+                10
 
             )
 
 
-            return
-
-
-
-
-
-
-
-        if signal is None:
-
-
-            print(
-
-                "[NO SIGNAL]"
-
-            )
-
-
-            return
-
-
-
-
-
-
-
-        print(
-
-            "[SIGNAL]",
-
-            signal
-
-        )
-
-
-
-        database.save_signal(
-
-            signal
-
-        )
-
-
-
-
-
-
-
-        if signal.get(
-
-            "type"
-
-        ) == "EXIT":
-
-
-
-            order_manager.close_position()
-
-
-            return
-
-
-
-
-
-
-
-        if not risk_manager.can_trade():
-
-
-            print(
-
-                "[RISK BLOCK]"
-
-            )
-
-
-            return
-
-
-
-
-
-
-
-        order_manager.execute(
-
-            signal
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # EQUITY PARSE
-    # =====================================================
-
-    def parse_equity(
-        self,
-        wallet
-    ):
-
-
-        try:
-
-
-            return float(
-
-                wallet
-
-                ["result"]
-
-                ["list"][0]
-
-                ["totalEquity"]
-
-            )
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[EQUITY PARSE ERROR]",
-
-                e
-
-            )
-
-
-            return 0
 
 
 
@@ -552,45 +498,53 @@ class TradingApp:
 
 
 
+
+
         try:
-
-
-            database.event(
-
-                "BOT STOP"
-
-            )
-
-
-            telegram_bot.bot_stop()
-
 
 
             private_ws.stop()
 
 
 
+        except:
+
+
+            pass
+
+
+
+
+
+        try:
+
+
             watchdog.stop()
 
 
 
-        except Exception as e:
+        except:
 
 
-            print(
-
-                "[STOP ERROR]",
-
-                e
-
-            )
+            pass
 
 
-            database.save_error(
 
-                str(e)
 
-            )
+
+        try:
+
+
+            database.close()
+
+
+
+        except:
+
+
+            pass
+
+
 
 
 
@@ -599,3 +553,17 @@ class TradingApp:
             "[BOT STOP COMPLETE]"
 
         )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SINGLETON
+# =====================================================
+
+app = TradingApp()
