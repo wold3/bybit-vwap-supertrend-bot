@@ -1,20 +1,19 @@
 # services/private_ws.py
 
 
-import threading
+import json
 import time
-
-
-from pybit.unified_trading import WebSocket
+import threading
+import websocket
+import hmac
+import hashlib
 
 
 from config import (
-    BYBIT_TESTNET,
-    CATEGORY,
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
+    BYBIT_PRIVATE_WS
 )
-
 
 
 from portfolio.position_manager import (
@@ -24,7 +23,8 @@ from portfolio.position_manager import (
 
 
 
-class PrivateWS:
+
+class PrivateWebSocket:
 
 
 
@@ -40,7 +40,14 @@ class PrivateWS:
         self.thread = None
 
 
-        self.last_message_time = 0
+        self.connected = False
+
+
+
+
+        print(
+            "[PRIVATE WS READY]"
+        )
 
 
 
@@ -55,7 +62,6 @@ class PrivateWS:
 
         if self.running:
 
-
             return
 
 
@@ -66,23 +72,68 @@ class PrivateWS:
 
         self.thread = threading.Thread(
 
-            target=self.run,
-
-            daemon=True
+            target=self.run
 
         )
 
+
+        self.thread.daemon = True
 
 
         self.thread.start()
 
 
 
-        print(
 
-            "[PRIVATE WS START]"
 
-        )
+    # =====================================
+    # AUTH
+    # =====================================
+
+    def auth_message(self):
+
+
+        expires = int(
+
+            time.time() * 1000
+
+        ) + 10000
+
+
+
+        signature = hmac.new(
+
+            BYBIT_API_SECRET.encode(),
+
+            f"GET/realtime{expires}".encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+
+        return {
+
+
+            "op":
+
+            "auth",
+
+
+            "args":
+
+            [
+
+                BYBIT_API_KEY,
+
+                expires,
+
+                signature
+
+            ]
+
+        }
 
 
 
@@ -90,7 +141,7 @@ class PrivateWS:
 
 
     # =====================================
-    # CONNECT LOOP
+    # RUN
     # =====================================
 
     def run(self):
@@ -99,17 +150,30 @@ class PrivateWS:
         while self.running:
 
 
-
             try:
 
 
+                self.ws = websocket.WebSocketApp(
 
-                self.connect()
+                    BYBIT_PRIVATE_WS,
+
+                    on_open=self.on_open,
+
+                    on_message=self.on_message,
+
+                    on_error=self.on_error,
+
+                    on_close=self.on_close
+
+                )
+
+
+
+                self.ws.run_forever()
 
 
 
             except Exception as e:
-
 
 
                 print(
@@ -130,41 +194,15 @@ class PrivateWS:
 
 
 
+
     # =====================================
-    # CONNECT
+    # OPEN
     # =====================================
 
-    def connect(self):
-
-
-
-        self.ws = WebSocket(
-
-            testnet=BYBIT_TESTNET,
-
-            channel_type="private",
-
-            api_key=BYBIT_API_KEY,
-
-            api_secret=BYBIT_API_SECRET
-
-        )
-
-
-
-        self.ws.order_stream(
-
-            callback=self.on_order
-
-        )
-
-
-        self.ws.position_stream(
-
-            callback=self.on_position
-
-        )
-
+    def on_open(
+        self,
+        ws
+    ):
 
 
         print(
@@ -174,14 +212,55 @@ class PrivateWS:
         )
 
 
-
-        while self.running:
-
-
-            self.last_message_time = time.time()
+        self.connected = True
 
 
-            time.sleep(1)
+
+        ws.send(
+
+            json.dumps(
+
+                self.auth_message()
+
+            )
+
+        )
+
+
+
+        time.sleep(1)
+
+
+
+        ws.send(
+
+            json.dumps(
+
+                {
+
+                    "op":
+
+                    "subscribe",
+
+
+                    "args":
+
+                    [
+
+                        "order",
+
+                        "execution",
+
+                        "position"
+
+                    ]
+
+                }
+
+            )
+
+        )
+
 
 
 
@@ -189,11 +268,12 @@ class PrivateWS:
 
 
     # =====================================
-    # ORDER EVENT
+    # MESSAGE
     # =====================================
 
-    def on_order(
+    def on_message(
         self,
+        ws,
         message
     ):
 
@@ -202,10 +282,7 @@ class PrivateWS:
         try:
 
 
-
-            print(
-
-                "[ORDER UPDATE]",
+            data = json.loads(
 
                 message
 
@@ -213,45 +290,46 @@ class PrivateWS:
 
 
 
-            data = message.get(
+            topic = data.get(
 
-                "data",
-
-                []
+                "topic"
 
             )
 
 
 
-            for order in data:
+            if topic == "execution":
 
 
+                self.handle_execution(
 
-                status = order.get(
-
-                    "orderStatus"
+                    data
 
                 )
 
 
 
-                if status == "Filled":
+
+            elif topic == "position":
+
+
+                self.handle_position(
+
+                    data
+
+                )
 
 
 
-                    print(
 
-                        "[ORDER FILLED]",
-
-                        order
-
-                    )
+            elif topic == "order":
 
 
+                self.handle_order(
 
-                    position_manager.sync()
+                    data
 
-
+                )
 
 
 
@@ -259,10 +337,9 @@ class PrivateWS:
         except Exception as e:
 
 
-
             print(
 
-                "[ORDER WS ERROR]",
+                "[WS MESSAGE ERROR]",
 
                 e
 
@@ -273,69 +350,133 @@ class PrivateWS:
 
 
 
+
     # =====================================
-    # POSITION EVENT
+    # EXECUTION
     # =====================================
 
-    def on_position(
+    def handle_execution(
         self,
-        message
+        data
     ):
 
 
+        print(
 
-        try:
+            "[EXECUTION EVENT]",
 
-
-
-            print(
-
-                "[POSITION UPDATE]",
-
-                message
-
-            )
-
-
-
-            position_manager.sync()
-
-
-
-
-        except Exception as e:
-
-
-
-            print(
-
-                "[POSITION WS ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-    # =====================================
-    # HEALTH
-    # =====================================
-
-    def heartbeat(self):
-
-
-        return (
-
-            time.time()
-
-            -
-
-            self.last_message_time
+            data
 
         )
+
+
+
+        position_manager.sync()
+
+
+
+
+
+
+
+
+    # =====================================
+    # POSITION
+    # =====================================
+
+    def handle_position(
+        self,
+        data
+    ):
+
+
+        print(
+
+            "[POSITION EVENT]"
+
+        )
+
+
+        position_manager.sync()
+
+
+
+
+
+
+
+
+    # =====================================
+    # ORDER
+    # =====================================
+
+    def handle_order(
+        self,
+        data
+    ):
+
+
+        print(
+
+            "[ORDER EVENT]",
+
+            data
+
+        )
+
+
+
+
+
+
+
+
+    # =====================================
+    # ERROR
+    # =====================================
+
+    def on_error(
+        self,
+        ws,
+        error
+    ):
+
+
+        print(
+
+            "[PRIVATE WS ERROR]",
+
+            error
+
+        )
+
+
+
+
+
+
+
+    # =====================================
+    # CLOSE
+    # =====================================
+
+    def on_close(
+        self,
+        ws,
+        code,
+        msg
+    ):
+
+
+        print(
+
+            "[PRIVATE WS CLOSED]"
+
+        )
+
+
+        self.connected = False
+
 
 
 
@@ -349,14 +490,6 @@ class PrivateWS:
     def stop(self):
 
 
-        print(
-
-            "[PRIVATE WS STOP]"
-
-        )
-
-
-
         self.running = False
 
 
@@ -367,18 +500,28 @@ class PrivateWS:
             if self.ws:
 
 
-                self.ws.exit()
+                self.ws.close()
 
 
 
-        except Exception:
+        except:
 
 
             pass
 
 
 
+        print(
+
+            "[PRIVATE WS STOPPED]"
+
+        )
 
 
 
-private_ws = PrivateWS()
+
+
+
+
+
+private_ws = PrivateWebSocket()
