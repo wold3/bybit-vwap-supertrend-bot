@@ -1,71 +1,67 @@
-```python
 # app.py
-
 
 import time
 import threading
 
 
-
 from api.bybit_api import bybit_api
 
-
 from risk.risk_manager import risk_manager
-
 
 from strategy.vwap_supertrend_strategy import (
     vwap_supertrend_strategy
 )
 
-
 from execution.order_manager import (
     order_manager
 )
-
 
 from portfolio.position_manager import (
     position_manager
 )
 
-
 from services.private_ws import (
     private_ws
 )
 
-
 from services.watchdog import (
     watchdog
 )
-
-
-from services.telegram_bot import (
-    telegram_bot
-)
-
 
 from database.database import (
     database
 )
 
 
+# Telegram이 아직 없을 경우 대비
+try:
+    from services.telegram_bot import telegram_bot
+except Exception:
+
+    class TelegramDummy:
+
+        def bot_start(self):
+            pass
+
+        def bot_stop(self):
+            pass
+
+        def error(self, msg):
+            pass
+
+
+    telegram_bot = TelegramDummy()
 
 
 
 class TradingApp:
 
 
-
     def __init__(self):
-
 
         self.running = False
 
-
         self.market_thread = None
-
-
-
-
 
 
 
@@ -75,17 +71,16 @@ class TradingApp:
 
     def start(self):
 
-
         print("====================")
         print("[BOT START]")
         print("====================")
 
 
-
         try:
 
-
+            # -----------------------------
             # API CHECK
+            # -----------------------------
 
             if not bybit_api.ping():
 
@@ -95,17 +90,14 @@ class TradingApp:
 
 
 
-
-
+            # -----------------------------
             # WALLET
+            # -----------------------------
 
             wallet = (
-
                 bybit_api
                 .get_wallet_balance()
-
             )
-
 
 
             if wallet is None:
@@ -116,29 +108,30 @@ class TradingApp:
 
 
 
-
-
-            equity = (
-
-                self.parse_equity(
-                    wallet
-                )
-
+            equity = self.parse_equity(
+                wallet
             )
 
 
 
+            print(
+                "[EQUITY]",
+                equity
+            )
 
 
-            # POSITION RECOVERY
+
+            # -----------------------------
+            # POSITION SYNC
+            # -----------------------------
 
             position_manager.sync()
 
 
 
-
-
+            # -----------------------------
             # RISK INIT
+            # -----------------------------
 
             risk_manager.initialize(
                 equity
@@ -146,17 +139,17 @@ class TradingApp:
 
 
 
-
-
+            # -----------------------------
             # LEVERAGE
+            # -----------------------------
 
             bybit_api.set_leverage()
 
 
 
-
-
-            # DATABASE EVENT
+            # -----------------------------
+            # DATABASE
+            # -----------------------------
 
             database.event(
                 "BOT START"
@@ -164,41 +157,61 @@ class TradingApp:
 
 
 
-
-
+            # -----------------------------
             # TELEGRAM
+            # -----------------------------
 
             telegram_bot.bot_start()
 
 
 
-
-
+            # -----------------------------
             # PRIVATE WS
+            # -----------------------------
 
-            private_ws.start()
+            try:
+
+                private_ws.start()
+
+            except Exception as e:
+
+                print(
+                    "[PRIVATE WS ERROR]",
+                    e
+                )
 
 
 
-
-
+            # -----------------------------
             # WATCHDOG
+            # -----------------------------
 
-            watchdog.start()
+            try:
+
+                watchdog.start()
+
+            except Exception as e:
+
+                print(
+                    "[WATCHDOG ERROR]",
+                    e
+                )
 
 
 
-
-
-            # MARKET DATA
-
-            self.start_market_stream()
-
-
-
-
+            # -----------------------------
+            # RUN FLAG
+            # -----------------------------
 
             self.running = True
+
+
+
+            # -----------------------------
+            # MARKET LOOP
+            # -----------------------------
+
+            self.start_market_stream()
 
 
 
@@ -208,9 +221,13 @@ class TradingApp:
 
 
 
-
-
         except Exception as e:
+
+
+            print(
+                "[START ERROR]",
+                e
+            )
 
 
             database.save_error(
@@ -230,7 +247,6 @@ class TradingApp:
 
 
 
-
     # =====================================
     # MARKET STREAM
     # =====================================
@@ -241,6 +257,11 @@ class TradingApp:
         def run():
 
 
+            print(
+                "[MARKET THREAD START]"
+            )
+
+
             while self.running:
 
 
@@ -248,12 +269,9 @@ class TradingApp:
 
 
                     candles = (
-
                         bybit_api
                         .get_kline()
-
                     )
-
 
 
                     if candles:
@@ -264,8 +282,13 @@ class TradingApp:
                         )
 
 
+                    try:
 
-                    watchdog.heartbeat()
+                        watchdog.heartbeat()
+
+                    except:
+
+                        pass
 
 
 
@@ -289,19 +312,16 @@ class TradingApp:
 
 
 
-
         self.market_thread = threading.Thread(
 
-            target=run
+            target=run,
+
+            daemon=True
 
         )
 
 
-        self.market_thread.daemon = True
-
-
         self.market_thread.start()
-
 
 
 
@@ -318,11 +338,9 @@ class TradingApp:
     ):
 
 
-
         if not self.running:
 
             return
-
 
 
 
@@ -336,12 +354,9 @@ class TradingApp:
         )
 
 
-
         if signal is None:
 
             return
-
-
 
 
 
@@ -358,14 +373,22 @@ class TradingApp:
 
 
 
-
-
+        # -----------------------------
         # EXIT
+        # -----------------------------
 
         if signal["type"] == "EXIT":
 
 
-            order_manager.close_position()
+            try:
+
+                order_manager.close_position()
+
+            except Exception as e:
+
+                database.save_error(
+                    str(e)
+                )
 
 
             return
@@ -373,9 +396,9 @@ class TradingApp:
 
 
 
-
-
+        # -----------------------------
         # ENTRY
+        # -----------------------------
 
         if not risk_manager.can_trade():
 
@@ -389,13 +412,25 @@ class TradingApp:
 
 
 
+        try:
+
+            order_manager.execute(
+                signal
+            )
 
 
-        order_manager.execute(
-            signal
-        )
+        except Exception as e:
 
 
+            print(
+                "[ORDER ERROR]",
+                e
+            )
+
+
+            database.save_error(
+                str(e)
+            )
 
 
 
@@ -426,11 +461,16 @@ class TradingApp:
             )
 
 
-        except:
+        except Exception as e:
+
+
+            print(
+                "[EQUITY PARSE ERROR]",
+                e
+            )
 
 
             return 0
-
 
 
 
@@ -457,7 +497,6 @@ class TradingApp:
         try:
 
 
-
             database.event(
                 "BOT STOP"
             )
@@ -479,6 +518,12 @@ class TradingApp:
         except Exception as e:
 
 
+            print(
+                "[STOP ERROR]",
+                e
+            )
+
+
             database.save_error(
                 str(e)
             )
@@ -488,4 +533,3 @@ class TradingApp:
         print(
             "[BOT STOP COMPLETE]"
         )
-```
