@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 
 # ==================================
-# LOAD ENV
+# ENV LOAD
 # ==================================
 
 load_dotenv(
@@ -19,7 +19,6 @@ BYBIT_API_KEY = os.getenv(
     "BYBIT_API_KEY",
     ""
 )
-
 
 BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
@@ -87,7 +86,7 @@ ACCOUNT_TYPE = os.getenv(
 
 
 # ==================================
-# TRADING CATEGORY
+# MARKET
 # ==================================
 
 CATEGORY = os.getenv(
@@ -95,10 +94,6 @@ CATEGORY = os.getenv(
     "linear"
 )
 
-
-# ==================================
-# SYMBOL
-# ==================================
 
 DEFAULT_SYMBOL = os.getenv(
     "DEFAULT_SYMBOL",
@@ -178,18 +173,62 @@ SUPERTREND_MULTIPLIER = float(
 # RISK
 # ==================================
 
-MAX_POSITION = float(
+MAX_POSITION_SIZE = float(
     os.getenv(
-        "MAX_POSITION",
+        "MAX_POSITION_SIZE",
         "0.001"
     )
 )
+
+
+# 호환용
+MAX_POSITION = MAX_POSITION_SIZE
 
 
 MAX_DAILY_LOSS = float(
     os.getenv(
         "MAX_DAILY_LOSS",
         "0.03"
+    )
+)
+
+
+MAX_LOSS_AMOUNT = float(
+    os.getenv(
+        "MAX_LOSS_AMOUNT",
+        "0"
+    )
+)
+
+
+RISK_PERCENT = float(
+    os.getenv(
+        "RISK_PERCENT",
+        "1.0"
+    )
+)
+
+
+STOP_LOSS_PERCENT = float(
+    os.getenv(
+        "STOP_LOSS_PERCENT",
+        "1.0"
+    )
+)
+
+
+TAKE_PROFIT_PERCENT = float(
+    os.getenv(
+        "TAKE_PROFIT_PERCENT",
+        "2.0"
+    )
+)
+
+
+MAX_OPEN_POSITIONS = int(
+    os.getenv(
+        "MAX_OPEN_POSITIONS",
+        "1"
     )
 )
 
@@ -204,9 +243,8 @@ LOG_LEVEL = os.getenv(
 )
 
 
-
 # ==================================
-# PRINT STATUS
+# STATUS
 # ==================================
 
 print("==============================")
@@ -219,6 +257,8 @@ print("CATEGORY :", CATEGORY)
 print("SYMBOL :", DEFAULT_SYMBOL)
 print("QTY :", DEFAULT_QTY)
 print("LEVERAGE :", LEVERAGE)
+print("VWAP :", VWAP_LENGTH)
+print("SUPERTREND :", SUPERTREND_PERIOD, SUPERTREND_MULTIPLIER)
 print("REST :", BYBIT_BASE_URL)
 print("PUBLIC WS :", BYBIT_PUBLIC_WS)
 print("PRIVATE WS :", BYBIT_PRIVATE_WS)
