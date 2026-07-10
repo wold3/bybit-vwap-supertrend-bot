@@ -1,6 +1,6 @@
 # =====================================================
 # main.py
-# Bybit VWAP SuperTrend Bot
+# BYBIT VWAP SUPERTREND BOT
 # =====================================================
 
 
@@ -15,11 +15,18 @@ from app import (
 
 
 
+from database.database import (
+    database
+)
+
+
+
 
 
 
 
 def main():
+
 
 
     app = TradingApp()
@@ -29,32 +36,49 @@ def main():
     try:
 
 
+
         app.start()
+
+
 
 
 
         while True:
 
 
+
             time.sleep(1)
+
+
+
+
 
 
 
     except KeyboardInterrupt:
 
 
+
+        print()
+
         print(
 
-            "\n[USER STOP]"
+            "[USER STOP]"
 
         )
+
 
 
         app.stop()
 
 
 
+
+
+
+
     except Exception as e:
+
 
 
         print(
@@ -66,7 +90,25 @@ def main():
         )
 
 
+
         traceback.print_exc()
+
+
+
+        try:
+
+
+            database.save_error(
+
+                str(e)
+
+            )
+
+
+        except:
+
+
+            pass
 
 
 
@@ -87,7 +129,29 @@ def main():
 
 
 
+    finally:
+
+
+
+        try:
+
+
+            database.close()
+
+
+        except:
+
+
+            pass
+
+
+
+
+
+
+
 if __name__ == "__main__":
+
 
 
     main()
