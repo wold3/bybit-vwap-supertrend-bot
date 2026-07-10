@@ -1,5 +1,9 @@
+# =====================================================
+# indicators/indicator_engine.py
+# VWAP + SuperTrend Indicator Engine
+# =====================================================
+
 from collections import deque
-import math
 
 
 from config import (
@@ -26,20 +30,18 @@ class IndicatorEngine:
         )
 
 
-
         self.last_market = None
+
+
+        self.last_supertrend = None
 
 
 
         print(
+
             "[INDICATOR ENGINE READY]"
+
         )
-
-
-
-
-
-
 
 
 
@@ -56,7 +58,9 @@ class IndicatorEngine:
 
 
         self.candles.append(
+
             candle
+
         )
 
 
@@ -73,11 +77,13 @@ class IndicatorEngine:
         vwap = self.calculate_vwap()
 
 
-
         trend = self.calculate_supertrend()
 
 
 
+
+
+        self.last_supertrend = trend
 
 
 
@@ -106,9 +112,6 @@ class IndicatorEngine:
 
 
 
-
-
-
     # =====================================================
     # VWAP
     # =====================================================
@@ -117,7 +120,9 @@ class IndicatorEngine:
 
 
         data = list(
+
             self.candles
+
         )[-VWAP_LENGTH:]
 
 
@@ -131,25 +136,28 @@ class IndicatorEngine:
 
 
 
-
         for c in data:
 
 
+            high = float(
 
-            price = (
+                c["high"]
 
-                float(c["high"])
+            )
 
-                +
 
-                float(c["low"])
+            low = float(
 
-                +
+                c["low"]
 
-                float(c["close"])
+            )
 
-            ) / 3
 
+            close = float(
+
+                c["close"]
+
+            )
 
 
 
@@ -161,9 +169,26 @@ class IndicatorEngine:
 
 
 
+            typical_price = (
+
+                high
+
+                +
+
+                low
+
+                +
+
+                close
+
+            ) / 3
+
+
+
+
             total_value += (
 
-                price
+                typical_price
 
                 *
 
@@ -172,9 +197,7 @@ class IndicatorEngine:
             )
 
 
-
             total_volume += volume
-
 
 
 
@@ -184,7 +207,6 @@ class IndicatorEngine:
 
 
             return None
-
 
 
 
@@ -204,8 +226,6 @@ class IndicatorEngine:
 
 
 
-
-
     # =====================================================
     # ATR
     # =====================================================
@@ -214,13 +234,23 @@ class IndicatorEngine:
 
 
         data = list(
+
             self.candles
+
         )
 
 
 
-        trs = []
+        if len(data) < SUPERTREND_PERIOD + 1:
 
+
+            return None
+
+
+
+
+
+        trs = []
 
 
 
@@ -232,7 +262,6 @@ class IndicatorEngine:
             len(data)
 
         ):
-
 
 
             high = float(
@@ -263,30 +292,29 @@ class IndicatorEngine:
                 high - low,
 
 
-                abs(high - prev_close),
+                abs(
+
+                    high - prev_close
+
+                ),
 
 
-                abs(low - prev_close),
+                abs(
 
+                    low - prev_close
+
+                )
 
             )
 
 
 
             trs.append(
+
                 tr
+
             )
 
-
-
-
-
-
-
-        if len(trs) < SUPERTREND_PERIOD:
-
-
-            return None
 
 
 
@@ -302,9 +330,6 @@ class IndicatorEngine:
 
 
         return atr
-
-
-
 
 
 
@@ -343,7 +368,6 @@ class IndicatorEngine:
         )
 
 
-
         high = float(
 
             candle["high"]
@@ -351,13 +375,11 @@ class IndicatorEngine:
         )
 
 
-
         low = float(
 
             candle["low"]
 
         )
-
 
 
 
@@ -377,7 +399,7 @@ class IndicatorEngine:
 
 
 
-        upper = (
+        upper_band = (
 
             hl2
 
@@ -394,7 +416,8 @@ class IndicatorEngine:
 
 
 
-        lower = (
+
+        lower_band = (
 
             hl2
 
@@ -413,7 +436,25 @@ class IndicatorEngine:
 
 
 
-        if close > upper:
+
+
+        previous = self.last_supertrend
+
+
+
+
+
+        # ==============================
+        # TREND CONTINUATION
+        # ==============================
+
+
+        if previous == "UP":
+
+
+            if close < lower_band:
+
+                return "DOWN"
 
 
             return "UP"
@@ -421,7 +462,13 @@ class IndicatorEngine:
 
 
 
-        elif close < lower:
+
+        if previous == "DOWN":
+
+
+            if close > upper_band:
+
+                return "UP"
 
 
             return "DOWN"
@@ -430,24 +477,31 @@ class IndicatorEngine:
 
 
 
-        # 기존 방향 유지
-
-        if self.last_market:
 
 
-            return self.last_market.get(
-
-                "supertrend"
-
-            )
+        # ==============================
+        # FIRST TREND
+        # ==============================
 
 
+        if close > upper_band:
 
-        return None
+
+            return "UP"
 
 
 
 
+        if close < lower_band:
+
+
+            return "DOWN"
+
+
+
+
+
+        return "UP"
 
 
 
@@ -473,7 +527,8 @@ class IndicatorEngine:
 
 
 
-
-
+# =====================================================
+# SINGLETON
+# =====================================================
 
 indicator_engine = IndicatorEngine()
