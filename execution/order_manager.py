@@ -1,11 +1,7 @@
 # =====================================================
 # execution/order_manager.py
-# Bybit Order Execution Manager
+# Order Manager V2
 # =====================================================
-
-import time
-
-
 
 from config import (
     DEFAULT_SYMBOL,
@@ -15,17 +11,14 @@ from config import (
 )
 
 
-
 from api.bybit_api import (
     bybit_api
 )
 
 
-
 from risk.risk_manager import (
     risk_manager
 )
-
 
 
 from portfolio.position_manager import (
@@ -56,8 +49,10 @@ class OrderManager:
 
 
 
+
+
     # =====================================================
-    # EXECUTE SIGNAL
+    # EXECUTE
     # =====================================================
 
     def execute(
@@ -69,10 +64,12 @@ class OrderManager:
         try:
 
 
-            if not signal:
+            if signal is None:
 
 
                 return False
+
+
 
 
 
@@ -96,31 +93,11 @@ class OrderManager:
 
 
 
-            if not risk_manager.can_trade():
-
-
-                print(
-
-                    "[ORDER BLOCKED BY RISK]"
-
-                )
-
-
-                return False
-
-
-
-
-
 
             if action == "BUY":
 
 
-                return self.open_position(
-
-                    "Buy"
-
-                )
+                return self.buy()
 
 
 
@@ -129,11 +106,7 @@ class OrderManager:
             elif action == "SELL":
 
 
-                return self.open_position(
-
-                    "Sell"
-
-                )
+                return self.sell()
 
 
 
@@ -149,7 +122,6 @@ class OrderManager:
 
 
             return False
-
 
 
 
@@ -175,28 +147,16 @@ class OrderManager:
 
 
 
+
+
     # =====================================================
-    # CHECK POSITION
+    # POSITION CHECK
     # =====================================================
 
     def has_position(self):
 
 
-        try:
-
-
-            position_manager.sync()
-
-
-
-            return position_manager.has_position()
-
-
-
-        except:
-
-
-            return False
+        return position_manager.has_position()
 
 
 
@@ -205,7 +165,7 @@ class OrderManager:
 
 
     # =====================================================
-    # POSITION SIZE
+    # QTY CALCULATE
     # =====================================================
 
     def calculate_qty(
@@ -215,6 +175,7 @@ class OrderManager:
 
 
         try:
+
 
 
             price = (
@@ -242,13 +203,17 @@ class OrderManager:
 
                 stop = (
 
-                    price *
+                    price
+
+                    *
 
                     (
 
-                        1 -
+                        1
 
-                        STOP_LOSS_PERCENT / 100
+                        -
+
+                        STOP_LOSS_PERCENT/100
 
                     )
 
@@ -261,17 +226,22 @@ class OrderManager:
 
                 stop = (
 
-                    price *
+                    price
+
+                    *
 
                     (
 
-                        1 +
+                        1
 
-                        STOP_LOSS_PERCENT /100
+                        +
+
+                        STOP_LOSS_PERCENT/100
 
                     )
 
                 )
+
 
 
 
@@ -295,7 +265,6 @@ class OrderManager:
 
 
 
-
             if qty <= 0:
 
 
@@ -305,33 +274,17 @@ class OrderManager:
 
 
 
-            if not risk_manager.check_position_size(
+
+            qty = bybit_api.format_qty(
 
                 qty
 
-            ):
-
-
-                print(
-
-                    "[QTY LIMIT BLOCK]"
-
-                )
-
-
-                return 0
-
-
-
-
-
-            return round(
-
-                qty,
-
-                3
-
             )
+
+
+
+            return qty
+
 
 
 
@@ -357,18 +310,16 @@ class OrderManager:
 
 
 
+
+
     # =====================================================
-    # OPEN POSITION
+    # BUY
     # =====================================================
 
-    def open_position(
-        self,
-        side
-    ):
+    def buy(self):
 
 
         try:
-
 
 
             if self.has_position():
@@ -376,7 +327,7 @@ class OrderManager:
 
                 print(
 
-                    "[POSITION EXISTS]"
+                    "[BUY SKIP] POSITION EXISTS"
 
                 )
 
@@ -390,26 +341,15 @@ class OrderManager:
 
             qty = self.calculate_qty(
 
-                side
+                "Buy"
 
             )
 
 
 
-            if qty <= 0:
+            result = bybit_api.create_order(
 
-
-                return False
-
-
-
-
-
-            print(
-
-                "[OPEN ORDER]",
-
-                side,
+                "Buy",
 
                 qty
 
@@ -417,73 +357,29 @@ class OrderManager:
 
 
 
-
-
-            result = (
-
-                bybit_api
-
-                .create_order(
-
-                    side,
-
-                    qty
-
-                )
-
-            )
-
-
-
-
-
-
-            if not result:
+            if result:
 
 
                 print(
 
-                    "[ORDER FAILED]"
+                    "[BUY SUCCESS]"
 
                 )
 
 
-                return False
+                self.set_protection(
+
+                    "Buy"
+
+                )
+
+
+                return True
 
 
 
 
-
-
-            print(
-
-                "[ORDER SUCCESS]"
-
-            )
-
-
-
-
-
-            time.sleep(1)
-
-
-
-            position_manager.sync()
-
-
-
-
-
-            self.set_tp_sl()
-
-
-
-
-
-            return True
-
-
+            return False
 
 
 
@@ -494,7 +390,7 @@ class OrderManager:
 
             print(
 
-                "[OPEN POSITION ERROR]",
+                "[BUY ERROR]",
 
                 e
 
@@ -509,38 +405,131 @@ class OrderManager:
 
 
 
+
+
     # =====================================================
-    # TP / SL
+    # SELL
     # =====================================================
 
-    def set_tp_sl(self):
+    def sell(self):
 
 
         try:
 
 
 
-            entry = (
+            if self.has_position():
 
-                position_manager
 
-                .entry_price()
+                print(
+
+                    "[SELL SKIP] POSITION EXISTS"
+
+                )
+
+
+                return False
+
+
+
+
+
+            qty = self.calculate_qty(
+
+                "Sell"
 
             )
 
 
 
-            side = (
+            result = bybit_api.create_order(
 
-                position_manager
+                "Sell",
 
-                .side()
+                qty
 
             )
 
 
 
-            if entry <= 0:
+
+            if result:
+
+
+                print(
+
+                    "[SELL SUCCESS]"
+
+                )
+
+
+                self.set_protection(
+
+                    "Sell"
+
+                )
+
+
+                return True
+
+
+
+
+
+            return False
+
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[SELL ERROR]",
+
+                e
+
+            )
+
+
+            return False
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # TP SL
+    # =====================================================
+
+    def set_protection(
+        self,
+        side
+    ):
+
+
+        try:
+
+
+
+            price = (
+
+                bybit_api
+
+                .get_last_price()
+
+            )
+
+
+
+            if not price:
 
 
                 return False
@@ -554,11 +543,15 @@ class OrderManager:
 
                 tp = (
 
-                    entry *
+                    price
+
+                    *
 
                     (
 
-                        1 +
+                        1
+
+                        +
 
                         TAKE_PROFIT_PERCENT/100
 
@@ -567,14 +560,17 @@ class OrderManager:
                 )
 
 
-
                 sl = (
 
-                    entry *
+                    price
+
+                    *
 
                     (
 
-                        1 -
+                        1
+
+                        -
 
                         STOP_LOSS_PERCENT/100
 
@@ -584,18 +580,21 @@ class OrderManager:
 
 
 
-
-
             else:
+
 
 
                 tp = (
 
-                    entry *
+                    price
+
+                    *
 
                     (
 
-                        1 -
+                        1
+
+                        -
 
                         TAKE_PROFIT_PERCENT/100
 
@@ -604,14 +603,17 @@ class OrderManager:
                 )
 
 
-
                 sl = (
 
-                    entry *
+                    price
+
+                    *
 
                     (
 
-                        1 +
+                        1
+
+                        +
 
                         STOP_LOSS_PERCENT/100
 
@@ -629,9 +631,9 @@ class OrderManager:
 
                 .set_trading_stop(
 
-                    round(tp,2),
+                    tp,
 
-                    round(sl,2)
+                    sl
 
                 )
 
@@ -639,18 +641,16 @@ class OrderManager:
 
 
 
-            if result:
 
+            print(
 
-                print(
+                "[TP SL SET]",
 
-                    "[TP SL SET]",
+                tp,
 
-                    tp,
+                sl
 
-                    sl
-
-                )
+            )
 
 
 
@@ -680,61 +680,31 @@ class OrderManager:
 
 
 
+
+
     # =====================================================
-    # CLOSE POSITION
+    # CLOSE
     # =====================================================
 
     def close_position(self):
 
 
-        try:
+        print(
+
+            "[CLOSE POSITION]"
+
+        )
 
 
-            print(
+        return (
 
-                "[CLOSE POSITION]"
+            bybit_api
 
-            )
+            .close_position()
 
-
-
-            result = (
-
-                bybit_api
-
-                .close_position()
-
-            )
+        )
 
 
-
-            if result:
-
-
-                position_manager.clear()
-
-
-
-            return result
-
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[CLOSE ERROR]",
-
-                e
-
-            )
-
-
-            return False
 
 
 
@@ -754,20 +724,16 @@ class OrderManager:
 
             "symbol":
 
-            DEFAULT_SYMBOL,
-
-
-            "position":
-
-            position_manager.current,
+                DEFAULT_SYMBOL,
 
 
             "ready":
 
-            True
+                True
 
 
         }
+
 
 
 
