@@ -1,8 +1,6 @@
 import time
 
-
 from pybit.unified_trading import HTTP
-
 
 
 from config import (
@@ -29,7 +27,7 @@ from config import (
 
     TIME_IN_FORCE,
 
-    LEVERAGE
+    LEVERAGE,
 
 )
 
@@ -37,9 +35,9 @@ from config import (
 
 
 
-# ==========================================
-# BYBIT API CLIENT
-# ==========================================
+# ==================================================
+# BYBIT V5 API CLIENT
+# ==================================================
 
 class BybitAPI:
 
@@ -59,21 +57,15 @@ class BybitAPI:
 
 
 
-
         self.session = HTTP(
-
 
             testnet=BYBIT_TESTNET,
 
-
             demo=BYBIT_DEMO,
-
 
             api_key=BYBIT_API_KEY,
 
-
             api_secret=BYBIT_API_SECRET
-
 
         )
 
@@ -81,9 +73,9 @@ class BybitAPI:
 
 
 
-    # ======================================
-    # WALLET
-    # ======================================
+    # ==================================================
+    # WALLET BALANCE
+    # ==================================================
 
     def get_wallet_balance(self):
 
@@ -109,7 +101,6 @@ class BybitAPI:
 
 
 
-
         except Exception as e:
 
 
@@ -125,9 +116,9 @@ class BybitAPI:
 
 
 
-    # ======================================
+    # ==================================================
     # POSITION
-    # ======================================
+    # ==================================================
 
     def get_position(self):
 
@@ -163,9 +154,9 @@ class BybitAPI:
 
 
 
-    # ======================================
+    # ==================================================
     # KLINE
-    # ======================================
+    # ==================================================
 
     def get_kline(
 
@@ -200,7 +191,6 @@ class BybitAPI:
 
 
 
-
         except Exception as e:
 
 
@@ -216,9 +206,9 @@ class BybitAPI:
 
 
 
-    # ======================================
-    # TICKER
-    # ======================================
+    # ==================================================
+    # CURRENT PRICE
+    # ==================================================
 
     def get_price(self):
 
@@ -238,13 +228,23 @@ class BybitAPI:
             )
 
 
+            price = (
 
-            price = result["result"]["list"][0]["lastPrice"]
+                result
+
+                ["result"]
+
+                ["list"]
+
+                [0]
+
+                ["lastPrice"]
+
+            )
 
 
 
             return float(price)
-
 
 
 
@@ -263,9 +263,9 @@ class BybitAPI:
 
 
 
-    # ======================================
+    # ==================================================
     # LEVERAGE
-    # ======================================
+    # ==================================================
 
     def set_leverage(self):
 
@@ -303,15 +303,16 @@ class BybitAPI:
 
 
 
-
         except Exception as e:
 
 
-            msg = str(e)
+            error = str(e)
 
 
 
-            if "110043" in msg:
+            # 이미 설정된 경우
+
+            if "110043" in error:
 
 
                 print(
@@ -320,7 +321,6 @@ class BybitAPI:
 
 
                 return True
-
 
 
 
@@ -336,9 +336,9 @@ class BybitAPI:
 
 
 
-    # ======================================
+    # ==================================================
     # CREATE ORDER
-    # ======================================
+    # ==================================================
 
     def create_order(
 
@@ -346,7 +346,11 @@ class BybitAPI:
 
         side,
 
-        qty=None
+        qty=None,
+
+        take_profit=None,
+
+        stop_loss=None
 
     ):
 
@@ -363,25 +367,78 @@ class BybitAPI:
 
 
 
+            params = {
+
+
+                "category": CATEGORY,
+
+
+                "symbol": DEFAULT_SYMBOL,
+
+
+                "side": side,
+
+
+                "orderType": ORDER_TYPE,
+
+
+                "qty": str(qty),
+
+
+                "timeInForce": TIME_IN_FORCE
+
+
+            }
+
+
+
+
+
+            # 서버 TP
+
+            if take_profit:
+
+
+                params["takeProfit"] = str(
+
+                    take_profit
+
+                )
+
+
+
+
+
+            # 서버 SL
+
+            if stop_loss:
+
+
+                params["stopLoss"] = str(
+
+                    stop_loss
+
+                )
+
+
+
+
+
+            print(
+                "[ORDER REQUEST]"
+            )
+
+
+            print(params)
+
+
+
+
+
             response = self.session.place_order(
 
 
-                category=CATEGORY,
-
-
-                symbol=DEFAULT_SYMBOL,
-
-
-                side=side,
-
-
-                orderType=ORDER_TYPE,
-
-
-                qty=str(qty),
-
-
-                timeInForce=TIME_IN_FORCE
+                **params
 
 
             )
@@ -402,6 +459,7 @@ class BybitAPI:
 
 
 
+
         except Exception as e:
 
 
@@ -417,9 +475,69 @@ class BybitAPI:
 
 
 
-    # ======================================
-    # CANCEL
-    # ======================================
+    # ==================================================
+    # CLOSE POSITION
+    # ==================================================
+
+    def close_position(
+
+        self,
+
+        side,
+
+        qty
+
+    ):
+
+
+        try:
+
+
+            close_side = (
+
+                "Sell"
+
+                if side == "Buy"
+
+                else
+
+                "Buy"
+
+            )
+
+
+
+            return self.create_order(
+
+
+                side=close_side,
+
+
+                qty=qty
+
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[CLOSE ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+    # ==================================================
+    # CANCEL ORDERS
+    # ==================================================
 
     def cancel_all_orders(self):
 
@@ -440,7 +558,6 @@ class BybitAPI:
 
 
 
-
         except Exception as e:
 
 
@@ -456,9 +573,9 @@ class BybitAPI:
 
 
 
-    # ======================================
-    # ORDER HISTORY
-    # ======================================
+    # ==================================================
+    # OPEN ORDERS
+    # ==================================================
 
     def get_open_orders(self):
 
@@ -494,16 +611,16 @@ class BybitAPI:
 
 
 
-    # ======================================
+    # ==================================================
     # SERVER TIME
-    # ======================================
+    # ==================================================
 
     def server_time(self):
 
 
         return int(
 
-            time.time()*1000
+            time.time() * 1000
 
         )
 
@@ -511,8 +628,8 @@ class BybitAPI:
 
 
 
-# ==========================================
+# ==================================================
 # SINGLETON
-# ==========================================
+# ==================================================
 
 bybit_api = BybitAPI()
