@@ -1,26 +1,16 @@
 # =====================================================
 # services/watchdog.py
+# Trading Bot Watchdog
 # =====================================================
 
 import time
 import threading
 
 
-from api.bybit_api import (
-    bybit_api
-)
-
-
-from order.order_manager import (
-    order_manager
-)
-
 
 from config import (
     WATCHDOG_INTERVAL,
-    MAX_API_ERROR,
-    STOP_LOSS_PERCENT,
-    TAKE_PROFIT_PERCENT
+    MAX_API_ERROR
 )
 
 
@@ -28,22 +18,36 @@ from config import (
 class Watchdog:
 
 
+
     def __init__(self):
+
 
         self.running = False
 
+
         self.thread = None
 
-        self.last_heartbeat = time.time()
 
-        self.api_error_count = 0
 
-        self.system_ok = True
+        self.last_heartbeat = 0
+
+
+        self.api_errors = 0
+
+
+        self.lock = threading.Lock()
+
 
 
         print(
+
             "[WATCHDOG READY]"
+
         )
+
+
+
+
 
 
 
@@ -53,30 +57,47 @@ class Watchdog:
 
     def start(self):
 
+
         if self.running:
 
+
             return
+
 
 
         self.running = True
 
 
+
+        self.last_heartbeat = time.time()
+
+
+
         self.thread = threading.Thread(
 
-            target=self.monitor
+            target=self.run,
+
+            daemon=True
 
         )
 
-
-        self.thread.daemon = True
 
 
         self.thread.start()
 
 
+
         print(
+
             "[WATCHDOG START]"
+
         )
+
+
+
+
+
+
 
 
 
@@ -84,7 +105,7 @@ class Watchdog:
     # LOOP
     # =====================================================
 
-    def monitor(self):
+    def run(self):
 
 
         while self.running:
@@ -93,13 +114,7 @@ class Watchdog:
             try:
 
 
-                self.check_api()
-
-
-                self.check_position()
-
-
-                self.check_health()
+                self.check()
 
 
 
@@ -107,8 +122,11 @@ class Watchdog:
 
 
                 print(
+
                     "[WATCHDOG ERROR]",
+
                     e
+
                 )
 
 
@@ -121,311 +139,106 @@ class Watchdog:
 
 
 
-    # =====================================================
-    # API CHECK
-    # =====================================================
-
-    def check_api(self):
-
-
-        result = (
-
-            bybit_api
-            .ping()
-
-        )
 
 
 
-        if result:
-
-
-            self.api_error_count = 0
-
-            self.system_ok = True
-
-
-
-        else:
-
-
-            self.api_error_count += 1
-
-
-
-            print(
-
-                "[API ERROR COUNT]",
-
-                self.api_error_count
-
-            )
-
-
-
-            if self.api_error_count >= MAX_API_ERROR:
-
-
-                self.emergency_stop()
 
 
 
     # =====================================================
-    # POSITION MONITOR
+    # CHECK
     # =====================================================
 
-    def check_position(self):
-
-
-        try:
-
-
-            position = (
-
-                bybit_api
-                .get_position()
-
-            )
-
-
-
-            if position is None:
-
-                return
-
-
-
-            rows = (
-
-                position
-
-                .get(
-
-                    "result",
-
-                    {}
-
-                )
-
-                .get(
-
-                    "list",
-
-                    []
-
-                )
-
-            )
-
-
-
-            for p in rows:
-
-
-
-                size = float(
-
-                    p.get(
-
-                        "size",
-
-                        0
-
-                    )
-
-                )
-
-
-
-                if size <= 0:
-
-                    continue
-
-
-
-                side = p.get(
-
-                    "side"
-
-                )
-
-
-
-                entry = float(
-
-                    p.get(
-
-                        "avgPrice",
-
-                        0
-
-                    )
-
-                )
-
-
-
-                price = (
-
-                    bybit_api
-
-                    .get_last_price()
-
-                )
-
-
-
-                if price is None:
-
-                    return
-
-
-
-                if entry <= 0:
-
-                    return
-
-
-
-                if side == "Buy":
-
-
-                    pnl = (
-
-                        (price-entry)
-
-                        /
-
-                        entry
-
-                    ) * 100
-
-
-
-                else:
-
-
-                    pnl = (
-
-                        (entry-price)
-
-                        /
-
-                        entry
-
-                    ) * 100
-
-
-
-
-
-                print(
-
-                    "[POSITION MONITOR]",
-
-                    side,
-
-                    round(
-
-                        pnl,
-
-                        3
-
-                    ),
-
-                    "%"
-
-                )
-
-
-
-
-
-                # -----------------------------
-                # STOP LOSS
-                # -----------------------------
-
-                if pnl <= -STOP_LOSS_PERCENT:
-
-
-                    print(
-
-                        "[STOP LOSS]"
-
-                    )
-
-
-                    order_manager.close_position()
-
-
-                    return
-
-
-
-
-
-                # -----------------------------
-                # TAKE PROFIT
-                # -----------------------------
-
-                if pnl >= TAKE_PROFIT_PERCENT:
-
-
-                    print(
-
-                        "[TAKE PROFIT]"
-
-                    )
-
-
-                    order_manager.close_position()
-
-
-                    return
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[POSITION CHECK ERROR]",
-
-                e
-
-            )
-
-
-
-    # =====================================================
-    # HEALTH CHECK
-    # =====================================================
-
-    def check_health(self):
+    def check(self):
 
 
         now = time.time()
 
 
 
-        if (
+        diff = (
 
-            now - self.last_heartbeat
+            now
 
-            >
+            -
 
-            WATCHDOG_INTERVAL * 5
+            self.last_heartbeat
+
+        )
+
+
+
+
+
+        if diff > (
+
+            WATCHDOG_INTERVAL * 3
 
         ):
 
 
             print(
 
-                "[WATCHDOG WARNING] NO HEARTBEAT"
+                "[WATCHDOG WARNING]"
+
+                ,
+
+                "NO HEARTBEAT",
+
+                round(diff,1),
+
+                "sec"
 
             )
+
+
+
+
+
+
+
+        if self.api_errors >= MAX_API_ERROR:
+
+
+            print(
+
+                "[WATCHDOG] TOO MANY API ERRORS"
+
+            )
+
+
+
+            self.api_errors = 0
+
+
+
+
+
+
+
+        print(
+
+            "[WATCHDOG OK]",
+
+            "heartbeat:",
+
+            round(diff,1),
+
+            "sec",
+
+            "api_error:",
+
+            self.api_errors
+
+        )
+
+
+
+
+
+
+
+
 
 
 
@@ -436,35 +249,38 @@ class Watchdog:
     def heartbeat(self):
 
 
-        self.last_heartbeat = time.time()
+        with self.lock:
+
+
+            self.last_heartbeat = time.time()
+
+
+
+            self.api_errors = 0
+
+
+
+
+
+
 
 
 
     # =====================================================
-    # EMERGENCY STOP
+    # API ERROR
     # =====================================================
 
-    def emergency_stop(self):
+    def api_error(self):
 
 
-        print(
-            "==================="
-        )
-
-        print(
-            "[WATCHDOG EMERGENCY STOP]"
-        )
-
-        print(
-            "API FAILURE"
-        )
-
-        print(
-            "==================="
-        )
+        with self.lock:
 
 
-        self.system_ok = False
+            self.api_errors += 1
+
+
+
+
 
 
 
@@ -483,22 +299,23 @@ class Watchdog:
                 self.running,
 
 
-            "system_ok":
+            "last_heartbeat":
 
-                self.system_ok,
+                self.last_heartbeat,
 
 
             "api_errors":
 
-                self.api_error_count,
-
-
-            "heartbeat":
-
-                self.last_heartbeat
+                self.api_errors
 
 
         }
+
+
+
+
+
+
 
 
 
@@ -512,11 +329,15 @@ class Watchdog:
         self.running = False
 
 
+
         print(
 
             "[WATCHDOG STOP]"
 
         )
+
+
+
 
 
 
