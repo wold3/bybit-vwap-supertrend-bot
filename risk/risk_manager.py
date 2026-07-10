@@ -2,15 +2,7 @@ import time
 
 
 from portfolio.bybit_wallet import wallet
-
 from position.position_manager import position_manager
-
-
-from config import (
-    MAX_POSITION_SIZE,
-    DAILY_LOSS_LIMIT,
-    ORDER_COOLDOWN,
-)
 
 
 
@@ -25,26 +17,28 @@ class RiskManager:
         self.enabled = True
 
 
+        # 최대 주문 수량
 
-        self.max_position_size = (
-            MAX_POSITION_SIZE
-        )
-
+        self.max_position_size = 0.01
 
 
-        self.cooldown_seconds = (
-            ORDER_COOLDOWN
-        )
 
+        # 주문 간격
+
+        self.cooldown_seconds = 30
 
 
         self.last_order_time = 0
 
 
 
-        self.daily_loss_limit = (
-            DAILY_LOSS_LIMIT
-        )
+
+
+        # 일일 손실 제한
+
+        self.daily_loss_limit = -100
+
+
 
 
 
@@ -52,7 +46,14 @@ class RiskManager:
 
 
 
-        self.initialized = False
+        # PNL CHECK CACHE
+
+        self.last_loss_check = 0
+
+
+        self.loss_check_interval = 30
+
+
 
 
 
@@ -66,10 +67,11 @@ class RiskManager:
 
 
 
+
+
     # =====================================================
     # INIT
     # =====================================================
-
 
     def initialize(self):
 
@@ -77,22 +79,7 @@ class RiskManager:
         try:
 
 
-
             equity = wallet.get_equity()
-
-
-
-            if equity is None:
-
-
-                print(
-                    "[RISK INIT FAILED]"
-                )
-
-
-                return False
-
-
 
 
 
@@ -102,23 +89,10 @@ class RiskManager:
 
 
 
-            self.initialized = True
-
-
-
             print(
-
                 "[RISK INIT EQUITY]",
-
                 self.start_equity
-
             )
-
-
-
-            return True
-
-
 
 
 
@@ -131,7 +105,6 @@ class RiskManager:
             )
 
 
-            return False
 
 
 
@@ -142,7 +115,6 @@ class RiskManager:
     # =====================================================
     # ORDER CHECK
     # =====================================================
-
 
     def allow_order(
         self,
@@ -165,6 +137,8 @@ class RiskManager:
 
 
 
+
+
         try:
 
 
@@ -181,6 +155,8 @@ class RiskManager:
 
 
             return False
+
+
 
 
 
@@ -209,19 +185,19 @@ class RiskManager:
 
 
 
-        # -------------------------
-        # Existing Position
-        # -------------------------
+
+
+        # POSITION CHECK
 
 
         try:
 
 
-            position_manager.sync()
+            position = position_manager.current
 
 
 
-            if position_manager.has_position():
+            if position["size"] > 0:
 
 
                 print(
@@ -230,7 +206,6 @@ class RiskManager:
 
 
                 return False
-
 
 
 
@@ -249,55 +224,31 @@ class RiskManager:
 
 
 
-
-        # -------------------------
-        # Cooldown
-        # -------------------------
+        # COOLDOWN
 
 
         now = time.time()
 
 
 
-        if (
-
-            now - self.last_order_time
-
-            <
+        remain = (
 
             self.cooldown_seconds
 
-        ):
+            -
+
+            (now - self.last_order_time)
+
+        )
 
 
-            remain = round(
 
-                self.cooldown_seconds
-
-                -
-
-                (
-
-                    now
-
-                    -
-
-                    self.last_order_time
-
-                ),
-
-                1
-
-            )
-
+        if remain > 0:
 
 
             print(
-
-                "[RISK COOLDOWN]",
-
-                remain
-
+                "[RISK BLOCK] COOLDOWN",
+                round(remain,1)
             )
 
 
@@ -316,10 +267,13 @@ class RiskManager:
 
 
 
+
+
+
+
     # =====================================================
     # RECORD
     # =====================================================
-
 
     def record_order(self):
 
@@ -332,15 +286,17 @@ class RiskManager:
 
 
 
+
+
+
     # =====================================================
     # DAILY LOSS
     # =====================================================
 
-
     def check_daily_loss(self):
 
 
-        if not self.initialized:
+        if self.start_equity is None:
 
 
             return True
@@ -349,54 +305,50 @@ class RiskManager:
 
 
 
+
+        now = time.time()
+
+
+
+        if (
+
+            now - self.last_loss_check
+
+            <
+
+            self.loss_check_interval
+
+        ):
+
+
+            return True
+
+
+
+
+        self.last_loss_check = now
+
+
+
+
+
         try:
 
 
-            current = wallet.get_equity()
-
-
-
-            if current is None:
-
-
-                return True
-
-
-
-
-
             current = float(
-                current
+                wallet.get_equity()
             )
 
 
 
-            pnl = (
-
-                current
-
-                -
-
-                self.start_equity
-
-            )
-
-
+            pnl = current - self.start_equity
 
 
 
             print(
-
                 "[DAILY PNL]",
-
-                round(
-                    pnl,
-                    2
-                )
-
+                round(pnl,2)
             )
-
-
 
 
 
@@ -406,13 +358,8 @@ class RiskManager:
 
 
                 print(
-
                     "[RISK STOP]",
-
-                    "LOSS LIMIT",
-
                     pnl
-
                 )
 
 
@@ -427,17 +374,12 @@ class RiskManager:
 
 
 
-
         except Exception as e:
 
 
-
             print(
-
                 "[LOSS CHECK ERROR]",
-
                 e
-
             )
 
 
@@ -450,21 +392,24 @@ class RiskManager:
 
 
 
+
+
+
+
     # =====================================================
     # RESET
     # =====================================================
 
-
     def reset_daily(self):
 
 
-        self.enabled = True
+        self.initialize()
 
 
         self.last_order_time = 0
 
 
-        self.initialize()
+        self.enabled = True
 
 
 
@@ -479,10 +424,12 @@ class RiskManager:
 
 
 
+
+
+
     # =====================================================
     # STATUS
     # =====================================================
-
 
     def status(self):
 
@@ -520,7 +467,6 @@ class RiskManager:
 
 
 
-
         return {
 
 
@@ -544,17 +490,15 @@ class RiskManager:
                 self.start_equity,
 
 
-            "daily_loss_limit":
-
-                self.daily_loss_limit,
-
-
-            "pnl":
+            "current_pnl":
 
                 pnl,
 
 
         }
+
+
+
 
 
 
