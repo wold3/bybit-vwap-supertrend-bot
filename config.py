@@ -20,6 +20,7 @@ BYBIT_API_KEY = os.getenv(
     ""
 )
 
+
 BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
     ""
@@ -46,8 +47,7 @@ LIVE_TRADING = (
     os.getenv(
         "LIVE_TRADING",
         "false"
-    )
-    .lower()
+    ).lower()
     == "true"
 )
 
@@ -56,8 +56,7 @@ BYBIT_TESTNET = (
     os.getenv(
         "BYBIT_TESTNET",
         "false"
-    )
-    .lower()
+    ).lower()
     == "true"
 )
 
@@ -188,6 +187,11 @@ MAX_DAILY_LOSS_PERCENT = float(
 )
 
 
+# risk_manager 호환
+
+MAX_DRAWDOWN_PERCENT = MAX_DAILY_LOSS_PERCENT
+
+
 
 # ==================================
 # TP / SL
@@ -243,9 +247,9 @@ SUPERTREND_MULTIPLIER = float(
 # STRATEGY COMPATIBILITY
 # ==================================
 
-# 기존 strategy 파일 호환용
-
 ST_LENGTH = SUPERTREND_PERIOD
+
+ST_PERIOD = SUPERTREND_PERIOD
 
 ST_MULTIPLIER = SUPERTREND_MULTIPLIER
 
