@@ -1,19 +1,13 @@
 # =====================================================
 # execution/order_manager.py
-# Order Manager
+# Order Execution Manager
 # =====================================================
-
-import time
-
 
 
 from config import (
-    DEFAULT_SYMBOL,
-    STOP_LOSS_PERCENT,
-    TAKE_PROFIT_PERCENT,
-    LIVE
+    LIVE,
+    DEFAULT_SYMBOL
 )
-
 
 
 from api.bybit_api import (
@@ -21,10 +15,22 @@ from api.bybit_api import (
 )
 
 
+from risk.risk_manager import (
+    risk_manager
+)
+
 
 from portfolio.position_manager import (
     position_manager
 )
+
+
+from web.server import (
+    add_log,
+    update_status
+)
+
+
 
 
 
@@ -33,6 +39,9 @@ class OrderManager:
 
 
     def __init__(self):
+
+
+        self.last_signal = None
 
 
         print(
@@ -48,9 +57,8 @@ class OrderManager:
 
 
 
-
     # =====================================================
-    # EXECUTE SIGNAL
+    # EXECUTE
     # =====================================================
 
     def execute(
@@ -62,50 +70,11 @@ class OrderManager:
         try:
 
 
+
             if not signal:
 
 
-                return False
-
-
-
-
-
-            print(
-
-                "[ORDER EXECUTE]",
-
-                signal
-
-            )
-
-
-
-
-
-
-
-            # ---------------------------------
-            # POSITION CHECK
-            # ---------------------------------
-
-            if position_manager.has_position():
-
-
-                print(
-
-                    "[ORDER BLOCKED]"
-
-                    ,
-
-                    "POSITION EXISTS"
-
-                )
-
-
-                return False
-
-
+                return
 
 
 
@@ -119,13 +88,11 @@ class OrderManager:
 
 
 
-            price = float(
+            price = signal.get(
 
-                signal.get(
+                "price",
 
-                    "price"
-
-                )
+                0
 
             )
 
@@ -133,10 +100,40 @@ class OrderManager:
 
 
 
+            # -----------------------------
+            # DUPLICATE FILTER
+            # -----------------------------
+
+
+            if side == self.last_signal:
 
 
 
-            qty = self.calculate_qty(
+                print(
+
+                    "[ORDER SKIP] DUPLICATE"
+
+                )
+
+
+                return
+
+
+
+
+
+            self.last_signal = side
+
+
+
+
+
+
+            print(
+
+                "[ORDER SIGNAL]",
+
+                side,
 
                 price
 
@@ -148,12 +145,94 @@ class OrderManager:
 
 
 
+            # -----------------------------
+            # POSITION CHECK
+            # -----------------------------
 
-            result = bybit_api.create_order(
 
-                side,
+            position = (
 
-                qty
+                position_manager
+
+                .get_position()
+
+            )
+
+
+
+            if position:
+
+
+                print(
+
+                    "[ORDER SKIP] POSITION EXISTS"
+
+                )
+
+
+                return
+
+
+
+
+
+
+
+
+            # -----------------------------
+            # SIZE CALCULATION
+            # -----------------------------
+
+
+            qty = (
+
+                risk_manager
+
+                .calculate_position_size(
+
+                    price
+
+                )
+
+            )
+
+
+
+            if qty <= 0:
+
+
+
+                print(
+
+                    "[ORDER SKIP] INVALID QTY"
+
+                )
+
+
+                return
+
+
+
+
+
+
+
+            # -----------------------------
+            # TEST / LIVE ORDER
+            # -----------------------------
+
+
+            result = (
+
+                bybit_api
+
+                .place_order(
+
+                    side,
+
+                    qty
+
+                )
 
             )
 
@@ -163,27 +242,9 @@ class OrderManager:
 
 
 
-            if not result:
-
-
-                print(
-
-                    "[ORDER FAILED]"
-
-                )
-
-
-                return False
-
-
-
-
-
-
-
             print(
 
-                "[ORDER SUCCESS]",
+                "[ORDER RESULT]",
 
                 result
 
@@ -193,17 +254,9 @@ class OrderManager:
 
 
 
+            add_log(
 
-
-            # ---------------------------------
-            # TP / SL
-            # ---------------------------------
-
-            self.set_tp_sl(
-
-                side,
-
-                price
+                f"ORDER {side} {qty}"
 
             )
 
@@ -211,7 +264,30 @@ class OrderManager:
 
 
 
-            return True
+
+
+
+            update_status(
+
+                {
+
+
+                "position":
+
+                    side
+
+
+                }
+
+            )
+
+
+
+
+
+
+            return result
+
 
 
 
@@ -224,263 +300,23 @@ class OrderManager:
 
             print(
 
-                "[ORDER MANAGER ERROR]",
+                "[ORDER ERROR]",
 
                 e
 
             )
 
 
-            return False
 
+            add_log(
 
-
-
-
-
-
-
-
-
-    # =====================================================
-    # QTY CALCULATION
-    # =====================================================
-
-    def calculate_qty(
-        self,
-        price
-    ):
-
-
-        try:
-
-
-
-            # 테스트용 기본 수량
-
-
-            qty = (
-
-                0.001
+                str(e)
 
             )
 
 
 
-            return qty
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[QTY ERROR]",
-
-                e
-
-            )
-
-
-            return 0
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # TP SL
-    # =====================================================
-
-    def set_tp_sl(
-        self,
-        side,
-        entry
-    ):
-
-
-
-        try:
-
-
-
-            if side == "Buy":
-
-
-
-                tp = (
-
-                    entry
-
-                    *
-
-                    (
-
-                    1
-
-                    +
-
-                    TAKE_PROFIT_PERCENT / 100
-
-                    )
-
-                )
-
-
-
-                sl = (
-
-                    entry
-
-                    *
-
-                    (
-
-                    1
-
-                    -
-
-                    STOP_LOSS_PERCENT / 100
-
-                    )
-
-                )
-
-
-
-
-
-
-
-            else:
-
-
-
-                tp = (
-
-                    entry
-
-                    *
-
-                    (
-
-                    1
-
-                    -
-
-                    TAKE_PROFIT_PERCENT / 100
-
-                    )
-
-                )
-
-
-
-                sl = (
-
-                    entry
-
-                    *
-
-                    (
-
-                    1
-
-                    +
-
-                    STOP_LOSS_PERCENT / 100
-
-                    )
-
-                )
-
-
-
-
-
-
-
-            print(
-
-                "[TP/SL]",
-
-                "TP:",
-
-                tp,
-
-                "SL:",
-
-                sl
-
-            )
-
-
-
-
-
-
-
-            bybit_api.set_trading_stop(
-
-                tp,
-
-                sl
-
-            )
-
-
-
-
-
-
-        except Exception as e:
-
-
-
-            print(
-
-                "[TP SL ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # CLOSE
-    # =====================================================
-
-    def close(
-        self
-    ):
-
-
-        print(
-
-            "[CLOSE POSITION]"
-
-        )
-
-
-
-        return bybit_api.close_position()
+            return None
 
 
 
