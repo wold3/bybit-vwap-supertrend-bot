@@ -1,22 +1,17 @@
 # =====================================================
 # risk/risk_manager.py
-# Risk Management Engine
+# Risk Manager
 # =====================================================
 
-
-import time
-import threading
+import math
 
 
 
 from config import (
     RISK_PER_TRADE_PERCENT,
-    MAX_POSITION_SIZE,
-    MAX_DAILY_LOSS_PERCENT,
-    MAX_LOSS_STREAK
+    STOP_LOSS_PERCENT,
+    MAX_POSITION_SIZE
 )
-
-
 
 
 
@@ -29,24 +24,10 @@ class RiskManager:
     def __init__(self):
 
 
-        self.lock = threading.Lock()
-
-
-
         self.equity = 0
 
 
-        self.start_equity = 0
-
-
-        self.daily_loss = 0
-
-
-        self.loss_streak = 0
-
-
-        self.initialized = False
-
+        self.risk_amount = 0
 
 
         print(
@@ -64,16 +45,16 @@ class RiskManager:
 
 
     # =====================================================
-    # INITIALIZE
+    # SET EQUITY
     # =====================================================
 
-    def initialize(
+    def update_equity(
         self,
         equity
     ):
 
 
-        with self.lock:
+        try:
 
 
             self.equity = float(
@@ -83,115 +64,34 @@ class RiskManager:
             )
 
 
-            self.start_equity = float(
 
-                equity
+            self.risk_amount = (
+
+                self.equity
+
+                *
+
+                RISK_PER_TRADE_PERCENT
+
+                /
+
+                100
 
             )
 
 
-            self.daily_loss = 0
 
+            print(
 
-            self.loss_streak = 0
+                "[RISK READY]",
 
+                self.equity
 
-            self.initialized = True
-
-
-
-
-        print(
-
-            "[RISK READY]",
-
-            equity
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # CAN TRADE
-    # =====================================================
-
-    def can_trade(self):
-
-
-        try:
-
-
-            if not self.initialized:
-
-
-                return False
-
-
-
-
-
-            # loss streak
-
-            if self.loss_streak >= MAX_LOSS_STREAK:
-
-
-                print(
-
-                    "[RISK BLOCK] LOSS STREAK"
-
-                )
-
-
-                return False
-
-
-
-
-
-
-            # daily loss
-
-
-            loss_percent = (
-
-
-                self.daily_loss
-
-                /
-
-                self.start_equity
-
-            ) * 100
-
-
-
-
-
-            if loss_percent >= MAX_DAILY_LOSS_PERCENT:
-
-
-                print(
-
-                    "[RISK BLOCK] DAILY LOSS"
-
-                )
-
-
-                return False
-
-
-
+            )
 
 
 
             return True
-
 
 
 
@@ -202,7 +102,7 @@ class RiskManager:
 
             print(
 
-                "[RISK CHECK ERROR]",
+                "[RISK EQUITY ERROR]",
 
                 e
 
@@ -220,31 +120,20 @@ class RiskManager:
 
 
 
-
     # =====================================================
     # POSITION SIZE
     # =====================================================
 
     def calculate_position_size(
         self,
-        entry,
-        stop
+        price
     ):
 
 
         try:
 
 
-            if entry <= 0:
-
-
-                return 0
-
-
-
-
-
-            if stop <= 0:
+            if self.equity <= 0:
 
 
                 return 0
@@ -254,44 +143,23 @@ class RiskManager:
 
 
 
-            risk_money = (
+            stop_distance = (
 
-                self.equity
+                price
 
                 *
 
-                (
+                STOP_LOSS_PERCENT
 
-                    RISK_PER_TRADE_PERCENT
+                /
 
-                    /
-
-                    100
-
-                )
+                100
 
             )
 
 
 
-
-
-
-            distance = abs(
-
-                entry
-
-                -
-
-                stop
-
-            )
-
-
-
-
-
-            if distance == 0:
+            if stop_distance <= 0:
 
 
                 return 0
@@ -303,11 +171,11 @@ class RiskManager:
 
             qty = (
 
-                risk_money
+                self.risk_amount
 
                 /
 
-                distance
+                stop_distance
 
             )
 
@@ -315,8 +183,23 @@ class RiskManager:
 
 
 
-            return qty
 
+
+            if qty > MAX_POSITION_SIZE:
+
+
+                qty = MAX_POSITION_SIZE
+
+
+
+
+
+
+            return self.round_qty(
+
+                qty
+
+            )
 
 
 
@@ -347,56 +230,69 @@ class RiskManager:
 
 
     # =====================================================
-    # MAX POSITION CHECK
+    # QTY ROUND
     # =====================================================
 
-    def check_position_size(
+    def round_qty(
         self,
         qty
     ):
 
 
-        try:
+        step = 0.001
 
 
 
-            if qty <= 0:
+        qty = math.floor(
 
+            qty / step
 
-                return False
-
-
-
+        ) * step
 
 
 
-            if qty > MAX_POSITION_SIZE:
+        return round(
 
+            qty,
 
-                print(
+            3
 
-                    "[POSITION LIMIT]",
-
-                    qty
-
-                )
-
-
-                return False
+        )
 
 
 
 
 
 
-            return True
 
 
 
+    # =====================================================
+    # CHECK RISK
+    # =====================================================
+
+    def check_trade(
+        self,
+        price
+    ):
+
+
+        qty = self.calculate_position_size(
+
+            price
+
+        )
 
 
 
-        except:
+        if qty <= 0:
+
+
+            print(
+
+                "[RISK BLOCK]"
+
+            )
 
 
             return False
@@ -405,95 +301,8 @@ class RiskManager:
 
 
 
+        return True
 
-
-
-
-
-
-    # =====================================================
-    # UPDATE PNL
-    # =====================================================
-
-    def update_pnl(
-        self,
-        pnl
-    ):
-
-
-        with self.lock:
-
-
-
-            pnl = float(
-
-                pnl
-
-            )
-
-
-
-
-            self.equity += pnl
-
-
-
-
-
-            if pnl < 0:
-
-
-                self.loss_streak += 1
-
-
-                self.daily_loss += abs(
-
-                    pnl
-
-                )
-
-
-
-            else:
-
-
-                self.loss_streak = 0
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # RESET DAILY
-    # =====================================================
-
-    def reset_daily(self):
-
-
-        with self.lock:
-
-
-            self.daily_loss = 0
-
-
-            self.loss_streak = 0
-
-
-            self.start_equity = self.equity
-
-
-
-
-
-        print(
-
-            "[RISK DAILY RESET]"
-
-        )
 
 
 
@@ -518,19 +327,9 @@ class RiskManager:
                 self.equity,
 
 
-            "daily_loss":
+            "risk_amount":
 
-                self.daily_loss,
-
-
-            "loss_streak":
-
-                self.loss_streak,
-
-
-            "can_trade":
-
-                self.can_trade()
+                self.risk_amount
 
 
         }
