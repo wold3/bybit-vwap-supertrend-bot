@@ -6,20 +6,21 @@ from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
     BYBIT_TESTNET,
-    BYBIT_DEMO,
+    DEMO,
     CATEGORY,
     DEFAULT_SYMBOL,
     ACCOUNT_TYPE,
     DEFAULT_QTY,
     ORDER_TYPE,
     TIME_IN_FORCE,
+    LEVERAGE,
 )
 
 
 
-# ==================================================
-# BYBIT V5 API CLIENT
-# ==================================================
+# ==========================================
+# BYBIT V5 API
+# ==========================================
 
 class BybitAPI:
 
@@ -30,18 +31,19 @@ class BybitAPI:
         print("==============================")
         print("[BYBIT API INIT]")
         print("TESTNET :", BYBIT_TESTNET)
-        print("DEMO :", BYBIT_DEMO)
+        print("DEMO :", DEMO)
         print("ACCOUNT :", ACCOUNT_TYPE)
         print("CATEGORY :", CATEGORY)
         print("SYMBOL :", DEFAULT_SYMBOL)
         print("==============================")
 
 
+
         self.session = HTTP(
 
             testnet=BYBIT_TESTNET,
 
-            demo=BYBIT_DEMO,
+            demo=DEMO,
 
             api_key=BYBIT_API_KEY,
 
@@ -51,15 +53,15 @@ class BybitAPI:
 
 
 
-    # ==================================================
+    # ======================================
     # WALLET
-    # ==================================================
+    # ======================================
 
     def get_wallet_balance(self):
 
         try:
 
-            result = self.session.get_wallet_balance(
+            response = self.session.get_wallet_balance(
 
                 accountType=ACCOUNT_TYPE
 
@@ -68,73 +70,31 @@ class BybitAPI:
 
             print("[WALLET RESPONSE]")
 
-            return result
+            return response
 
 
 
         except Exception as e:
+
 
             print(
                 "[WALLET ERROR]",
                 e
             )
 
+
             return None
 
 
 
-    # ==================================================
-    # EQUITY
-    # ==================================================
 
-    def get_equity(self):
-
-        try:
-
-            data = self.get_wallet_balance()
-
-
-            if not data:
-
-                return 0
-
-
-
-            account = data["result"]["list"][0]
-
-
-            equity = float(
-
-                account["totalEquity"]
-
-            )
-
-
-            return equity
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[EQUITY ERROR]",
-                e
-            )
-
-
-            return 0
-
-
-
-    # ==================================================
+    # ======================================
     # POSITION
-    # ==================================================
+    # ======================================
 
     def get_position(self):
 
         try:
-
 
             return self.session.get_positions(
 
@@ -143,6 +103,7 @@ class BybitAPI:
                 symbol=DEFAULT_SYMBOL
 
             )
+
 
 
         except Exception as e:
@@ -158,9 +119,51 @@ class BybitAPI:
 
 
 
-    # ==================================================
+
+    # ======================================
+    # CURRENT PRICE
+    # ======================================
+
+    def get_last_price(self):
+
+        try:
+
+
+            result = self.session.get_tickers(
+
+                category=CATEGORY,
+
+                symbol=DEFAULT_SYMBOL
+
+            )
+
+
+
+            price = result["result"]["list"][0]["lastPrice"]
+
+
+
+            return float(price)
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[PRICE ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+    # ======================================
     # KLINE
-    # ==================================================
+    # ======================================
 
     def get_kline(
 
@@ -203,9 +206,57 @@ class BybitAPI:
 
 
 
-    # ==================================================
-    # PLACE ORDER
-    # ==================================================
+
+    # ======================================
+    # SET LEVERAGE
+    # ======================================
+
+    def set_leverage(self):
+
+
+        try:
+
+
+            response = self.session.set_leverage(
+
+                category=CATEGORY,
+
+                symbol=DEFAULT_SYMBOL,
+
+                buyLeverage=str(LEVERAGE),
+
+                sellLeverage=str(LEVERAGE)
+
+            )
+
+
+            print(
+                "[LEVERAGE SET]",
+                response
+            )
+
+
+            return response
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[LEVERAGE ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+    # ======================================
+    # CREATE ORDER
+    # ======================================
 
     def create_order(
 
@@ -213,9 +264,7 @@ class BybitAPI:
 
         side,
 
-        qty=None,
-
-        reduce_only=False
+        qty=None
 
     ):
 
@@ -241,21 +290,36 @@ class BybitAPI:
 
                 qty=str(qty),
 
-                timeInForce=TIME_IN_FORCE,
-
-                reduceOnly=reduce_only
+                timeInForce=TIME_IN_FORCE
 
             )
 
 
 
-            print("==============================")
-            print("[ORDER RESPONSE]")
+            print(
+                "[ORDER RESPONSE]"
+            )
+
+
             print(response)
-            print("==============================")
+
+
+
+            if response.get(
+                "retCode"
+            ) != 0:
+
+
+                print(
+                    "[ORDER FAILED]"
+                )
+
+                return None
+
 
 
             return response
+
 
 
 
@@ -272,9 +336,10 @@ class BybitAPI:
 
 
 
-    # ==================================================
-    # CANCEL
-    # ==================================================
+
+    # ======================================
+    # CANCEL ALL
+    # ======================================
 
     def cancel_all_orders(self):
 
@@ -291,9 +356,9 @@ class BybitAPI:
             )
 
 
-            print("[CANCEL RESPONSE]")
-
-            print(response)
+            print(
+                "[CANCEL RESPONSE]"
+            )
 
 
             return response
@@ -313,15 +378,16 @@ class BybitAPI:
 
 
 
-    # ==================================================
+
+    # ======================================
     # SERVER TIME
-    # ==================================================
+    # ======================================
 
     def server_time(self):
 
         return int(
 
-            time.time()*1000
+            time.time() * 1000
 
         )
 
@@ -329,8 +395,8 @@ class BybitAPI:
 
 
 
-# ==================================================
+# ==========================================
 # SINGLETON
-# ==================================================
+# ==========================================
 
 bybit_api = BybitAPI()
