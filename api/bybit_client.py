@@ -6,9 +6,9 @@ import requests
 
 
 from config import (
+    BYBIT_BASE_URL,
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
-    BYBIT_BASE_URL,
 )
 
 
@@ -21,19 +21,22 @@ class BybitClient:
     def __init__(self):
 
 
-        self.key = BYBIT_API_KEY
+        self.base_url = BYBIT_BASE_URL
 
-        self.secret = BYBIT_API_SECRET
+        self.api_key = BYBIT_API_KEY
 
-        self.base = BYBIT_BASE_URL
+        self.api_secret = BYBIT_API_SECRET
 
 
 
         print("==============================")
         print("[BYBIT CLIENT INIT]")
-        print("BASE :", self.base)
-        print("KEY :", self.key[:6])
+        print("BASE :", self.base_url)
+        print("KEY :", self.api_key[:6])
         print("==============================")
+
+
+
 
 
 
@@ -47,9 +50,24 @@ class BybitClient:
     def _sign(
         self,
         timestamp,
-        recv_window,
-        body
+        params
     ):
+
+
+        recv_window = "5000"
+
+
+        if isinstance(params, dict):
+
+            param_str = json.dumps(
+                params,
+                separators=(",", ":")
+            )
+
+        else:
+
+            param_str = str(params)
+
 
 
         payload = (
@@ -58,34 +76,33 @@ class BybitClient:
 
             +
 
-            self.key
+            self.api_key
 
             +
 
-            str(recv_window)
+            recv_window
 
             +
 
-            body
+            param_str
 
         )
 
 
 
-        return hmac.new(
+        signature = hmac.new(
 
-            self.secret.encode(
-                "utf-8"
-            ),
+            self.api_secret.encode(),
 
-            payload.encode(
-                "utf-8"
-            ),
+            payload.encode(),
 
             hashlib.sha256
 
         ).hexdigest()
 
+
+
+        return signature
 
 
 
@@ -99,16 +116,12 @@ class BybitClient:
 
     def _headers(
         self,
-        body=""
+        params
     ):
 
 
         timestamp = str(
-
-            int(
-                time.time()*1000
-            )
-
+            int(time.time()*1000)
         )
 
 
@@ -120,9 +133,7 @@ class BybitClient:
 
             timestamp,
 
-            recv_window,
-
-            body
+            params
 
         )
 
@@ -133,7 +144,7 @@ class BybitClient:
 
             "X-BAPI-API-KEY":
 
-                self.key,
+                self.api_key,
 
 
             "X-BAPI-SIGN":
@@ -153,9 +164,11 @@ class BybitClient:
 
             "Content-Type":
 
-                "application/json"
+                "application/json",
 
         }
+
+
 
 
 
@@ -174,34 +187,28 @@ class BybitClient:
     ):
 
 
+        if params is None:
+
+            params = {}
+
+
+
         try:
 
 
-            if params is None:
-
-                params = {}
+            query = params
 
 
 
-            query = ""
-
-
-            if params:
-
-
-                query = "&".join(
-
-                    f"{k}={v}"
-
-                    for k,v in params.items()
-
-                )
+            headers = self._headers(
+                query
+            )
 
 
 
             url = (
 
-                self.base
+                self.base_url
 
                 +
 
@@ -211,27 +218,13 @@ class BybitClient:
 
 
 
-            if query:
-
-
-                url += "?" + query
-
-
-
-
-
-
-            headers = self._headers(
-                ""
-            )
-
-
-
             response = requests.get(
 
                 url,
 
                 headers=headers,
+
+                params=query,
 
                 timeout=10
 
@@ -251,8 +244,6 @@ class BybitClient:
 
 
             return data
-
-
 
 
 
@@ -281,33 +272,26 @@ class BybitClient:
     def post(
         self,
         endpoint,
-        params
+        params=None
     ):
 
 
+        if params is None:
+
+            params = {}
+
+
+
+
         try:
+
 
 
             body = json.dumps(
 
                 params,
 
-                separators=(
-                    ",",
-                    ":"
-                )
-
-            )
-
-
-
-            url = (
-
-                self.base
-
-                +
-
-                endpoint
+                separators=(",", ":")
 
             )
 
@@ -315,9 +299,22 @@ class BybitClient:
 
             headers = self._headers(
 
-                body
+                params
 
             )
+
+
+
+            url = (
+
+                self.base_url
+
+                +
+
+                endpoint
+
+            )
+
 
 
 
@@ -332,6 +329,7 @@ class BybitClient:
                 timeout=10
 
             )
+
 
 
 
@@ -352,7 +350,6 @@ class BybitClient:
 
 
 
-
         except Exception as e:
 
 
@@ -363,6 +360,10 @@ class BybitClient:
 
 
             return None
+
+
+
+
 
 
 
