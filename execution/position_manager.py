@@ -1,9 +1,10 @@
 from config import (
-    TAKE_PROFIT_PERCENT,
-    STOP_LOSS_PERCENT,
     CATEGORY,
     DEFAULT_SYMBOL,
+    TAKE_PROFIT_PERCENT,
+    STOP_LOSS_PERCENT,
 )
+
 
 
 
@@ -17,6 +18,14 @@ class PositionManager:
     def __init__(self):
 
 
+        self.side = None
+
+        self.entry_price = 0
+
+        self.qty = 0
+
+
+
         print("==============================")
         print("[POSITION MANAGER INIT]")
         print("CATEGORY :", CATEGORY)
@@ -24,7 +33,85 @@ class PositionManager:
         print("==============================")
 
 
-        self.position = None
+
+
+
+    # ======================================
+    # UPDATE POSITION
+    # ======================================
+
+    def update_position(
+
+        self,
+
+        side,
+
+        qty,
+
+        entry_price
+
+    ):
+
+
+        self.side = side
+
+        self.qty = float(qty)
+
+        self.entry_price = float(entry_price)
+
+
+
+        print(
+            "[POSITION UPDATED]",
+            self.side,
+            self.qty,
+            self.entry_price
+        )
+
+
+
+
+
+    # ======================================
+    # CLEAR
+    # ======================================
+
+    def clear(self):
+
+
+        self.side = None
+
+        self.qty = 0
+
+        self.entry_price = 0
+
+
+
+        print(
+            "[POSITION CLEARED]"
+        )
+
+
+
+
+
+    # ======================================
+    # CHECK POSITION
+    # ======================================
+
+    def has_position(self):
+
+
+        return (
+
+            self.side is not None
+
+            and
+
+            self.qty > 0
+
+        )
+
 
 
 
@@ -34,27 +121,34 @@ class PositionManager:
     # ======================================
 
     def evaluate_exit(
+
         self,
+
         entry_price,
+
         side,
-        prices
+
+        closes
+
     ):
 
 
         try:
 
 
-            if not prices:
+            if len(closes) == 0:
 
                 return None
 
 
 
+
             current_price = float(
 
-                prices[-1]
+                closes[-1]
 
             )
+
 
 
 
@@ -67,55 +161,48 @@ class PositionManager:
 
 
 
-            # ==============================
-            # LONG POSITION
-            # ==============================
+
+            # --------------------------
+            # LONG
+            # --------------------------
 
             if side == "Buy":
 
 
-                profit_price = (
 
-                    entry_price
-
-                    *
+                profit = (
 
                     (
 
-                        1
-
-                        +
-
-                        TAKE_PROFIT_PERCENT / 100
-
-                    )
-
-                )
-
-
-
-                stop_price = (
-
-                    entry_price
-
-                    *
-
-                    (
-
-                        1
+                        current_price
 
                         -
 
-                        STOP_LOSS_PERCENT / 100
+                        entry_price
 
                     )
+
+                    /
+
+                    entry_price
+
+                    *
+
+                    100
 
                 )
 
 
 
 
-                if current_price >= profit_price:
+                if profit >= TAKE_PROFIT_PERCENT:
+
+
+                    print(
+                        "[TAKE PROFIT]",
+                        round(profit,2),
+                        "%"
+                    )
 
 
                     return "TAKE_PROFIT"
@@ -123,7 +210,14 @@ class PositionManager:
 
 
 
-                if current_price <= stop_price:
+                if profit <= -STOP_LOSS_PERCENT:
+
+
+                    print(
+                        "[STOP LOSS]",
+                        round(profit,2),
+                        "%"
+                    )
 
 
                     return "STOP_LOSS"
@@ -132,56 +226,49 @@ class PositionManager:
 
 
 
-            # ==============================
-            # SHORT POSITION
-            # ==============================
+
+            # --------------------------
+            # SHORT
+            # --------------------------
 
             elif side == "Sell":
 
 
 
-                profit_price = (
-
-                    entry_price
-
-                    *
+                profit = (
 
                     (
 
-                        1
+                        entry_price
 
                         -
 
-                        TAKE_PROFIT_PERCENT / 100
+                        current_price
 
                     )
 
-                )
-
-
-
-                stop_price = (
+                    /
 
                     entry_price
 
                     *
 
-                    (
-
-                        1
-
-                        +
-
-                        STOP_LOSS_PERCENT / 100
-
-                    )
+                    100
 
                 )
 
 
 
 
-                if current_price <= profit_price:
+
+                if profit >= TAKE_PROFIT_PERCENT:
+
+
+                    print(
+                        "[TAKE PROFIT]",
+                        round(profit,2),
+                        "%"
+                    )
 
 
                     return "TAKE_PROFIT"
@@ -189,10 +276,19 @@ class PositionManager:
 
 
 
-                if current_price >= stop_price:
+
+                if profit <= -STOP_LOSS_PERCENT:
+
+
+                    print(
+                        "[STOP LOSS]",
+                        round(profit,2),
+                        "%"
+                    )
 
 
                     return "STOP_LOSS"
+
 
 
 
@@ -206,7 +302,7 @@ class PositionManager:
 
 
             print(
-                "[POSITION MANAGER ERROR]",
+                "[EXIT CHECK ERROR]",
                 e
             )
 
@@ -218,28 +314,21 @@ class PositionManager:
 
 
     # ======================================
-    # UPDATE POSITION
-    # ======================================
-
-    def update(
-        self,
-        position
-    ):
-
-
-        self.position = position
-
-
-
-
-
-    # ======================================
     # GET POSITION
     # ======================================
 
     def get_position(self):
 
-        return self.position
+
+        return {
+
+            "side": self.side,
+
+            "qty": self.qty,
+
+            "entry_price": self.entry_price
+
+        }
 
 
 
