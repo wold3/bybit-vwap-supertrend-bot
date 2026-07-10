@@ -1,15 +1,11 @@
 # =====================================================
 # portfolio/position_manager.py
-# Position Manager V2
+# Position Manager
 # =====================================================
 
 
-import time
-import threading
-
-
-
 from config import (
+    CATEGORY,
     DEFAULT_SYMBOL
 )
 
@@ -19,6 +15,10 @@ from api.bybit_api import (
 )
 
 
+from web.server import (
+    update_status,
+    add_log
+)
 
 
 
@@ -31,14 +31,13 @@ class PositionManager:
     def __init__(self):
 
 
-        self.lock = threading.Lock()
+        self.position = None
 
 
-        self.current = None
+        self.size = 0
 
 
-        self.last_sync = 0
-
+        self.entry_price = 0
 
 
         print(
@@ -62,202 +61,98 @@ class PositionManager:
     def sync(self):
 
 
-        with self.lock:
+        try:
 
 
-            try:
+            result = bybit_api.request(
+
+                "GET",
+
+                "/v5/position/list",
+
+                {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+
+                }
+
+            )
 
 
 
-                response = (
 
-                    bybit_api
 
-                    .get_position()
+            if not result:
+
+
+                return False
+
+
+
+
+
+            positions = (
+
+                result
+
+                .get("result", {})
+
+                .get("list", [])
+
+            )
+
+
+
+
+
+            if not positions:
+
+
+                self.clear()
+
+                return True
+
+
+
+
+
+
+            p = positions[0]
+
+
+
+            size = float(
+
+                p.get(
+
+                    "size",
+
+                    0
 
                 )
 
+            )
 
 
-                if not response:
 
 
-                    self.current = None
 
 
-                    return None
 
+            if size == 0:
 
 
 
-
-
-                positions = (
-
-                    response
-
-                    .get(
-
-                        "result",
-
-                        {}
-
-                    )
-
-                    .get(
-
-                        "list",
-
-                        []
-
-                    )
-
-                )
-
-
-
-
-
-
-                for p in positions:
-
-
-
-                    size = float(
-
-                        p.get(
-
-                            "size",
-
-                            0
-
-                        )
-
-                    )
-
-
-
-
-
-                    if size > 0:
-
-
-
-                        self.current = {
-
-
-
-                            "symbol":
-
-                                p.get(
-
-                                    "symbol"
-
-                                ),
-
-
-
-                            "side":
-
-                                p.get(
-
-                                    "side"
-
-                                ),
-
-
-
-                            "size":
-
-                                size,
-
-
-
-                            "entry_price":
-
-                                float(
-
-                                    p.get(
-
-                                        "avgPrice",
-
-                                        0
-
-                                    )
-
-                                ),
-
-
-
-                            "mark_price":
-
-                                float(
-
-                                    p.get(
-
-                                        "markPrice",
-
-                                        0
-
-                                    )
-
-                                ),
-
-
-
-                            "unrealized_pnl":
-
-                                float(
-
-                                    p.get(
-
-                                        "unrealisedPnl",
-
-                                        0
-
-                                    )
-
-                                ),
-
-
-
-                            "updated":
-
-                                time.time()
-
-                        }
-
-
-
-
-
-                        self.last_sync = time.time()
-
-
-
-                        print(
-
-                            "[POSITION SYNC]",
-
-                            self.current
-
-                        )
-
-
-
-                        return self.current
-
-
-
-
-
-
-
-                self.current = None
-
-
-
-                self.last_sync = time.time()
+                self.clear()
 
 
 
@@ -269,155 +164,79 @@ class PositionManager:
 
 
 
-                return None
+                return True
 
 
 
 
 
 
-            except Exception as e:
+            side = p.get(
+
+                "side"
+
+            )
 
 
 
-                print(
-
-                    "[POSITION SYNC ERROR]",
-
-                    e
-
-                )
-
-
-                return None
+            self.position = side
 
 
 
+            self.size = size
 
 
 
+            self.entry_price = float(
 
+                p.get(
 
+                    "avgPrice",
 
-
-    # =====================================================
-    # UPDATE FROM WS
-    # =====================================================
-
-    def update_from_ws(
-        self,
-        data
-    ):
-
-
-        try:
-
-
-            with self.lock:
-
-
-                if not data:
-
-
-                    return
-
-
-
-
-
-                size = float(
-
-                    data.get(
-
-                        "size",
-
-                        0
-
-                    )
+                    0
 
                 )
 
-
-
-                if size <= 0:
-
-
-                    self.current = None
-
-
-                    return
+            )
 
 
 
 
 
-                self.current = {
 
+            update_status({
 
-                    "symbol":
+                "position":
 
-                        data.get(
+                    side
 
-                            "symbol",
-
-                            DEFAULT_SYMBOL
-
-                        ),
-
-
-                    "side":
-
-                        data.get(
-
-                            "side"
-
-                        ),
-
-
-                    "size":
-
-                        size,
-
-
-                    "entry_price":
-
-                        float(
-
-                            data.get(
-
-                                "entryPrice",
-
-                                0
-
-                            )
-
-                        ),
-
-
-                    "unrealized_pnl":
-
-                        float(
-
-                            data.get(
-
-                                "unrealisedPnl",
-
-                                0
-
-                            )
-
-                        ),
-
-
-                    "updated":
-
-                        time.time()
-
-                }
+            })
 
 
 
-                self.last_sync = time.time()
+            add_log(
+
+                f"POSITION {side} {size}"
+
+            )
+
+
+
+            print(
+
+                "[POSITION]",
+
+                side,
+
+                size
+
+            )
+
+
+
+            return True
+
+
 
 
 
@@ -429,7 +248,102 @@ class PositionManager:
 
             print(
 
-                "[WS POSITION ERROR]",
+                "[POSITION SYNC ERROR]",
+
+                e
+
+            )
+
+
+            return False
+
+
+
+
+
+
+
+    # =====================================================
+    # UPDATE FROM WS
+    # =====================================================
+
+    def update(
+        self,
+        data
+    ):
+
+
+        try:
+
+
+
+            self.position = data.get(
+
+                "side"
+
+            )
+
+
+
+            self.size = float(
+
+                data.get(
+
+                    "size",
+
+                    0
+
+                )
+
+            )
+
+
+
+            self.entry_price = float(
+
+                data.get(
+
+                    "entryPrice",
+
+                    0
+
+                )
+
+            )
+
+
+
+
+
+            if self.size == 0:
+
+
+                self.clear()
+
+
+
+            else:
+
+
+                update_status({
+
+                    "position":
+
+                        self.position
+
+                })
+
+
+
+
+
+        except Exception as e:
+
+
+
+            print(
+
+                "[POSITION UPDATE ERROR]",
 
                 e
 
@@ -442,157 +356,36 @@ class PositionManager:
 
 
 
+    # =====================================================
+    # GET POSITION
+    # =====================================================
+
+    def get_position(self):
+
+
+        return self.position
+
+
+
+
+
+
 
     # =====================================================
-    # HAS POSITION
+    # CHECK POSITION
     # =====================================================
 
     def has_position(self):
 
 
-        with self.lock:
+        if self.position and self.size > 0:
 
 
-            if not self.current:
+            return True
 
 
-                return False
 
-
-
-            return (
-
-                self.current.get(
-
-                    "size",
-
-                    0
-
-                )
-
-                > 0
-
-            )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # SIDE
-    # =====================================================
-
-    def side(self):
-
-
-        if not self.current:
-
-
-            return None
-
-
-
-        return self.current.get(
-
-            "side"
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # SIZE
-    # =====================================================
-
-    def size(self):
-
-
-        if not self.current:
-
-
-            return 0
-
-
-
-        return self.current.get(
-
-            "size",
-
-            0
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # ENTRY
-    # =====================================================
-
-    def entry_price(self):
-
-
-        if not self.current:
-
-
-            return 0
-
-
-
-        return self.current.get(
-
-            "entry_price",
-
-            0
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # PNL
-    # =====================================================
-
-    def pnl(self):
-
-
-        if not self.current:
-
-
-            return 0
-
-
-
-        return self.current.get(
-
-            "unrealized_pnl",
-
-            0
-
-        )
-
-
+        return False
 
 
 
@@ -607,53 +400,25 @@ class PositionManager:
     def clear(self):
 
 
-        with self.lock:
+        self.position = None
 
 
-            self.current = None
+        self.size = 0
 
 
-
-            print(
-
-                "[POSITION CLEARED]"
-
-            )
+        self.entry_price = 0
 
 
 
 
 
-
-
-
-
-    # =====================================================
-    # STATUS
-    # =====================================================
-
-    def status(self):
-
-
-        return {
-
-
-            "symbol":
-
-                DEFAULT_SYMBOL,
-
+        update_status({
 
             "position":
 
-                self.current,
+                "NONE"
 
-
-            "last_sync":
-
-                self.last_sync
-
-
-        }
+        })
 
 
 
