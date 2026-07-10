@@ -24,9 +24,9 @@ class OrderManager:
 
 
 
-    # =================================================
+    # =====================================================
     # EXECUTE SIGNAL
-    # =================================================
+    # =====================================================
 
     def execute(
         self,
@@ -40,7 +40,6 @@ class OrderManager:
                 return False
 
 
-
             action = signal.get(
                 "signal"
             )
@@ -50,7 +49,6 @@ class OrderManager:
                 "[ORDER EXECUTE]",
                 action
             )
-
 
 
             if action == "BUY":
@@ -84,7 +82,6 @@ class OrderManager:
 
         except Exception as e:
 
-
             print(
                 "[EXECUTE ERROR]",
                 e
@@ -94,16 +91,74 @@ class OrderManager:
 
 
 
-    # =================================================
+    # =====================================================
+    # POSITION CHECK
+    # =====================================================
+
+    def has_position(
+        self,
+        position
+    ):
+
+        try:
+
+            if position is None:
+
+                return False
+
+
+            rows = (
+                position
+                .get(
+                    "result",
+                    {}
+                )
+                .get(
+                    "list",
+                    []
+                )
+            )
+
+
+            for p in rows:
+
+
+                size = float(
+
+                    p.get(
+                        "size",
+                        0
+                    )
+
+                )
+
+
+                if size > 0:
+
+                    return True
+
+
+
+            return False
+
+
+
+        except Exception:
+
+
+            return False
+
+
+
+    # =====================================================
     # CREATE ORDER
-    # =================================================
+    # =====================================================
 
     def create_order(
         self,
         side,
         qty=None
     ):
-
 
         try:
 
@@ -116,18 +171,23 @@ class OrderManager:
 
             print(
                 "[ORDER REQUEST]",
+                "SIDE:",
                 side,
+                "QTY:",
                 qty
             )
 
 
 
-            result = bybit_api.create_order(
+            result = (
+                bybit_api
+                .create_order(
 
-                side,
+                    side,
 
-                qty
+                    qty
 
+                )
             )
 
 
@@ -139,13 +199,13 @@ class OrderManager:
                     "[ORDER FAILED]"
                 )
 
+
                 return False
 
 
 
             print(
-                "[ORDER SUCCESS]",
-                result
+                "[ORDER SUCCESS]"
             )
 
 
@@ -166,14 +226,13 @@ class OrderManager:
 
 
 
-    # =================================================
+    # =====================================================
     # BUY
-    # =================================================
+    # =====================================================
 
     def buy(
         self
     ):
-
 
         try:
 
@@ -184,14 +243,22 @@ class OrderManager:
             )
 
 
-
-            if position:
+            if self.has_position(
+                position
+            ):
 
 
                 print(
-                    "[POSITION CHECK]",
-                    "EXIST"
+                    "[POSITION EXISTS]"
                 )
+
+
+                print(
+                    "[BUY SKIPPED]"
+                )
+
+
+                return False
 
 
 
@@ -218,14 +285,13 @@ class OrderManager:
 
 
 
-    # =================================================
+    # =====================================================
     # SELL
-    # =================================================
+    # =====================================================
 
     def sell(
         self
     ):
-
 
         try:
 
@@ -236,14 +302,22 @@ class OrderManager:
             )
 
 
-
-            if position:
+            if self.has_position(
+                position
+            ):
 
 
                 print(
-                    "[POSITION CHECK]",
-                    "EXIST"
+                    "[POSITION EXISTS]"
                 )
+
+
+                print(
+                    "[SELL SKIPPED]"
+                )
+
+
+                return False
 
 
 
@@ -270,14 +344,13 @@ class OrderManager:
 
 
 
-    # =================================================
+    # =====================================================
     # CLOSE POSITION
-    # =================================================
+    # =====================================================
 
     def close_position(
         self
     ):
-
 
         try:
 
@@ -287,13 +360,10 @@ class OrderManager:
             )
 
 
-            result = (
+            return (
                 bybit_api
                 .close_position()
             )
-
-
-            return result
 
 
 
@@ -310,25 +380,21 @@ class OrderManager:
 
 
 
-    # =================================================
+    # =====================================================
     # STATUS
-    # =================================================
+    # =====================================================
 
     def status(
         self
     ):
 
-
         return {
 
-
             "symbol":
-            DEFAULT_SYMBOL,
-
+                DEFAULT_SYMBOL,
 
             "ready":
-            True
-
+                True
 
         }
 
@@ -336,6 +402,8 @@ class OrderManager:
 
 
 
-# Singleton
+# =====================================================
+# SINGLETON
+# =====================================================
 
 order_manager = OrderManager()
