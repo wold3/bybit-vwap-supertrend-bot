@@ -1,87 +1,44 @@
 # services/telegram_bot.py
 
 
-import threading
-import time
 import requests
+import time
 
 
 from config import (
+    TELEGRAM_ENABLED,
     TELEGRAM_TOKEN,
     TELEGRAM_CHAT_ID
 )
 
 
-from risk.risk_manager import (
-    risk_manager
-)
-
-
-from portfolio.position_manager import (
-    position_manager
-)
-
-
-from api.bybit_api import (
-    bybit_api
-)
 
 
 
 class TelegramBot:
 
 
-
     def __init__(self):
 
 
-        self.running = False
+        self.enabled = TELEGRAM_ENABLED
 
 
-        self.thread = None
+        self.token = TELEGRAM_TOKEN
 
 
-        self.offset = None
-
-
-
-
-    # =====================================
-    # START
-    # =====================================
-
-    def start(self):
-
-
-        if not TELEGRAM_TOKEN:
-
-            print(
-                "[TELEGRAM DISABLED]"
-            )
-
-            return
-
-
-
-        self.running = True
-
-
-        self.thread = threading.Thread(
-
-            target=self.loop,
-
-            daemon=True
-
-        )
-
-
-        self.thread.start()
+        self.chat_id = TELEGRAM_CHAT_ID
 
 
 
         print(
-            "[TELEGRAM START]"
+
+            "[TELEGRAM INIT]",
+
+            self.enabled
+
         )
+
 
 
 
@@ -92,8 +49,21 @@ class TelegramBot:
 
     def send(
         self,
-        text
+        message
     ):
+
+
+        if not self.enabled:
+
+            return False
+
+
+
+        if not self.token or not self.chat_id:
+
+            return False
+
+
 
 
         try:
@@ -101,33 +71,52 @@ class TelegramBot:
 
             url = (
 
-                "https://api.telegram.org/"
-
-                f"bot{TELEGRAM_TOKEN}/sendMessage"
+                f"https://api.telegram.org/"
+                f"bot{self.token}/sendMessage"
 
             )
 
 
-            requests.post(
+
+            data = {
+
+
+                "chat_id":
+
+                self.chat_id,
+
+
+                "text":
+
+                message,
+
+
+                "parse_mode":
+
+                "HTML"
+
+            }
+
+
+
+
+
+            response = requests.post(
 
                 url,
 
-                json={
-
-                    "chat_id":
-
-                    TELEGRAM_CHAT_ID,
-
-
-                    "text":
-
-                    text
-
-                },
+                data=data,
 
                 timeout=5
 
             )
+
+
+
+            return response.status_code == 200
+
+
+
 
 
         except Exception as e:
@@ -142,242 +131,126 @@ class TelegramBot:
             )
 
 
-
-
-    # =====================================
-    # RECEIVE LOOP
-    # =====================================
-
-    def loop(self):
-
-
-        while self.running:
-
-
-            try:
-
-
-                url = (
-
-                    "https://api.telegram.org/"
-
-                    f"bot{TELEGRAM_TOKEN}/getUpdates"
-
-                )
-
-
-                params = {}
-
-
-                if self.offset:
-
-                    params["offset"] = self.offset
+            return False
 
 
 
-                result = requests.get(
-
-                    url,
-
-                    params=params,
-
-                    timeout=10
-
-                ).json()
-
-
-
-                for item in result.get(
-                    "result",
-                    []
-                ):
-
-
-                    self.offset = (
-
-                        item["update_id"]
-
-                        +
-
-                        1
-
-                    )
-
-
-                    message = (
-
-                        item
-                        .get("message", {})
-                        .get("text")
-
-                    )
-
-
-
-                    if message:
-
-                        self.command(
-
-                            message
-
-                        )
-
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "[TG LOOP ERROR]",
-
-                    e
-
-                )
-
-
-
-            time.sleep(2)
 
 
 
 
     # =====================================
-    # COMMAND
+    # BOT START
     # =====================================
 
-    def command(
+    def bot_start(self):
+
+
+        self.send(
+
+            """
+🤖 <b>BOT START</b>
+
+Bybit VWAP SuperTrend Bot
+
+Status:
+ONLINE
+            """
+
+        )
+
+
+
+
+
+
+    # =====================================
+    # ORDER
+    # =====================================
+
+    def order(
         self,
-        cmd
+        side,
+        symbol,
+        price,
+        qty,
+        tp,
+        sl
     ):
 
 
-        cmd = cmd.lower()
+        text = f"""
 
+📌 <b>ORDER EXECUTED</b>
 
 
-        # STATUS
+Symbol:
+{symbol}
 
-        if cmd == "/status":
 
+Side:
+{side}
 
-            self.send(
 
-                str(
+Price:
+{price}
 
-                    risk_manager.status()
 
-                )
+Qty:
+{qty}
 
-            )
 
+TP:
+{tp}
 
 
-        # POSITION
+SL:
+{sl}
 
-        elif cmd == "/position":
 
+Time:
+{time.strftime('%Y-%m-%d %H:%M:%S')}
 
-            self.send(
+"""
 
-                str(
 
-                    position_manager.status()
+        self.send(text)
 
-                )
 
-            )
 
 
 
-        # RISK
 
-        elif cmd == "/risk":
 
+    # =====================================
+    # ERROR
+    # =====================================
 
-            self.send(
+    def error(
+        self,
+        message
+    ):
 
-                str(
 
-                    risk_manager.status()
+        self.send(
 
-                )
+            f"""
 
-            )
+🚨 <b>BOT ERROR</b>
 
 
+{message}
 
-        # STOP
 
-        elif cmd == "/stop":
+Time:
+{time.strftime('%Y-%m-%d %H:%M:%S')}
 
+"""
 
-            risk_manager.emergency_stop()
+        )
 
 
-            self.send(
 
-                "KILL SWITCH ON"
-
-            )
-
-
-
-        # START
-
-        elif cmd == "/start":
-
-
-            risk_manager.reset()
-
-
-            self.send(
-
-                "TRADING ENABLED"
-
-            )
-
-
-
-        # CLOSE
-
-        elif cmd == "/close":
-
-
-            position = (
-
-                position_manager.get()
-
-            )
-
-
-            if position:
-
-
-                bybit_api.close_position(
-
-                    position["side"],
-
-                    position["size"]
-
-                )
-
-
-                self.send(
-
-                    "POSITION CLOSED"
-
-                )
-
-
-            else:
-
-
-                self.send(
-
-                    "NO POSITION"
-
-                )
 
 
 
@@ -386,10 +259,21 @@ class TelegramBot:
     # STOP
     # =====================================
 
-    def stop(self):
+    def bot_stop(self):
 
 
-        self.running = False
+        self.send(
+
+            """
+🛑 <b>BOT STOPPED</b>
+
+System shutdown
+            """
+
+        )
+
+
+
 
 
 
