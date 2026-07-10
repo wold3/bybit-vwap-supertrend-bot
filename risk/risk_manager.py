@@ -5,6 +5,8 @@ from config import (
     DEFAULT_QTY,
 )
 
+from api.bybit_api import bybit_api
+
 
 # ==========================================
 # RISK MANAGER
@@ -15,21 +17,19 @@ class RiskManager:
 
     def __init__(self):
 
+        self.start_equity = 0
+
         self.last_order_time = 0
-
-        self.initial_equity = 0
-
-        self.current_equity = 0
 
         self.max_daily_loss = 5.0   # %
 
-        self.daily_loss = 0
+        self.current_equity = 0
 
 
         print("==============================")
         print("[RISK MANAGER INIT]")
-        print("ORDER COOLDOWN :", ORDER_COOLDOWN)
         print("MAX DAILY LOSS :", self.max_daily_loss, "%")
+        print("ORDER COOLDOWN :", ORDER_COOLDOWN)
         print("==============================")
 
 
@@ -38,25 +38,30 @@ class RiskManager:
     # INITIALIZE
     # ======================================
 
-    def initialize(
-        self,
-        equity
-    ):
+    def initialize(self):
 
         try:
 
-            self.initial_equity = float(equity)
+            wallet = bybit_api.get_wallet_balance()
 
-            self.current_equity = float(equity)
+
+            if wallet:
+
+                self.start_equity = self.get_equity(
+                    wallet
+                )
+
+                self.current_equity = self.start_equity
 
 
             print("==============================")
             print("[RISK INITIALIZED]")
-            print("INIT EQUITY :", self.initial_equity)
+            print("START EQUITY :", self.start_equity)
             print("==============================")
 
 
             return True
+
 
 
         except Exception as e:
@@ -70,53 +75,43 @@ class RiskManager:
 
 
 
+
     # ======================================
-    # UPDATE EQUITY
+    # GET EQUITY
     # ======================================
 
-    def update_equity(
+    def get_equity(
         self,
-        equity
+        wallet=None
     ):
+
 
         try:
 
-            self.current_equity = float(equity)
 
+            if wallet is None:
 
-            if self.initial_equity > 0:
-
-                loss = (
-                    self.initial_equity
-                    -
-                    self.current_equity
-                )
-
-
-                self.daily_loss = (
-                    loss
-                    /
-                    self.initial_equity
-                ) * 100
+                wallet = bybit_api.get_wallet_balance()
 
 
 
-            print(
-                "[DAILY LOSS]",
-                round(
-                    self.daily_loss,
-                    4
-                ),
-                "%"
-            )
+            value = wallet["result"]["list"][0]["totalEquity"]
+
+
+            return float(value)
+
 
 
         except Exception as e:
 
+
             print(
-                "[EQUITY UPDATE ERROR]",
+                "[EQUITY ERROR]",
                 e
             )
+
+            return 0
+
 
 
 
@@ -124,18 +119,44 @@ class RiskManager:
     # DAILY LOSS CHECK
     # ======================================
 
-    def daily_loss_allowed(self):
+    def check_daily_loss(self):
 
 
-        if self.daily_loss >= self.max_daily_loss:
+        self.current_equity = self.get_equity()
 
+
+        if self.start_equity <= 0:
+
+            return True
+
+
+
+        loss = (
+
+            self.start_equity
+            -
+            self.current_equity
+
+        ) / self.start_equity * 100
+
+
+
+        print(
+            "[DAILY LOSS]",
+            round(loss,4),
+            "%"
+        )
+
+
+
+        if loss >= self.max_daily_loss:
 
             print(
-                "[RISK BLOCK] DAILY LOSS LIMIT"
+                "[RISK STOP] DAILY LOSS LIMIT"
             )
 
-
             return False
+
 
 
         return True
@@ -144,7 +165,7 @@ class RiskManager:
 
 
     # ======================================
-    # ORDER COOLDOWN CHECK
+    # ORDER COOLDOWN
     # ======================================
 
     def order_allowed(self):
@@ -153,35 +174,11 @@ class RiskManager:
         now = time.time()
 
 
-        elapsed = (
-            now
-            -
-            self.last_order_time
-        )
+        elapsed = now - self.last_order_time
+
 
 
         if elapsed < ORDER_COOLDOWN:
-
-
-            remain = (
-                ORDER_COOLDOWN
-                -
-                elapsed
-            )
-
-
-            print(
-                "[COOLDOWN]",
-                round(remain,1),
-                "sec"
-            )
-
-
-            return False
-
-
-
-        if not self.daily_loss_allowed():
 
             return False
 
@@ -199,6 +196,7 @@ class RiskManager:
     def update_order_time(self):
 
         self.last_order_time = time.time()
+
 
 
 
@@ -221,32 +219,19 @@ class RiskManager:
 
             if qty <= 0:
 
-
                 print(
                     "[RISK BLOCK] INVALID QTY"
                 )
-
 
                 return False
 
 
 
-            max_qty = float(DEFAULT_QTY) * 10
-
-
-
-            if qty > max_qty:
-
+            if qty > DEFAULT_QTY * 10:
 
                 print(
-                    "[RISK BLOCK] POSITION TOO LARGE"
+                    "[RISK BLOCK] TOO LARGE"
                 )
-
-                print(
-                    "MAX :",
-                    max_qty
-                )
-
 
                 return False
 
@@ -256,13 +241,7 @@ class RiskManager:
 
 
 
-        except Exception as e:
-
-
-            print(
-                "[POSITION SIZE ERROR]",
-                e
-            )
+        except:
 
 
             return False
@@ -271,38 +250,21 @@ class RiskManager:
 
 
     # ======================================
-    # MANUAL RESET
+    # GLOBAL RISK CHECK
     # ======================================
 
-    def reset_daily_loss(self):
-
-        self.daily_loss = 0
-
-        self.initial_equity = self.current_equity
+    def allowed(self):
 
 
+        if not self.check_daily_loss():
 
-    # ======================================
-    # STATUS
-    # ======================================
+            return False
 
-    def status(self):
 
-        return {
 
-            "initial_equity":
-                self.initial_equity,
+        return True
 
-            "current_equity":
-                self.current_equity,
 
-            "daily_loss":
-                self.daily_loss,
-
-            "last_order":
-                self.last_order_time
-
-        }
 
 
 
