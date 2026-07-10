@@ -2,34 +2,39 @@ import os
 
 
 # =====================================================
-# ENVIRONMENT
+# MODE
 # =====================================================
 
-LIVE_TRADING = False
+# 실제 주문 실행 여부
+# False = 주문 차단 (테스트)
+# True  = Demo 주문 실행
+LIVE_TRADING = True
 
 
-TESTNET = False
-
-
+# Bybit Demo Trading
 DEMO_TRADING = True
 
 
+# Bybit Testnet 사용 여부
+TESTNET = False
+
+
 
 
 
 # =====================================================
-# BYBIT API
+# API KEY
 # =====================================================
 
 BYBIT_API_KEY = os.getenv(
     "BYBIT_API_KEY",
-    "YOUR_API_KEY"
+    "YOUR_DEMO_API_KEY"
 )
 
 
 BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
-    "YOUR_API_SECRET"
+    "YOUR_DEMO_API_SECRET"
 )
 
 
@@ -47,20 +52,17 @@ ACCOUNT_TYPE = "UNIFIED"
 
 
 # =====================================================
-# SYMBOL
+# MARKET
 # =====================================================
 
 DEFAULT_SYMBOL = "BTCUSDT"
 
-
-
-
-
-# =====================================================
-# CATEGORY
-# =====================================================
-
 CATEGORY = "linear"
+
+
+TIMEFRAME = "1"
+
+
 
 
 
@@ -70,9 +72,10 @@ CATEGORY = "linear"
 # REST API
 # =====================================================
 
-
 if DEMO_TRADING:
 
+
+    # Demo Trading API
 
     BYBIT_BASE_URL = (
         "https://api-demo.bybit.com"
@@ -100,21 +103,27 @@ else:
 
 
 
+
+
 # =====================================================
 # WEBSOCKET
 # =====================================================
 
-
 if DEMO_TRADING:
 
 
-    BYBIT_PUBLIC_WS = (
-        "wss://stream-demo.bybit.com/v5/public/linear"
+    # Private WS
+    BYBIT_PRIVATE_WS = (
+        "wss://stream-demo.bybit.com/v5/private"
     )
 
 
-    BYBIT_PRIVATE_WS = (
-        "wss://stream-demo.bybit.com/v5/private"
+    # Public market data
+    # Demo Public WS는 일부 환경에서 404 발생 가능
+    # 시장 데이터용으로 일반 Public WS 사용
+
+    BYBIT_PUBLIC_WS = (
+        "wss://stream.bybit.com/v5/public/linear"
     )
 
 
@@ -154,9 +163,8 @@ else:
 
 
 # =====================================================
-# TRADING SETTINGS
+# TRADING
 # =====================================================
-
 
 LEVERAGE = 5
 
@@ -165,16 +173,13 @@ DEFAULT_QTY = 0.001
 
 
 
-TIMEFRAME = "1"
-
 
 
 
 
 # =====================================================
-# STRATEGY
+# INDICATOR
 # =====================================================
-
 
 VWAP_LENGTH = 20
 
@@ -190,10 +195,11 @@ SUPERTREND_MULTIPLIER = 3
 
 
 
+
+
 # =====================================================
 # RISK
 # =====================================================
-
 
 MAX_POSITION_SIZE = 0.01
 
@@ -226,5 +232,7 @@ print("TESTNET :", TESTNET)
 print("LIVE :", LIVE_TRADING)
 print("ACCOUNT :", ACCOUNT_TYPE)
 print("SYMBOL :", DEFAULT_SYMBOL)
-print("BASE :", BYBIT_BASE_URL)
+print("REST :", BYBIT_BASE_URL)
+print("PUBLIC WS :", BYBIT_PUBLIC_WS)
+print("PRIVATE WS :", BYBIT_PRIVATE_WS)
 print("==============================")
