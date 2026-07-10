@@ -1,13 +1,13 @@
 # =====================================================
 # api/bybit_api.py
-# Bybit V5 REST API Wrapper
+# Bybit V5 REST API
 # =====================================================
 
 import time
 import hmac
 import hashlib
-import requests
 import json
+import requests
 
 
 
@@ -33,16 +33,12 @@ class BybitAPI:
 
     def __init__(self):
 
-
-        self.base_url = BYBIT_REST_URL
-
-
         print("==============================")
         print("[BYBIT API INIT]")
-        print("URL :", self.base_url)
+        print("TESTNET :", False)
         print("ACCOUNT :", ACCOUNT_TYPE)
-        print("CATEGORY :", CATEGORY)
-        print("SYMBOL :", DEFAULT_SYMBOL)
+        print("CATEGORY:", CATEGORY)
+        print("SYMBOL  :", DEFAULT_SYMBOL)
         print("==============================")
 
 
@@ -55,26 +51,18 @@ class BybitAPI:
     # SIGN
     # =====================================================
 
-    def sign(
+    def generate_signature(
         self,
         timestamp,
-        params
+        payload
     ):
 
 
         recv_window = "5000"
 
 
-        param_str = json.dumps(
 
-            params,
-
-            separators=(",", ":")
-
-        )
-
-
-        payload = (
+        param = (
 
             str(timestamp)
 
@@ -88,7 +76,7 @@ class BybitAPI:
 
             +
 
-            param_str
+            payload
 
         )
 
@@ -98,7 +86,7 @@ class BybitAPI:
 
             BYBIT_API_SECRET.encode(),
 
-            payload.encode(),
+            param.encode(),
 
             hashlib.sha256
 
@@ -135,7 +123,34 @@ class BybitAPI:
         )
 
 
+
         recv_window = "5000"
+
+
+
+        if method == "GET":
+
+
+            payload = json.dumps(
+
+                params,
+
+                separators=(",", ":")
+
+            )
+
+        else:
+
+
+            payload = json.dumps(
+
+                params,
+
+                separators=(",", ":")
+
+            )
+
+
 
 
 
@@ -149,11 +164,11 @@ class BybitAPI:
 
             "X-BAPI-SIGN":
 
-                self.sign(
+                self.generate_signature(
 
                     timestamp,
 
-                    params
+                    payload
 
                 ),
 
@@ -172,14 +187,14 @@ class BybitAPI:
 
                 "application/json"
 
-
         }
+
 
 
 
         url = (
 
-            self.base_url
+            BYBIT_REST_URL
 
             +
 
@@ -192,10 +207,11 @@ class BybitAPI:
         try:
 
 
+
             if method == "GET":
 
 
-                response = requests.get(
+                r = requests.get(
 
                     url,
 
@@ -211,13 +227,13 @@ class BybitAPI:
             else:
 
 
-                response = requests.post(
+                r = requests.post(
 
                     url,
 
                     headers=headers,
 
-                    json=params,
+                    data=payload,
 
                     timeout=10
 
@@ -225,11 +241,17 @@ class BybitAPI:
 
 
 
-            data = response.json()
+            data = r.json()
 
 
 
-            if data.get("retCode") != 0:
+            if data.get(
+
+                "retCode",
+
+                -1
+
+            ) != 0:
 
 
                 print(
@@ -281,7 +303,7 @@ class BybitAPI:
 
             r = requests.get(
 
-                self.base_url
+                BYBIT_REST_URL
 
                 +
 
@@ -373,7 +395,6 @@ class BybitAPI:
 
                     200
 
-
             }
 
         )
@@ -391,9 +412,9 @@ class BybitAPI:
 
             result
 
-            .get("result",{})
+            .get("result", {})
 
-            .get("list",[])
+            .get("list", [])
 
         )
 
@@ -407,7 +428,6 @@ class BybitAPI:
 
 
             candles.append(
-
 
                 {
 
@@ -443,7 +463,6 @@ class BybitAPI:
 
 
                 }
-
 
             )
 
@@ -562,7 +581,7 @@ class BybitAPI:
 
 
     # =====================================================
-    # SET LEVERAGE
+    # LEVERAGE
     # =====================================================
 
     def set_leverage(self):
@@ -596,10 +615,10 @@ class BybitAPI:
 
                     str(LEVERAGE)
 
-
             }
 
         )
+
 
 
         if result:
@@ -634,7 +653,7 @@ class BybitAPI:
 
 
     # =====================================================
-    # CREATE ORDER
+    # CREATE MARKET ORDER
     # =====================================================
 
     def create_order(
@@ -694,6 +713,66 @@ class BybitAPI:
 
 
     # =====================================================
+    # SET TP SL
+    # =====================================================
+
+    def set_trading_stop(
+        self,
+        take_profit,
+        stop_loss
+    ):
+
+
+        return self.request(
+
+            "POST",
+
+            "/v5/position/trading-stop",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL,
+
+
+                "tpslMode":
+
+                    "Full",
+
+
+                "positionIdx":
+
+                    0,
+
+
+                "takeProfit":
+
+                    str(take_profit),
+
+
+                "stopLoss":
+
+                    str(stop_loss)
+
+
+            }
+
+        )
+
+
+
+
+
+
+
+    # =====================================================
     # CLOSE POSITION
     # =====================================================
 
@@ -715,9 +794,9 @@ class BybitAPI:
 
             position
 
-            .get("result",{})
+            .get("result", {})
 
-            .get("list",[])
+            .get("list", [])
 
         )
 
@@ -743,19 +822,13 @@ class BybitAPI:
             if size > 0:
 
 
-                side = p.get("side")
-
-
-
                 close_side = (
 
                     "Sell"
 
-                    if side == "Buy"
+                    if p.get("side") == "Buy"
 
-                    else
-
-                    "Buy"
+                    else "Buy"
 
                 )
 
