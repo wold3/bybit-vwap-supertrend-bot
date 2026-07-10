@@ -1,41 +1,60 @@
 from config import (
     ACCOUNT_TYPE,
     CATEGORY,
-    SETTLE_COIN,
 )
 
-from api.bybit_client import bybit_client
+
+from api.bybit_client import (
+    bybit_client
+)
+
+
 
 
 
 class BybitWallet:
 
 
+
     def __init__(self):
+
+
+        self.account_type = ACCOUNT_TYPE
+
 
         print("==============================")
         print("[WALLET INIT]")
-        print("ACCOUNT :", ACCOUNT_TYPE)
-        print("CATEGORY :", CATEGORY)
-        print("SETTLE :", SETTLE_COIN)
+        print("ACCOUNT :", self.account_type)
         print("==============================")
+
+
+
+
 
 
 
     # =====================================================
-    # ACCOUNT BALANCE
+    # GET BALANCE
     # =====================================================
 
     def get_balance(self):
 
-        params = {
-
-            "accountType": ACCOUNT_TYPE,
-
-        }
-
 
         try:
+
+
+            params = {
+
+
+                "accountType":
+
+                    self.account_type
+
+
+            }
+
+
+
 
             result = bybit_client.get(
 
@@ -46,13 +65,41 @@ class BybitWallet:
             )
 
 
-            print(
-                "[BALANCE RESPONSE]",
-                result
-            )
 
 
-            return result
+
+            if not result:
+
+
+                return None
+
+
+
+
+
+
+            if result.get(
+                "retCode"
+            ) != 0:
+
+
+
+                print(
+                    "[WALLET ERROR]",
+                    result
+                )
+
+
+                return None
+
+
+
+
+
+            return result["result"]
+
+
+
 
 
 
@@ -60,12 +107,15 @@ class BybitWallet:
 
 
             print(
-                "[BALANCE ERROR]",
+                "[WALLET EXCEPTION]",
                 e
             )
 
 
             return None
+
+
+
 
 
 
@@ -76,52 +126,48 @@ class BybitWallet:
 
     def get_equity(self):
 
+
         try:
+
 
             data = self.get_balance()
 
 
-            if not data:
+
+            if data is None:
+
 
                 return 0
 
 
 
-            if data.get("retCode") != 0:
 
-                print(
-                    "[BALANCE API ERROR]",
-                    data
+
+            account = data["list"][0]
+
+
+
+
+
+            equity = float(
+
+                account.get(
+
+                    "totalEquity",
+
+                    0
+
                 )
 
-                return 0
-
-
-
-
-            account = (
-
-                data
-                .get("result", {})
-                .get("list", [])
-
-            )
-
-
-            if not account:
-
-                return 0
-
-
-
-            equity = account[0].get(
-                "totalEquity",
-                0
             )
 
 
 
-            return float(equity)
+
+
+            return equity
+
+
 
 
 
@@ -140,6 +186,9 @@ class BybitWallet:
 
 
 
+
+
+
     # =====================================================
     # AVAILABLE BALANCE
     # =====================================================
@@ -154,38 +203,34 @@ class BybitWallet:
 
 
 
-            if not data:
+            if data is None:
+
 
                 return 0
 
 
 
-            account = (
-
-                data
-                .get("result", {})
-                .get("list", [])
-
-            )
 
 
-            if not account:
-
-                return 0
+            account = data["list"][0]
 
 
 
-            balance = account[0].get(
 
-                "totalAvailableBalance",
 
-                0
+            return float(
+
+                account.get(
+
+                    "totalAvailableBalance",
+
+                    0
+
+                )
 
             )
 
 
-
-            return float(balance)
 
 
 
@@ -204,6 +249,8 @@ class BybitWallet:
 
 
 
+
+
     # =====================================================
     # STATUS
     # =====================================================
@@ -216,7 +263,7 @@ class BybitWallet:
 
             "account":
 
-                ACCOUNT_TYPE,
+                self.account_type,
 
 
             "equity":
@@ -228,10 +275,6 @@ class BybitWallet:
 
                 self.get_available_balance(),
 
-
-            "settle":
-
-                SETTLE_COIN,
 
         }
 
