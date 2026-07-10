@@ -1,8 +1,10 @@
+# =====================================================
 # services/telegram_bot.py
-
+# Telegram Notification Service
+# =====================================================
 
 import requests
-import time
+
 
 
 from config import (
@@ -15,27 +17,20 @@ from config import (
 
 
 
+
+
 class TelegramBot:
 
 
+
     def __init__(self):
-
-
-        self.enabled = TELEGRAM_ENABLED
-
-
-        self.token = TELEGRAM_TOKEN
-
-
-        self.chat_id = TELEGRAM_CHAT_ID
-
 
 
         print(
 
             "[TELEGRAM INIT]",
 
-            self.enabled
+            TELEGRAM_ENABLED
 
         )
 
@@ -43,9 +38,11 @@ class TelegramBot:
 
 
 
-    # =====================================
-    # SEND MESSAGE
-    # =====================================
+
+
+    # =====================================================
+    # SEND
+    # =====================================================
 
     def send(
         self,
@@ -53,28 +50,52 @@ class TelegramBot:
     ):
 
 
-        if not self.enabled:
-
-            return False
-
-
-
-        if not self.token or not self.chat_id:
-
-            return False
-
-
-
-
         try:
+
+
+            if not TELEGRAM_ENABLED:
+
+
+                return False
+
+
+
+
+
+            if not TELEGRAM_TOKEN:
+
+
+                return False
+
+
+
+
+
+            if not TELEGRAM_CHAT_ID:
+
+
+                return False
+
+
+
+
 
 
             url = (
 
-                f"https://api.telegram.org/"
-                f"bot{self.token}/sendMessage"
+                "https://api.telegram.org/bot"
+
+                +
+
+                TELEGRAM_TOKEN
+
+                +
+
+                "/sendMessage"
 
             )
+
+
 
 
 
@@ -83,17 +104,13 @@ class TelegramBot:
 
                 "chat_id":
 
-                self.chat_id,
+                    TELEGRAM_CHAT_ID,
 
 
                 "text":
 
-                message,
+                    message
 
-
-                "parse_mode":
-
-                "HTML"
 
             }
 
@@ -113,7 +130,11 @@ class TelegramBot:
 
 
 
-            return response.status_code == 200
+            return (
+
+                response.status_code == 200
+
+            )
 
 
 
@@ -139,23 +160,16 @@ class TelegramBot:
 
 
 
-    # =====================================
+    # =====================================================
     # BOT START
-    # =====================================
+    # =====================================================
 
     def bot_start(self):
 
 
         self.send(
 
-            """
-🤖 <b>BOT START</b>
-
-Bybit VWAP SuperTrend Bot
-
-Status:
-ONLINE
-            """
+            "🚀 BYBIT BOT START"
 
         )
 
@@ -164,57 +178,19 @@ ONLINE
 
 
 
-    # =====================================
-    # ORDER
-    # =====================================
 
-    def order(
-        self,
-        side,
-        symbol,
-        price,
-        qty,
-        tp,
-        sl
-    ):
+    # =====================================================
+    # BOT STOP
+    # =====================================================
+
+    def bot_stop(self):
 
 
-        text = f"""
+        self.send(
 
-📌 <b>ORDER EXECUTED</b>
+            "🛑 BYBIT BOT STOP"
 
-
-Symbol:
-{symbol}
-
-
-Side:
-{side}
-
-
-Price:
-{price}
-
-
-Qty:
-{qty}
-
-
-TP:
-{tp}
-
-
-SL:
-{sl}
-
-
-Time:
-{time.strftime('%Y-%m-%d %H:%M:%S')}
-
-"""
-
-
-        self.send(text)
+        )
 
 
 
@@ -222,9 +198,9 @@ Time:
 
 
 
-    # =====================================
+    # =====================================================
     # ERROR
-    # =====================================
+    # =====================================================
 
     def error(
         self,
@@ -234,18 +210,11 @@ Time:
 
         self.send(
 
-            f"""
+            "❌ ERROR\n"
 
-🚨 <b>BOT ERROR</b>
+            +
 
-
-{message}
-
-
-Time:
-{time.strftime('%Y-%m-%d %H:%M:%S')}
-
-"""
+            str(message)
 
         )
 
@@ -255,20 +224,23 @@ Time:
 
 
 
-    # =====================================
-    # STOP
-    # =====================================
+    # =====================================================
+    # SIGNAL
+    # =====================================================
 
-    def bot_stop(self):
+    def signal(
+        self,
+        data
+    ):
 
 
         self.send(
 
-            """
-🛑 <b>BOT STOPPED</b>
+            "📈 SIGNAL\n"
 
-System shutdown
-            """
+            +
+
+            str(data)
 
         )
 
@@ -277,5 +249,37 @@ System shutdown
 
 
 
+
+    # =====================================================
+    # ORDER
+    # =====================================================
+
+    def order(
+        self,
+        data
+    ):
+
+
+        self.send(
+
+            "💰 ORDER\n"
+
+            +
+
+            str(data)
+
+        )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SINGLETON
+# =====================================================
 
 telegram_bot = TelegramBot()
