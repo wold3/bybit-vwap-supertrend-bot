@@ -19,9 +19,11 @@ from api.bybit_api import (
 )
 
 
+
 from strategy.vwap_supertrend_strategy import (
     vwap_supertrend_strategy
 )
+
 
 
 from execution.order_manager import (
@@ -29,9 +31,11 @@ from execution.order_manager import (
 )
 
 
+
 from portfolio.position_manager import (
     position_manager
 )
+
 
 
 from risk.risk_manager import (
@@ -39,14 +43,17 @@ from risk.risk_manager import (
 )
 
 
+
 from services.private_ws import (
     private_ws
 )
 
 
+
 from services.watchdog import (
     watchdog
 )
+
 
 
 from database.database import (
@@ -55,13 +62,16 @@ from database.database import (
 
 
 
-# ============================
-# WEB DASHBOARD
-# ============================
-
 from web.server import (
     start_dashboard,
-    update_status
+    update_status,
+    add_log
+)
+
+
+
+from web.chart_data import (
+    add_candle
 )
 
 
@@ -76,7 +86,6 @@ class TradingApp:
 
 
         self.running = False
-
 
         self.market_thread = None
 
@@ -111,10 +120,28 @@ class TradingApp:
 
 
 
-            # WEB
+            # WEB DASHBOARD
 
             start_dashboard()
 
+
+
+            update_status(
+
+                {
+
+                "bot":
+
+                    "STARTING",
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+                }
+
+            )
 
 
 
@@ -146,6 +173,7 @@ class TradingApp:
 
 
 
+
             equity = float(
 
                 wallet
@@ -170,6 +198,14 @@ class TradingApp:
 
 
 
+            add_log(
+
+                f"EQUITY {equity}"
+
+            )
+
+
+
             risk_manager.update_equity(
 
                 equity
@@ -181,7 +217,8 @@ class TradingApp:
 
 
 
-            # POSITION
+
+            # POSITION SYNC
 
 
             try:
@@ -191,12 +228,23 @@ class TradingApp:
 
 
 
-            except Exception:
+                print(
+
+                    "[POSITION SYNC OK]"
+
+                )
+
+
+
+            except Exception as e:
+
 
 
                 print(
 
-                    "[POSITION SYNC ERROR]"
+                    "[POSITION SYNC ERROR]",
+
+                    e
 
                 )
 
@@ -205,25 +253,18 @@ class TradingApp:
 
 
 
-            # STATUS
 
 
-            update_status(
-
-                {
+            # WATCHDOG
 
 
-                "bot":
-
-                    "STARTING",
+            watchdog.start()
 
 
-                "symbol":
 
-                    DEFAULT_SYMBOL
+            print(
 
-
-                }
+                "[WATCHDOG START]"
 
             )
 
@@ -232,7 +273,8 @@ class TradingApp:
 
 
 
-            # SERVICES
+
+            # PRIVATE WS
 
 
             print(
@@ -246,17 +288,14 @@ class TradingApp:
 
 
 
-            watchdog.start()
 
 
 
 
-
+            # MARKET THREAD
 
 
             self.running = True
-
-
 
 
 
@@ -281,16 +320,21 @@ class TradingApp:
 
                 {
 
-
                 "bot":
 
                     "RUNNING"
-
 
                 }
 
             )
 
+
+
+            add_log(
+
+                "BOT READY"
+
+            )
 
 
 
@@ -319,7 +363,16 @@ class TradingApp:
             )
 
 
+
+            database.save_error(
+
+                e
+
+            )
+
+
             self.stop()
+
 
 
             raise e
@@ -366,8 +419,6 @@ class TradingApp:
 
 
 
-
-
                 if candles:
 
 
@@ -384,46 +435,47 @@ class TradingApp:
 
 
 
-                    data = []
+                    clean = []
 
 
 
                     for c in candles:
 
 
-                        data.append(
+
+                        clean.append(
 
                             {
 
 
                             "timestamp":
 
-                                c[0],
+                                int(c[0]),
 
 
                             "open":
 
-                                c[1],
+                                float(c[1]),
 
 
                             "high":
 
-                                c[2],
+                                float(c[2]),
 
 
                             "low":
 
-                                c[3],
+                                float(c[3]),
 
 
                             "close":
 
-                                c[4],
+                                float(c[4]),
 
 
                             "volume":
 
-                                c[5]
+                                float(c[5])
 
 
                             }
@@ -434,11 +486,12 @@ class TradingApp:
 
 
 
+
                     print(
 
                         "[CANDLE RECEIVED]",
 
-                        len(data)
+                        len(clean)
 
                     )
 
@@ -447,41 +500,46 @@ class TradingApp:
 
 
 
-                    signal = (
 
-                        vwap_supertrend_strategy
-
-                        .analyze(
-
-                            data
-
-                        )
-
-                    )
+                    last = clean[-1]
 
 
 
 
 
 
-                    # ==========================
-                    # DASHBOARD UPDATE
-                    # ==========================
+
+                    # CHART DATA
 
 
-                    last = data[-1]
-
-
-
-                    update_status(
+                    add_candle(
 
                         {
 
 
-                        "price":
+                        "time":
 
-                            float(last["close"]),
+                            last["timestamp"],
 
+
+                        "open":
+
+                            last["open"],
+
+
+                        "high":
+
+                            last["high"],
+
+
+                        "low":
+
+                            last["low"],
+
+
+                        "close":
+
+                            last["close"]
 
 
                         }
@@ -494,17 +552,79 @@ class TradingApp:
 
 
 
+                    signal = (
+
+                        vwap_supertrend_strategy
+
+                        .analyze(
+
+                            clean
+
+                        )
+
+                    )
+
+
+
+
+
+
+
+                    update_status(
+
+                        {
+
+
+                        "price":
+
+                            last["close"]
+
+
+                        }
+
+                    )
+
+
+
+
+
+
 
                     if signal:
 
 
+
                         print(
 
-                            "[APP SIGNAL]",
+                            "[SIGNAL]",
 
                             signal
 
                         )
+
+
+                        add_log(
+
+                            str(signal)
+
+                        )
+
+
+
+                        update_status(
+
+                            {
+
+
+                            "signal":
+
+                                signal["signal"]
+
+
+                            }
+
+                        )
+
 
 
                         order_manager.execute(
@@ -515,10 +635,8 @@ class TradingApp:
 
 
 
-
-
-
                     else:
+
 
 
                         print(
@@ -526,8 +644,6 @@ class TradingApp:
                             "[NO SIGNAL]"
 
                         )
-
-
 
 
 
@@ -552,11 +668,21 @@ class TradingApp:
                 )
 
 
+
                 database.save_error(
 
                     e
 
                 )
+
+
+
+                add_log(
+
+                    str(e)
+
+                )
+
 
 
 
@@ -567,8 +693,6 @@ class TradingApp:
                 10
 
             )
-
-
 
 
 
@@ -597,10 +721,12 @@ class TradingApp:
 
 
 
+
         try:
 
 
             private_ws.stop()
+
 
 
         except:
@@ -612,10 +738,12 @@ class TradingApp:
 
 
 
+
         try:
 
 
             watchdog.stop()
+
 
 
         except:
@@ -634,10 +762,12 @@ class TradingApp:
             database.close()
 
 
+
         except:
 
 
             pass
+
 
 
 
@@ -654,6 +784,14 @@ class TradingApp:
 
 
             }
+
+        )
+
+
+
+        add_log(
+
+            "BOT STOPPED"
 
         )
 
