@@ -133,3 +133,30 @@ print("REST :", BYBIT_BASE_URL)
 print("PUBLIC WS :", BYBIT_PUBLIC_WS)
 print("PRIVATE WS :", BYBIT_PRIVATE_WS)
 print("==============================")
+
+# ==================================
+# INDICATORS
+# ==================================
+
+VWAP_LENGTH = int(
+    os.getenv(
+        "VWAP_LENGTH",
+        20
+    )
+)
+
+
+SUPERTREND_PERIOD = int(
+    os.getenv(
+        "SUPERTREND_PERIOD",
+        10
+    )
+)
+
+
+SUPERTREND_MULTIPLIER = float(
+    os.getenv(
+        "SUPERTREND_MULTIPLIER",
+        3.0
+    )
+)
