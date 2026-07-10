@@ -3,15 +3,25 @@ import signal
 import traceback
 
 
+
 from api.bybit_api import bybit_api
 
+
 from ws.public_ws import public_ws
+
 from ws.private_ws import private_ws
+
+
 
 from signals.vwap_supertrend import signal_engine
 
+
+
 from execution.order_manager import order_manager
+
 from execution.position_manager import position_manager
+
+
 
 from risk.risk_manager import risk_manager
 
@@ -20,15 +30,18 @@ from risk.risk_manager import risk_manager
 
 
 # ==========================================
-# BOT APPLICATION
+# APPLICATION
 # ==========================================
 
 class BotApp:
 
 
+
     def __init__(self):
 
+
         self.running = False
+
 
 
         print("==============================")
@@ -47,15 +60,19 @@ class BotApp:
 
 
         print()
+
         print("====================================")
+
         print("VWAP SUPERTREND BOT START")
+
         print("====================================")
 
 
 
-        # --------------------------
-        # WALLET
-        # --------------------------
+
+
+        # Wallet
+
 
         wallet = bybit_api.get_wallet_balance()
 
@@ -69,11 +86,18 @@ class BotApp:
 
                 equity = float(
 
-                    wallet["result"]
-                    ["list"][0]
+                    wallet
+
+                    ["result"]
+
+                    ["list"]
+
+                    [0]
+
                     ["totalEquity"]
 
                 )
+
 
 
                 risk_manager.initialize(
@@ -83,11 +107,12 @@ class BotApp:
                 )
 
 
+
             except Exception as e:
 
 
                 print(
-                    "[RISK INIT ERROR]",
+                    "[RISK ERROR]",
                     e
                 )
 
@@ -95,34 +120,20 @@ class BotApp:
 
 
 
-        # --------------------------
-        # LEVERAGE
-        # --------------------------
-
-        try:
+        # Leverage
 
 
-            bybit_api.set_leverage()
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[LEVERAGE ERROR]",
-                e
-            )
+        bybit_api.set_leverage()
 
 
 
 
 
-        # --------------------------
-        # WS START
-        # --------------------------
+        # WS Start
+
 
         public_ws.run_thread()
+
 
         private_ws.run_thread()
 
@@ -176,24 +187,41 @@ class BotApp:
 
 
     # ======================================
-    # LOOP
+    # MAIN LOOP
     # ======================================
 
     def loop(self):
 
 
         (
+
             opens,
+
             highs,
+
             lows,
+
             closes,
+
             volumes
+
 
         ) = public_ws.get_ohlcv()
 
 
 
+
+
         if len(closes) < 20:
+
+
+            print(
+
+                "[WAIT DATA]",
+
+                len(closes)
+
+            )
 
 
             return
@@ -202,29 +230,15 @@ class BotApp:
 
 
 
-        print(
-            "[DATA]",
-            len(closes)
-        )
+        # Position Exit
 
-
-
-
-
-        # --------------------------
-        # POSITION EXIT
-        # --------------------------
 
         if position_manager.has_position():
 
 
-            exit_signal = (
+            exit_signal = position_manager.check_exit(
 
-                position_manager.check_exit(
-
-                    closes[-1]
-
-                )
+                closes[-1]
 
             )
 
@@ -234,12 +248,19 @@ class BotApp:
 
 
                 print(
+
                     "[EXIT]",
+
                     exit_signal
+
                 )
 
 
                 order_manager.close_position()
+
+
+
+                position_manager.clear()
 
 
 
@@ -249,9 +270,8 @@ class BotApp:
 
 
 
-        # --------------------------
-        # RISK CHECK
-        # --------------------------
+        # Risk
+
 
         if not risk_manager.can_trade():
 
@@ -262,9 +282,8 @@ class BotApp:
 
 
 
-        # --------------------------
-        # DUPLICATE POSITION
-        # --------------------------
+        # Position exists
+
 
         if order_manager.has_position():
 
@@ -275,19 +294,23 @@ class BotApp:
 
 
 
-        # --------------------------
-        # SIGNAL
-        # --------------------------
+        # Signal
 
-        result = signal_engine.check_signal(
+
+        signal_result = signal_engine.check_signal(
+
 
             close=closes,
 
+
             volume=volumes,
+
 
             high=highs,
 
+
             low=lows
+
 
         )
 
@@ -295,19 +318,22 @@ class BotApp:
 
 
 
-        if result:
+        if signal_result:
 
 
             print(
+
                 "[SIGNAL]",
-                result
+
+                signal_result
+
             )
 
 
 
 
 
-            if result == "Buy":
+            if signal_result == "Buy":
 
 
                 order_manager.buy()
@@ -316,11 +342,10 @@ class BotApp:
 
 
 
-            elif result == "Sell":
+            elif signal_result == "Sell":
 
 
                 order_manager.sell()
-
 
 
 
@@ -368,10 +393,12 @@ app = BotApp()
 
 
 
-def shutdown(signum, frame):
+def shutdown(sig, frame):
 
 
     app.stop()
+
+
 
 
 
@@ -421,7 +448,7 @@ if __name__ == "__main__":
 
 
         print(
-            "[FATAL ERROR]",
+            "[FATAL]",
             e
         )
 
