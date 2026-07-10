@@ -1,83 +1,89 @@
-import signal
-import sys
+# =====================================================
+# main.py
+# =====================================================
+
+
 import time
-
-
-from app import TradingApp
-
-
-
-app = TradingApp()
+import traceback
 
 
 
-running = True
-
-
-
-def shutdown_handler(sig, frame):
-
-    global running
-
-
-    print("[SYSTEM] SHUTDOWN")
-
-
-    running = False
-
-
-    app.stop()
-
-
-    sys.exit(0)
-
-
-
-signal.signal(
-    signal.SIGINT,
-    shutdown_handler
-)
-
-
-signal.signal(
-    signal.SIGTERM,
-    shutdown_handler
+from app import (
+    TradingApp
 )
 
 
 
-if __name__ == "__main__":
+
+
+
+def main():
+
+
+    app = TradingApp()
+
 
 
     try:
+
 
 
         app.start()
 
 
 
-        while running:
+        while True:
 
 
-            # Health Check
-
-            if hasattr(app, "health_check"):
-
-                app.health_check()
+            time.sleep(1)
 
 
 
-            time.sleep(5)
+
+    except KeyboardInterrupt:
+
+
+
+        print()
+
+        print(
+            "[KEYBOARD STOP]"
+        )
+
+
+
+        app.stop()
+
+
 
 
 
     except Exception as e:
 
 
+
         print(
+
             "[MAIN ERROR]",
+
             e
+
         )
 
 
+        traceback.print_exc()
+
+
+
         app.stop()
+
+
+
+
+
+
+
+if __name__ == "__main__":
+
+
+    main()
