@@ -1,5 +1,6 @@
 # =====================================================
 # main.py
+# Bybit VWAP SuperTrend Bot
 # =====================================================
 
 
@@ -17,6 +18,7 @@ from app import (
 
 
 
+
 def main():
 
 
@@ -25,7 +27,6 @@ def main():
 
 
     try:
-
 
 
         app.start()
@@ -39,27 +40,21 @@ def main():
 
 
 
-
     except KeyboardInterrupt:
 
 
-
-        print()
-
         print(
-            "[KEYBOARD STOP]"
-        )
 
+            "\n[USER STOP]"
+
+        )
 
 
         app.stop()
 
 
 
-
-
     except Exception as e:
-
 
 
         print(
@@ -75,7 +70,16 @@ def main():
 
 
 
-        app.stop()
+        try:
+
+
+            app.stop()
+
+
+        except:
+
+
+            pass
 
 
 
