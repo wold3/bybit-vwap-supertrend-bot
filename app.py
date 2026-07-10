@@ -2,14 +2,7 @@ import threading
 import time
 
 
-from websocket.public_ws import (
-    ws_client,
-)
-
-
-from websocket.private_ws import (
-    private_ws_client,
-)
+from websocket_stream import stream
 
 
 from indicators.indicator_engine import (
@@ -32,13 +25,13 @@ from risk.risk_manager import (
 )
 
 
-from guard.bot_guard import (
-    bot_guard,
+from watchdog.watchdog import (
+    watchdog,
 )
 
 
-from watchdog.watchdog import (
-    watchdog,
+from guard.bot_guard import (
+    bot_guard,
 )
 
 
@@ -53,40 +46,16 @@ from portfolio.bybit_wallet import (
 class TradingApp:
 
 
-
     def __init__(self):
-
 
         print("==============================")
         print("[APP INIT]")
         print("==============================")
 
 
-
         self.running = False
 
-
         self.thread = None
-
-
-
-
-
-
-
-        # Public WS callback 연결
-
-        ws_client.set_callback(
-
-            self.on_candle
-
-        )
-
-
-
-
-
-
 
 
 
@@ -99,14 +68,11 @@ class TradingApp:
 
         if self.running:
 
-
             return
 
 
 
-
         self.running = True
-
 
 
         print("==============================")
@@ -115,32 +81,42 @@ class TradingApp:
 
 
 
+        # Risk
 
+        try:
 
-        # Risk 초기화
+            risk_manager.initialize()
 
-        risk_manager.initialize()
+        except Exception as e:
 
-
-
+            print(
+                "[RISK INIT ERROR]",
+                e
+            )
 
 
 
         # Watchdog
 
-        watchdog.start()
+        try:
+
+            watchdog.start()
+
+        except Exception as e:
+
+            print(
+                "[WATCHDOG ERROR]",
+                e
+            )
 
 
 
 
-
-
-
-        # Private WS
+        # Websocket 시작
 
         threading.Thread(
 
-            target=private_ws_client.start,
+            target=stream.start,
 
             daemon=True
 
@@ -148,19 +124,7 @@ class TradingApp:
 
 
 
-
-
-
-
-        # Public WS
-
-        ws_client.start()
-
-
-
-
-
-
+        # Main Loop
 
         self.thread = threading.Thread(
 
@@ -175,8 +139,6 @@ class TradingApp:
 
 
 
-
-
         print(
             "[BOT RUNNING]"
         )
@@ -185,12 +147,8 @@ class TradingApp:
 
 
 
-
-
-
-
     # =====================================================
-    # CANDLE CALLBACK
+    # CANDLE PROCESS
     # =====================================================
 
     def on_candle(
@@ -199,18 +157,13 @@ class TradingApp:
     ):
 
 
-
         if not bot_guard.is_running():
 
             return
 
 
 
-
-
         try:
-
-
 
 
             indicators = indicator_engine.update(
@@ -221,18 +174,9 @@ class TradingApp:
 
 
 
-
-
-
             if not indicators:
 
-
                 return
-
-
-
-
-
 
 
 
@@ -246,41 +190,27 @@ class TradingApp:
 
 
 
-
-
-
             if signal == "BUY":
 
 
-
                 print(
-                    "[SIGNAL BUY]"
+                    "[BUY SIGNAL]"
                 )
-
 
 
                 order_manager.buy()
 
 
 
-
-
-
             elif signal == "SELL":
 
 
-
                 print(
-                    "[SIGNAL SELL]"
+                    "[SELL SIGNAL]"
                 )
 
 
-
                 order_manager.sell()
-
-
-
-
 
 
 
@@ -288,16 +218,9 @@ class TradingApp:
 
 
             print(
-
-                "[CANDLE PROCESS ERROR]",
-
+                "[CANDLE ERROR]",
                 e
-
             )
-
-
-
-
 
 
 
@@ -317,13 +240,10 @@ class TradingApp:
         )
 
 
-
         while self.running:
 
 
-
             try:
-
 
 
                 watchdog.heartbeat()
@@ -338,25 +258,16 @@ class TradingApp:
 
 
 
-
-
             except Exception as e:
 
 
-
                 print(
-
-                    "[APP LOOP ERROR]",
-
+                    "[LOOP ERROR]",
                     e
-
                 )
 
 
                 time.sleep(5)
-
-
-
 
 
 
@@ -375,35 +286,33 @@ class TradingApp:
         )
 
 
-
         self.running = False
 
 
 
-        bot_guard.stop()
+        try:
+
+            bot_guard.stop()
+
+        except:
+
+            pass
 
 
 
-        ws_client.stop()
+        try:
 
+            watchdog.stop()
 
+        except:
 
-        private_ws_client.stop()
-
-
-
-        watchdog.stop()
+            pass
 
 
 
         print(
             "[BOT STOPPED]"
         )
-
-
-
-
-
 
 
 
