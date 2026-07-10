@@ -1,31 +1,36 @@
-from strategy.indicators import indicators
+# strategy/vwap_supertrend_strategy.py
+
+import pandas as pd
 
 from config import (
+    VWAP_LENGTH,
     ST_LENGTH,
-    ST_MULTIPLIER,
+    SUPERTREND_PERIOD,
+    SUPERTREND_MULTIPLIER,
+
     USE_VOLUME_FILTER,
-    MIN_VOLUME_MULTIPLIER,
+    MIN_VOLUME_MULTIPLIER
+)
+
+
+from indicators.indicators import (
+    Indicators
 )
 
 
 
-class VWAPSuperTrendStrategy:
+class VWAPSupertrendStrategy:
 
 
     def __init__(self):
 
-
-        self.position = None
-
-
-        self.last_trend = 0
+        self.indicators = Indicators()
 
 
 
-
-    # ======================================
+    # =====================================
     # ANALYZE
-    # ======================================
+    # =====================================
 
     def analyze(
         self,
@@ -33,338 +38,311 @@ class VWAPSuperTrendStrategy:
     ):
 
 
-        if not candles:
+        try:
 
-            return None
 
+            if candles is None:
 
+                return None
 
-        if len(candles) < ST_LENGTH + 20:
 
-            return None
 
+            if len(candles) < 50:
 
+                return None
 
-        closes = [
 
-            float(c["close"])
 
-            for c in candles
+            df = pd.DataFrame(
+                candles
+            )
 
-        ]
 
 
-        highs = [
+            # =============================
+            # DATA
+            # =============================
 
-            float(c["high"])
+            opens = (
+                df["open"]
+                .astype(float)
+                .tolist()
+            )
 
-            for c in candles
 
-        ]
+            highs = (
+                df["high"]
+                .astype(float)
+                .tolist()
+            )
 
 
-        lows = [
+            lows = (
+                df["low"]
+                .astype(float)
+                .tolist()
+            )
 
-            float(c["low"])
 
-            for c in candles
+            closes = (
+                df["close"]
+                .astype(float)
+                .tolist()
+            )
 
-        ]
 
+            volumes = (
+                df["volume"]
+                .astype(float)
+                .tolist()
+            )
 
-        volumes = [
 
-            float(c["volume"])
 
-            for c in candles
+            # =============================
+            # VWAP
+            # =============================
 
-        ]
+            vwap = (
 
+                self.indicators
+                .vwap(
 
+                    closes,
 
-        # ==========================
-        # INDICATORS
-        # ==========================
+                    volumes
 
+                )
 
-        vwap = indicators.vwap(
+            )
 
-            closes,
 
-            volumes
 
-        )
+            # =============================
+            # SUPERTREND
+            # =============================
 
+            supertrend = (
 
+                self.indicators
+                .supertrend(
 
-        supertrend = indicators.supertrend(
+                    highs,
 
-            highs,
+                    lows,
 
-            lows,
+                    closes,
 
-            closes,
+                    SUPERTREND_PERIOD,
 
-            ST_LENGTH,
+                    SUPERTREND_MULTIPLIER
 
-            ST_MULTIPLIER
+                )
 
-        )
+            )
 
 
 
-        if supertrend is None:
+            last_close = closes[-1]
 
-            return None
+            last_vwap = vwap[-1]
 
+            last_st = supertrend[-1]
 
 
-        trend = supertrend["direction"]
 
+            # =============================
+            # VOLUME FILTER
+            # =============================
 
+            volume_ok = True
 
-        price = closes[-1]
 
 
+            if USE_VOLUME_FILTER:
 
-        current_volume = volumes[-1]
 
+                avg_volume = (
 
-        avg_volume = sum(
+                    sum(volumes[-20:])
 
-            volumes[-20:]
+                    /
 
-        ) / 20
+                    20
 
+                )
 
 
-        # ==========================
-        # VOLUME FILTER
-        # ==========================
+                volume_ok = (
 
+                    volumes[-1]
 
-        if USE_VOLUME_FILTER:
+                    >
 
+                    avg_volume *
+                    MIN_VOLUME_MULTIPLIER
 
-            if current_volume < (
+                )
 
-                avg_volume *
 
-                MIN_VOLUME_MULTIPLIER
 
-            ):
+            if not volume_ok:
 
                 return None
 
 
 
 
-        # ==========================
-        # ENTRY
-        # ==========================
+            # =============================
+            # ENTRY LONG
+            # =============================
+
+            if (
+
+                last_close > last_vwap
+
+                and
+
+                last_close > last_st
+
+            ):
 
 
-        # SuperTrend 변경 확인
+                return {
 
 
-        trend_changed = (
-
-            trend != self.last_trend
-
-        )
+                    "type":
+                        "ENTRY",
 
 
-        self.last_trend = trend
+                    "side":
+                        "Buy",
+
+
+                    "price":
+                        last_close,
+
+
+                    "strategy":
+                        "VWAP_SUPERTREND"
+
+                }
 
 
 
 
-        # LONG
+
+            # =============================
+            # ENTRY SHORT
+            # =============================
+
+            if (
+
+                last_close < last_vwap
+
+                and
+
+                last_close < last_st
+
+            ):
+
+
+                return {
+
+
+                    "type":
+                        "ENTRY",
+
+
+                    "side":
+                        "Sell",
+
+
+                    "price":
+                        last_close,
+
+
+                    "strategy":
+                        "VWAP_SUPERTREND"
+
+                }
+
+
+
+
+            # =============================
+            # EXIT
+            # =============================
+
+            return self.check_exit(
+
+                last_close,
+
+                last_vwap,
+
+                last_st
+
+            )
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[STRATEGY ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+    # =====================================
+    # EXIT
+    # =====================================
+
+    def check_exit(
+
+        self,
+
+        price,
+
+        vwap,
+
+        supertrend
+
+    ):
+
 
 
         if (
-
-            trend == 1
-
-            and
-
-            trend_changed
-
-            and
-
-            price > vwap
-
-            and
-
-            self.position != "Buy"
-
-        ):
-
-
-
-            self.position = "Buy"
-
-
-
-            return {
-
-
-                "type":
-
-                "ENTRY",
-
-
-                "side":
-
-                "Buy",
-
-
-                "price":
-
-                price,
-
-
-                "vwap":
-
-                vwap,
-
-
-                "trend":
-
-                trend
-
-
-            }
-
-
-
-
-        # SHORT
-
-
-        if (
-
-            trend == -1
-
-            and
-
-            trend_changed
-
-            and
 
             price < vwap
 
             and
 
-            self.position != "Sell"
+            price < supertrend
 
         ):
-
-
-
-            self.position = "Sell"
-
 
 
             return {
 
 
                 "type":
-
-                "ENTRY",
-
-
-                "side":
-
-                "Sell",
+                    "EXIT",
 
 
-                "price":
-
-                price,
-
-
-                "vwap":
-
-                vwap,
-
-
-                "trend":
-
-                trend
-
+                "strategy":
+                    "VWAP_SUPERTREND"
 
             }
-
-
-
-
-        # ==========================
-        # EXIT
-        # ==========================
-
-
-        if self.position == "Buy":
-
-
-            if trend == -1:
-
-
-
-                old = self.position
-
-
-                self.position = None
-
-
-
-                return {
-
-
-                    "type":
-
-                    "EXIT",
-
-
-                    "side":
-
-                    old
-
-
-                }
-
-
-
-
-        if self.position == "Sell":
-
-
-            if trend == 1:
-
-
-
-                old = self.position
-
-
-                self.position = None
-
-
-
-                return {
-
-
-                    "type":
-
-                    "EXIT",
-
-
-                    "side":
-
-                    old
-
-
-                }
-
 
 
 
@@ -374,4 +352,8 @@ class VWAPSuperTrendStrategy:
 
 
 
-vwap_supertrend_strategy = VWAPSuperTrendStrategy()
+# Singleton
+
+vwap_supertrend_strategy = (
+    VWAPSupertrendStrategy()
+)
