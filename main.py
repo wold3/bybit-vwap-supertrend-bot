@@ -1,6 +1,6 @@
 import time
 import signal
-import threading
+import traceback
 
 
 from api.bybit_api import bybit_api
@@ -16,9 +16,6 @@ from execution.position_manager import position_manager
 from risk.risk_manager import risk_manager
 
 
-from config import (
-    DEFAULT_QTY,
-)
 
 
 
@@ -31,9 +28,7 @@ class BotApp:
 
     def __init__(self):
 
-
         self.running = False
-
 
 
         print("==============================")
@@ -58,9 +53,9 @@ class BotApp:
 
 
 
-        # ------------------------------
+        # --------------------------
         # WALLET
-        # ------------------------------
+        # --------------------------
 
         wallet = bybit_api.get_wallet_balance()
 
@@ -100,9 +95,9 @@ class BotApp:
 
 
 
-        # ------------------------------
+        # --------------------------
         # LEVERAGE
-        # ------------------------------
+        # --------------------------
 
         try:
 
@@ -123,9 +118,9 @@ class BotApp:
 
 
 
-        # ------------------------------
+        # --------------------------
         # WS START
-        # ------------------------------
+        # --------------------------
 
         public_ws.run_thread()
 
@@ -150,6 +145,7 @@ class BotApp:
 
 
 
+
         while self.running:
 
 
@@ -169,6 +165,9 @@ class BotApp:
                 )
 
 
+                traceback.print_exc()
+
+
 
             time.sleep(1)
 
@@ -177,17 +176,20 @@ class BotApp:
 
 
     # ======================================
-    # MAIN LOOP
+    # LOOP
     # ======================================
 
     def loop(self):
 
 
-        opens, highs, lows, closes, volumes = (
+        (
+            opens,
+            highs,
+            lows,
+            closes,
+            volumes
 
-            public_ws.get_ohlcv()
-
-        )
+        ) = public_ws.get_ohlcv()
 
 
 
@@ -195,6 +197,7 @@ class BotApp:
 
 
             return
+
 
 
 
@@ -208,39 +211,35 @@ class BotApp:
 
 
 
-        # ------------------------------
-        # EXIT CHECK
-        # ------------------------------
+        # --------------------------
+        # POSITION EXIT
+        # --------------------------
 
         if position_manager.has_position():
 
 
+            exit_signal = (
 
-            result = position_manager.evaluate_exit(
+                position_manager.check_exit(
 
-                position_manager.entry_price,
+                    closes[-1]
 
-                position_manager.side,
-
-                closes
+                )
 
             )
 
 
 
-            if result:
-
+            if exit_signal:
 
 
                 print(
                     "[EXIT]",
-                    result
+                    exit_signal
                 )
 
 
                 order_manager.close_position()
-
-                position_manager.clear()
 
 
 
@@ -250,10 +249,9 @@ class BotApp:
 
 
 
-
-        # ------------------------------
-        # ENTRY CHECK
-        # ------------------------------
+        # --------------------------
+        # RISK CHECK
+        # --------------------------
 
         if not risk_manager.can_trade():
 
@@ -262,6 +260,11 @@ class BotApp:
 
 
 
+
+
+        # --------------------------
+        # DUPLICATE POSITION
+        # --------------------------
 
         if order_manager.has_position():
 
@@ -272,7 +275,11 @@ class BotApp:
 
 
 
-        signal_result = signal_engine.check_signal(
+        # --------------------------
+        # SIGNAL
+        # --------------------------
+
+        result = signal_engine.check_signal(
 
             close=closes,
 
@@ -286,50 +293,34 @@ class BotApp:
 
 
 
-        if signal_result:
+
+
+        if result:
 
 
             print(
                 "[SIGNAL]",
-                signal_result
+                result
             )
 
 
 
-            if signal_result == "Buy":
 
 
-                if order_manager.buy():
+            if result == "Buy":
 
 
-                    position_manager.update_position(
-
-                        "Buy",
-
-                        DEFAULT_QTY,
-
-                        closes[-1]
-
-                    )
+                order_manager.buy()
 
 
 
 
-            elif signal_result == "Sell":
+
+            elif result == "Sell":
 
 
-                if order_manager.sell():
+                order_manager.sell()
 
-
-                    position_manager.update_position(
-
-                        "Sell",
-
-                        DEFAULT_QTY,
-
-                        closes[-1]
-
-                    )
 
 
 
@@ -347,7 +338,6 @@ class BotApp:
         print(
             "[SHUTDOWN]"
         )
-
 
 
         self.running = False
@@ -369,6 +359,7 @@ class BotApp:
 
 
 
+
 # ==========================================
 # SIGNAL HANDLER
 # ==========================================
@@ -377,22 +368,10 @@ app = BotApp()
 
 
 
-def shutdown_handler(
-
-    signum,
-
-    frame
-
-):
+def shutdown(signum, frame):
 
 
     app.stop()
-
-
-
-    raise SystemExit
-
-
 
 
 
@@ -400,19 +379,19 @@ signal.signal(
 
     signal.SIGINT,
 
-    shutdown_handler
+    shutdown
 
 )
-
 
 
 signal.signal(
 
     signal.SIGTERM,
 
-    shutdown_handler
+    shutdown
 
 )
+
 
 
 
@@ -424,4 +403,30 @@ signal.signal(
 if __name__ == "__main__":
 
 
-    app.start()
+    try:
+
+
+        app.start()
+
+
+
+    except KeyboardInterrupt:
+
+
+        app.stop()
+
+
+
+    except Exception as e:
+
+
+        print(
+            "[FATAL ERROR]",
+            e
+        )
+
+
+        traceback.print_exc()
+
+
+        app.stop()
