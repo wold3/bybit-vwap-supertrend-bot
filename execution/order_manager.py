@@ -1,99 +1,109 @@
 import time
 
-from config import (
-    CATEGORY,
-    DEFAULT_SYMBOL,
-    DEFAULT_QTY,
-    ORDER_TYPE,
-    TIME_IN_FORCE,
-    ORDER_COOLDOWN,
-)
 
-from api.bybit_api import bybit_api
-from risk.risk_manager import risk_manager
-
-
-# ==========================================
-# ORDER MANAGER
-# ==========================================
-
-class OrderManager:
+class RiskManager:
 
 
     def __init__(self):
 
+        print("==============================")
+        print("[RISK MANAGER INIT]")
+        print("==============================")
+
+
+        # ==============================
+        # EQUITY
+        # ==============================
+
+        self.initial_equity = 0.0
+
+        self.current_equity = 0.0
+
+        self.highest_equity = 0.0
+
+
+
+        # ==============================
+        # LOSS CONTROL
+        # ==============================
+
+        self.daily_loss = 0.0
+
+        self.max_daily_loss = 5.0
+
+
+
+        # ==============================
+        # ORDER CONTROL
+        # ==============================
+
         self.last_order_time = 0
 
-
-        print("==============================")
-        print("[EXECUTION ORDER MANAGER INIT]")
-        print("CATEGORY :", CATEGORY)
-        print("SYMBOL :", DEFAULT_SYMBOL)
-        print("==============================")
+        self.order_cooldown = 60
 
 
-    # ======================================
-    # CREATE ORDER
-    # ======================================
 
-    def execute_order(
-        self,
-        side,
-        qty=None
-    ):
+        # ==============================
+        # POSITION CONTROL
+        # ==============================
+
+        self.max_position_qty = 0.01
+
+
+
+        # ==============================
+        # STATUS
+        # ==============================
+
+        self.trading_enabled = True
+
+        self.start_time = None
+
+
+
+
+    # ==================================================
+    # INITIALIZE
+    # ==================================================
+
+    def initialize(self, equity):
 
 
         try:
 
 
-            if qty is None:
+            self.initial_equity = float(equity)
 
-                qty = DEFAULT_QTY
+            self.current_equity = float(equity)
 
-
-
-            # risk check
-
-            if not risk_manager.order_allowed():
-
-                print(
-                    "[ORDER BLOCK] COOLDOWN"
-                )
-
-                return None
+            self.highest_equity = float(equity)
 
 
 
-            if not risk_manager.check_position_size(qty):
+            self.daily_loss = 0.0
 
-                return None
+            self.trading_enabled = True
+
+
+            self.start_time = time.time()
 
 
 
             print("==============================")
-            print("[ORDER REQUEST]")
-            print("SIDE :", side)
-            print("QTY :", qty)
-            print("==============================")
-
-
-            result = bybit_api.create_order(
-
-                side=side,
-
-                qty=qty
-
+            print("[RISK INITIALIZED]")
+            print(
+                "EQUITY :",
+                self.initial_equity
             )
+            print(
+                "MAX DAILY LOSS :",
+                self.max_daily_loss,
+                "%"
+            )
+            print("==============================")
 
 
-            if result:
-
-
-                risk_manager.update_order_time()
-
-
-
-            return result
+            return True
 
 
 
@@ -101,7 +111,82 @@ class OrderManager:
 
 
             print(
-                "[ORDER MANAGER ERROR]",
+                "[RISK INIT ERROR]",
+                e
+            )
+
+
+            return False
+
+
+
+
+    # ==================================================
+    # UPDATE EQUITY
+    # ==================================================
+
+    def update_equity(self, equity):
+
+
+        try:
+
+
+            self.current_equity = float(equity)
+
+
+
+            if self.current_equity > self.highest_equity:
+
+                self.highest_equity = self.current_equity
+
+
+
+            if self.initial_equity > 0:
+
+
+                loss = (
+
+                    self.initial_equity
+                    -
+                    self.current_equity
+
+                )
+
+
+                self.daily_loss = (
+
+                    loss
+                    /
+                    self.initial_equity
+
+                ) * 100
+
+
+
+            print(
+                "[DAILY LOSS]",
+                round(
+                    self.daily_loss,
+                    4
+                ),
+                "%"
+            )
+
+
+
+            self.check_daily_loss()
+
+
+
+            return self.daily_loss
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[EQUITY UPDATE ERROR]",
                 e
             )
 
@@ -111,57 +196,287 @@ class OrderManager:
 
 
 
-    # ======================================
-    # LONG
-    # ======================================
+    # ==================================================
+    # DAILY LOSS LIMIT
+    # ==================================================
 
-    def buy(
-        self,
-        qty=None
-    ):
+    def check_daily_loss(self):
 
-        return self.execute_order(
 
-            side="Buy",
+        if self.daily_loss >= self.max_daily_loss:
 
-            qty=qty
 
+            self.trading_enabled = False
+
+
+            print("==============================")
+            print("[RISK STOP]")
+            print(
+                "LOSS LIMIT:",
+                self.daily_loss,
+                "%"
+            )
+            print("==============================")
+
+
+            return False
+
+
+
+        return True
+
+
+
+
+    # ==================================================
+    # ORDER PERMISSION
+    # ==================================================
+
+    def order_allowed(self):
+
+
+        if not self.trading_enabled:
+
+
+            print(
+                "[ORDER BLOCK] DAILY LOSS"
+            )
+
+
+            return False
+
+
+
+        now = time.time()
+
+
+
+        if now - self.last_order_time < self.order_cooldown:
+
+
+            remain = (
+
+                self.order_cooldown
+                -
+                (now - self.last_order_time)
+
+            )
+
+
+            print(
+                "[ORDER COOLDOWN]",
+                round(remain,1),
+                "sec"
+            )
+
+
+            return False
+
+
+
+        return True
+
+
+
+
+    # ==================================================
+    # POSITION SIZE CHECK
+    # ==================================================
+
+    def check_position_size(self, qty):
+
+
+        try:
+
+
+            qty = float(qty)
+
+
+
+            if qty > self.max_position_qty:
+
+
+                print(
+                    "[POSITION SIZE BLOCK]",
+                    qty
+                )
+
+
+                return False
+
+
+
+            return True
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[SIZE CHECK ERROR]",
+                e
+            )
+
+
+            return False
+
+
+
+
+    # ==================================================
+    # UPDATE ORDER TIME
+    # ==================================================
+
+    def update_order_time(self):
+
+
+        self.last_order_time = time.time()
+
+
+        print(
+            "[ORDER TIME UPDATED]"
         )
 
 
 
-    # ======================================
-    # SHORT
-    # ======================================
 
-    def sell(
+    # ==================================================
+    # POSITION RISK
+    # ==================================================
+
+    def calculate_position_size(
+
         self,
-        qty=None
+
+        balance,
+
+        risk_percent,
+
+        stop_loss_percent
+
     ):
 
-        return self.execute_order(
 
-            side="Sell",
+        try:
 
-            qty=qty
 
+            risk_amount = (
+
+                float(balance)
+
+                *
+
+                float(risk_percent)
+
+                /
+
+                100
+
+            )
+
+
+            size = (
+
+                risk_amount
+
+                /
+
+                (
+
+                    float(stop_loss_percent)
+
+                    /
+
+                    100
+
+                )
+
+            )
+
+
+            return round(
+                size,
+                6
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[POSITION CALC ERROR]",
+                e
+            )
+
+
+            return 0
+
+
+
+
+    # ==================================================
+    # RESET
+    # ==================================================
+
+    def reset_daily(self):
+
+
+        self.initial_equity = self.current_equity
+
+        self.daily_loss = 0.0
+
+        self.trading_enabled = True
+
+
+        print(
+            "[RISK DAILY RESET]"
         )
 
 
 
-    # ======================================
-    # CANCEL
-    # ======================================
 
-    def cancel_all(self):
+    # ==================================================
+    # STATUS
+    # ==================================================
 
-        return bybit_api.cancel_all_orders()
-
+    def get_status(self):
 
 
+        return {
 
-# ==========================================
+
+            "initial_equity":
+                self.initial_equity,
+
+
+            "current_equity":
+                self.current_equity,
+
+
+            "highest_equity":
+                self.highest_equity,
+
+
+            "daily_loss":
+                self.daily_loss,
+
+
+            "trading_enabled":
+                self.trading_enabled,
+
+
+            "last_order_time":
+                self.last_order_time
+
+
+        }
+
+
+
+# ==================================================
 # SINGLETON
-# ==========================================
+# ==================================================
 
-order_manager = OrderManager()
+risk_manager = RiskManager()
