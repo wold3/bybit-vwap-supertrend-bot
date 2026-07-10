@@ -5,8 +5,8 @@ from pybit.unified_trading import WebSocket
 
 from config import (
     BYBIT_TESTNET,
-    CATEGORY,
     DEFAULT_SYMBOL,
+    CATEGORY,
 )
 
 
@@ -23,9 +23,11 @@ class PublicWS:
 
         self.running = False
 
-        self.kline = []
+        self.kline = None
 
-        self.last_price = None
+        self.ticker = None
+
+        self.orderbook = None
 
 
         print("==============================")
@@ -37,47 +39,43 @@ class PublicWS:
 
 
     # ======================================
-    # KLINE CALLBACK
+    # CALLBACK
     # ======================================
 
-    def handle_kline(self, message):
+    def handle_message(self, message):
 
         try:
 
-            data = message.get("data")
+            topic = message.get("topic")
 
 
-            if not data:
-                return
+            # ------------------------------
+            # KLINE
+            # ------------------------------
 
+            if topic.startswith("kline"):
 
-            for candle in data:
-
-                close = float(
-                    candle["close"]
-                )
-
-
-                self.last_price = close
-
-
-                self.kline.append(
-                    candle
-                )
-
-
-                # 최근 200개 유지
-
-                if len(self.kline) > 200:
-
-                    self.kline.pop(0)
+                self.kline = message
 
 
 
-                print(
-                    "[KLINE]",
-                    close
-                )
+            # ------------------------------
+            # TICKER
+            # ------------------------------
+
+            elif topic.startswith("tickers"):
+
+                self.ticker = message
+
+
+
+            # ------------------------------
+            # ORDERBOOK
+            # ------------------------------
+
+            elif topic.startswith("orderbook"):
+
+                self.orderbook = message
 
 
 
@@ -102,7 +100,6 @@ class PublicWS:
             return
 
 
-
         self.running = True
 
 
@@ -117,21 +114,47 @@ class PublicWS:
 
 
 
+        # 1분봉
+
         self.ws.kline_stream(
 
             interval=1,
 
             symbol=DEFAULT_SYMBOL,
 
-            callback=self.handle_kline
+            callback=self.handle_message
 
         )
 
 
 
-        print(
-            "[PUBLIC WS STARTED]"
+        # Ticker
+
+        self.ws.ticker_stream(
+
+            symbol=DEFAULT_SYMBOL,
+
+            callback=self.handle_message
+
         )
+
+
+
+        # Orderbook
+
+        self.ws.orderbook_stream(
+
+            depth=50,
+
+            symbol=DEFAULT_SYMBOL,
+
+            callback=self.handle_message
+
+        )
+
+
+
+        print("[PUBLIC WS STARTED]")
 
 
 
@@ -171,47 +194,30 @@ class PublicWS:
         self.running = False
 
 
-        print(
-            "[PUBLIC WS STOPPED]"
-        )
+        print("[PUBLIC WS STOPPED]")
 
 
 
     # ======================================
-    # DATA GETTER
+    # GETTERS
     # ======================================
 
-    def get_prices(self):
+    def get_kline(self):
 
-
-        prices = []
-
-
-        for candle in self.kline:
-
-            try:
-
-                prices.append(
-
-                    float(
-                        candle["close"]
-                    )
-
-                )
-
-            except:
-
-                pass
+        return self.kline
 
 
 
-        return prices
+    def get_ticker(self):
+
+        return self.ticker
 
 
 
-    def get_last_price(self):
+    def get_orderbook(self):
 
-        return self.last_price
+        return self.orderbook
+
 
 
 
