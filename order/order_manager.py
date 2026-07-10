@@ -1,10 +1,14 @@
 # =====================================================
 # order/order_manager.py
+# Bybit V5 Unified Order Manager
 # =====================================================
+
 
 from config import (
     DEFAULT_QTY,
-    DEFAULT_SYMBOL
+    DEFAULT_SYMBOL,
+    STOP_LOSS_PERCENT,
+    TAKE_PROFIT_PERCENT,
 )
 
 
@@ -19,6 +23,8 @@ from risk.risk_manager import (
 
 
 
+
+
 class OrderManager:
 
 
@@ -28,6 +34,10 @@ class OrderManager:
         print(
             "[ORDER MANAGER READY]"
         )
+
+
+
+
 
 
 
@@ -44,54 +54,24 @@ class OrderManager:
         try:
 
 
-            if not signal:
+            if signal is None:
 
                 return False
 
 
 
-            action = (
 
-                signal.get("signal")
-
-                or
-
-                signal.get("type")
-
-                or
-
-                signal.get("action")
-
+            action = signal.get(
+                "signal"
             )
-
-
-
-            if not action:
-
-
-                print(
-
-                    "[EMPTY SIGNAL]",
-
-                    signal
-
-                )
-
-                return False
-
-
-
-            action = action.upper()
 
 
 
             print(
-
                 "[ORDER EXECUTE]",
-
                 action
-
             )
+
 
 
 
@@ -102,27 +82,18 @@ class OrderManager:
 
 
 
-            if action == "SELL":
+            elif action == "SELL":
 
 
                 return self.sell()
 
 
 
-            if action == "EXIT":
+            elif action == "EXIT":
 
 
                 return self.close_position()
 
-
-
-            print(
-
-                "[UNKNOWN ACTION]",
-
-                action
-
-            )
 
 
             return False
@@ -134,11 +105,8 @@ class OrderManager:
 
 
             print(
-
                 "[EXECUTE ERROR]",
-
                 e
-
             )
 
 
@@ -148,62 +116,35 @@ class OrderManager:
 
 
 
+
+
     # =====================================================
     # POSITION CHECK
     # =====================================================
 
-    def get_position(self):
+    def has_position(self):
 
 
         try:
 
 
-            return (
-
+            position = (
                 bybit_api
                 .get_position()
-
             )
-
-
-        except:
-
-
-            return None
-
-
-
-
-    def has_position(
-        self
-    ):
-
-
-        try:
-
-
-            data = self.get_position()
 
 
 
             rows = (
 
-                data
-
+                position
                 .get(
-
                     "result",
-
                     {}
-
                 )
-
                 .get(
-
                     "list",
-
                     []
-
                 )
 
             )
@@ -216,14 +157,9 @@ class OrderManager:
                 if float(
 
                     p.get(
-
                         "size",
-
                         0
-
                     )
-
-                    or 0
 
                 ) > 0:
 
@@ -232,14 +168,18 @@ class OrderManager:
 
 
 
-            return False
-
-
-
-        except:
 
 
             return False
+
+
+
+        except Exception:
+
+
+            return False
+
+
 
 
 
@@ -249,44 +189,49 @@ class OrderManager:
     # QTY
     # =====================================================
 
-    def calculate_qty(
-        self,
-        side
-    ):
+    def calculate_qty(self):
 
 
         try:
 
 
             price = (
-
                 bybit_api
                 .get_last_price()
-
             )
 
 
-            if not price:
-
+            if price is None:
 
                 return DEFAULT_QTY
 
 
 
 
-            stop_distance = price * 0.01
+
+            stop_distance = (
+
+                price
+
+                *
+
+                STOP_LOSS_PERCENT
+
+                /
+
+                100
+
+            )
 
 
 
-            stop = (
+            stop_price = (
 
-                price - stop_distance
+                price
 
-                if side == "Buy"
+                -
 
-                else
-
-                price + stop_distance
+                stop_distance
 
             )
 
@@ -299,7 +244,7 @@ class OrderManager:
 
                     price,
 
-                    stop
+                    stop_price
 
                 )
 
@@ -314,17 +259,17 @@ class OrderManager:
 
 
 
+
             if not risk_manager.check_position_size(qty):
 
 
                 print(
-
                     "[QTY BLOCK]"
-
                 )
 
 
                 return 0
+
 
 
 
@@ -338,15 +283,13 @@ class OrderManager:
 
 
 
+
         except Exception as e:
 
 
             print(
-
                 "[QTY ERROR]",
-
                 e
-
             )
 
 
@@ -356,8 +299,10 @@ class OrderManager:
 
 
 
+
+
     # =====================================================
-    # CREATE
+    # CREATE ORDER
     # =====================================================
 
     def create_order(
@@ -367,47 +312,156 @@ class OrderManager:
     ):
 
 
+
         try:
 
 
-            print(
 
-                "================"
-
+            price = (
+                bybit_api
+                .get_last_price()
             )
 
+
+
+            if price is None:
+
+                return False
+
+
+
+
+
+            if side == "Buy":
+
+
+                stop_loss = (
+
+                    price
+
+                    *
+
+                    (
+
+                        1
+
+                        -
+
+                        STOP_LOSS_PERCENT / 100
+
+                    )
+
+                )
+
+
+                take_profit = (
+
+                    price
+
+                    *
+
+                    (
+
+                        1
+
+                        +
+
+                        TAKE_PROFIT_PERCENT / 100
+
+                    )
+
+                )
+
+
+
+
+            else:
+
+
+                stop_loss = (
+
+                    price
+
+                    *
+
+                    (
+
+                        1
+
+                        +
+
+                        STOP_LOSS_PERCENT / 100
+
+                    )
+
+                )
+
+
+
+                take_profit = (
+
+                    price
+
+                    *
+
+                    (
+
+                        1
+
+                        -
+
+                        TAKE_PROFIT_PERCENT / 100
+
+                    )
+
+                )
+
+
+
+
+
+
+
             print(
-
-                "[ORDER REQUEST]"
-
-            )
-
-            print(
-
-                "SIDE:",
-
-                side
-
-            )
-
-            print(
-
-                "QTY:",
-
+                "[ORDER REQUEST]",
+                side,
                 qty
-
             )
+
 
 
 
             result = (
 
                 bybit_api
-                .create_order(
+                .session
+                .place_order(
 
-                    side,
+                    category="linear",
 
-                    qty
+                    symbol=DEFAULT_SYMBOL,
+
+                    side=side,
+
+                    orderType="Market",
+
+                    qty=str(qty),
+
+
+                    stopLoss=str(
+                        round(
+                            stop_loss,
+                            2
+                        )
+                    ),
+
+
+                    takeProfit=str(
+                        round(
+                            take_profit,
+                            2
+                        )
+                    )
 
                 )
 
@@ -415,43 +469,32 @@ class OrderManager:
 
 
 
-            if not result:
+            if result.get(
+                "retCode"
+            ) == 0:
+
 
 
                 print(
-
-                    "[ORDER FAILED]"
-
-                )
-
-                return False
-
-
-
-            if result.get("retCode") != 0:
-
-
-                print(
-
-                    "[BYBIT ORDER ERROR]",
-
+                    "[ORDER SUCCESS]",
                     result
-
                 )
 
+                return True
 
-                return False
+
 
 
 
             print(
-
-                "[ORDER SUCCESS]"
-
+                "[ORDER FAILED]",
+                result
             )
 
 
-            return True
+
+            return False
+
 
 
 
@@ -459,15 +502,14 @@ class OrderManager:
 
 
             print(
-
-                "[CREATE ORDER ERROR]",
-
+                "[ORDER ERROR]",
                 e
-
             )
 
 
             return False
+
+
 
 
 
@@ -484,26 +526,25 @@ class OrderManager:
 
 
             print(
-
                 "[BUY SKIP POSITION EXISTS]"
-
             )
+
 
             return False
 
 
 
-        qty = self.calculate_qty(
 
-            "Buy"
 
-        )
+        qty = self.calculate_qty()
+
 
 
         if qty <= 0:
 
-
             return False
+
+
 
 
 
@@ -514,6 +555,9 @@ class OrderManager:
             qty
 
         )
+
+
+
 
 
 
@@ -530,27 +574,25 @@ class OrderManager:
 
 
             print(
-
                 "[SELL SKIP POSITION EXISTS]"
-
             )
+
 
             return False
 
 
 
-        qty = self.calculate_qty(
 
-            "Sell"
 
-        )
+        qty = self.calculate_qty()
 
 
 
         if qty <= 0:
 
-
             return False
+
+
 
 
 
@@ -566,8 +608,11 @@ class OrderManager:
 
 
 
+
+
+
     # =====================================================
-    # CLOSE
+    # CLOSE POSITION
     # =====================================================
 
     def close_position(self):
@@ -577,13 +622,12 @@ class OrderManager:
 
 
             print(
-
                 "[CLOSE POSITION]"
-
             )
 
 
-            result = (
+
+            return (
 
                 bybit_api
                 .close_position()
@@ -591,33 +635,19 @@ class OrderManager:
             )
 
 
-            if result:
-
-
-                print(
-
-                    "[CLOSE SUCCESS]"
-
-                )
-
-
-            return result
-
-
 
         except Exception as e:
 
 
             print(
-
                 "[CLOSE ERROR]",
-
                 e
-
             )
 
 
             return False
+
+
 
 
 
@@ -648,5 +678,12 @@ class OrderManager:
 
 
 
+
+
+
+
+# =====================================================
+# SINGLETON
+# =====================================================
 
 order_manager = OrderManager()
