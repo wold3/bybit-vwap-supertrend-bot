@@ -9,8 +9,6 @@ from config import (
 
     BYBIT_TESTNET,
 
-    BYBIT_DEMO,
-
     CATEGORY,
 
     DEFAULT_SYMBOL,
@@ -19,8 +17,10 @@ from config import (
 
 
 
+
+
 # ==========================================
-# PUBLIC WS MANAGER
+# PUBLIC MARKET WS
 # ==========================================
 
 class PublicWS:
@@ -31,11 +31,9 @@ class PublicWS:
 
         self.ws = None
 
+        self.thread = None
 
         self.running = False
-
-
-        self.thread = None
 
 
 
@@ -79,10 +77,7 @@ class PublicWS:
 
             if not data:
 
-
                 return
-
-
 
 
 
@@ -91,37 +86,23 @@ class PublicWS:
 
 
             close = float(
-
                 candle["close"]
-
             )
-
 
             high = float(
-
                 candle["high"]
-
             )
-
 
             low = float(
-
                 candle["low"]
-
             )
-
 
             open_price = float(
-
                 candle["open"]
-
             )
 
-
             volume = float(
-
                 candle["volume"]
-
             )
 
 
@@ -129,50 +110,40 @@ class PublicWS:
 
 
             self.opens.append(
-
                 open_price
-
             )
 
 
             self.highs.append(
-
                 high
-
             )
 
 
             self.lows.append(
-
                 low
-
             )
 
 
             self.closes.append(
-
                 close
-
             )
 
 
             self.volumes.append(
-
                 volume
-
             )
 
 
 
 
 
-            # 최대 보관
+            # 최근 200개 유지
 
-            limit = 200
+            max_length = 200
 
 
 
-            if len(self.closes) > limit:
+            if len(self.closes) > max_length:
 
 
                 self.opens.pop(0)
@@ -190,11 +161,8 @@ class PublicWS:
 
 
             print(
-
                 "[KLINE]",
-
                 close
-
             )
 
 
@@ -220,16 +188,25 @@ class PublicWS:
     def connect(self):
 
 
+        print(
+            "[PUBLIC WS CONNECT]"
+        )
+
+
+
+        # 중요:
+        # Demo Public WS 사용 금지
+        # Market Data는 일반 V5 Public 사용
+
+
         self.ws = WebSocket(
 
 
             testnet=BYBIT_TESTNET,
 
 
-            demo=BYBIT_DEMO,
-
-
             channel_type="linear"
+
 
         )
 
@@ -271,7 +248,7 @@ class PublicWS:
 
 
     # ======================================
-    # START LOOP
+    # RUN
     # ======================================
 
     def start(self):
@@ -313,7 +290,7 @@ class PublicWS:
 
     # ======================================
     # THREAD
-    # ======================================
+    ======================================
 
     def run_thread(self):
 
@@ -326,6 +303,7 @@ class PublicWS:
 
             daemon=True
 
+
         )
 
 
@@ -337,12 +315,31 @@ class PublicWS:
 
     # ======================================
     # STOP
-    # ======================================
+    ======================================
 
     def stop(self):
 
 
         self.running = False
+
+
+
+        try:
+
+
+            if self.ws:
+
+
+                self.ws.exit()
+
+
+
+        except Exception:
+
+
+            pass
+
+
 
 
 
@@ -355,8 +352,8 @@ class PublicWS:
 
 
     # ======================================
-    # OHLCV
-    # ======================================
+    # OHLCV DATA
+    ======================================
 
     def get_ohlcv(self):
 
