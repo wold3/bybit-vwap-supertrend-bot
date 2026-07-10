@@ -1,41 +1,34 @@
-import time
+from indicators.indicator_engine import indicator_engine
 
+from position.position_manager import position_manager
 
-from indicators.indicator_engine import (
-    indicator_engine
-)
-
-
-from config import (
-    DEFAULT_SYMBOL,
-)
 
 
 
 class StrategyEngine:
 
 
+
     def __init__(self):
 
 
-        self.symbol = DEFAULT_SYMBOL
-
+        self.last_signal = None
 
         self.last_timestamp = None
 
-        self.last_signal = None
+
+        print(
+            "[STRATEGY ENGINE READY]"
+        )
 
 
-        print("==============================")
-        print("[STRATEGY ENGINE READY]")
-        print("SYMBOL :", self.symbol)
-        print("==============================")
+
 
 
 
 
     # =====================================================
-    # CANDLE PROCESS
+    # CANDLE EVENT
     # =====================================================
 
     def on_candle(
@@ -47,33 +40,44 @@ class StrategyEngine:
         try:
 
 
-            # -----------------------------
-            # CONFIRM CHECK
-            # -----------------------------
+
+            # -------------------------
+            # 완성 캔들만
+            # -------------------------
 
             if not candle.get(
                 "confirm",
                 False
             ):
 
+
                 return None
+
+
 
 
 
 
             timestamp = int(
+
                 candle["timestamp"]
+
             )
 
 
 
-            # -----------------------------
-            # DUPLICATE CANDLE
-            # -----------------------------
+
+
+            # -------------------------
+            # 중복 캔들 방지
+            # -------------------------
 
             if timestamp == self.last_timestamp:
 
+
                 return None
+
+
 
 
 
@@ -83,9 +87,10 @@ class StrategyEngine:
 
 
 
-            # -----------------------------
-            # UPDATE INDICATOR
-            # -----------------------------
+
+            # -------------------------
+            # Indicator Update
+            # -------------------------
 
             indicator_engine.update(
                 candle
@@ -93,22 +98,18 @@ class StrategyEngine:
 
 
 
-            market = (
 
-                indicator_engine
-                .get_market_data(
-                    candle
-                )
 
+            market = indicator_engine.get_market_data(
+                candle
             )
+
+
 
 
 
             if market is None:
 
-                print(
-                    "[STRATEGY WAIT] INDICATOR"
-                )
 
                 return None
 
@@ -116,9 +117,13 @@ class StrategyEngine:
 
 
 
+
             close = float(
+
                 candle["close"]
+
             )
+
 
 
             vwap = market.get(
@@ -132,34 +137,72 @@ class StrategyEngine:
 
 
 
-            if vwap is None:
+
+
+            if vwap is None or trend is None:
+
 
                 return None
 
-
-            if trend is None:
-
-                return None
 
 
 
 
 
             print(
-                "[MARKET]",
-                "PRICE:",
+
+                "[INDICATOR]",
+
+                "PRICE=",
                 close,
-                "VWAP:",
+
+                "VWAP=",
                 round(vwap,2),
-                "TREND:",
+
+                "TREND=",
                 trend
+
             )
 
 
 
 
 
-            signal = None
+
+            # =================================================
+            # POSITION CHECK
+            # =================================================
+
+
+            try:
+
+
+                position_manager.sync()
+
+
+
+                if position_manager.has_position():
+
+
+                    print(
+                        "[STRATEGY BLOCK] POSITION EXISTS"
+                    )
+
+
+                    return None
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[POSITION CHECK ERROR]",
+                    e
+                )
+
+
+
 
 
 
@@ -170,9 +213,18 @@ class StrategyEngine:
             # =================================================
 
 
+            signal = None
+
+
+
+
+
+
             # LONG
 
+
             if (
+
 
                 close > vwap
 
@@ -180,16 +232,22 @@ class StrategyEngine:
 
                 trend == "UP"
 
+
             ):
+
 
                 signal = "BUY"
 
 
 
 
+
+
             # SHORT
 
+
             elif (
+
 
                 close < vwap
 
@@ -197,7 +255,9 @@ class StrategyEngine:
 
                 trend == "DOWN"
 
+
             ):
+
 
                 signal = "SELL"
 
@@ -206,7 +266,11 @@ class StrategyEngine:
 
 
 
+
+
+
             if signal is None:
+
 
                 return None
 
@@ -214,21 +278,18 @@ class StrategyEngine:
 
 
 
-            # =================================================
-            # DUPLICATE SIGNAL BLOCK
-            # =================================================
 
+
+            # -------------------------
+            # 같은 신호 반복 방지
+            # -------------------------
 
             if signal == self.last_signal:
 
 
-                print(
-                    "[SIGNAL BLOCK] SAME SIGNAL",
-                    signal
-                )
-
-
                 return None
+
+
 
 
 
@@ -238,18 +299,17 @@ class StrategyEngine:
 
 
 
-            print(
-                "=============================="
-            )
+
 
             print(
+
                 "[TRADE SIGNAL]",
+
                 signal
+
             )
 
-            print(
-                "=============================="
-            )
+
 
 
 
@@ -260,12 +320,16 @@ class StrategyEngine:
 
 
 
+
         except Exception as e:
 
 
             print(
+
                 "[STRATEGY ERROR]",
+
                 e
+
             )
 
 
@@ -273,24 +337,6 @@ class StrategyEngine:
 
 
 
-
-
-
-    # =====================================================
-    # RESET
-    # =====================================================
-
-    def reset(self):
-
-
-        self.last_timestamp = None
-
-        self.last_signal = None
-
-
-        print(
-            "[STRATEGY RESET]"
-        )
 
 
 
