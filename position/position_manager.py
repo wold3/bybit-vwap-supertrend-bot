@@ -3,12 +3,11 @@ import time
 
 from config import (
     DEFAULT_SYMBOL,
-    CATEGORY,
 )
 
 
 from api.bybit_client import (
-    bybit_client
+    bybit_client,
 )
 
 
@@ -25,9 +24,6 @@ class PositionManager:
         self.symbol = DEFAULT_SYMBOL
 
 
-        self.category = CATEGORY
-
-
 
         self.current = {
 
@@ -35,17 +31,16 @@ class PositionManager:
             "side": None,
 
 
-            "size": 0.0,
+            "size": 0,
 
 
-            "avg_price": 0.0,
+            "avg_price": 0,
 
 
-            "unrealised_pnl": 0.0,
+            "unrealised_pnl": 0,
 
 
             "position_idx": 0,
-
 
         }
 
@@ -54,8 +49,9 @@ class PositionManager:
         print("==============================")
         print("[POSITION MANAGER READY]")
         print("SYMBOL :", self.symbol)
-        print("CATEGORY :", self.category)
         print("==============================")
+
+
 
 
 
@@ -73,13 +69,13 @@ class PositionManager:
         try:
 
 
+
             params = {
 
 
                 "category":
 
-                    self.category,
-
+                    "linear",
 
 
                 "symbol":
@@ -92,6 +88,7 @@ class PositionManager:
 
 
 
+
             response = bybit_client.get(
 
                 "/v5/position/list",
@@ -99,6 +96,7 @@ class PositionManager:
                 params
 
             )
+
 
 
 
@@ -119,10 +117,12 @@ class PositionManager:
             ) != 0:
 
 
-
                 print(
+
                     "[POSITION API ERROR]",
+
                     response
+
                 )
 
 
@@ -133,21 +133,17 @@ class PositionManager:
 
 
 
+
             positions = (
 
                 response
 
-                .get(
-                    "result",
-                    {}
-                )
+                .get("result", {})
 
-                .get(
-                    "list",
-                    []
-                )
+                .get("list", [])
 
             )
+
 
 
 
@@ -167,7 +163,13 @@ class PositionManager:
 
 
 
+
+            # One-way mode 기준
+
             pos = positions[0]
+
+
+
 
 
 
@@ -176,8 +178,11 @@ class PositionManager:
             size = float(
 
                 pos.get(
+
                     "size",
+
                     0
+
                 )
 
             )
@@ -186,7 +191,7 @@ class PositionManager:
 
 
 
-            # 빈 포지션
+
 
             if size <= 0:
 
@@ -195,6 +200,7 @@ class PositionManager:
 
 
                 return self.current
+
 
 
 
@@ -212,11 +218,9 @@ class PositionManager:
 
 
 
-
                 "size":
 
                     size,
-
 
 
 
@@ -236,7 +240,6 @@ class PositionManager:
 
 
 
-
                 "unrealised_pnl":
 
                     float(
@@ -250,7 +253,6 @@ class PositionManager:
                         )
 
                     ),
-
 
 
 
@@ -275,6 +277,8 @@ class PositionManager:
 
 
 
+
+
             print(
 
                 "[POSITION UPDATE]",
@@ -285,15 +289,16 @@ class PositionManager:
 
 
 
-
             return self.current
 
 
 
 
 
-        except Exception as e:
 
+
+
+        except Exception as e:
 
 
             print(
@@ -305,8 +310,11 @@ class PositionManager:
             )
 
 
-
             return self.current
+
+
+
+
 
 
 
@@ -327,18 +335,23 @@ class PositionManager:
             "side": None,
 
 
-            "size": 0.0,
+            "size": 0,
 
 
-            "avg_price": 0.0,
+            "avg_price": 0,
 
 
-            "unrealised_pnl": 0.0,
+            "unrealised_pnl": 0,
 
 
             "position_idx": 0,
 
+
         }
+
+
+
+
 
 
 
@@ -369,20 +382,13 @@ class PositionManager:
 
 
 
-    def get_position(self):
-
-
-        return self.current
-
-
-
-
 
 
     def get_side(self):
 
 
         return self.current["side"]
+
 
 
 
@@ -399,6 +405,7 @@ class PositionManager:
 
 
 
+
     def get_avg_price(self):
 
 
@@ -409,10 +416,14 @@ class PositionManager:
 
 
 
+
     def get_pnl(self):
 
 
         return self.current["unrealised_pnl"]
+
+
+
 
 
 
@@ -436,10 +447,27 @@ class PositionManager:
         while True:
 
 
-            self.sync()
+            try:
+
+
+                self.sync()
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[POSITION MONITOR ERROR]",
+                    e
+                )
+
 
 
             time.sleep(5)
+
+
+
 
 
 
