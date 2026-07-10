@@ -2,10 +2,10 @@ import time
 
 from config import (
     ORDER_COOLDOWN,
-    DEFAULT_QTY,
+    MAX_POSITION_SIZE,
+    MAX_DAILY_LOSS_PERCENT,
 )
 
-from api.bybit_api import bybit_api
 
 
 # ==========================================
@@ -19,16 +19,16 @@ class RiskManager:
 
         self.start_equity = 0
 
+        self.current_equity = 0
+
         self.last_order_time = 0
 
-        self.max_daily_loss = 5.0   # %
-
-        self.current_equity = 0
+        self.daily_loss = 0
 
 
         print("==============================")
         print("[RISK MANAGER INIT]")
-        print("MAX DAILY LOSS :", self.max_daily_loss, "%")
+        print("MAX DAILY LOSS :", MAX_DAILY_LOSS_PERCENT, "%")
         print("ORDER COOLDOWN :", ORDER_COOLDOWN)
         print("==============================")
 
@@ -38,20 +38,20 @@ class RiskManager:
     # INITIALIZE
     # ======================================
 
-    def initialize(self):
+    def initialize(self, equity=None):
+
 
         try:
 
-            wallet = bybit_api.get_wallet_balance()
+            if equity is None:
+
+                equity = 0
 
 
-            if wallet:
 
-                self.start_equity = self.get_equity(
-                    wallet
-                )
+            self.start_equity = float(equity)
 
-                self.current_equity = self.start_equity
+            self.current_equity = float(equity)
 
 
             print("==============================")
@@ -66,106 +66,20 @@ class RiskManager:
 
         except Exception as e:
 
+
             print(
                 "[RISK INIT ERROR]",
                 e
             )
 
-            return False
-
-
-
-
-    # ======================================
-    # GET EQUITY
-    # ======================================
-
-    def get_equity(
-        self,
-        wallet=None
-    ):
-
-
-        try:
-
-
-            if wallet is None:
-
-                wallet = bybit_api.get_wallet_balance()
-
-
-
-            value = wallet["result"]["list"][0]["totalEquity"]
-
-
-            return float(value)
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[EQUITY ERROR]",
-                e
-            )
-
-            return 0
-
-
-
-
-    # ======================================
-    # DAILY LOSS CHECK
-    # ======================================
-
-    def check_daily_loss(self):
-
-
-        self.current_equity = self.get_equity()
-
-
-        if self.start_equity <= 0:
-
-            return True
-
-
-
-        loss = (
-
-            self.start_equity
-            -
-            self.current_equity
-
-        ) / self.start_equity * 100
-
-
-
-        print(
-            "[DAILY LOSS]",
-            round(loss,4),
-            "%"
-        )
-
-
-
-        if loss >= self.max_daily_loss:
-
-            print(
-                "[RISK STOP] DAILY LOSS LIMIT"
-            )
 
             return False
 
 
 
-        return True
-
-
-
 
     # ======================================
-    # ORDER COOLDOWN
+    # ORDER COOLDOWN CHECK
     # ======================================
 
     def order_allowed(self):
@@ -179,6 +93,7 @@ class RiskManager:
 
 
         if elapsed < ORDER_COOLDOWN:
+
 
             return False
 
@@ -195,6 +110,7 @@ class RiskManager:
 
     def update_order_time(self):
 
+
         self.last_order_time = time.time()
 
 
@@ -204,10 +120,7 @@ class RiskManager:
     # POSITION SIZE CHECK
     # ======================================
 
-    def check_position_size(
-        self,
-        qty
-    ):
+    def check_position_size(self, qty):
 
 
         try:
@@ -217,21 +130,13 @@ class RiskManager:
 
 
 
-            if qty <= 0:
+            if qty > MAX_POSITION_SIZE:
+
 
                 print(
-                    "[RISK BLOCK] INVALID QTY"
+                    "[RISK BLOCK] POSITION SIZE LIMIT"
                 )
 
-                return False
-
-
-
-            if qty > DEFAULT_QTY * 10:
-
-                print(
-                    "[RISK BLOCK] TOO LARGE"
-                )
 
                 return False
 
@@ -241,7 +146,13 @@ class RiskManager:
 
 
 
-        except:
+        except Exception as e:
+
+
+            print(
+                "[POSITION SIZE ERROR]",
+                e
+            )
 
 
             return False
@@ -250,19 +161,103 @@ class RiskManager:
 
 
     # ======================================
-    # GLOBAL RISK CHECK
+    # DAILY LOSS CHECK
     # ======================================
 
-    def allowed(self):
+    def check_daily_loss(self, equity):
 
 
-        if not self.check_daily_loss():
+        try:
+
+
+            self.current_equity = float(equity)
+
+
+
+            if self.start_equity <= 0:
+
+                return True
+
+
+
+            loss_percent = (
+
+                (
+                    self.start_equity
+                    -
+                    self.current_equity
+                )
+
+                /
+
+                self.start_equity
+
+                *
+
+                100
+
+            )
+
+
+
+            self.daily_loss = loss_percent
+
+
+
+            if loss_percent >= MAX_DAILY_LOSS_PERCENT:
+
+
+                print(
+                    "[RISK BLOCK] DAILY LOSS LIMIT",
+                    loss_percent,
+                    "%"
+                )
+
+
+                return False
+
+
+
+            return True
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[LOSS CHECK ERROR]",
+                e
+            )
+
 
             return False
 
 
 
-        return True
+
+    # ======================================
+    # STATUS
+    # ======================================
+
+    def status(self):
+
+
+        return {
+
+            "start_equity":
+                self.start_equity,
+
+            "current_equity":
+                self.current_equity,
+
+            "daily_loss":
+                self.daily_loss,
+
+            "last_order":
+                self.last_order_time
+
+        }
 
 
 
