@@ -1,4 +1,3 @@
-```python
 import os
 from dotenv import load_dotenv
 
@@ -120,4 +119,4 @@ print("REST :", BYBIT_BASE_URL)
 print("PUBLIC WS :", PUBLIC_WS)
 print("PRIVATE WS :", PRIVATE_WS)
 print("==============================")
-```
+
