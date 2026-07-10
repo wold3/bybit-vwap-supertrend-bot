@@ -11,7 +11,7 @@ from config import (
 
 
 # ==========================================
-# BYBIT PUBLIC WEBSOCKET V5
+# PUBLIC WEBSOCKET V5
 # ==========================================
 
 class PublicWS:
@@ -23,10 +23,9 @@ class PublicWS:
 
         self.running = False
 
-        self.last_price = None
+        self.price = None
 
         self.kline = []
-
 
         print("==============================")
         print("[PUBLIC WS INIT]")
@@ -37,10 +36,10 @@ class PublicWS:
 
 
     # ======================================
-    # PRICE CALLBACK
+    # TICKER CALLBACK
     # ======================================
 
-    def handle_ticker(self, message):
+    def ticker_callback(self, message):
 
         try:
 
@@ -51,19 +50,24 @@ class PublicWS:
                 return
 
 
-            price = data.get("lastPrice")
+            if isinstance(data, list):
+
+                data = data[0]
 
 
-            if price:
+            last_price = data.get("lastPrice")
 
-                self.last_price = float(price)
+
+            if last_price:
+
+                self.price = float(last_price)
 
 
 
         except Exception as e:
 
             print(
-                "[PUBLIC TICKER ERROR]",
+                "[PUBLIC WS TICKER ERROR]",
                 e
             )
 
@@ -73,7 +77,7 @@ class PublicWS:
     # KLINE CALLBACK
     # ======================================
 
-    def handle_kline(self, message):
+    def kline_callback(self, message):
 
         try:
 
@@ -87,39 +91,29 @@ class PublicWS:
             for candle in data:
 
 
-                item = {
-
-                    "start": candle.get("start"),
-
-                    "open": float(candle.get("open")),
-
-                    "high": float(candle.get("high")),
-
-                    "low": float(candle.get("low")),
-
-                    "close": float(candle.get("close")),
-
-                    "volume": float(candle.get("volume"))
-
-                }
+                close = candle.get("close")
 
 
-                self.kline.append(item)
+                if close:
 
 
+                    self.kline.append(
+                        float(close)
+                    )
 
-            # 최근 200개 유지
 
-            if len(self.kline) > 200:
+                    # 최근 200개 유지
 
-                self.kline = self.kline[-200:]
+                    if len(self.kline) > 200:
+
+                        self.kline.pop(0)
 
 
 
         except Exception as e:
 
             print(
-                "[PUBLIC KLINE ERROR]",
+                "[PUBLIC WS KLINE ERROR]",
                 e
             )
 
@@ -137,53 +131,66 @@ class PublicWS:
             return
 
 
-        self.running = True
+        try:
+
+
+            self.running = True
 
 
 
-        self.ws = WebSocket(
+            self.ws = WebSocket(
 
-            testnet=BYBIT_TESTNET,
+                testnet=BYBIT_TESTNET,
 
-            channel_type="linear"
+                channel_type="linear"
 
-        )
-
-
-
-        # 실시간 가격
-
-        self.ws.ticker_stream(
-
-            symbol=DEFAULT_SYMBOL,
-
-            callback=self.handle_ticker
-
-        )
+            )
 
 
 
-        # 1분봉
+            # ticker
 
-        self.ws.kline_stream(
+            self.ws.ticker_stream(
 
-            interval=1,
+                symbol=DEFAULT_SYMBOL,
 
-            symbol=DEFAULT_SYMBOL,
+                callback=self.ticker_callback
 
-            callback=self.handle_kline
-
-        )
+            )
 
 
 
-        print("[PUBLIC WS STARTED]")
+            # candle 1분봉
+
+            self.ws.kline_stream(
+
+                interval=1,
+
+                symbol=DEFAULT_SYMBOL,
+
+                callback=self.kline_callback
+
+            )
 
 
 
-        while self.running:
+            print("[PUBLIC WS STARTED]")
 
-            time.sleep(1)
+
+
+            while self.running:
+
+                time.sleep(1)
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[PUBLIC WS START ERROR]",
+                e
+            )
 
 
 
@@ -217,25 +224,29 @@ class PublicWS:
         self.running = False
 
 
-        print("[PUBLIC WS STOPPED]")
+        print(
+            "[PUBLIC WS STOPPED]"
+        )
 
 
 
     # ======================================
-    # GETTERS
+    # GET PRICE
     # ======================================
 
     def get_price(self):
 
-        return self.last_price
+        return self.price
 
 
 
-    def get_candles(self):
+    # ======================================
+    # GET CANDLES
+    # ======================================
 
-        return self.kline
+    def get_prices(self):
 
-
+        return self.kline.copy()
 
 
 
