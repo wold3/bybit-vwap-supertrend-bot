@@ -22,25 +22,27 @@ BYBIT_API_SECRET = os.getenv(
 BYBIT_TESTNET = (
     os.getenv(
         "BYBIT_TESTNET",
-        "False"
-    ).lower() == "true"
+        "false"
+    ).lower()
+    == "true"
 )
 
 
 BYBIT_DEMO = (
     os.getenv(
         "BYBIT_DEMO",
-        "True"
-    ).lower() == "true"
+        "true"
+    ).lower()
+    == "true"
 )
 
 
 
-# =====================================================
-# MARKET
-# =====================================================
+CATEGORY = os.getenv(
+    "CATEGORY",
+    "linear"
+)
 
-CATEGORY = "linear"
 
 DEFAULT_SYMBOL = os.getenv(
     "SYMBOL",
@@ -58,24 +60,21 @@ ACCOUNT_TYPE = "UNIFIED"
 
 
 # =====================================================
-# TRADING MODE
+# TRADING
 # =====================================================
 
 LIVE = (
     os.getenv(
         "LIVE",
-        "False"
-    ).lower() == "true"
+        "false"
+    ).lower()
+    == "true"
 )
 
 
-DEMO = not LIVE
+DEMO = BYBIT_DEMO
 
 
-
-# =====================================================
-# LEVERAGE
-# =====================================================
 
 LEVERAGE = int(
     os.getenv(
@@ -86,9 +85,17 @@ LEVERAGE = int(
 
 
 
+DEFAULT_QTY = float(
+    os.getenv(
+        "DEFAULT_QTY",
+        "0.001"
+    )
+)
+
+
+
 # =====================================================
-# STRATEGY
-# VWAP + SUPERTREND
+# VWAP
 # =====================================================
 
 VWAP_LENGTH = int(
@@ -98,6 +105,28 @@ VWAP_LENGTH = int(
     )
 )
 
+
+USE_VOLUME_FILTER = (
+    os.getenv(
+        "USE_VOLUME_FILTER",
+        "true"
+    ).lower()
+    == "true"
+)
+
+
+MIN_VOLUME_MULTIPLIER = float(
+    os.getenv(
+        "MIN_VOLUME_MULTIPLIER",
+        "1.2"
+    )
+)
+
+
+
+# =====================================================
+# SUPERTREND
+# =====================================================
 
 SUPERTREND_PERIOD = int(
     os.getenv(
@@ -115,23 +144,9 @@ SUPERTREND_MULTIPLIER = float(
 )
 
 
+ST_LENGTH = SUPERTREND_PERIOD
 
-# Volume Filter
-
-USE_VOLUME_FILTER = (
-    os.getenv(
-        "USE_VOLUME_FILTER",
-        "True"
-    ).lower() == "true"
-)
-
-
-MIN_VOLUME_MULTIPLIER = float(
-    os.getenv(
-        "MIN_VOLUME_MULTIPLIER",
-        "1.2"
-    )
-)
+ST_MULTIPLIER = SUPERTREND_MULTIPLIER
 
 
 
@@ -163,14 +178,6 @@ MAX_LOSS_STREAK = int(
 )
 
 
-MAX_POSITION_SIZE = float(
-    os.getenv(
-        "MAX_POSITION_SIZE",
-        "0.01"
-    )
-)
-
-
 
 # =====================================================
 # WATCHDOG
@@ -194,24 +201,15 @@ MAX_API_ERROR = int(
 
 
 # =====================================================
-# DATABASE
-# =====================================================
-
-DATABASE_ENABLED = True
-
-DATABASE_FILE = "trading.db"
-
-
-
-# =====================================================
 # TELEGRAM
 # =====================================================
 
 TELEGRAM_ENABLED = (
     os.getenv(
         "TELEGRAM_ENABLED",
-        "False"
-    ).lower() == "true"
+        "false"
+    ).lower()
+    == "true"
 )
 
 
@@ -229,35 +227,32 @@ TELEGRAM_CHAT_ID = os.getenv(
 
 
 # =====================================================
-# BOT LOOP
+# DATABASE
 # =====================================================
 
-KLINE_INTERVAL = os.getenv(
-    "KLINE_INTERVAL",
-    "1"
+DATABASE_ENABLED = True
+
+
+DATABASE_PATH = os.getenv(
+    "DATABASE_PATH",
+    "trading.db"
 )
 
 
-LOOP_INTERVAL = int(
+
+# =====================================================
+# DEBUG
+# =====================================================
+
+DEBUG = (
     os.getenv(
-        "LOOP_INTERVAL",
-        "5"
-    )
+        "DEBUG",
+        "false"
+    ).lower()
+    == "true"
 )
 
 
-
-# =====================================================
-# LOG
-# =====================================================
-
-LOG_LEVEL = "INFO"
-
-
-
-# =====================================================
-# PRINT CHECK
-# =====================================================
 
 print("==============================")
 print("[CONFIG LOADED]")
