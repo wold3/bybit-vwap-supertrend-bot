@@ -274,6 +274,54 @@ ST_MULTIPLIER = SUPERTREND_MULTIPLIER
 
 
 # ==================================
+# STRATEGY FILTER
+# ==================================
+
+USE_VOLUME_FILTER = (
+    os.getenv(
+        "USE_VOLUME_FILTER",
+        "true"
+    ).lower()
+    == "true"
+)
+
+
+USE_VWAP_FILTER = (
+    os.getenv(
+        "USE_VWAP_FILTER",
+        "true"
+    ).lower()
+    == "true"
+)
+
+
+USE_TREND_FILTER = (
+    os.getenv(
+        "USE_TREND_FILTER",
+        "true"
+    ).lower()
+    == "true"
+)
+
+
+MIN_TREND_STRENGTH = float(
+    os.getenv(
+        "MIN_TREND_STRENGTH",
+        "0.001"
+    )
+)
+
+
+MIN_VOLUME = float(
+    os.getenv(
+        "MIN_VOLUME",
+        "0"
+    )
+)
+
+
+
+# ==================================
 # LOG
 # ==================================
 
@@ -285,7 +333,7 @@ LOG_LEVEL = os.getenv(
 
 
 # ==================================
-# STARTUP CHECK
+# DEBUG
 # ==================================
 
 print("==============================")
