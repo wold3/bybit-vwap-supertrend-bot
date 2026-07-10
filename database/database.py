@@ -1,13 +1,12 @@
 # =====================================================
 # database/database.py
-# SQLite Trading Database
+# SQLite Database Manager
 # =====================================================
 
 import sqlite3
 import threading
-import time
-import json
 import os
+import time
 
 
 
@@ -31,36 +30,13 @@ class Database:
         self.lock = threading.Lock()
 
 
-        self.path = DATABASE_PATH
-
-
-
-        self.initialize()
-
-
-
-        print(
-            "[DATABASE READY]"
-        )
-
-
-
-
-
-
-
-    # =====================================================
-    # CONNECT
-    # =====================================================
-
-    def connect(self):
-
 
         folder = os.path.dirname(
 
-            self.path
+            DATABASE_PATH
 
         )
+
 
 
         if folder:
@@ -76,9 +52,32 @@ class Database:
 
 
 
+        self.create_tables()
+
+
+
+        print(
+
+            "[DATABASE READY]"
+
+        )
+
+
+
+
+
+
+
+    # =====================================================
+    # CONNECTION
+    # =====================================================
+
+    def connect(self):
+
+
         return sqlite3.connect(
 
-            self.path,
+            DATABASE_PATH,
 
             check_same_thread=False
 
@@ -91,10 +90,10 @@ class Database:
 
 
     # =====================================================
-    # INIT TABLE
+    # TABLE CREATE
     # =====================================================
 
-    def initialize(self):
+    def create_tables(self):
 
 
         with self.lock:
@@ -110,12 +109,14 @@ class Database:
             cur.execute(
 
                 """
+
                 CREATE TABLE IF NOT EXISTS events
                 (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    time REAL,
-                    event TEXT
+                    event TEXT,
+                    created REAL
                 )
+
                 """
 
             )
@@ -125,27 +126,15 @@ class Database:
             cur.execute(
 
                 """
-                CREATE TABLE IF NOT EXISTS errors
-                (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    time REAL,
-                    error TEXT
-                )
-                """
 
-            )
-
-
-
-            cur.execute(
-
-                """
                 CREATE TABLE IF NOT EXISTS signals
                 (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    time REAL,
-                    data TEXT
+                    signal TEXT,
+                    price REAL,
+                    created REAL
                 )
+
                 """
 
             )
@@ -155,14 +144,33 @@ class Database:
             cur.execute(
 
                 """
+
                 CREATE TABLE IF NOT EXISTS orders
                 (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    time REAL,
                     side TEXT,
                     qty REAL,
-                    result TEXT
+                    result TEXT,
+                    created REAL
                 )
+
+                """
+
+            )
+
+
+
+            cur.execute(
+
+                """
+
+                CREATE TABLE IF NOT EXISTS errors
+                (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    error TEXT,
+                    created REAL
+                )
+
                 """
 
             )
@@ -199,27 +207,35 @@ class Database:
                 conn = self.connect()
 
 
-                conn.execute(
+                cur = conn.cursor()
+
+
+
+                cur.execute(
 
                     """
+
                     INSERT INTO events
-                    VALUES
                     (
-                    NULL,
-                    ?,
-                    ?
+                        event,
+                        created
                     )
+
+                    VALUES
+                    (?,?)
+
                     """,
 
                     (
 
-                        time.time(),
+                        text,
 
-                        text
+                        time.time()
 
                     )
 
                 )
+
 
 
                 conn.commit()
@@ -235,74 +251,6 @@ class Database:
             print(
 
                 "[DB EVENT ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-
-    # =====================================================
-    # ERROR
-    # =====================================================
-
-    def save_error(
-        self,
-        error
-    ):
-
-
-        try:
-
-
-            with self.lock:
-
-
-                conn = self.connect()
-
-
-
-                conn.execute(
-
-                    """
-                    INSERT INTO errors
-                    VALUES
-                    (
-                    NULL,
-                    ?,
-                    ?
-                    )
-                    """,
-
-                    (
-
-                        time.time(),
-
-                        str(error)
-
-                    )
-
-                )
-
-
-
-                conn.commit()
-
-
-                conn.close()
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[DB ERROR]",
 
                 e
 
@@ -333,30 +281,45 @@ class Database:
                 conn = self.connect()
 
 
+                cur = conn.cursor()
 
-                conn.execute(
+
+
+                cur.execute(
 
                     """
+
                     INSERT INTO signals
-                    VALUES
                     (
-                    NULL,
-                    ?,
-                    ?
+                        signal,
+                        price,
+                        created
                     )
+
+                    VALUES
+                    (?,?,?)
+
                     """,
 
                     (
 
-                        time.time(),
+                        signal.get(
 
-                        json.dumps(
+                            "signal"
 
-                            signal,
+                        ),
 
-                            ensure_ascii=False
 
-                        )
+                        signal.get(
+
+                            "price",
+
+                            0
+
+                        ),
+
+
+                        time.time()
 
                     )
 
@@ -368,7 +331,6 @@ class Database:
 
 
                 conn.close()
-
 
 
 
@@ -410,36 +372,36 @@ class Database:
                 conn = self.connect()
 
 
+                cur = conn.cursor()
 
-                conn.execute(
+
+
+                cur.execute(
 
                     """
+
                     INSERT INTO orders
-                    VALUES
                     (
-                    NULL,
-                    ?,
-                    ?,
-                    ?,
-                    ?
+                        side,
+                        qty,
+                        result,
+                        created
                     )
+
+                    VALUES
+                    (?,?,?,?)
+
                     """,
 
                     (
-
-                        time.time(),
 
                         side,
 
                         qty,
 
-                        json.dumps(
+                        str(result),
 
-                            result,
-
-                            ensure_ascii=False
-
-                        )
+                        time.time()
 
                     )
 
@@ -472,43 +434,72 @@ class Database:
 
 
     # =====================================================
-    # READ LAST EVENTS
+    # ERROR
     # =====================================================
 
-    def recent_events(
+    def save_error(
         self,
-        limit=20
+        error
     ):
 
 
-        conn = self.connect()
+        try:
+
+
+            with self.lock:
+
+
+                conn = self.connect()
+
+
+                cur = conn.cursor()
 
 
 
-        rows = conn.execute(
+                cur.execute(
 
-            """
-            SELECT *
-            FROM events
-            ORDER BY id DESC
-            LIMIT ?
-            """,
+                    """
 
-            (
+                    INSERT INTO errors
+                    (
+                        error,
+                        created
+                    )
 
-                limit,
+                    VALUES
+                    (?,?)
+
+                    """,
+
+                    (
+
+                        str(error),
+
+                        time.time()
+
+                    )
+
+                )
+
+
+
+                conn.commit()
+
+
+                conn.close()
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[DB ERROR]",
+
+                e
 
             )
-
-        ).fetchall()
-
-
-
-        conn.close()
-
-
-
-        return rows
 
 
 
@@ -528,7 +519,7 @@ class Database:
 
             "database":
 
-                self.path,
+                DATABASE_PATH,
 
 
             "ready":
@@ -537,7 +528,6 @@ class Database:
 
 
         }
-
 
 
 
