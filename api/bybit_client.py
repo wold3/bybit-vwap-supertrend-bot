@@ -18,7 +18,6 @@ class BybitClient:
 
     def __init__(self):
 
-
         self.base_url = BYBIT_BASE_URL
 
         self.api_key = BYBIT_API_KEY
@@ -26,20 +25,20 @@ class BybitClient:
         self.api_secret = BYBIT_API_SECRET
 
 
-
         print("==============================")
         print("[BYBIT CLIENT INIT]")
         print("BASE :", self.base_url)
-        print("KEY :", self.api_key[:6])
+        print(
+            "KEY :",
+            self.api_key[:6] if self.api_key else "NONE"
+        )
         print("==============================")
 
 
 
-
-
-    # =====================================================
-    # SIGN
-    # =====================================================
+    # ==========================================
+    # SIGN V5
+    # ==========================================
 
     def _sign(
         self,
@@ -51,20 +50,24 @@ class BybitClient:
         recv_window = "5000"
 
 
+
+        # GET Query String
         if isinstance(params, dict):
 
-            param_str = json.dumps(
-                params,
-                separators=(",", ":")
+            param_str = "&".join(
+                f"{key}={value}"
+                for key, value in params.items()
             )
 
+
+        # POST Body
         else:
 
             param_str = str(params)
 
 
 
-        payload = (
+        origin_string = (
 
             str(timestamp)
 
@@ -86,9 +89,13 @@ class BybitClient:
 
         signature = hmac.new(
 
-            self.api_secret.encode(),
+            self.api_secret.encode(
+                "utf-8"
+            ),
 
-            payload.encode(),
+            origin_string.encode(
+                "utf-8"
+            ),
 
             hashlib.sha256
 
@@ -102,9 +109,9 @@ class BybitClient:
 
 
 
-    # =====================================================
+    # ==========================================
     # HEADERS
-    # =====================================================
+    # ==========================================
 
     def _headers(
         self,
@@ -113,7 +120,9 @@ class BybitClient:
 
 
         timestamp = str(
-            int(time.time() * 1000)
+            int(
+                time.time() * 1000
+            )
         )
 
 
@@ -156,7 +165,7 @@ class BybitClient:
 
             "Content-Type":
 
-                "application/json",
+                "application/json"
 
         }
 
@@ -164,69 +173,9 @@ class BybitClient:
 
 
 
-    # =====================================================
-    # RESPONSE PARSER
-    # =====================================================
-
-    def _parse_response(
-        self,
-        response
-    ):
-
-
-        print(
-            "[BYBIT STATUS]",
-            response.status_code
-        )
-
-
-        print(
-            "[BYBIT TEXT]",
-            response.text[:500]
-        )
-
-
-
-        if not response.text:
-
-            return None
-
-
-
-        try:
-
-            data = response.json()
-
-
-        except Exception:
-
-
-            print(
-                "[JSON PARSE ERROR]"
-            )
-
-
-            return None
-
-
-
-        print(
-            "[BYBIT RESPONSE]",
-            data
-        )
-
-
-        return data
-
-
-
-
-
-
-
-    # =====================================================
+    # ==========================================
     # GET
-    # =====================================================
+    # ==========================================
 
     def get(
         self,
@@ -244,11 +193,6 @@ class BybitClient:
         try:
 
 
-            headers = self._headers(
-                params
-            )
-
-
             url = (
 
                 self.base_url
@@ -256,6 +200,14 @@ class BybitClient:
                 +
 
                 endpoint
+
+            )
+
+
+
+            headers = self._headers(
+
+                params
 
             )
 
@@ -275,10 +227,20 @@ class BybitClient:
 
 
 
-            return self._parse_response(
-                response
+            print(
+                "[BYBIT STATUS]",
+                response.status_code
             )
 
+
+            print(
+                "[BYBIT TEXT]",
+                response.text[:300]
+            )
+
+
+
+            return response.json()
 
 
 
@@ -297,11 +259,9 @@ class BybitClient:
 
 
 
-
-
-    # =====================================================
+    # ==========================================
     # POST
-    # =====================================================
+    # ==========================================
 
     def post(
         self,
@@ -319,11 +279,26 @@ class BybitClient:
         try:
 
 
+            url = (
+
+                self.base_url
+
+                +
+
+                endpoint
+
+            )
+
+
+
             body = json.dumps(
 
                 params,
 
-                separators=(",", ":")
+                separators=(
+                    ",",
+                    ":"
+                )
 
             )
 
@@ -332,18 +307,6 @@ class BybitClient:
             headers = self._headers(
 
                 params
-
-            )
-
-
-
-            url = (
-
-                self.base_url
-
-                +
-
-                endpoint
 
             )
 
@@ -363,10 +326,20 @@ class BybitClient:
 
 
 
-            return self._parse_response(
-                response
+            print(
+                "[BYBIT STATUS]",
+                response.status_code
             )
 
+
+            print(
+                "[BYBIT TEXT]",
+                response.text[:300]
+            )
+
+
+
+            return response.json()
 
 
 
@@ -384,5 +357,9 @@ class BybitClient:
 
 
 
+
+# ==========================================
+# INSTANCE
+# ==========================================
 
 bybit_client = BybitClient()
