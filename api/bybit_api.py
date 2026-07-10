@@ -10,7 +10,6 @@ import json
 import requests
 
 
-
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
@@ -23,12 +22,7 @@ from config import (
 
 
 
-
-
-
-
 class BybitAPI:
-
 
 
     def __init__(self):
@@ -41,12 +35,8 @@ class BybitAPI:
 
 
 
-
-
-
-
     # =====================================================
-    # SIGN
+    # SIGNATURE
     # =====================================================
 
     def generate_signature(
@@ -55,11 +45,10 @@ class BybitAPI:
         payload
     ):
 
-
         recv_window = "5000"
 
 
-        param = (
+        origin = (
 
             str(timestamp)
 
@@ -82,13 +71,11 @@ class BybitAPI:
 
             BYBIT_API_SECRET.encode(),
 
-            param.encode(),
+            origin.encode(),
 
             hashlib.sha256
 
         ).hexdigest()
-
-
 
 
 
@@ -126,16 +113,16 @@ class BybitAPI:
             )
 
 
-
             recv_window = "5000"
 
 
 
+            # GET query string
 
             if method == "GET":
 
 
-                query = "&".join(
+                payload = "&".join(
 
                     [
 
@@ -150,9 +137,6 @@ class BybitAPI:
                     ]
 
                 )
-
-
-                payload = query
 
 
 
@@ -176,14 +160,14 @@ class BybitAPI:
 
 
 
-
-            signature = self.generate_signature(
+            sign = self.generate_signature(
 
                 timestamp,
 
                 payload
 
             )
+
 
 
 
@@ -198,7 +182,7 @@ class BybitAPI:
 
                 "X-BAPI-SIGN":
 
-                    signature,
+                    sign,
 
 
                 "X-BAPI-SIGN-TYPE":
@@ -221,8 +205,6 @@ class BybitAPI:
                     "application/json"
 
             }
-
-
 
 
 
@@ -277,17 +259,37 @@ class BybitAPI:
 
 
 
-
             data = response.json()
 
 
 
-            if data.get(
+
+
+            ret = data.get(
 
                 "retCode"
 
-            ) != 0:
+            )
 
+
+
+
+
+            # ---------------------------------
+            # 정상 + 레버리지 동일 상태
+            # ---------------------------------
+
+            if ret == 110043:
+
+
+                return data
+
+
+
+
+
+
+            if ret != 0:
 
 
                 print(
@@ -299,8 +301,9 @@ class BybitAPI:
                 )
 
 
-
                 return None
+
+
 
 
 
@@ -312,7 +315,6 @@ class BybitAPI:
 
 
         except Exception as e:
-
 
 
             print(
@@ -355,7 +357,11 @@ class BybitAPI:
             )
 
 
-            return r.status_code == 200
+            return (
+
+                r.status_code == 200
+
+            )
 
 
 
@@ -402,7 +408,7 @@ class BybitAPI:
 
 
     # =====================================================
-    # LEVERAGE
+    # SET LEVERAGE
     # =====================================================
 
     def set_leverage(self):
@@ -445,21 +451,24 @@ class BybitAPI:
         if result:
 
 
-            print(
-
-                "[LEVERAGE SET]"
-
-            )
+            if result.get("retCode") == 110043:
 
 
-        else:
+                print(
+
+                    "[LEVERAGE ALREADY SET]"
+
+                )
 
 
-            print(
+            else:
 
-                "[LEVERAGE ALREADY SET]"
 
-            )
+                print(
+
+                    "[LEVERAGE SET]"
+
+                )
 
 
 
@@ -523,6 +532,7 @@ class BybitAPI:
 
 
 
+
         rows = (
 
             result
@@ -551,43 +561,42 @@ class BybitAPI:
 
 
 
-        for x in reversed(rows):
+        for c in reversed(rows):
 
 
             candles.append(
-
 
                 {
 
 
                     "timestamp":
 
-                        int(x[0]),
+                        int(c[0]),
 
 
                     "open":
 
-                        float(x[1]),
+                        float(c[1]),
 
 
                     "high":
 
-                        float(x[2]),
+                        float(c[2]),
 
 
                     "low":
 
-                        float(x[3]),
+                        float(c[3]),
 
 
                     "close":
 
-                        float(x[4]),
+                        float(c[4]),
 
 
                     "volume":
 
-                        float(x[5])
+                        float(c[5])
 
                 }
 
@@ -602,7 +611,6 @@ class BybitAPI:
             len(candles)
 
         )
-
 
 
         return candles
@@ -638,11 +646,9 @@ class BybitAPI:
 
                     DEFAULT_SYMBOL
 
-
             }
 
         )
-
 
 
         try:
@@ -653,7 +659,6 @@ class BybitAPI:
                 result["result"]["list"][0]["lastPrice"]
 
             )
-
 
 
         except:
@@ -746,7 +751,6 @@ class BybitAPI:
 
                     DEFAULT_SYMBOL
 
-
             }
 
         )
@@ -772,6 +776,7 @@ class BybitAPI:
 
 
             return False
+
 
 
 
@@ -812,7 +817,6 @@ class BybitAPI:
                     "side"
 
                 )
-
 
 
                 close_side = (
@@ -885,7 +889,6 @@ class BybitAPI:
                 "stopLoss":
 
                     str(sl)
-
 
             }
 
