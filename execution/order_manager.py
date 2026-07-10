@@ -1,20 +1,35 @@
 import time
 
 
+from config import (
+
+    CATEGORY,
+
+    DEFAULT_SYMBOL,
+
+    DEFAULT_QTY,
+
+    ORDER_COOLDOWN,
+
+    TAKE_PROFIT_PERCENT,
+
+    STOP_LOSS_PERCENT,
+
+)
+
+
 from api.bybit_api import bybit_api
 
+from execution.position_manager import position_manager
 
-from config import (
-    DEFAULT_QTY,
-    CATEGORY,
-    DEFAULT_SYMBOL,
-    ORDER_COOLDOWN,
-)
+from risk.risk_manager import risk_manager
+
+
 
 
 
 # ==========================================
-# EXECUTION ORDER MANAGER
+# ORDER MANAGER
 # ==========================================
 
 class OrderManager:
@@ -23,13 +38,7 @@ class OrderManager:
     def __init__(self):
 
 
-        self.position_side = None
-
-        self.position_qty = 0
-
-
         self.last_order_time = 0
-
 
 
         print("==============================")
@@ -46,470 +55,34 @@ class OrderManager:
     # COOLDOWN CHECK
     # ======================================
 
-    def can_order(self):
+    def cooldown_ok(self):
 
 
         now = time.time()
 
 
 
-        elapsed = now - self.last_order_time
+        if (
 
+            now - self.last_order_time
 
+            <
 
-        if elapsed < ORDER_COOLDOWN:
+            ORDER_COOLDOWN
 
-
-            remain = int(
-
-                ORDER_COOLDOWN - elapsed
-
-            )
+        ):
 
 
             print(
-                "[ORDER COOLDOWN]",
-                remain,
-                "sec"
+                "[ORDER BLOCK] COOLDOWN"
             )
 
 
             return False
-
 
 
 
         return True
-
-
-
-
-
-    # ======================================
-    # UPDATE POSITION
-    # ======================================
-
-    def update_position(self, position):
-
-
-        try:
-
-
-            side = position.get(
-                "side"
-            )
-
-
-            size = float(
-
-                position.get(
-                    "size",
-                    0
-                )
-
-            )
-
-
-
-            if size > 0:
-
-
-                self.position_side = side
-
-                self.position_qty = size
-
-
-
-            else:
-
-
-                self.position_side = None
-
-                self.position_qty = 0
-
-
-
-
-
-            print(
-                "[ORDER POSITION SYNC]",
-                self.position_side,
-                self.position_qty
-            )
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[ORDER POSITION UPDATE ERROR]",
-                e
-            )
-
-
-
-
-
-    # ======================================
-    # BUY
-    # ======================================
-
-    def buy(self):
-
-
-        try:
-
-
-
-            if not self.can_order():
-
-                return False
-
-
-
-
-
-            if self.has_position():
-
-
-                print(
-                    "[BUY BLOCKED] EXIST POSITION"
-                )
-
-
-                return False
-
-
-
-
-
-            print(
-                "[ORDER REQUEST] BUY"
-            )
-
-
-
-            result = bybit_api.create_order(
-
-                "Buy",
-
-                DEFAULT_QTY
-
-            )
-
-
-
-
-
-            if (
-
-                result
-
-                and
-
-                result.get(
-                    "retCode"
-                )
-
-                ==
-
-                0
-
-            ):
-
-
-
-                self.position_side = "Buy"
-
-                self.position_qty = DEFAULT_QTY
-
-
-                self.last_order_time = time.time()
-
-
-
-                print(
-                    "[BUY SUCCESS]"
-                )
-
-
-
-                return True
-
-
-
-
-
-
-            print(
-                "[BUY FAILED]",
-                result
-            )
-
-
-
-            return False
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[BUY ERROR]",
-                e
-            )
-
-
-            return False
-
-
-
-
-
-    # ======================================
-    # SELL
-    # ======================================
-
-    def sell(self):
-
-
-        try:
-
-
-
-            if not self.can_order():
-
-                return False
-
-
-
-
-
-            if self.has_position():
-
-
-                print(
-                    "[SELL BLOCKED] EXIST POSITION"
-                )
-
-
-                return False
-
-
-
-
-
-            print(
-                "[ORDER REQUEST] SELL"
-            )
-
-
-
-
-            result = bybit_api.create_order(
-
-                "Sell",
-
-                DEFAULT_QTY
-
-            )
-
-
-
-
-
-            if (
-
-                result
-
-                and
-
-                result.get(
-                    "retCode"
-                )
-
-                ==
-
-                0
-
-            ):
-
-
-
-                self.position_side = "Sell"
-
-                self.position_qty = DEFAULT_QTY
-
-
-                self.last_order_time = time.time()
-
-
-
-                print(
-                    "[SELL SUCCESS]"
-                )
-
-
-
-                return True
-
-
-
-
-
-            print(
-                "[SELL FAILED]",
-                result
-            )
-
-
-
-            return False
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[SELL ERROR]",
-                e
-            )
-
-
-            return False
-
-
-
-
-
-    # ======================================
-    # CLOSE POSITION
-    # ======================================
-
-    def close_position(self):
-
-
-        try:
-
-
-
-            if not self.has_position():
-
-
-                return False
-
-
-
-
-
-            if self.position_side == "Buy":
-
-
-                side = "Sell"
-
-
-
-            else:
-
-
-                side = "Buy"
-
-
-
-
-
-            print(
-                "[CLOSE REQUEST]",
-                side
-            )
-
-
-
-
-
-            result = bybit_api.create_order(
-
-                side,
-
-                self.position_qty
-
-            )
-
-
-
-
-
-            if (
-
-                result
-
-                and
-
-                result.get(
-                    "retCode"
-                )
-
-                ==
-
-                0
-
-            ):
-
-
-
-                self.position_side = None
-
-                self.position_qty = 0
-
-
-
-                self.last_order_time = time.time()
-
-
-
-                print(
-                    "[POSITION CLOSED]"
-                )
-
-
-
-                return True
-
-
-
-
-
-
-            print(
-                "[CLOSE FAILED]",
-                result
-            )
-
-
-
-            return False
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[CLOSE ERROR]",
-                e
-            )
-
-
-            return False
 
 
 
@@ -522,13 +95,135 @@ class OrderManager:
     def has_position(self):
 
 
-        return (
+        return position_manager.has_position()
 
-            self.position_side is not None
 
-            and
 
-            self.position_qty > 0
+
+
+    # ======================================
+    # TP SL CALC
+    # ======================================
+
+    def calculate_tp_sl(
+
+        self,
+
+        side,
+
+        price
+
+    ):
+
+
+        if side == "Buy":
+
+
+            tp = (
+
+                price
+
+                *
+
+                (
+
+                    1
+
+                    +
+
+                    TAKE_PROFIT_PERCENT / 100
+
+                )
+
+            )
+
+
+            sl = (
+
+                price
+
+                *
+
+                (
+
+                    1
+
+                    -
+
+                    STOP_LOSS_PERCENT / 100
+
+                )
+
+            )
+
+
+
+        else:
+
+
+            tp = (
+
+                price
+
+                *
+
+                (
+
+                    1
+
+                    -
+
+                    TAKE_PROFIT_PERCENT / 100
+
+                )
+
+            )
+
+
+            sl = (
+
+                price
+
+                *
+
+                (
+
+                    1
+
+                    +
+
+                    STOP_LOSS_PERCENT / 100
+
+                )
+
+            )
+
+
+
+        return tp, sl
+
+
+
+
+
+    # ======================================
+    # BUY
+    # ======================================
+
+    def buy(
+
+        self,
+
+        qty=None
+
+    ):
+
+
+        return self.execute(
+
+            "Buy",
+
+            qty
 
         )
 
@@ -537,50 +232,298 @@ class OrderManager:
 
 
     # ======================================
-    # STATUS
+    # SELL
     # ======================================
 
-    def get_status(self):
+    def sell(
+
+        self,
+
+        qty=None
+
+    ):
 
 
-        return {
+        return self.execute(
+
+            "Sell",
+
+            qty
+
+        )
 
 
-            "side":
-
-                self.position_side,
 
 
-            "qty":
 
-                self.position_qty,
+    # ======================================
+    # EXECUTE
+    # ======================================
+
+    def execute(
+
+        self,
+
+        side,
+
+        qty=None
+
+    ):
 
 
-            "cooldown":
+        try:
 
-                max(
 
-                    0,
 
-                    int(
+            if qty is None:
 
-                        ORDER_COOLDOWN -
 
-                        (
+                qty = DEFAULT_QTY
 
-                            time.time()
 
-                            -
 
-                            self.last_order_time
 
-                        )
 
-                    )
+            if not self.cooldown_ok():
 
+
+                return None
+
+
+
+
+
+            if self.has_position():
+
+
+                print(
+                    "[ORDER BLOCK] POSITION EXISTS"
                 )
 
-        }
+
+                return None
+
+
+
+
+
+            if not risk_manager.check_position_size(
+
+                qty
+
+            ):
+
+
+                return None
+
+
+
+
+
+            price = bybit_api.get_price()
+
+
+
+            if price is None:
+
+
+                return None
+
+
+
+
+
+            tp, sl = self.calculate_tp_sl(
+
+
+                side,
+
+
+                price
+
+
+            )
+
+
+
+
+
+            print("==============================")
+            print("[ORDER EXECUTE]")
+            print("SIDE :", side)
+            print("QTY :", qty)
+            print("PRICE :", price)
+            print("TP :", tp)
+            print("SL :", sl)
+            print("==============================")
+
+
+
+
+
+            response = bybit_api.create_order(
+
+
+                side=side,
+
+
+                qty=qty,
+
+
+                take_profit=tp,
+
+
+                stop_loss=sl
+
+
+            )
+
+
+
+
+
+            if response and response.get("retCode") == 0:
+
+
+
+                self.last_order_time = time.time()
+
+
+
+                print(
+                    "[ORDER SUCCESS]"
+                )
+
+
+
+                return response
+
+
+
+
+            print(
+                "[ORDER FAILED]"
+            )
+
+
+
+            return response
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[ORDER MANAGER ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+    # ======================================
+    # CLOSE
+    # ======================================
+
+    def close_position(self):
+
+
+        try:
+
+
+            if not position_manager.has_position():
+
+
+                return None
+
+
+
+
+
+            side = position_manager.side
+
+
+            qty = position_manager.qty
+
+
+
+
+
+            print(
+                "[CLOSE POSITION]"
+            )
+
+
+
+
+
+            return bybit_api.close_position(
+
+
+                side,
+
+
+                qty
+
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[CLOSE ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+    # ======================================
+    # WS POSITION UPDATE
+    # ======================================
+
+    def update_position(self, data):
+
+
+        try:
+
+
+            if data["side"]:
+
+
+                print(
+                    "[ORDER MANAGER POSITION SYNC]"
+                )
+
+
+
+            else:
+
+
+                print(
+                    "[ORDER MANAGER EMPTY POSITION]"
+                )
+
+
+
+        except Exception:
+
+
+            pass
 
 
 
