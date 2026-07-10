@@ -1,4 +1,3 @@
-```python
 # ==================================================
 # CONFIGURATION
 # ==================================================
@@ -392,4 +391,4 @@ print("DEMO :", BYBIT_DEMO)
 print("CATEGORY :", CATEGORY)
 print("SYMBOL :", DEFAULT_SYMBOL)
 print("==============================")
-```
+
