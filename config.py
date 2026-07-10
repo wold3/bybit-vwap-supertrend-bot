@@ -20,7 +20,6 @@ BYBIT_API_KEY = os.getenv(
     ""
 )
 
-
 BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
     ""
@@ -187,9 +186,20 @@ MAX_DAILY_LOSS_PERCENT = float(
 )
 
 
-# risk_manager 호환
+MAX_DRAWDOWN_PERCENT = float(
+    os.getenv(
+        "MAX_DRAWDOWN_PERCENT",
+        str(MAX_DAILY_LOSS_PERCENT)
+    )
+)
 
-MAX_DRAWDOWN_PERCENT = MAX_DAILY_LOSS_PERCENT
+
+MAX_LOSS_STREAK = int(
+    os.getenv(
+        "MAX_LOSS_STREAK",
+        "3"
+    )
+)
 
 
 
