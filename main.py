@@ -1,6 +1,6 @@
 # =====================================================
 # main.py
-# Bot Launcher
+# Trading Bot Entry Point
 # =====================================================
 
 
@@ -14,6 +14,13 @@ from app import (
 )
 
 
+from database.database import (
+    database
+)
+
+
+
+
 
 
 
@@ -23,6 +30,7 @@ def main():
     try:
 
 
+
         app.start()
 
 
@@ -30,7 +38,10 @@ def main():
         while True:
 
 
+
             time.sleep(1)
+
+
 
 
 
@@ -40,15 +51,19 @@ def main():
 
 
 
+        print()
+
         print(
 
-            "\n[USER STOP]"
+            "[USER STOP]"
 
         )
 
 
 
         app.stop()
+
+
 
 
 
@@ -75,14 +90,39 @@ def main():
         try:
 
 
-            app.stop()
+            database.save_error(
 
+                e
+
+            )
 
 
         except:
 
 
             pass
+
+
+
+        app.stop()
+
+
+
+
+
+
+
+    finally:
+
+
+
+        print(
+
+            "[PROGRAM EXIT]"
+
+        )
+
+
 
 
 
