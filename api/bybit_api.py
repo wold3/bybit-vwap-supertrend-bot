@@ -2,18 +2,26 @@ import time
 
 from pybit.unified_trading import HTTP
 
+
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
     BYBIT_TESTNET,
     BYBIT_BASE_URL,
+
     CATEGORY,
     DEFAULT_SYMBOL,
+
     ACCOUNT_TYPE,
+
     DEFAULT_QTY,
+
     ORDER_TYPE,
     TIME_IN_FORCE,
+
+    LEVERAGE,
 )
+
 
 
 # ==================================================
@@ -22,7 +30,9 @@ from config import (
 
 class BybitAPI:
 
+
     def __init__(self):
+
 
         print("==============================")
         print("[BYBIT API INIT]")
@@ -38,8 +48,6 @@ class BybitAPI:
 
             testnet=BYBIT_TESTNET,
 
-            demo=True,
-
             api_key=BYBIT_API_KEY,
 
             api_secret=BYBIT_API_SECRET
@@ -49,7 +57,7 @@ class BybitAPI:
 
 
     # ==================================================
-    # WALLET BALANCE
+    # WALLET
     # ==================================================
 
     def get_wallet_balance(self):
@@ -64,8 +72,6 @@ class BybitAPI:
 
 
             print("[WALLET RESPONSE]")
-            print(result)
-
 
             return result
 
@@ -73,9 +79,15 @@ class BybitAPI:
 
         except Exception as e:
 
-            print("[WALLET ERROR]", e)
+
+            print(
+                "[WALLET ERROR]",
+                e
+            )
+
 
             return None
+
 
 
 
@@ -86,6 +98,7 @@ class BybitAPI:
     def get_position(self):
 
         try:
+
 
             result = self.session.get_positions(
 
@@ -102,9 +115,15 @@ class BybitAPI:
 
         except Exception as e:
 
-            print("[POSITION ERROR]", e)
+
+            print(
+                "[POSITION ERROR]",
+                e
+            )
+
 
             return None
+
 
 
 
@@ -122,7 +141,9 @@ class BybitAPI:
 
     ):
 
+
         try:
+
 
             result = self.session.get_kline(
 
@@ -143,14 +164,21 @@ class BybitAPI:
 
         except Exception as e:
 
-            print("[KLINE ERROR]", e)
+
+            print(
+                "[KLINE ERROR]",
+                e
+            )
+
 
             return None
 
 
 
+
+
     # ==================================================
-    # CREATE ORDER
+    # MARKET ORDER
     # ==================================================
 
     def create_order(
@@ -163,7 +191,9 @@ class BybitAPI:
 
     ):
 
+
         try:
+
 
             if qty is None:
 
@@ -189,7 +219,9 @@ class BybitAPI:
 
 
             print("[ORDER RESPONSE]")
+
             print(result)
+
 
 
             return result
@@ -198,19 +230,28 @@ class BybitAPI:
 
         except Exception as e:
 
-            print("[ORDER ERROR]", e)
+
+            print(
+                "[ORDER ERROR]",
+                e
+            )
+
 
             return None
 
 
 
+
+
     # ==================================================
-    # CANCEL ALL ORDERS
+    # CANCEL ALL ORDER
     # ==================================================
 
     def cancel_all_orders(self):
 
+
         try:
+
 
             result = self.session.cancel_all_orders(
 
@@ -221,7 +262,61 @@ class BybitAPI:
             )
 
 
-            print("[CANCEL ALL]")
+            print(
+                "[CANCEL ALL]"
+            )
+
+
+            return result
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[CANCEL ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+    # ==================================================
+    # SET LEVERAGE
+    # ==================================================
+
+    def set_leverage(
+
+        self,
+
+        leverage=LEVERAGE
+
+    ):
+
+
+        try:
+
+
+            result = self.session.set_leverage(
+
+                category=CATEGORY,
+
+                symbol=DEFAULT_SYMBOL,
+
+                buyLeverage=str(leverage),
+
+                sellLeverage=str(leverage)
+
+            )
+
+
+            print("[LEVERAGE RESPONSE]")
+
             print(result)
 
 
@@ -231,9 +326,171 @@ class BybitAPI:
 
         except Exception as e:
 
-            print("[CANCEL ERROR]", e)
+
+            print(
+                "[LEVERAGE ERROR]",
+                e
+            )
+
 
             return None
+
+
+
+
+
+    # ==================================================
+    # SET TP / SL
+    # ==================================================
+
+    def set_trading_stop(
+
+        self,
+
+        take_profit,
+
+        stop_loss
+
+    ):
+
+
+        try:
+
+
+            result = self.session.set_trading_stop(
+
+                category=CATEGORY,
+
+                symbol=DEFAULT_SYMBOL,
+
+                tpslMode="Full",
+
+                positionIdx=0,
+
+                takeProfit=str(take_profit),
+
+                stopLoss=str(stop_loss)
+
+            )
+
+
+            print("[TP SL RESPONSE]")
+
+            print(result)
+
+
+            return result
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[TP SL ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+    # ==================================================
+    # CLOSE POSITION
+    # ==================================================
+
+    def close_position(self):
+
+
+        try:
+
+
+            position = self.get_position()
+
+
+
+            if position is None:
+
+                return None
+
+
+
+            data = position["result"]["list"]
+
+
+
+            for p in data:
+
+
+                size = float(
+
+                    p.get(
+                        "size",
+                        0
+
+                    )
+
+                )
+
+
+                if size <= 0:
+
+                    continue
+
+
+
+                side = p["side"]
+
+
+
+                close_side = (
+
+                    "Sell"
+
+                    if side == "Buy"
+
+                    else
+
+                    "Buy"
+
+                )
+
+
+
+                result = self.create_order(
+
+                    side=close_side,
+
+                    qty=size
+
+                )
+
+
+                return result
+
+
+
+
+            return None
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[CLOSE ERROR]",
+                e
+            )
+
+
+            return None
+
+
 
 
 
@@ -245,9 +502,11 @@ class BybitAPI:
 
         return int(
 
-            time.time() * 1000
+            time.time()*1000
 
         )
+
+
 
 
 
