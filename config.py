@@ -1,233 +1,130 @@
 import os
+from dotenv import load_dotenv
 
 
-# =====================================================
-# MODE
-# =====================================================
+# ==================================
+# LOAD ENV
+# ==================================
 
-# 실제 주문 실행 여부
-# False = 주문 차단 (테스트)
-# True  = Demo 주문 실행
-LIVE_TRADING = True
+load_dotenv()
 
 
-# Bybit Demo Trading
-DEMO_TRADING = True
-
-
-# Bybit Testnet 사용 여부
-TESTNET = False
-
-
-
-
-
-# =====================================================
-# API KEY
-# =====================================================
+# ==================================
+# BYBIT API
+# ==================================
 
 BYBIT_API_KEY = os.getenv(
     "BYBIT_API_KEY",
-    "YOUR_DEMO_API_KEY"
+    ""
 )
-
 
 BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
-    "YOUR_DEMO_API_SECRET"
+    ""
 )
 
 
+# ==================================
+# SERVER
+# ==================================
+
+BYBIT_BASE_URL = os.getenv(
+    "BYBIT_BASE_URL",
+    "https://api-demo.bybit.com"
+)
 
 
+BYBIT_PUBLIC_WS = os.getenv(
+    "BYBIT_PUBLIC_WS",
+    "wss://stream.bybit.com/v5/public"
+)
 
-# =====================================================
+
+BYBIT_PRIVATE_WS = os.getenv(
+    "BYBIT_PRIVATE_WS",
+    "wss://stream-demo.bybit.com/v5/private"
+)
+
+
+# ==================================
+# MODE
+# ==================================
+
+LIVE_TRADING = (
+    os.getenv(
+        "LIVE_TRADING",
+        "false"
+    ).lower()
+    == "true"
+)
+
+
+BYBIT_TESTNET = (
+    os.getenv(
+        "BYBIT_TESTNET",
+        "false"
+    ).lower()
+    == "true"
+)
+
+
+# Demo Trading 여부
+
+DEMO = not LIVE_TRADING
+
+
+TESTNET = BYBIT_TESTNET
+
+
+# ==================================
 # ACCOUNT
-# =====================================================
+# ==================================
 
-ACCOUNT_TYPE = "UNIFIED"
-
-
-
-
-
-# =====================================================
-# MARKET
-# =====================================================
-
-DEFAULT_SYMBOL = "BTCUSDT"
-
-CATEGORY = "linear"
+ACCOUNT_TYPE = os.getenv(
+    "ACCOUNT_TYPE",
+    "UNIFIED"
+)
 
 
-TIMEFRAME = "1"
+# ==================================
+# SYMBOL
+# ==================================
+
+DEFAULT_SYMBOL = os.getenv(
+    "DEFAULT_SYMBOL",
+    "BTCUSDT"
+)
 
 
+# ==================================
+# ORDER
+# ==================================
 
-
-
-
-
-# =====================================================
-# REST API
-# =====================================================
-
-if DEMO_TRADING:
-
-
-    # Demo Trading API
-
-    BYBIT_BASE_URL = (
-        "https://api-demo.bybit.com"
+ORDER_RETRY = int(
+    os.getenv(
+        "ORDER_RETRY",
+        "3"
     )
+)
 
 
-elif TESTNET:
-
-
-    BYBIT_BASE_URL = (
-        "https://api-testnet.bybit.com"
-    )
-
-
-else:
-
-
-    BYBIT_BASE_URL = (
-        "https://api.bybit.com"
-    )
-
-
-
-
-
-
-
-
-
-# =====================================================
-# WEBSOCKET
-# =====================================================
-
-if DEMO_TRADING:
-
-
-    # Private WS
-    BYBIT_PRIVATE_WS = (
-        "wss://stream-demo.bybit.com/v5/private"
-    )
-
-
-    # Public market data
-    # Demo Public WS는 일부 환경에서 404 발생 가능
-    # 시장 데이터용으로 일반 Public WS 사용
-
-    BYBIT_PUBLIC_WS = (
-        "wss://stream.bybit.com/v5/public/linear"
-    )
-
-
-
-elif TESTNET:
-
-
-    BYBIT_PUBLIC_WS = (
-        "wss://stream-testnet.bybit.com/v5/public/linear"
-    )
-
-
-    BYBIT_PRIVATE_WS = (
-        "wss://stream-testnet.bybit.com/v5/private"
-    )
-
-
-
-else:
-
-
-    BYBIT_PUBLIC_WS = (
-        "wss://stream.bybit.com/v5/public/linear"
-    )
-
-
-    BYBIT_PRIVATE_WS = (
-        "wss://stream.bybit.com/v5/private"
-    )
-
-
-
-
-
-
-
-
-
-# =====================================================
-# TRADING
-# =====================================================
-
-LEVERAGE = 5
-
-
-DEFAULT_QTY = 0.001
-
-
-
-
-
-
-
-# =====================================================
-# INDICATOR
-# =====================================================
-
-VWAP_LENGTH = 20
-
-
-SUPERTREND_PERIOD = 10
-
-
-SUPERTREND_MULTIPLIER = 3
-
-
-
-
-
-
-
-
-
-# =====================================================
-# RISK
-# =====================================================
-
-MAX_POSITION_SIZE = 0.01
-
-
-DAILY_LOSS_LIMIT = -100
-
-
-ORDER_COOLDOWN = 30
-
-
-
-
-
-
-
-# =====================================================
+# ==================================
 # LOG
-# =====================================================
+# ==================================
 
-LOG_LEVEL = "INFO"
+LOG_LEVEL = os.getenv(
+    "LOG_LEVEL",
+    "INFO"
+)
 
 
-
-
+# ==================================
+# PRINT STATUS
+# ==================================
 
 print("==============================")
 print("[CONFIG LOADED]")
-print("DEMO :", DEMO_TRADING)
+print("DEMO :", DEMO)
 print("TESTNET :", TESTNET)
 print("LIVE :", LIVE_TRADING)
 print("ACCOUNT :", ACCOUNT_TYPE)
