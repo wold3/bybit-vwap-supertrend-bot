@@ -10,6 +10,7 @@ import json
 import requests
 
 
+
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
@@ -22,12 +23,16 @@ from config import (
 
 
 
+
+
 class BybitAPI:
+
 
 
     def __init__(self):
 
         self.base_url = BYBIT_REST_URL
+
 
         print(
             "[BYBIT API READY]"
@@ -35,22 +40,25 @@ class BybitAPI:
 
 
 
+
+
     # =====================================================
-    # SIGNATURE
+    # SIGN
     # =====================================================
 
-    def generate_signature(
+    def sign(
         self,
         timestamp,
         payload
     ):
+
 
         recv_window = "5000"
 
 
         origin = (
 
-            str(timestamp)
+            timestamp
 
             +
 
@@ -76,6 +84,9 @@ class BybitAPI:
             hashlib.sha256
 
         ).hexdigest()
+
+
+
 
 
 
@@ -117,7 +128,6 @@ class BybitAPI:
 
 
 
-            # GET query string
 
             if method == "GET":
 
@@ -160,7 +170,8 @@ class BybitAPI:
 
 
 
-            sign = self.generate_signature(
+
+            signature = self.sign(
 
                 timestamp,
 
@@ -182,7 +193,7 @@ class BybitAPI:
 
                 "X-BAPI-SIGN":
 
-                    sign,
+                    signature,
 
 
                 "X-BAPI-SIGN-TYPE":
@@ -209,6 +220,7 @@ class BybitAPI:
 
 
 
+
             url = (
 
                 self.base_url
@@ -226,7 +238,7 @@ class BybitAPI:
             if method == "GET":
 
 
-                response = requests.get(
+                r = requests.get(
 
                     url,
 
@@ -243,7 +255,7 @@ class BybitAPI:
             else:
 
 
-                response = requests.post(
+                r = requests.post(
 
                     url,
 
@@ -259,13 +271,13 @@ class BybitAPI:
 
 
 
-            data = response.json()
+            data = r.json()
 
 
 
 
 
-            ret = data.get(
+            code = data.get(
 
                 "retCode"
 
@@ -274,12 +286,9 @@ class BybitAPI:
 
 
 
+            # leverage already set
 
-            # ---------------------------------
-            # 정상 + 레버리지 동일 상태
-            # ---------------------------------
-
-            if ret == 110043:
+            if code == 110043:
 
 
                 return data
@@ -289,7 +298,7 @@ class BybitAPI:
 
 
 
-            if ret != 0:
+            if code != 0:
 
 
                 print(
@@ -307,7 +316,6 @@ class BybitAPI:
 
 
 
-
             return data
 
 
@@ -319,7 +327,7 @@ class BybitAPI:
 
             print(
 
-                "[REQUEST ERROR]",
+                "[API REQUEST ERROR]",
 
                 e
 
@@ -357,11 +365,7 @@ class BybitAPI:
             )
 
 
-            return (
-
-                r.status_code == 200
-
-            )
+            return r.status_code == 200
 
 
 
@@ -369,6 +373,7 @@ class BybitAPI:
 
 
             return False
+
 
 
 
@@ -407,8 +412,9 @@ class BybitAPI:
 
 
 
+
     # =====================================================
-    # SET LEVERAGE
+    # LEVERAGE
     # =====================================================
 
     def set_leverage(self):
@@ -518,7 +524,6 @@ class BybitAPI:
 
                     200
 
-
             }
 
         )
@@ -533,25 +538,14 @@ class BybitAPI:
 
 
 
+
         rows = (
 
             result
 
-            .get(
+            .get("result",{})
 
-                "result",
-
-                {}
-
-            )
-
-            .get(
-
-                "list",
-
-                []
-
-            )
+            .get("list",[])
 
         )
 
@@ -621,8 +615,9 @@ class BybitAPI:
 
 
 
+
     # =====================================================
-    # LAST PRICE
+    # PRICE
     # =====================================================
 
     def get_last_price(self):
@@ -651,12 +646,17 @@ class BybitAPI:
         )
 
 
+
         try:
 
 
             return float(
 
-                result["result"]["list"][0]["lastPrice"]
+                result["result"]
+
+                ["list"][0]
+
+                ["lastPrice"]
 
             )
 
@@ -665,6 +665,45 @@ class BybitAPI:
 
 
             return None
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # POSITION
+    # =====================================================
+
+    def get_position(self):
+
+
+        return self.request(
+
+            "GET",
+
+            "/v5/position/list",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+            }
+
+        )
+
+
 
 
 
@@ -681,6 +720,15 @@ class BybitAPI:
         side,
         qty
     ):
+
+
+
+        qty = self.format_qty(
+
+            qty
+
+        )
+
 
 
         return self.request(
@@ -726,43 +774,9 @@ class BybitAPI:
 
 
 
-    # =====================================================
-    # POSITION
-    # =====================================================
-
-    def get_position(self):
-
-
-        return self.request(
-
-            "GET",
-
-            "/v5/position/list",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL
-
-            }
-
-        )
-
-
-
-
-
-
 
     # =====================================================
-    # CLOSE POSITION
+    # CLOSE
     # =====================================================
 
     def close_position(self):
@@ -780,6 +794,7 @@ class BybitAPI:
 
 
 
+
         rows = (
 
             position
@@ -789,6 +804,7 @@ class BybitAPI:
             .get("list",[])
 
         )
+
 
 
 
@@ -810,6 +826,7 @@ class BybitAPI:
 
 
             if size > 0:
+
 
 
                 side = p.get(
@@ -844,6 +861,134 @@ class BybitAPI:
 
 
         return False
+
+
+
+
+
+
+
+
+    # =====================================================
+    # INSTRUMENT
+    # =====================================================
+
+    def get_instrument_info(self):
+
+
+        return self.request(
+
+            "GET",
+
+            "/v5/market/instruments-info",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+            }
+
+        )
+
+
+
+
+
+
+
+
+    # =====================================================
+    # QTY FORMAT
+    # =====================================================
+
+    def format_qty(
+        self,
+        qty
+    ):
+
+
+        try:
+
+
+            info = self.get_instrument_info()
+
+
+
+            step = float(
+
+                info["result"]
+
+                ["list"][0]
+
+                ["lotSizeFilter"]
+
+                ["qtyStep"]
+
+            )
+
+
+
+            precision = len(
+
+                str(step)
+
+                .split(".")[1]
+
+            )
+
+
+
+            qty = (
+
+                int(qty / step)
+
+                *
+
+                step
+
+            )
+
+
+
+            return round(
+
+                qty,
+
+                precision
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[QTY FORMAT ERROR]",
+
+                e
+
+            )
+
+
+            return round(
+
+                qty,
+
+                3
+
+            )
+
+
 
 
 
@@ -893,6 +1038,7 @@ class BybitAPI:
             }
 
         )
+
 
 
 
