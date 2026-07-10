@@ -1,21 +1,12 @@
 import time
 import threading
 
-
 from pybit.unified_trading import WebSocket
-
 
 from config import (
     TESTNET,
     DEFAULT_SYMBOL,
 )
-
-
-from indicators.indicator_engine import indicator_engine
-from strategy.strategy_engine import strategy_engine
-
-
-
 
 
 class WebSocketStream:
@@ -27,9 +18,9 @@ class WebSocketStream:
 
         self.ws = None
 
-        self.last_timestamp = None
+        self.callback_func = None
 
-        self.running = False
+        self.last_timestamp = None
 
 
         print("==============================")
@@ -40,6 +31,10 @@ class WebSocketStream:
 
 
 
+    def set_callback(self, callback):
+
+        self.callback_func = callback
+
 
 
     # ==================================
@@ -48,64 +43,35 @@ class WebSocketStream:
 
     def start(self):
 
-
-        if self.running:
-
-            return
+        print("[PUBLIC WS START]")
 
 
-        self.running = True
+        self.ws = WebSocket(
+
+            testnet=TESTNET,
+
+            channel_type="linear"
+
+        )
 
 
+        self.ws.kline_stream(
 
-        try:
+            interval=5,
 
+            symbol=self.symbol,
 
-            self.ws = WebSocket(
+            callback=self.callback
 
-                testnet=TESTNET,
-
-                channel_type="linear"
-
-            )
+        )
 
 
-
-            self.ws.kline_stream(
-
-                interval=5,
-
-                symbol=self.symbol,
-
-                callback=self.callback
-
-            )
+        print("[STREAM STARTED]")
 
 
+        while True:
 
-            print(
-                "[STREAM STARTED]"
-            )
-
-
-
-            while self.running:
-
-
-                time.sleep(1)
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[WEBSOCKET START ERROR]",
-                e
-            )
-
-
-
+            time.sleep(1)
 
 
 
@@ -113,23 +79,16 @@ class WebSocketStream:
     # CALLBACK
     # ==================================
 
-    def callback(
-        self,
-        message
-    ):
-
+    def callback(self, message):
 
         try:
-
 
             if "data" not in message:
 
                 return
 
 
-
             data = message["data"]
-
 
 
             if not data:
@@ -137,9 +96,7 @@ class WebSocketStream:
                 return
 
 
-
             candle_data = data[0]
-
 
 
             if not candle_data.get(
@@ -151,13 +108,10 @@ class WebSocketStream:
 
 
 
-
             candle = {
-
 
                 "symbol":
                     self.symbol,
-
 
 
                 "timestamp":
@@ -166,12 +120,10 @@ class WebSocketStream:
                     ),
 
 
-
                 "open":
                     float(
                         candle_data["open"]
                     ),
-
 
 
                 "high":
@@ -180,12 +132,10 @@ class WebSocketStream:
                     ),
 
 
-
                 "low":
                     float(
                         candle_data["low"]
                     ),
-
 
 
                 "close":
@@ -194,12 +144,10 @@ class WebSocketStream:
                     ),
 
 
-
                 "volume":
                     float(
                         candle_data["volume"]
                     ),
-
 
 
                 "confirm":
@@ -209,13 +157,9 @@ class WebSocketStream:
 
 
 
-
-            # 중복 캔들 방지
-
             if candle["timestamp"] == self.last_timestamp:
 
                 return
-
 
 
             self.last_timestamp = candle["timestamp"]
@@ -229,91 +173,20 @@ class WebSocketStream:
 
 
 
+            if self.callback_func:
 
-
-            # Indicator
-
-            indicators = indicator_engine.update(
-
-                candle
-
-            )
-
-
-
-            if not indicators:
-
-                return
-
-
-
-
-
-            # Strategy
-
-            signal = strategy_engine.on_candle(
-
-                candle
-
-            )
-
-
-
-            if signal:
-
-
-                print(
-                    "[SIGNAL]",
-                    signal
+                self.callback_func(
+                    candle
                 )
-
-
 
 
 
         except Exception as e:
 
-
             print(
                 "[WS CALLBACK ERROR]",
                 e
             )
-
-
-
-
-
-
-
-    # ==================================
-    # STOP
-    # ==================================
-
-    def stop(self):
-
-
-        self.running = False
-
-
-
-        try:
-
-            if self.ws:
-
-                self.ws.exit()
-
-        except Exception:
-
-
-            pass
-
-
-
-        print(
-            "[STREAM STOPPED]"
-        )
-
-
 
 
 
@@ -324,8 +197,7 @@ class WebSocketStream:
 
     def run_thread(self):
 
-
-        thread = threading.Thread(
+        t = threading.Thread(
 
             target=self.start,
 
@@ -333,11 +205,7 @@ class WebSocketStream:
 
         )
 
-
-        thread.start()
-
-
-
+        t.start()
 
 
 
