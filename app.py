@@ -36,12 +36,11 @@ from portfolio.bybit_wallet import (
 
 
 
-
-
 class TradingApp:
 
 
     def __init__(self):
+
 
         print("==============================")
         print("[APP INIT]")
@@ -54,11 +53,19 @@ class TradingApp:
 
 
 
+        # websocket callback 연결
+
+        stream.set_callback(
+            self.on_candle
+        )
 
 
-    # =====================================================
+
+
+
+    # =====================================
     # START
-    # =====================================================
+    # =====================================
 
     def start(self):
 
@@ -72,13 +79,14 @@ class TradingApp:
         self.running = True
 
 
-        print("==============================")
+
+        print("====================================")
         print("VWAP SUPERTREND BOT START")
-        print("==============================")
+        print("====================================")
 
 
 
-        # Risk Manager
+        # Risk 초기화
 
         try:
 
@@ -93,7 +101,9 @@ class TradingApp:
 
 
 
-        # Watchdog
+
+
+        # Watchdog 시작
 
         try:
 
@@ -108,19 +118,17 @@ class TradingApp:
 
 
 
-        # WebSocket Start
 
-        threading.Thread(
 
-            target=stream.start,
+        # Public Websocket 시작
 
-            daemon=True
-
-        ).start()
+        stream.run_thread()
 
 
 
-        # Main Loop
+
+
+        # 메인 루프
 
         self.thread = threading.Thread(
 
@@ -135,27 +143,31 @@ class TradingApp:
 
 
 
-        print(
-            "[BOT RUNNING]"
-        )
+        print("[BOT RUNNING]")
 
 
 
 
 
 
+    # =====================================
+    # CANDLE EVENT
+    # =====================================
 
-    # =====================================================
-    # CANDLE PROCESS
-    # =====================================================
-
-    def process_candle(
+    def on_candle(
         self,
         candle
     ):
 
 
         try:
+
+
+            print(
+                "[PROCESS CANDLE]",
+                candle["close"]
+            )
+
 
 
             indicators = indicator_engine.update(
@@ -172,11 +184,17 @@ class TradingApp:
 
 
 
-            signal = strategy_engine.on_candle(
 
-                candle
+
+            signal = strategy_engine.analyze(
+
+                candle,
+
+                indicators
 
             )
+
+
 
 
 
@@ -192,6 +210,8 @@ class TradingApp:
 
 
 
+
+
             elif signal == "SELL":
 
 
@@ -201,6 +221,9 @@ class TradingApp:
 
 
                 order_manager.sell()
+
+
+
 
 
 
@@ -218,9 +241,9 @@ class TradingApp:
 
 
 
-    # =====================================================
+    # =====================================
     # LOOP
-    # =====================================================
+    # =====================================
 
     def loop(self):
 
@@ -228,6 +251,7 @@ class TradingApp:
         print(
             "[APP LOOP START]"
         )
+
 
 
         while self.running:
@@ -248,12 +272,16 @@ class TradingApp:
 
 
 
+
             except Exception as e:
 
 
                 print(
+
                     "[LOOP ERROR]",
+
                     e
+
                 )
 
 
@@ -265,9 +293,9 @@ class TradingApp:
 
 
 
-    # =====================================================
+    # =====================================
     # STOP
-    # =====================================================
+    # =====================================
 
     def stop(self):
 
@@ -275,6 +303,7 @@ class TradingApp:
         print(
             "[BOT STOPPING]"
         )
+
 
 
         self.running = False
@@ -285,7 +314,7 @@ class TradingApp:
 
             watchdog.stop()
 
-        except Exception:
+        except:
 
             pass
 
