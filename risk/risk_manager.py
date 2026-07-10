@@ -1,8 +1,21 @@
 import time
 
 
-from portfolio.bybit_wallet import wallet
-from position.position_manager import position_manager
+from config import (
+    MAX_POSITION_SIZE,
+    DAILY_LOSS_LIMIT,
+    ORDER_COOLDOWN,
+)
+
+
+from portfolio.bybit_wallet import (
+    wallet,
+)
+
+
+from position.position_manager import (
+    position_manager,
+)
 
 
 
@@ -11,48 +24,41 @@ from position.position_manager import position_manager
 class RiskManager:
 
 
+
     def __init__(self):
 
 
         self.enabled = True
 
 
-        # 최대 주문 수량
 
-        self.max_position_size = 0.01
+        self.max_position_size = (
+
+            MAX_POSITION_SIZE
+
+        )
 
 
+        self.cooldown_seconds = (
 
-        # 주문 간격
+            ORDER_COOLDOWN
 
-        self.cooldown_seconds = 30
+        )
+
+
+        self.daily_loss_limit = (
+
+            DAILY_LOSS_LIMIT
+
+        )
+
 
 
         self.last_order_time = 0
 
 
 
-
-
-        # 일일 손실 제한
-
-        self.daily_loss_limit = -100
-
-
-
-
-
         self.start_equity = None
-
-
-
-        # PNL CHECK CACHE
-
-        self.last_loss_check = 0
-
-
-        self.loss_check_interval = 30
-
 
 
 
@@ -84,7 +90,9 @@ class RiskManager:
 
 
             self.start_equity = float(
+
                 equity
+
             )
 
 
@@ -93,6 +101,7 @@ class RiskManager:
                 "[RISK INIT EQUITY]",
                 self.start_equity
             )
+
 
 
 
@@ -146,7 +155,7 @@ class RiskManager:
 
 
 
-        except Exception:
+        except:
 
 
             print(
@@ -162,10 +171,19 @@ class RiskManager:
 
 
 
+
         if qty <= 0:
 
 
+            print(
+                "[RISK BLOCK] ZERO SIZE"
+            )
+
+
             return False
+
+
+
 
 
 
@@ -187,68 +205,17 @@ class RiskManager:
 
 
 
-        # POSITION CHECK
+        # 현재 포지션 확인
 
-
-        try:
-
-
-            position = position_manager.current
+        position_manager.sync()
 
 
 
-            if position["size"] > 0:
-
-
-                print(
-                    "[RISK BLOCK] POSITION EXISTS"
-                )
-
-
-                return False
-
-
-
-
-        except Exception as e:
+        if position_manager.has_position():
 
 
             print(
-                "[POSITION CHECK ERROR]",
-                e
-            )
-
-
-
-
-
-
-
-        # COOLDOWN
-
-
-        now = time.time()
-
-
-
-        remain = (
-
-            self.cooldown_seconds
-
-            -
-
-            (now - self.last_order_time)
-
-        )
-
-
-
-        if remain > 0:
-
-
-            print(
-                "[RISK BLOCK] COOLDOWN",
-                round(remain,1)
+                "[RISK BLOCK] POSITION EXISTS"
             )
 
 
@@ -259,8 +226,56 @@ class RiskManager:
 
 
 
-        return True
 
+        # cooldown
+
+
+        elapsed = (
+
+            time.time()
+
+            -
+
+            self.last_order_time
+
+        )
+
+
+
+        if elapsed < self.cooldown_seconds:
+
+
+            remain = round(
+
+                self.cooldown_seconds
+
+                -
+
+                elapsed,
+
+                1
+
+            )
+
+
+            print(
+
+                "[RISK BLOCK] COOLDOWN",
+
+                remain
+
+            )
+
+
+            return False
+
+
+
+
+
+
+
+        return True
 
 
 
@@ -306,49 +321,37 @@ class RiskManager:
 
 
 
-        now = time.time()
-
-
-
-        if (
-
-            now - self.last_loss_check
-
-            <
-
-            self.loss_check_interval
-
-        ):
-
-
-            return True
-
-
-
-
-        self.last_loss_check = now
-
-
-
-
-
         try:
 
 
             current = float(
+
                 wallet.get_equity()
+
             )
 
 
 
-            pnl = current - self.start_equity
+            pnl = (
+
+                current
+
+                -
+
+                self.start_equity
+
+            )
 
 
 
             print(
+
                 "[DAILY PNL]",
+
                 round(pnl,2)
+
             )
+
 
 
 
@@ -356,10 +359,12 @@ class RiskManager:
             if pnl <= self.daily_loss_limit:
 
 
-
                 print(
-                    "[RISK STOP]",
+
+                    "[RISK STOP] DAILY LOSS LIMIT",
+
                     pnl
+
                 )
 
 
@@ -374,18 +379,23 @@ class RiskManager:
 
 
 
+
         except Exception as e:
 
 
             print(
+
                 "[LOSS CHECK ERROR]",
+
                 e
+
             )
 
 
 
-        return True
 
+
+        return True
 
 
 
@@ -403,13 +413,13 @@ class RiskManager:
     def reset_daily(self):
 
 
-        self.initialize()
+        self.enabled = True
 
 
         self.last_order_time = 0
 
 
-        self.enabled = True
+        self.initialize()
 
 
 
@@ -458,10 +468,11 @@ class RiskManager:
 
 
 
-        except Exception:
+        except:
 
 
             pass
+
 
 
 
@@ -485,6 +496,11 @@ class RiskManager:
                 self.cooldown_seconds,
 
 
+            "daily_loss_limit":
+
+                self.daily_loss_limit,
+
+
             "start_equity":
 
                 self.start_equity,
@@ -496,6 +512,8 @@ class RiskManager:
 
 
         }
+
+
 
 
 
