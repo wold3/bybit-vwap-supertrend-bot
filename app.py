@@ -3,7 +3,6 @@
 # Trading Application Core
 # =====================================================
 
-
 import time
 import threading
 
@@ -20,11 +19,9 @@ from api.bybit_api import (
 )
 
 
-
 from strategy.vwap_supertrend_strategy import (
     vwap_supertrend_strategy
 )
-
 
 
 from execution.order_manager import (
@@ -32,11 +29,9 @@ from execution.order_manager import (
 )
 
 
-
 from portfolio.position_manager import (
     position_manager
 )
-
 
 
 from risk.risk_manager import (
@@ -44,11 +39,9 @@ from risk.risk_manager import (
 )
 
 
-
 from services.private_ws import (
     private_ws
 )
-
 
 
 from services.watchdog import (
@@ -56,12 +49,20 @@ from services.watchdog import (
 )
 
 
-
 from database.database import (
     database
 )
 
 
+
+# ============================
+# WEB DASHBOARD
+# ============================
+
+from web.server import (
+    start_dashboard,
+    update_status
+)
 
 
 
@@ -80,14 +81,11 @@ class TradingApp:
         self.market_thread = None
 
 
-
         print(
 
             "[TRADING APP READY]"
 
         )
-
-
 
 
 
@@ -105,7 +103,6 @@ class TradingApp:
         try:
 
 
-
             print("====================")
 
             print("[BOT START]")
@@ -114,13 +111,16 @@ class TradingApp:
 
 
 
+            # WEB
+
+            start_dashboard()
 
 
 
 
-            # -----------------------------
+
+
             # WALLET
-            # -----------------------------
 
 
             wallet = (
@@ -133,54 +133,7 @@ class TradingApp:
 
 
 
-            if wallet:
-
-
-                try:
-
-
-                    equity = float(
-
-                        wallet["result"]
-
-                        ["list"][0]
-
-                        ["totalEquity"]
-
-                    )
-
-
-
-                    print(
-
-                        "[EQUITY]",
-
-                        equity
-
-                    )
-
-
-
-                    risk_manager.update_equity(
-
-                        equity
-
-                    )
-
-
-
-                except Exception:
-
-
-                    print(
-
-                        "[WALLET PARSE ERROR]"
-
-                    )
-
-
-
-            else:
+            if not wallet:
 
 
                 raise Exception(
@@ -193,25 +146,104 @@ class TradingApp:
 
 
 
+            equity = float(
+
+                wallet
+
+                ["result"]
+
+                ["list"][0]
+
+                ["totalEquity"]
+
+            )
 
 
 
-            # -----------------------------
+            print(
+
+                "[EQUITY]",
+
+                equity
+
+            )
+
+
+
+            risk_manager.update_equity(
+
+                equity
+
+            )
+
+
+
+
+
+
             # POSITION
-            # -----------------------------
 
 
-            position_manager.sync()
+            try:
 
 
-
-
+                position_manager.sync()
 
 
 
-            # -----------------------------
-            # WATCHDOG
-            # -----------------------------
+            except Exception:
+
+
+                print(
+
+                    "[POSITION SYNC ERROR]"
+
+                )
+
+
+
+
+
+
+            # STATUS
+
+
+            update_status(
+
+                {
+
+
+                "bot":
+
+                    "STARTING",
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+
+                }
+
+            )
+
+
+
+
+
+
+            # SERVICES
+
+
+            print(
+
+                "[PRIVATE WS CONNECTING]"
+
+            )
+
+
+            private_ws.start()
+
 
 
             watchdog.start()
@@ -222,25 +254,9 @@ class TradingApp:
 
 
 
-            # -----------------------------
-            # PRIVATE WS
-            # -----------------------------
-
-
-            private_ws.start()
-
-
-
-
-
-
-
-            # -----------------------------
-            # MARKET LOOP
-            # -----------------------------
-
-
             self.running = True
+
+
 
 
 
@@ -253,7 +269,28 @@ class TradingApp:
             )
 
 
+
             self.market_thread.start()
+
+
+
+
+
+
+            update_status(
+
+                {
+
+
+                "bot":
+
+                    "RUNNING"
+
+
+                }
+
+            )
+
 
 
 
@@ -262,7 +299,6 @@ class TradingApp:
                 "[BOT READY]"
 
             )
-
 
 
 
@@ -286,9 +322,7 @@ class TradingApp:
             self.stop()
 
 
-
             raise e
-
 
 
 
@@ -317,6 +351,7 @@ class TradingApp:
         while self.running:
 
 
+
             try:
 
 
@@ -328,6 +363,8 @@ class TradingApp:
                     .get_kline()
 
                 )
+
+
 
 
 
@@ -345,15 +382,16 @@ class TradingApp:
 
 
 
-                    normalized = []
+
+
+                    data = []
 
 
 
                     for c in candles:
 
 
-                        normalized.append(
-
+                        data.append(
 
                             {
 
@@ -387,8 +425,8 @@ class TradingApp:
 
                                 c[5]
 
-                            }
 
+                            }
 
                         )
 
@@ -400,9 +438,10 @@ class TradingApp:
 
                         "[CANDLE RECEIVED]",
 
-                        len(normalized)
+                        len(data)
 
                     )
+
 
 
 
@@ -414,7 +453,7 @@ class TradingApp:
 
                         .analyze(
 
-                            normalized
+                            data
 
                         )
 
@@ -424,7 +463,48 @@ class TradingApp:
 
 
 
+
+                    # ==========================
+                    # DASHBOARD UPDATE
+                    # ==========================
+
+
+                    last = data[-1]
+
+
+
+                    update_status(
+
+                        {
+
+
+                        "price":
+
+                            float(last["close"]),
+
+
+
+                        }
+
+                    )
+
+
+
+
+
+
+
+
                     if signal:
+
+
+                        print(
+
+                            "[APP SIGNAL]",
+
+                            signal
+
+                        )
 
 
                         order_manager.execute(
@@ -432,6 +512,22 @@ class TradingApp:
                             signal
 
                         )
+
+
+
+
+
+
+                    else:
+
+
+                        print(
+
+                            "[NO SIGNAL]"
+
+                        )
+
+
 
 
 
@@ -465,11 +561,14 @@ class TradingApp:
 
 
 
+
             time.sleep(
 
                 10
 
             )
+
+
 
 
 
@@ -493,9 +592,7 @@ class TradingApp:
         )
 
 
-
         self.running = False
-
 
 
 
@@ -504,7 +601,6 @@ class TradingApp:
 
 
             private_ws.stop()
-
 
 
         except:
@@ -522,11 +618,11 @@ class TradingApp:
             watchdog.stop()
 
 
-
         except:
 
 
             pass
+
 
 
 
@@ -538,13 +634,28 @@ class TradingApp:
             database.close()
 
 
-
         except:
 
 
             pass
 
 
+
+
+
+        update_status(
+
+            {
+
+
+            "bot":
+
+                "STOPPED"
+
+
+            }
+
+        )
 
 
 
@@ -565,5 +676,6 @@ class TradingApp:
 # =====================================================
 # SINGLETON
 # =====================================================
+
 
 app = TradingApp()
