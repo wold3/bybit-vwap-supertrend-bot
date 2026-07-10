@@ -5,15 +5,12 @@ from pybit.unified_trading import WebSocket
 
 from config import (
     BYBIT_TESTNET,
+    BYBIT_DEMO,
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
     CATEGORY,
 )
 
-
-# ==========================================
-# PRIVATE WEBSOCKET V5
-# ==========================================
 
 class PrivateWS:
 
@@ -25,10 +22,9 @@ class PrivateWS:
         self.running = False
 
         self.position = {}
-
         self.orders = {}
-
         self.wallet = {}
+
 
         print("==============================")
         print("[PRIVATE WS INIT]")
@@ -36,9 +32,8 @@ class PrivateWS:
         print("==============================")
 
 
-
     # ======================================
-    # MESSAGE HANDLER
+    # CALLBACK
     # ======================================
 
     def handle_position(self, message):
@@ -48,14 +43,15 @@ class PrivateWS:
             self.position = message
 
             print("[POSITION UPDATE]")
+            print(message)
+
 
         except Exception as e:
 
             print(
-                "[POSITION WS ERROR]",
+                "[POSITION CALLBACK ERROR]",
                 e
             )
-
 
 
     def handle_order(self, message):
@@ -65,14 +61,15 @@ class PrivateWS:
             self.orders = message
 
             print("[ORDER UPDATE]")
+            print(message)
+
 
         except Exception as e:
 
             print(
-                "[ORDER WS ERROR]",
+                "[ORDER CALLBACK ERROR]",
                 e
             )
-
 
 
     def handle_wallet(self, message):
@@ -81,12 +78,13 @@ class PrivateWS:
 
             self.wallet = message
 
-            print("[WALLET UPDATE]")
+            print("[PRIVATE WALLET UPDATE]")
+
 
         except Exception as e:
 
             print(
-                "[WALLET WS ERROR]",
+                "[WALLET CALLBACK ERROR]",
                 e
             )
 
@@ -98,21 +96,21 @@ class PrivateWS:
 
     def start(self):
 
-
         if self.running:
 
             return
 
 
-        self.running = True
-
-
         try:
+
+            self.running = True
 
 
             self.ws = WebSocket(
 
                 testnet=BYBIT_TESTNET,
+
+                demo=BYBIT_DEMO,
 
                 channel_type="private",
 
@@ -121,7 +119,6 @@ class PrivateWS:
                 api_secret=BYBIT_API_SECRET
 
             )
-
 
 
             self.ws.position_stream(
@@ -163,10 +160,6 @@ class PrivateWS:
             )
 
 
-            self.running=False
-
-
-
 
     # ======================================
     # THREAD
@@ -195,7 +188,20 @@ class PrivateWS:
     def stop(self):
 
 
-        self.running=False
+        self.running = False
+
+
+        try:
+
+            if self.ws:
+
+                self.ws.exit()
+
+
+        except:
+
+            pass
+
 
 
         print("[PRIVATE WS STOPPED]")
@@ -203,7 +209,7 @@ class PrivateWS:
 
 
     # ======================================
-    # DATA ACCESS
+    # GETTERS
     # ======================================
 
     def get_position(self):
@@ -225,9 +231,5 @@ class PrivateWS:
 
 
 
-
-# ==========================================
-# SINGLETON
-# ==========================================
 
 private_ws = PrivateWS()
