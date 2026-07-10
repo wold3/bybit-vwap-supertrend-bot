@@ -2,20 +2,30 @@ import threading
 import time
 
 
+
 from pybit.unified_trading import WebSocket
 
 
+
 from config import (
+
     BYBIT_TESTNET,
+
     BYBIT_DEMO,
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
+
     CATEGORY,
+
+    DEFAULT_SYMBOL,
+
+    BYBIT_API_KEY,
+
+    BYBIT_API_SECRET,
+
 )
 
 
+
 from execution.position_manager import position_manager
-from execution.order_manager import order_manager
 
 
 
@@ -26,6 +36,7 @@ from execution.order_manager import order_manager
 # ==========================================
 
 class PrivateWS:
+
 
 
     def __init__(self):
@@ -41,14 +52,6 @@ class PrivateWS:
 
 
 
-        self.order_data = None
-
-        self.position_data = None
-
-        self.wallet_data = None
-
-
-
         print("==============================")
         print("[PRIVATE WS INIT]")
         print("CATEGORY :", CATEGORY)
@@ -59,114 +62,21 @@ class PrivateWS:
 
 
     # ======================================
-    # MESSAGE HANDLER
+    # POSITION CALLBACK
     # ======================================
 
-    def handle_message(self, message):
-
-
-        try:
-
-
-            topic = message.get(
-                "topic",
-                ""
-            )
-
-
-
-            # --------------------------
-            # ORDER
-            # --------------------------
-
-            if topic == "order":
-
-
-                self.order_data = message
-
-
-
-                print(
-                    "[ORDER UPDATE]"
-                )
-
-
-                self.sync_order(
-                    message
-                )
-
-
-
-
-
-            # --------------------------
-            # POSITION
-            # --------------------------
-
-            elif topic == "position":
-
-
-                self.position_data = message
-
-
-
-                print(
-                    "[POSITION UPDATE]"
-                )
-
-
-                self.sync_position(
-                    message
-                )
-
-
-
-
-
-            # --------------------------
-            # WALLET
-            # --------------------------
-
-            elif topic == "wallet":
-
-
-                self.wallet_data = message
-
-
-
-                print(
-                    "[WALLET UPDATE]"
-                )
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[PRIVATE MESSAGE ERROR]",
-                e
-            )
-
-
-
-
-
-    # ======================================
-    # POSITION SYNC
-    # ======================================
-
-    def sync_position(self, message):
+    def position_callback(self, message):
 
 
         try:
 
 
             data = message.get(
+
                 "data",
+
                 []
+
             )
 
 
@@ -180,31 +90,57 @@ class PrivateWS:
 
 
 
-            pos = data[0]
+            position = data[0]
 
 
 
-            side = pos.get(
-                "side",
-                ""
+            symbol = position.get(
+
+                "symbol"
+
             )
+
+
+
+            if symbol != DEFAULT_SYMBOL:
+
+
+                return
+
+
+
+
+
+            side = position.get(
+
+                "side"
+
+            )
+
 
 
             size = float(
 
-                pos.get(
+                position.get(
+
                     "size",
+
                     0
+
                 )
 
             )
+
 
 
             entry = float(
 
-                pos.get(
+                position.get(
+
                     "avgPrice",
+
                     0
+
                 )
 
             )
@@ -213,35 +149,23 @@ class PrivateWS:
 
 
 
-            if size > 0 and side:
+            if size > 0:
 
 
 
                 position_manager.update_position(
 
+
                     side,
+
 
                     size,
 
+
                     entry
 
-                )
-
-
-
-                order_manager.update_position(
-
-                    {
-
-                        "side": side,
-
-                        "size": size
-
-                    }
 
                 )
-
-
 
 
 
@@ -252,27 +176,13 @@ class PrivateWS:
 
 
 
-                order_manager.update_position(
-
-                    {
-
-                        "side": None,
-
-                        "size": 0
-
-                    }
-
-                )
-
-
-
 
 
         except Exception as e:
 
 
             print(
-                "[POSITION SYNC ERROR]",
+                "[PRIVATE POSITION ERROR]",
                 e
             )
 
@@ -281,24 +191,31 @@ class PrivateWS:
 
 
     # ======================================
-    # ORDER SYNC
+    # ORDER CALLBACK
     # ======================================
 
-    def sync_order(self, message):
+    def order_callback(self, message):
 
 
         try:
 
 
             data = message.get(
+
                 "data",
+
                 []
+
             )
+
 
 
             if not data:
 
+
                 return
+
+
 
 
 
@@ -307,26 +224,27 @@ class PrivateWS:
 
 
             status = order.get(
+
                 "orderStatus"
+
             )
 
 
 
             side = order.get(
+
                 "side"
-            )
-
-
-
-            print(
-
-                "[ORDER STATUS]",
-
-                status,
-
-                side
 
             )
+
+
+
+            print("==============================")
+            print("[ORDER UPDATE]")
+            print("SIDE :", side)
+            print("STATUS :", status)
+            print("==============================")
+
 
 
 
@@ -335,7 +253,7 @@ class PrivateWS:
 
 
             print(
-                "[ORDER SYNC ERROR]",
+                "[ORDER CALLBACK ERROR]",
                 e
             )
 
@@ -367,28 +285,24 @@ class PrivateWS:
 
             api_secret=BYBIT_API_SECRET
 
+
         )
 
+
+
+
+
+        self.ws.position_stream(
+
+            callback=self.position_callback
+
+        )
 
 
 
         self.ws.order_stream(
 
-            callback=self.handle_message
-
-        )
-
-
-        self.ws.position_stream(
-
-            callback=self.handle_message
-
-        )
-
-
-        self.ws.wallet_stream(
-
-            callback=self.handle_message
+            callback=self.order_callback
 
         )
 
@@ -397,6 +311,8 @@ class PrivateWS:
         print(
             "[PRIVATE WS STARTED]"
         )
+
+
 
 
 
@@ -423,7 +339,6 @@ class PrivateWS:
         while self.running:
 
 
-
             try:
 
 
@@ -441,7 +356,7 @@ class PrivateWS:
 
 
                 print(
-                    "[PRIVATE WS RECONNECT] 5 sec"
+                    "[PRIVATE WS RECONNECT] 5 SEC"
                 )
 
 
@@ -490,35 +405,6 @@ class PrivateWS:
         print(
             "[PRIVATE WS STOPPED]"
         )
-
-
-
-
-
-    # ======================================
-    # GETTERS
-    # ======================================
-
-    def get_position(self):
-
-
-        return self.position_data
-
-
-
-
-    def get_order(self):
-
-
-        return self.order_data
-
-
-
-
-    def get_wallet(self):
-
-
-        return self.wallet_data
 
 
 
