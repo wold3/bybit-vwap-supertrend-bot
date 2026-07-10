@@ -6,16 +6,16 @@ from pybit.unified_trading import WebSocket
 
 
 from config import (
-    BYBIT_PUBLIC_WS,
+    BYBIT_TESTNET,
     CATEGORY,
     DEFAULT_SYMBOL,
-    BYBIT_TESTNET,
 )
 
 
 
+
 # ==========================================
-# PUBLIC KLINE WEBSOCKET
+# PUBLIC WEBSOCKET V5
 # ==========================================
 
 class PublicWS:
@@ -29,13 +29,18 @@ class PublicWS:
         self.running = False
 
 
-        self.price = None
+
+        self.prices = []
 
 
         self.opens = []
+
         self.highs = []
+
         self.lows = []
+
         self.closes = []
+
         self.volumes = []
 
 
@@ -49,13 +54,17 @@ class PublicWS:
 
 
 
+
     # ======================================
-    # KLINE CALLBACK
+    # TICKER CALLBACK
     # ======================================
 
-    def handle_kline(
+    def ticker_callback(
+
         self,
+
         message
+
     ):
 
 
@@ -63,7 +72,81 @@ class PublicWS:
 
 
             data = message.get(
-                "data"
+
+                "data",
+
+                {}
+
+            )
+
+
+            if "lastPrice" in data:
+
+
+                price = float(
+
+                    data["lastPrice"]
+
+                )
+
+
+                self.prices.append(
+
+                    price
+
+                )
+
+
+                if len(self.prices) > 500:
+
+                    self.prices.pop(0)
+
+
+
+                print(
+
+                    "[PRICE]",
+
+                    price
+
+                )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[TICKER ERROR]",
+                e
+            )
+
+
+
+
+
+    # ======================================
+    # KLINE CALLBACK
+    # ======================================
+
+    def kline_callback(
+
+        self,
+
+        message
+
+    ):
+
+
+        try:
+
+
+            data = message.get(
+
+                "data",
+
+                []
+
             )
 
 
@@ -73,76 +156,89 @@ class PublicWS:
 
 
 
+
             candle = data[0]
 
 
 
-            open_price = float(
-                candle["open"]
-            )
-
-            high_price = float(
-                candle["high"]
-            )
-
-            low_price = float(
-                candle["low"]
-            )
-
-            close_price = float(
-                candle["close"]
-            )
-
-            volume = float(
-                candle["volume"]
-            )
-
-
-
-            self.price = close_price
-
-
-
             self.opens.append(
-                open_price
+
+                float(
+
+                    candle["open"]
+
+                )
+
             )
+
 
             self.highs.append(
-                high_price
+
+                float(
+
+                    candle["high"]
+
+                )
+
             )
+
 
             self.lows.append(
-                low_price
+
+                float(
+
+                    candle["low"]
+
+                )
+
             )
+
 
             self.closes.append(
-                close_price
+
+                float(
+
+                    candle["close"]
+
+                )
+
             )
+
 
             self.volumes.append(
-                volume
+
+                float(
+
+                    candle["volume"]
+
+                )
+
             )
 
 
 
-            if len(self.closes) > 300:
+            if len(self.closes) > 500:
 
 
-                self.opens = self.opens[-300:]
+                self.opens.pop(0)
 
-                self.highs = self.highs[-300:]
+                self.highs.pop(0)
 
-                self.lows = self.lows[-300:]
+                self.lows.pop(0)
 
-                self.closes = self.closes[-300:]
+                self.closes.pop(0)
 
-                self.volumes = self.volumes[-300:]
+                self.volumes.pop(0)
+
 
 
 
             print(
+
                 "[KLINE]",
-                close_price
+
+                self.closes[-1]
+
             )
 
 
@@ -154,6 +250,7 @@ class PublicWS:
                 "[KLINE ERROR]",
                 e
             )
+
 
 
 
@@ -182,15 +279,26 @@ class PublicWS:
 
 
 
+            self.ws.ticker_stream(
+
+                symbol=DEFAULT_SYMBOL,
+
+                callback=self.ticker_callback
+
+            )
+
+
+
             self.ws.kline_stream(
 
                 interval=1,
 
                 symbol=DEFAULT_SYMBOL,
 
-                callback=self.handle_kline
+                callback=self.kline_callback
 
             )
+
 
 
 
@@ -202,7 +310,10 @@ class PublicWS:
 
             while self.running:
 
+
                 time.sleep(1)
+
+
 
 
 
@@ -213,6 +324,7 @@ class PublicWS:
                 "[PUBLIC WS START ERROR]",
                 e
             )
+
 
 
 
@@ -255,15 +367,10 @@ class PublicWS:
 
 
 
+
     # ======================================
-    # GETTERS
+    # DATA GETTER
     # ======================================
-
-    def get_price(self):
-
-        return self.price
-
-
 
     def get_ohlcv(self):
 
