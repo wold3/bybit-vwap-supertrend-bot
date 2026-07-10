@@ -1,781 +1,221 @@
-import logging
 import time
-from functools import wraps
 
 from pybit.unified_trading import HTTP
 
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
-    TESTNET,
-)
-
-logger = logging.getLogger(__name__)
-
-session = HTTP(
-    testnet=TESTNET,
-    api_key=BYBIT_API_KEY,
-    api_secret=BYBIT_API_SECRET,
+    BYBIT_BASE_URL,
+    BYBIT_TESTNET,
+    CATEGORY,
+    DEFAULT_SYMBOL,
+    ACCOUNT_TYPE,
 )
 
 
-# =====================================================
-# Retry
-# =====================================================
+class BybitAPI:
 
-def retry(max_retry=3, delay=1):
-    def decorator(func):
 
-        @wraps(func)
-        def wrapper(*args, **kwargs):
+    def __init__(self):
 
-            last_error = None
+        print("==============================")
+        print("[BYBIT API INIT]")
+        print("BASE :", BYBIT_BASE_URL)
+        print("TESTNET :", BYBIT_TESTNET)
+        print("ACCOUNT :", ACCOUNT_TYPE)
+        print("==============================")
 
-            for i in range(max_retry):
 
-                try:
-                    return func(*args, **kwargs)
+        self.session = HTTP(
+            testnet=BYBIT_TESTNET,
+            api_key=BYBIT_API_KEY,
+            api_secret=BYBIT_API_SECRET,
+            demo=True
+        )
 
-                except Exception as e:
 
-                    last_error = e
 
-                    logger.warning(
-                        "%s retry %d/%d : %s",
-                        func.__name__,
-                        i + 1,
-                        max_retry,
-                        e,
-                    )
+    # ==================================================
+    # WALLET
+    # ==================================================
 
-                    time.sleep(delay)
+    def get_wallet_balance(self):
 
-            raise last_error
+        try:
 
-        return wrapper
+            result = self.session.get_wallet_balance(
 
-    return decorator
+                accountType=ACCOUNT_TYPE
 
-
-# =====================================================
-# Common
-# =====================================================
-
-def _convert_side(signal: str) -> str:
-
-    signal = signal.upper()
-
-    if signal == "BUY":
-        return "Buy"
-
-    if signal in (
-        "SELL",
-        "SHORT",
-        "EXIT",
-    ):
-        return "Sell"
-
-    raise ValueError(
-        f"Unknown signal : {signal}"
-    )
-
-
-# =====================================================
-# Market Order
-# =====================================================
-
-@retry()
-def execute(
-    signal,
-    symbol,
-    qty,
-):
-    """
-    Backward compatible wrapper
-    """
-
-    return execute_market(
-        signal,
-        symbol,
-        qty,
-    )
-
-
-@retry()
-def execute_market(
-    signal,
-    symbol,
-    qty,
-):
-
-    side = _convert_side(signal)
-
-    logger.info(
-        "MARKET %s %s qty=%s",
-        side,
-        symbol,
-        qty,
-    )
-
-    response = session.place_order(
-        category="linear",
-        symbol=symbol,
-        side=side,
-        orderType="Market",
-        qty=str(qty),
-        timeInForce="IOC",
-    )
-
-    return {
-        "success": True,
-        "response": response,
-    }
-
-
-# =====================================================
-# Limit Order
-# =====================================================
-
-@retry()
-def execute_limit(
-    signal,
-    symbol,
-    qty,
-    price,
-):
-
-    side = _convert_side(signal)
-
-    logger.info(
-        "LIMIT %s %s qty=%s price=%s",
-        side,
-        symbol,
-        qty,
-        price,
-    )
-
-    response = session.place_order(
-        category="linear",
-        symbol=symbol,
-        side=side,
-        orderType="Limit",
-        qty=str(qty),
-        price=str(price),
-        timeInForce="GTC",
-    )
-
-    return {
-        "success": True,
-        "response": response,
-    }
-
-# =====================================================
-# Cancel Order
-# =====================================================
-
-@retry()
-def cancel_order(
-    symbol,
-    order_id,
-):
-
-    logger.info(
-        "CANCEL %s order=%s",
-        symbol,
-        order_id,
-    )
-
-    response = session.cancel_order(
-        category="linear",
-        symbol=symbol,
-        orderId=order_id,
-    )
-
-    return {
-        "success": True,
-        "response": response,
-    }
-
-
-# =====================================================
-# Cancel All Orders
-# =====================================================
-
-@retry()
-def cancel_all_orders(symbol):
-
-    logger.info(
-        "CANCEL ALL %s",
-        symbol,
-    )
-
-    response = session.cancel_all_orders(
-        category="linear",
-        symbol=symbol,
-    )
-
-    return {
-        "success": True,
-        "response": response,
-    }
-
-
-# =====================================================
-# Open Orders
-# =====================================================
-
-@retry()
-def get_open_orders(symbol):
-
-    result = session.get_open_orders(
-        category="linear",
-        symbol=symbol,
-    )
-
-    return result.get(
-        "result",
-        {},
-    ).get(
-        "list",
-        [],
-    )
-
-
-# =====================================================
-# Order History
-# =====================================================
-
-@retry()
-def get_order_history(
-    symbol,
-    limit=50,
-):
-
-    result = session.get_order_history(
-        category="linear",
-        symbol=symbol,
-        limit=limit,
-    )
-
-    return result.get(
-        "result",
-        {},
-    ).get(
-        "list",
-        [],
-    )
-
-
-# =====================================================
-# Position
-# =====================================================
-
-@retry()
-def get_positions(symbol=None):
-
-    kwargs = {
-        "category": "linear",
-    }
-
-    if symbol:
-        kwargs["symbol"] = symbol
-
-    result = session.get_positions(
-        **kwargs,
-    )
-
-    return result.get(
-        "result",
-        {},
-    ).get(
-        "list",
-        [],
-    )
-
-
-@retry()
-def get_position(symbol):
-
-    positions = get_positions(symbol)
-
-    if not positions:
-        return None
-
-    return positions[0]
-
-
-# =====================================================
-# Close Position
-# =====================================================
-
-@retry()
-def close_position(symbol):
-
-    position = get_position(symbol)
-
-    if position is None:
-        return {
-            "success": False,
-            "error": "No position",
-        }
-
-    size = float(
-        position.get("size", 0)
-    )
-
-    if size <= 0:
-        return {
-            "success": False,
-            "error": "Position size is zero",
-        }
-
-    side = position.get("side")
-
-    close_side = (
-        "Sell"
-        if side == "Buy"
-        else "Buy"
-    )
-
-    logger.info(
-        "CLOSE %s size=%s",
-        symbol,
-        size,
-    )
-
-    response = session.place_order(
-        category="linear",
-        symbol=symbol,
-        side=close_side,
-        orderType="Market",
-        qty=str(size),
-        reduceOnly=True,
-        timeInForce="IOC",
-    )
-
-    return {
-        "success": True,
-        "response": response,
-    }
-
-
-# =====================================================
-# Reduce Only Order
-# =====================================================
-
-@retry()
-def reduce_only_order(
-    signal,
-    symbol,
-    qty,
-):
-
-    side = _convert_side(signal)
-
-    logger.info(
-        "REDUCE %s %s qty=%s",
-        side,
-        symbol,
-        qty,
-    )
-
-    response = session.place_order(
-        category="linear",
-        symbol=symbol,
-        side=side,
-        orderType="Market",
-        qty=str(qty),
-        reduceOnly=True,
-        timeInForce="IOC",
-    )
-
-    return {
-        "success": True,
-        "response": response,
-    }
-
-# =====================================================
-# Wallet
-# =====================================================
-
-@retry()
-def get_wallet_balance():
-
-    result = session.get_wallet_balance(
-        accountType="UNIFIED",
-    )
-
-    return result
-
-
-@retry()
-def get_balance(coin="USDT"):
-
-    result = session.get_wallet_balance(
-        accountType="UNIFIED",
-    )
-
-    accounts = (
-        result.get("result", {})
-        .get("list", [])
-    )
-
-    if not accounts:
-        return 0.0
-
-    coins = accounts[0].get("coin", [])
-
-    for item in coins:
-
-        if item.get("coin") == coin:
-
-            return float(
-                item.get(
-                    "walletBalance",
-                    0,
-                )
             )
 
-    return 0.0
-
-
-# =====================================================
-# Market
-# =====================================================
-
-@retry()
-def get_ticker(symbol):
-
-    result = session.get_tickers(
-        category="linear",
-        symbol=symbol,
-    )
-
-    tickers = (
-        result.get("result", {})
-        .get("list", [])
-    )
-
-    if not tickers:
-        return None
-
-    return tickers[0]
-
-
-@retry()
-def get_last_price(symbol):
-
-    ticker = get_ticker(symbol)
-
-    if ticker is None:
-        return None
-
-    return float(
-        ticker.get(
-            "lastPrice",
-            0,
-        )
-    )
 
-
-@retry()
-def get_kline(
-    symbol,
-    interval="1",
-    limit=200,
-):
+            print("[WALLET RESPONSE]")
+            print(result)
 
-    result = session.get_kline(
-        category="linear",
-        symbol=symbol,
-        interval=interval,
-        limit=limit,
-    )
 
-    return (
-        result.get("result", {})
-        .get("list", [])
-    )
+            return result
 
 
-# =====================================================
-# Leverage
-# =====================================================
 
-@retry()
-def set_leverage(
-    symbol,
-    leverage,
-):
+        except Exception as e:
 
-    logger.info(
-        "SET LEVERAGE %s -> %s",
-        symbol,
-        leverage,
-    )
+            print(
+                "[WALLET ERROR]",
+                e
+            )
 
-    response = session.set_leverage(
-        category="linear",
-        symbol=symbol,
-        buyLeverage=str(leverage),
-        sellLeverage=str(leverage),
-    )
+            return None
 
-    return {
-        "success": True,
-        "response": response,
-    }
 
 
-# =====================================================
-# TP / SL
-# =====================================================
+    # ==================================================
+    # POSITION
+    # ==================================================
 
-@retry()
-def set_trading_stop(
-    symbol,
-    take_profit=None,
-    stop_loss=None,
-    trailing_stop=None,
-):
+    def get_position(self):
 
-    params = {
-        "category": "linear",
-        "symbol": symbol,
-    }
+        try:
 
-    if take_profit is not None:
-        params["takeProfit"] = str(
-            take_profit
-        )
+            result = self.session.get_positions(
 
-    if stop_loss is not None:
-        params["stopLoss"] = str(
-            stop_loss
-        )
+                category=CATEGORY,
 
-    if trailing_stop is not None:
-        params["trailingStop"] = str(
-            trailing_stop
-        )
+                symbol=DEFAULT_SYMBOL
 
-    response = session.set_trading_stop(
-        **params
-    )
+            )
 
-    return {
-        "success": True,
-        "response": response,
-    }
 
+            return result
 
-# =====================================================
-# Unrealized PnL
-# =====================================================
 
-@retry()
-def get_unrealized_pnl(symbol):
 
-    position = get_position(symbol)
+        except Exception as e:
 
-    if position is None:
-        return 0.0
 
-    return float(
-        position.get(
-            "unrealisedPnl",
-            0,
-        )
-    )
+            print(
+                "[POSITION ERROR]",
+                e
+            )
 
 
-# =====================================================
-# Position Value
-# =====================================================
+            return None
 
-@retry()
-def get_position_value(symbol):
 
-    position = get_position(symbol)
 
-    if position is None:
-        return 0.0
 
-    return float(
-        position.get(
-            "positionValue",
-            0,
-        )
-    )
+    # ==================================================
+    # KLINE
+    # ==================================================
 
+    def get_kline(
+        self,
+        interval="1"
+    ):
 
-# =====================================================
-# Margin
-# =====================================================
 
-@retry()
-def get_position_margin(symbol):
+        try:
 
-    position = get_position(symbol)
 
-    if position is None:
-        return 0.0
+            result = self.session.get_kline(
 
-    return float(
-        position.get(
-            "positionIM",
-            0,
-        )
-    )
+                category=CATEGORY,
 
-# =====================================================
-# Orderbook
-# =====================================================
+                symbol=DEFAULT_SYMBOL,
 
-@retry()
-def get_orderbook(
-    symbol,
-    limit=50,
-):
+                interval=interval,
 
-    result = session.get_orderbook(
-        category="linear",
-        symbol=symbol,
-        limit=limit,
-    )
+                limit=200
 
-    return (
-        result.get("result", {})
-        .get("list", [])
-    )
+            )
 
 
-# =====================================================
-# Server Time
-# =====================================================
+            return result
 
-@retry()
-def get_server_time():
 
-    return session.get_server_time()
 
+        except Exception as e:
 
-# =====================================================
-# Ping
-# =====================================================
 
-def ping():
+            print(
+                "[KLINE ERROR]",
+                e
+            )
 
-    try:
 
-        session.get_server_time()
+            return None
 
-        return True
 
-    except Exception as e:
 
-        logger.error(
-            "Bybit Ping Failed : %s",
-            e,
+
+    # ==================================================
+    # ORDER
+    # ==================================================
+
+    def create_order(
+        self,
+        side,
+        qty
+    ):
+
+
+        try:
+
+
+            result = self.session.place_order(
+
+                category=CATEGORY,
+
+                symbol=DEFAULT_SYMBOL,
+
+                side=side,
+
+                orderType="Market",
+
+                qty=str(qty),
+
+                timeInForce="GTC"
+
+            )
+
+
+            print(
+                "[ORDER RESPONSE]",
+                result
+            )
+
+
+            return result
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[ORDER ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+    # ==================================================
+    # SERVER TIME
+    # ==================================================
+
+    def server_time(self):
+
+        return int(
+            time.time()*1000
         )
 
-        return False
 
 
-# =====================================================
-# Position Status
-# =====================================================
 
-def is_position_open(symbol):
+# singleton
 
-    position = get_position(symbol)
-
-    if position is None:
-        return False
-
-    size = float(
-        position.get(
-            "size",
-            0,
-        )
-    )
-
-    return size > 0
-
-
-def get_position_side(symbol):
-
-    position = get_position(symbol)
-
-    if position is None:
-        return None
-
-    return position.get("side")
-
-
-def get_position_size(symbol):
-
-    position = get_position(symbol)
-
-    if position is None:
-        return 0.0
-
-    return float(
-        position.get(
-            "size",
-            0,
-        )
-    )
-
-
-# =====================================================
-# Exchange Info
-# =====================================================
-
-@retry()
-def get_instruments(symbol=None):
-
-    params = {
-        "category": "linear",
-    }
-
-    if symbol:
-        params["symbol"] = symbol
-
-    result = session.get_instruments_info(
-        **params,
-    )
-
-    return (
-        result.get("result", {})
-        .get("list", [])
-    )
-
-
-# =====================================================
-# Health Check
-# =====================================================
-
-def health():
-
-    try:
-
-        balance = get_balance()
-
-        return {
-            "success": True,
-            "exchange": "Bybit",
-            "connected": True,
-            "balance": balance,
-        }
-
-    except Exception as e:
-
-        logger.exception(e)
-
-        return {
-            "success": False,
-            "exchange": "Bybit",
-            "connected": False,
-            "error": str(e),
-        }
+bybit_api = BybitAPI()
