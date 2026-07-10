@@ -1,9 +1,9 @@
-# strategy/vwap_supertrend_strategy.py
-
 import pandas as pd
+
 
 from config import (
     VWAP_LENGTH,
+
     ST_LENGTH,
     SUPERTREND_PERIOD,
     SUPERTREND_MULTIPLIER,
@@ -13,8 +13,8 @@ from config import (
 )
 
 
-from indicators.indicators import (
-    Indicators
+from indicators.indicator_engine import (
+    IndicatorEngine
 )
 
 
@@ -24,7 +24,7 @@ class VWAPSupertrendStrategy:
 
     def __init__(self):
 
-        self.indicators = Indicators()
+        self.indicator = IndicatorEngine()
 
 
 
@@ -59,17 +59,6 @@ class VWAPSupertrendStrategy:
 
 
 
-            # =============================
-            # DATA
-            # =============================
-
-            opens = (
-                df["open"]
-                .astype(float)
-                .tolist()
-            )
-
-
             highs = (
                 df["high"]
                 .astype(float)
@@ -99,13 +88,13 @@ class VWAPSupertrendStrategy:
 
 
 
-            # =============================
+            # ==========================
             # VWAP
-            # =============================
+            # ==========================
 
             vwap = (
 
-                self.indicators
+                self.indicator
                 .vwap(
 
                     closes,
@@ -118,13 +107,13 @@ class VWAPSupertrendStrategy:
 
 
 
-            # =============================
+            # ==========================
             # SUPERTREND
-            # =============================
+            # ==========================
 
             supertrend = (
 
-                self.indicators
+                self.indicator
                 .supertrend(
 
                     highs,
@@ -133,7 +122,7 @@ class VWAPSupertrendStrategy:
 
                     closes,
 
-                    SUPERTREND_PERIOD,
+                    ST_LENGTH,
 
                     SUPERTREND_MULTIPLIER
 
@@ -143,67 +132,56 @@ class VWAPSupertrendStrategy:
 
 
 
-            last_close = closes[-1]
+            price = closes[-1]
 
-            last_vwap = vwap[-1]
+            current_vwap = vwap[-1]
 
-            last_st = supertrend[-1]
+            current_st = supertrend[-1]
 
 
 
-            # =============================
+            # ==========================
             # VOLUME FILTER
-            # =============================
-
-            volume_ok = True
-
-
+            # ==========================
 
             if USE_VOLUME_FILTER:
 
 
                 avg_volume = (
 
-                    sum(volumes[-20:])
+                    sum(volumes[-VWAP_LENGTH:])
 
                     /
 
-                    20
+                    VWAP_LENGTH
 
                 )
 
 
-                volume_ok = (
-
-                    volumes[-1]
-
-                    >
+                if volumes[-1] < (
 
                     avg_volume *
                     MIN_VOLUME_MULTIPLIER
 
-                )
+                ):
 
-
-
-            if not volume_ok:
-
-                return None
+                    return None
 
 
 
 
-            # =============================
-            # ENTRY LONG
-            # =============================
+
+            # ==========================
+            # LONG
+            # ==========================
 
             if (
 
-                last_close > last_vwap
+                price > current_vwap
 
                 and
 
-                last_close > last_st
+                price > current_st
 
             ):
 
@@ -212,19 +190,19 @@ class VWAPSupertrendStrategy:
 
 
                     "type":
-                        "ENTRY",
+                    "ENTRY",
 
 
                     "side":
-                        "Buy",
+                    "Buy",
 
 
                     "price":
-                        last_close,
+                    price,
 
 
                     "strategy":
-                        "VWAP_SUPERTREND"
+                    "VWAP_SUPERTREND"
 
                 }
 
@@ -232,17 +210,17 @@ class VWAPSupertrendStrategy:
 
 
 
-            # =============================
-            # ENTRY SHORT
-            # =============================
+            # ==========================
+            # SHORT
+            # ==========================
 
             if (
 
-                last_close < last_vwap
+                price < current_vwap
 
                 and
 
-                last_close < last_st
+                price < current_st
 
             ):
 
@@ -251,38 +229,27 @@ class VWAPSupertrendStrategy:
 
 
                     "type":
-                        "ENTRY",
+                    "ENTRY",
 
 
                     "side":
-                        "Sell",
+                    "Sell",
 
 
                     "price":
-                        last_close,
+                    price,
 
 
                     "strategy":
-                        "VWAP_SUPERTREND"
+                    "VWAP_SUPERTREND"
 
                 }
 
 
 
 
-            # =============================
-            # EXIT
-            # =============================
 
-            return self.check_exit(
-
-                last_close,
-
-                last_vwap,
-
-                last_st
-
-            )
+            return None
 
 
 
@@ -302,57 +269,6 @@ class VWAPSupertrendStrategy:
 
 
 
-
-    # =====================================
-    # EXIT
-    # =====================================
-
-    def check_exit(
-
-        self,
-
-        price,
-
-        vwap,
-
-        supertrend
-
-    ):
-
-
-
-        if (
-
-            price < vwap
-
-            and
-
-            price < supertrend
-
-        ):
-
-
-            return {
-
-
-                "type":
-                    "EXIT",
-
-
-                "strategy":
-                    "VWAP_SUPERTREND"
-
-            }
-
-
-
-        return None
-
-
-
-
-
-# Singleton
 
 vwap_supertrend_strategy = (
     VWAPSupertrendStrategy()
