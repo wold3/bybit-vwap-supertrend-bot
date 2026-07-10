@@ -167,7 +167,7 @@ LEVERAGE = int(
 
 
 # ==================================
-# RISK
+# RISK MANAGEMENT
 # ==================================
 
 MAX_POSITION_SIZE = float(
@@ -202,6 +202,14 @@ MAX_LOSS_STREAK = int(
 )
 
 
+RISK_PER_TRADE_PERCENT = float(
+    os.getenv(
+        "RISK_PER_TRADE_PERCENT",
+        "1.0"
+    )
+)
+
+
 
 # ==================================
 # TP / SL
@@ -225,7 +233,7 @@ STOP_LOSS_PERCENT = float(
 
 
 # ==================================
-# INDICATOR
+# INDICATORS
 # ==================================
 
 VWAP_LENGTH = int(
@@ -277,7 +285,7 @@ LOG_LEVEL = os.getenv(
 
 
 # ==================================
-# DEBUG
+# STARTUP CHECK
 # ==================================
 
 print("==============================")
