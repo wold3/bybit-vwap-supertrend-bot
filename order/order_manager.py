@@ -1,55 +1,102 @@
+# =====================================================
+# order/order_manager.py
+# =====================================================
+
 from config import (
-    DEFAULT_SYMBOL,
-    CATEGORY,
     DEFAULT_QTY,
+    DEFAULT_SYMBOL,
 )
 
-
-from api.bybit_client import (
-    bybit_client,
+from api.bybit_api import (
+    bybit_api
 )
-
-
-from risk.risk_manager import (
-    risk_manager,
-)
-
-
 
 
 
 class OrderManager:
 
 
-
     def __init__(self):
 
-
-        self.symbol = DEFAULT_SYMBOL
-
-        self.category = CATEGORY
-
-
-        self.live = True
-
-
-        print("==============================")
-        print("[ORDER MANAGER INIT]")
-        print("SYMBOL :", self.symbol)
-        print("CATEGORY :", self.category)
-        print("==============================")
+        print(
+            "[ORDER MANAGER READY]"
+        )
 
 
 
+    # =================================================
+    # EXECUTE SIGNAL
+    # =================================================
+
+    def execute(
+        self,
+        signal
+    ):
+
+        try:
+
+            if signal is None:
+
+                return False
 
 
 
+            action = signal.get(
+                "signal"
+            )
+
+
+            print(
+                "[ORDER EXECUTE]",
+                action
+            )
 
 
 
-    # =====================================================
+            if action == "BUY":
+
+                return self.buy()
+
+
+
+            elif action == "SELL":
+
+                return self.sell()
+
+
+
+            elif action == "EXIT":
+
+                return self.close_position()
+
+
+
+            else:
+
+                print(
+                    "[UNKNOWN SIGNAL]",
+                    signal
+                )
+
+                return False
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[EXECUTE ERROR]",
+                e
+            )
+
+            return False
+
+
+
+    # =================================================
     # CREATE ORDER
-    # =====================================================
+    # =================================================
 
     def create_order(
         self,
@@ -61,170 +108,48 @@ class OrderManager:
         try:
 
 
-
             if qty is None:
 
                 qty = DEFAULT_QTY
 
 
 
-
-
-
-            qty = float(qty)
-
-
-
-
-
-
-
-            # Risk Check
-
-            if not risk_manager.allow_order(qty):
-
-
-                print(
-                    "[ORDER BLOCKED BY RISK]"
-                )
-
-
-                return None
-
-
-
-
-
-
-
-            params = {
-
-
-
-                "category":
-
-                    self.category,
-
-
-
-                "symbol":
-
-                    self.symbol,
-
-
-
-                "side":
-
-                    side,
-
-
-
-                "orderType":
-
-                    "Market",
-
-
-
-                "qty":
-
-                    str(qty),
-
-
-
-                "timeInForce":
-
-                    "IOC",
-
-
-
-            }
-
-
-
-
-
-
-
-
             print(
-                "[ORDER SEND]",
-                params
+                "[ORDER REQUEST]",
+                side,
+                qty
             )
 
 
 
+            result = bybit_api.create_order(
 
+                side,
 
-
-
-            response = bybit_client.post(
-
-                "/v5/order/create",
-
-                params
+                qty
 
             )
 
 
 
-
-
-
-            if not response:
-
-
-                return None
-
-
-
-
-
-
-
-
-            if response.get(
-                "retCode"
-            ) != 0:
+            if result is None:
 
 
                 print(
-
-                    "[ORDER ERROR]",
-
-                    response
-
+                    "[ORDER FAILED]"
                 )
 
-
-                return None
-
-
-
-
-
-
-
-            risk_manager.record_order()
-
-
+                return False
 
 
 
             print(
-
                 "[ORDER SUCCESS]",
-
-                response
-
+                result
             )
 
 
-
-            return response
-
-
-
-
+            return True
 
 
 
@@ -232,191 +157,177 @@ class OrderManager:
 
 
             print(
-
-                "[ORDER EXCEPTION]",
-
+                "[CREATE ORDER ERROR]",
                 e
+            )
+
+
+            return False
+
+
+
+    # =================================================
+    # BUY
+    # =================================================
+
+    def buy(
+        self
+    ):
+
+
+        try:
+
+
+            position = (
+                bybit_api
+                .get_position()
+            )
+
+
+
+            if position:
+
+
+                print(
+                    "[POSITION CHECK]",
+                    "EXIST"
+                )
+
+
+
+            return self.create_order(
+
+                "Buy",
+
+                DEFAULT_QTY
 
             )
 
 
-            return None
+
+        except Exception as e:
+
+
+            print(
+                "[BUY ERROR]",
+                e
+            )
+
+
+            return False
 
 
 
-
-
-
-
-
-
-
-    # =====================================================
-    # BUY
-    # =====================================================
-
-    def buy(
-        self,
-        qty=None
-    ):
-
-
-        return self.create_order(
-
-            "Buy",
-
-            qty
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
+    # =================================================
     # SELL
-    # =====================================================
+    # =================================================
 
     def sell(
-        self,
-        qty=None
+        self
     ):
 
 
-        return self.create_order(
-
-            "Sell",
-
-            qty
-
-        )
+        try:
 
 
+            position = (
+                bybit_api
+                .get_position()
+            )
 
 
 
+            if position:
+
+
+                print(
+                    "[POSITION CHECK]",
+                    "EXIST"
+                )
 
 
 
+            return self.create_order(
 
-    # =====================================================
+                "Sell",
+
+                DEFAULT_QTY
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[SELL ERROR]",
+                e
+            )
+
+
+            return False
+
+
+
+    # =================================================
     # CLOSE POSITION
-    # =====================================================
+    # =================================================
 
     def close_position(
-        self,
-        side,
-        qty
+        self
     ):
 
 
-
-        close_side = (
-
-            "Sell"
-
-            if side == "Buy"
-
-            else
-
-            "Buy"
-
-        )
+        try:
 
 
+            print(
+                "[CLOSE POSITION]"
+            )
 
 
-        params = {
+            result = (
+                bybit_api
+                .close_position()
+            )
 
 
-            "category":
-
-                self.category,
-
-
-            "symbol":
-
-                self.symbol,
-
-
-            "side":
-
-                close_side,
-
-
-            "orderType":
-
-                "Market",
-
-
-            "qty":
-
-                str(qty),
-
-
-            "reduceOnly":
-
-                True,
-
-
-        }
+            return result
 
 
 
-
-        print(
-
-            "[CLOSE ORDER]",
-
-            params
-
-        )
+        except Exception as e:
 
 
+            print(
+                "[CLOSE ERROR]",
+                e
+            )
 
 
-
-        return bybit_client.post(
-
-            "/v5/order/create",
-
-            params
-
-        )
+            return False
 
 
 
-
-
-
-
-
-
-
-
-
-    # =====================================================
+    # =================================================
     # STATUS
-    # =====================================================
+    # =================================================
 
-    def status(self):
+    def status(
+        self
+    ):
 
 
         return {
 
 
             "symbol":
+            DEFAULT_SYMBOL,
 
-                self.symbol,
 
-
-            "category":
-
-                self.category,
+            "ready":
+            True
 
 
         }
@@ -425,10 +336,6 @@ class OrderManager:
 
 
 
-
-
-
-
-
+# Singleton
 
 order_manager = OrderManager()
