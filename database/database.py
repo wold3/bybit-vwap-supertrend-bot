@@ -2,8 +2,9 @@
 
 
 import sqlite3
-import threading
+import os
 import time
+import threading
 
 
 from config import DATABASE_PATH
@@ -11,25 +12,78 @@ from config import DATABASE_PATH
 
 
 
-class Database:
 
+class Database:
 
 
     def __init__(self):
 
 
+        self.lock = threading.Lock()
+
+
         self.path = DATABASE_PATH
 
 
-        self.lock = threading.Lock()
+        self.create_folder()
 
 
         self.init_db()
 
 
 
+        print(
+            "[DATABASE READY]"
+        )
+
+
+
+
+
     # =====================================
-    # INIT DATABASE
+    # CREATE FOLDER
+    # =====================================
+
+    def create_folder(self):
+
+
+        folder = os.path.dirname(
+            self.path
+        )
+
+
+        if folder:
+
+            os.makedirs(
+                folder,
+                exist_ok=True
+            )
+
+
+
+
+
+
+
+    # =====================================
+    # CONNECTION
+    # =====================================
+
+    def connect(self):
+
+
+        return sqlite3.connect(
+            self.path
+        )
+
+
+
+
+
+
+
+    # =====================================
+    # INIT TABLE
     # =====================================
 
     def init_db(self):
@@ -38,100 +92,71 @@ class Database:
         with self.lock:
 
 
-            conn = sqlite3.connect(
+            conn = self.connect()
 
-                self.path
+
+            cur = conn.cursor()
+
+
+
+            # ORDERS
+
+            cur.execute(
+            """
+
+            CREATE TABLE IF NOT EXISTS orders(
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                order_id TEXT,
+
+                symbol TEXT,
+
+                side TEXT,
+
+                qty REAL,
+
+                price REAL,
+
+                status TEXT,
+
+                timestamp INTEGER
 
             )
 
-
-            cursor = conn.cursor()
-
-
-
-            # Trades
-
-            cursor.execute(
-                """
-
-                CREATE TABLE IF NOT EXISTS trades (
-
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                    symbol TEXT,
-
-                    side TEXT,
-
-                    entry REAL,
-
-                    exit REAL,
-
-                    qty REAL,
-
-                    pnl REAL,
-
-                    timestamp INTEGER
-
-                )
-
-                """
-            )
-
-
-
-
-            # Orders
-
-            cursor.execute(
-                """
-
-                CREATE TABLE IF NOT EXISTS orders (
-
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-                    order_id TEXT,
-
-                    symbol TEXT,
-
-                    side TEXT,
-
-                    qty REAL,
-
-                    price REAL,
-
-                    status TEXT,
-
-                    timestamp INTEGER
-
-                )
-
-                """
+            """
             )
 
 
 
 
 
-            # Signals
+            # EXECUTIONS
 
-            cursor.execute(
-                """
+            cur.execute(
+            """
 
-                CREATE TABLE IF NOT EXISTS signals (
+            CREATE TABLE IF NOT EXISTS executions(
 
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                    signal_type TEXT,
+                exec_id TEXT,
 
-                    side TEXT,
+                order_id TEXT,
 
-                    price REAL,
+                symbol TEXT,
 
-                    timestamp INTEGER
+                side TEXT,
 
-                )
+                qty REAL,
 
-                """
+                price REAL,
+
+                timestamp INTEGER
+
+            )
+
+            """
             )
 
 
@@ -139,22 +164,31 @@ class Database:
 
 
 
-            # Equity
 
-            cursor.execute(
-                """
+            # POSITIONS
 
-                CREATE TABLE IF NOT EXISTS equity (
+            cur.execute(
+            """
 
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS positions(
 
-                    value REAL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                    timestamp INTEGER
+                symbol TEXT,
 
-                )
+                side TEXT,
 
-                """
+                size REAL,
+
+                entry_price REAL,
+
+                pnl REAL,
+
+                timestamp INTEGER
+
+            )
+
+            """
             )
 
 
@@ -162,23 +196,83 @@ class Database:
 
 
 
-            # Errors
 
-            cursor.execute(
-                """
 
-                CREATE TABLE IF NOT EXISTS errors (
+            # SIGNALS
 
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cur.execute(
+            """
 
-                    message TEXT,
+            CREATE TABLE IF NOT EXISTS signals(
 
-                    timestamp INTEGER
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                )
+                type TEXT,
 
-                """
+                side TEXT,
+
+                price REAL,
+
+                vwap REAL,
+
+                supertrend INTEGER,
+
+                timestamp INTEGER
+
             )
+
+            """
+            )
+
+
+
+
+
+
+
+            # ERRORS
+
+            cur.execute(
+            """
+
+            CREATE TABLE IF NOT EXISTS errors(
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                message TEXT,
+
+                timestamp INTEGER
+
+            )
+
+            """
+            )
+
+
+
+
+
+
+
+            # SYSTEM EVENTS
+
+            cur.execute(
+            """
+
+            CREATE TABLE IF NOT EXISTS system_events(
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                event TEXT,
+
+                timestamp INTEGER
+
+            )
+
+            """
+            )
+
+
 
 
 
@@ -187,63 +281,6 @@ class Database:
 
             conn.close()
 
-
-
-        print(
-
-            "[DATABASE READY]"
-
-        )
-
-
-
-
-
-    # =====================================
-    # INSERT SIGNAL
-    # =====================================
-
-    def save_signal(
-        self,
-        signal
-    ):
-
-
-        self.execute(
-
-            """
-
-            INSERT INTO signals
-
-            (
-
-            signal_type,
-
-            side,
-
-            price,
-
-            timestamp
-
-            )
-
-            VALUES (?,?,?,?)
-
-            """,
-
-            (
-
-                signal["type"],
-
-                signal.get("side"),
-
-                signal.get("price"),
-
-                int(time.time())
-
-            )
-
-        )
 
 
 
@@ -260,271 +297,78 @@ class Database:
     ):
 
 
-        self.execute(
-
-            """
-
-            INSERT INTO orders
-
-            (
-
-            order_id,
-
-            symbol,
-
-            side,
-
-            qty,
-
-            price,
-
-            status,
-
-            timestamp
-
-            )
-
-            VALUES (?,?,?,?,?,?,?)
-
-            """,
-
-            (
-
-                order.get("orderId"),
-
-                order.get("symbol"),
-
-                order.get("side"),
-
-                float(
-
-                    order.get(
-
-                        "qty",
-
-                        0
-
-                    )
-
-                ),
-
-                float(
-
-                    order.get(
-
-                        "price",
-
-                        0
-
-                    )
-
-                ),
-
-                order.get(
-
-                    "orderStatus"
-
-                ),
-
-                int(time.time())
-
-            )
-
-        )
-
-
-
-
-
-
-    # =====================================
-    # SAVE TRADE
-    # =====================================
-
-    def save_trade(
-        self,
-        data
-    ):
-
-
-        self.execute(
-
-            """
-
-            INSERT INTO trades
-
-            (
-
-            symbol,
-
-            side,
-
-            entry,
-
-            exit,
-
-            qty,
-
-            pnl,
-
-            timestamp
-
-            )
-
-            VALUES (?,?,?,?,?,?,?)
-
-            """,
-
-            (
-
-                data["symbol"],
-
-                data["side"],
-
-                data["entry"],
-
-                data["exit"],
-
-                data["qty"],
-
-                data["pnl"],
-
-                int(time.time())
-
-            )
-
-        )
-
-
-
-
-
-
-    # =====================================
-    # EQUITY
-    # =====================================
-
-    def save_equity(
-        self,
-        equity
-    ):
-
-
-        self.execute(
-
-            """
-
-            INSERT INTO equity
-
-            (
-
-            value,
-
-            timestamp
-
-            )
-
-            VALUES (?,?)
-
-            """,
-
-            (
-
-                equity,
-
-                int(time.time())
-
-            )
-
-        )
-
-
-
-
-
-
-
-    # =====================================
-    # ERROR
-    # =====================================
-
-    def save_error(
-        self,
-        error
-    ):
-
-
-        self.execute(
-
-            """
-
-            INSERT INTO errors
-
-            (
-
-            message,
-
-            timestamp
-
-            )
-
-            VALUES (?,?)
-
-            """,
-
-            (
-
-                str(error),
-
-                int(time.time())
-
-            )
-
-        )
-
-
-
-
-
-
-    # =====================================
-    # EXECUTE
-    # =====================================
-
-    def execute(
-        self,
-        query,
-        params
-    ):
-
-
         try:
 
 
             with self.lock:
 
 
-                conn = sqlite3.connect(
+                conn = self.connect()
 
-                    self.path
+
+                cur = conn.cursor()
+
+
+
+                cur.execute(
+                """
+
+                INSERT INTO orders
+
+                (
+
+                order_id,
+                symbol,
+                side,
+                qty,
+                price,
+                status,
+                timestamp
 
                 )
 
+                VALUES (?,?,?,?,?,?,?)
 
-                cursor = conn.cursor()
+                """,
 
+                (
 
-                cursor.execute(
+                order.get(
+                    "orderId"
+                ),
 
-                    query,
+                order.get(
+                    "symbol"
+                ),
 
-                    params
+                order.get(
+                    "side"
+                ),
+
+                float(
+                    order.get(
+                        "qty",
+                        0
+                    )
+                ),
+
+                0,
+
+                order.get(
+                    "orderStatus"
+                ),
+
+                int(
+                    time.time()
+                )
 
                 )
+
+                )
+
 
 
                 conn.commit()
-
 
                 conn.close()
 
@@ -533,15 +377,300 @@ class Database:
         except Exception as e:
 
 
-            print(
+            self.save_error(
+                str(e)
+            )
 
-                "[DB ERROR]",
 
-                e
+
+
+
+
+
+    # =====================================
+    # SAVE POSITION
+    # =====================================
+
+    def save_position(
+        self,
+        position
+    ):
+
+
+        with self.lock:
+
+
+            conn = self.connect()
+
+
+            cur = conn.cursor()
+
+
+
+            cur.execute(
+            """
+
+            INSERT INTO positions
+
+            (
+
+            symbol,
+            side,
+            size,
+            entry_price,
+            pnl,
+            timestamp
+
+            )
+
+            VALUES(?,?,?,?,?,?)
+
+            """,
+
+            (
+
+            position.get(
+                "symbol"
+            ),
+
+            position.get(
+                "side"
+            ),
+
+            position.get(
+                "size"
+            ),
+
+            position.get(
+                "entry_price"
+            ),
+
+            position.get(
+                "unrealized_pnl"
+            ),
+
+            int(
+                time.time()
+            )
+
+            )
 
             )
 
 
+            conn.commit()
+
+
+            conn.close()
+
+
+
+
+
+
+
+    # =====================================
+    # SAVE SIGNAL
+    # =====================================
+
+    def save_signal(
+        self,
+        signal
+    ):
+
+
+        with self.lock:
+
+
+            conn = self.connect()
+
+
+            cur = conn.cursor()
+
+
+
+            cur.execute(
+            """
+
+            INSERT INTO signals
+
+            (
+
+            type,
+            side,
+            price,
+            vwap,
+            supertrend,
+            timestamp
+
+            )
+
+            VALUES(?,?,?,?,?,?)
+
+            """,
+
+            (
+
+            signal.get(
+                "type"
+            ),
+
+            signal.get(
+                "side"
+            ),
+
+            signal.get(
+                "price"
+            ),
+
+            signal.get(
+                "vwap"
+            ),
+
+            signal.get(
+                "supertrend"
+            ),
+
+            int(
+                time.time()
+            )
+
+            )
+
+            )
+
+
+            conn.commit()
+
+
+            conn.close()
+
+
+
+
+
+
+
+    # =====================================
+    # SAVE ERROR
+    # =====================================
+
+    def save_error(
+        self,
+        message
+    ):
+
+
+        try:
+
+
+            conn = self.connect()
+
+
+            cur = conn.cursor()
+
+
+
+            cur.execute(
+            """
+
+            INSERT INTO errors
+
+            (
+
+            message,
+            timestamp
+
+            )
+
+            VALUES(?,?)
+
+            """,
+
+            (
+
+            message,
+
+            int(
+                time.time()
+            )
+
+            )
+
+            )
+
+
+            conn.commit()
+
+
+            conn.close()
+
+
+
+        except:
+
+
+            pass
+
+
+
+
+
+
+
+    # =====================================
+    # EVENT
+    # =====================================
+
+    def event(
+        self,
+        message
+    ):
+
+
+        with self.lock:
+
+
+            conn = self.connect()
+
+
+            cur = conn.cursor()
+
+
+
+            cur.execute(
+            """
+
+            INSERT INTO system_events
+
+            (
+
+            event,
+            timestamp
+
+            )
+
+            VALUES(?,?)
+
+            """,
+
+            (
+
+            message,
+
+            int(
+                time.time()
+            )
+
+            )
+
+            )
+
+
+            conn.commit()
+
+
+            conn.close()
 
 
 
