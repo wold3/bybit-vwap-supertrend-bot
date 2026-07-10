@@ -1,7 +1,5 @@
 # api/bybit_api.py
 
-import time
-
 from pybit.unified_trading import HTTP
 
 from config import (
@@ -24,7 +22,6 @@ class BybitAPI:
 
     def __init__(self):
 
-
         print("==============================")
         print("[BYBIT API INIT]")
         print("TESTNET :", BYBIT_TESTNET)
@@ -39,6 +36,8 @@ class BybitAPI:
 
             testnet=BYBIT_TESTNET,
 
+            demo=BYBIT_DEMO,
+
             api_key=BYBIT_API_KEY,
 
             api_secret=BYBIT_API_SECRET
@@ -48,25 +47,22 @@ class BybitAPI:
 
 
     # ==================================
-    # CONNECTION TEST
+    # PING
     # ==================================
 
     def ping(self):
 
-
         try:
 
+            result = (
+                self.session
+                .get_server_time()
+            )
 
-            result = self.session.get_server_time()
 
-
-            if result.get(
-                "retCode"
-            ) == 0:
-
+            if result.get("retCode") == 0:
 
                 return True
-
 
 
             return False
@@ -74,153 +70,59 @@ class BybitAPI:
 
 
         except Exception as e:
-
 
             print(
                 "[PING ERROR]",
                 e
             )
 
-
             return False
 
 
 
-
-
     # ==================================
-    # WALLET
+    # WALLET BALANCE
     # ==================================
 
     def get_wallet_balance(self):
 
-
         try:
 
+            result = (
 
-            response = (
                 self.session
                 .get_wallet_balance(
 
                     accountType="UNIFIED"
 
                 )
+
             )
 
 
-            if response.get(
-                "retCode"
-            ) != 0:
-
+            if result.get("retCode") != 0:
 
                 print(
                     "[WALLET ERROR]",
-                    response
+                    result
                 )
-
 
                 return None
 
 
 
-            return response
+            return result
 
 
 
         except Exception as e:
-
 
             print(
                 "[WALLET EXCEPTION]",
                 e
             )
 
-
             return None
-
-
-
-
-
-    # ==================================
-    # LEVERAGE
-    # ==================================
-
-    def set_leverage(self):
-
-
-        try:
-
-
-            result = (
-
-                self.session
-                .set_leverage(
-
-                    category=CATEGORY,
-
-                    symbol=DEFAULT_SYMBOL,
-
-                    buyLeverage=str(
-                        LEVERAGE
-                    ),
-
-                    sellLeverage=str(
-                        LEVERAGE
-                    )
-
-                )
-
-            )
-
-
-            if result.get(
-                "retCode"
-            ) == 0:
-
-
-                print(
-                    "[LEVERAGE SET]",
-                    LEVERAGE
-                )
-
-
-                return True
-
-
-
-            return False
-
-
-
-        except Exception as e:
-
-
-            msg = str(e)
-
-
-
-            if "110043" in msg:
-
-
-                print(
-                    "[LEVERAGE OK] already set"
-                )
-
-
-                return True
-
-
-
-            print(
-                "[LEVERAGE ERROR]",
-                e
-            )
-
-
-            return False
-
-
 
 
 
@@ -232,7 +134,6 @@ class BybitAPI:
         self,
         interval="1"
     ):
-
 
         try:
 
@@ -255,17 +156,12 @@ class BybitAPI:
             )
 
 
-
-            if result.get(
-                "retCode"
-            ) != 0:
-
+            if result.get("retCode") != 0:
 
                 print(
                     "[KLINE ERROR]",
                     result
                 )
-
 
                 return None
 
@@ -280,13 +176,10 @@ class BybitAPI:
             )
 
 
-
             candles = []
 
 
-
             for row in reversed(rows):
-
 
                 candles.append(
 
@@ -320,7 +213,6 @@ class BybitAPI:
                 )
 
 
-
             return candles
 
 
@@ -338,6 +230,80 @@ class BybitAPI:
 
 
 
+    # ==================================
+    # LEVERAGE
+    # ==================================
+
+    def set_leverage(self):
+
+        try:
+
+
+            result = (
+
+                self.session
+                .set_leverage(
+
+                    category=CATEGORY,
+
+                    symbol=DEFAULT_SYMBOL,
+
+                    buyLeverage=str(
+                        LEVERAGE
+                    ),
+
+                    sellLeverage=str(
+                        LEVERAGE
+                    )
+
+                )
+
+            )
+
+
+            if result.get("retCode") == 0:
+
+                print(
+                    "[LEVERAGE SET]",
+                    LEVERAGE
+                )
+
+                return True
+
+
+
+            return False
+
+
+
+        except Exception as e:
+
+
+            error = str(e)
+
+
+
+            # 이미 설정된 경우 정상 처리
+
+            if "110043" in error:
+
+
+                print(
+                    "[LEVERAGE ALREADY SET]"
+                )
+
+                return True
+
+
+
+            print(
+                "[LEVERAGE ERROR]",
+                e
+            )
+
+
+            return False
+
 
 
     # ==================================
@@ -345,7 +311,6 @@ class BybitAPI:
     # ==================================
 
     def get_last_price(self):
-
 
         try:
 
@@ -362,7 +327,6 @@ class BybitAPI:
                 )
 
             )
-
 
 
             return float(
@@ -389,22 +353,15 @@ class BybitAPI:
 
 
 
-
-
     # ==================================
-    # MARKET ORDER
+    # CREATE ORDER
     # ==================================
 
     def create_order(
-
         self,
-
         side,
-
         qty
-
     ):
-
 
         try:
 
@@ -429,7 +386,6 @@ class BybitAPI:
             )
 
 
-
             return result
 
 
@@ -447,19 +403,16 @@ class BybitAPI:
 
 
 
-
-
     # ==================================
     # CLOSE POSITION
     # ==================================
 
     def close_position(self):
 
-
         try:
 
 
-            positions = (
+            result = (
 
                 self.session
                 .get_positions(
@@ -473,36 +426,33 @@ class BybitAPI:
             )
 
 
-            pos = (
+            position = (
 
-                positions
+                result
                 ["result"]
                 ["list"][0]
 
             )
 
 
-
             size = float(
-                pos["size"]
+                position["size"]
             )
 
 
-
             if size == 0:
-
 
                 return True
 
 
 
-            side = (
+            if position["side"] == "Buy":
 
-                "Sell"
-                if pos["side"] == "Buy"
-                else "Buy"
+                side = "Sell"
 
-            )
+            else:
+
+                side = "Buy"
 
 
 
@@ -529,10 +479,45 @@ class BybitAPI:
 
 
 
+    # ==================================
+    # POSITION
+    # ==================================
+
+    def get_position(self):
+
+        try:
 
 
-# ==================================
-# SINGLETON
-# ==================================
+            return (
+
+                self.session
+                .get_positions(
+
+                    category=CATEGORY,
+
+                    symbol=DEFAULT_SYMBOL
+
+                )
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[POSITION ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+
+# Singleton
 
 bybit_api = BybitAPI()
