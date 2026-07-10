@@ -24,7 +24,7 @@ BYBIT_API_KEY = (
 
     or
 
-    "sLo3fcWX9C7aGD2P0j"
+    "FHy9sykYKuB5qcPKP6"
 
 )
 
@@ -38,7 +38,7 @@ BYBIT_API_SECRET = (
 
     or
 
-    "D0rel1YGg7ORgGr0DXW6p0XbLfiQBgdiP2Vy"
+    "BO0OB5ZlDg2KX9jLxUMp6OtISk4Mmh3RyXB1"
 
 )
 
