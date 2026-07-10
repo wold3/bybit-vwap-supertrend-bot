@@ -1,5 +1,5 @@
-import threading
 import time
+import threading
 
 from pybit.unified_trading import WebSocket
 
@@ -11,6 +11,11 @@ from config import (
     CATEGORY,
 )
 
+
+
+# ==========================================
+# BYBIT PRIVATE WEBSOCKET V5
+# ==========================================
 
 class PrivateWS:
 
@@ -32,59 +37,54 @@ class PrivateWS:
         print("==============================")
 
 
+
     # ======================================
     # CALLBACK
     # ======================================
 
-    def handle_position(self, message):
+    def handle_message(self, message):
 
         try:
 
-            self.position = message
-
-            print("[POSITION UPDATE]")
-            print(message)
-
-
-        except Exception as e:
-
-            print(
-                "[POSITION CALLBACK ERROR]",
-                e
+            topic = message.get(
+                "topic"
             )
 
 
-    def handle_order(self, message):
+            if topic == "position":
 
-        try:
+                self.position = message
 
-            self.orders = message
+                print(
+                    "[POSITION UPDATE]"
+                )
 
-            print("[ORDER UPDATE]")
-            print(message)
+
+
+            elif topic == "order":
+
+                self.orders = message
+
+                print(
+                    "[ORDER UPDATE]"
+                )
+
+
+
+            elif topic == "wallet":
+
+                self.wallet = message
+
+                print(
+                    "[WALLET UPDATE]"
+                )
+
 
 
         except Exception as e:
 
             print(
-                "[ORDER CALLBACK ERROR]",
-                e
-            )
-
-
-    def handle_wallet(self, message):
-
-        try:
-
-            self.wallet = message
-
-            print("[PRIVATE WALLET UPDATE]")
-
-
-        except Exception as e:
-
-            print(
-                "[WALLET CALLBACK ERROR]",
+                "[PRIVATE WS MESSAGE ERROR]",
                 e
             )
 
@@ -96,14 +96,11 @@ class PrivateWS:
 
     def start(self):
 
-        if self.running:
-
-            return
-
-
         try:
 
+
             self.running = True
+
 
 
             self.ws = WebSocket(
@@ -121,33 +118,39 @@ class PrivateWS:
             )
 
 
+
             self.ws.position_stream(
 
-                callback=self.handle_position
+                callback=self.handle_message
 
             )
 
 
             self.ws.order_stream(
 
-                callback=self.handle_order
+                callback=self.handle_message
 
             )
 
 
             self.ws.wallet_stream(
 
-                callback=self.handle_wallet
+                callback=self.handle_message
 
             )
 
 
-            print("[PRIVATE WS STARTED]")
+
+            print(
+                "[PRIVATE WS STARTED]"
+            )
+
 
 
             while self.running:
 
                 time.sleep(1)
+
 
 
 
@@ -158,6 +161,7 @@ class PrivateWS:
                 "[PRIVATE WS START ERROR]",
                 e
             )
+
 
 
 
@@ -181,6 +185,7 @@ class PrivateWS:
 
 
 
+
     # ======================================
     # STOP
     # ======================================
@@ -191,20 +196,10 @@ class PrivateWS:
         self.running = False
 
 
-        try:
+        print(
+            "[PRIVATE WS STOPPED]"
+        )
 
-            if self.ws:
-
-                self.ws.exit()
-
-
-        except:
-
-            pass
-
-
-
-        print("[PRIVATE WS STOPPED]")
 
 
 
@@ -231,5 +226,9 @@ class PrivateWS:
 
 
 
+
+# ==========================================
+# SINGLETON
+# ==========================================
 
 private_ws = PrivateWS()
