@@ -1,6 +1,6 @@
 # =====================================================
 # services/watchdog.py
-# Trading Bot Watchdog
+# Bot Watchdog Service
 # =====================================================
 
 import time
@@ -8,10 +8,12 @@ import threading
 
 
 
-from config import (
-    WATCHDOG_INTERVAL,
-    MAX_API_ERROR
+from web.server import (
+    add_log,
+    update_status
 )
+
+
 
 
 
@@ -28,14 +30,10 @@ class Watchdog:
         self.thread = None
 
 
-
-        self.last_heartbeat = 0
-
-
-        self.api_errors = 0
+        self.last_heartbeat = time.time()
 
 
-        self.lock = threading.Lock()
+        self.timeout = 60
 
 
 
@@ -44,6 +42,8 @@ class Watchdog:
             "[WATCHDOG READY]"
 
         )
+
+
 
 
 
@@ -69,172 +69,16 @@ class Watchdog:
 
 
 
-        self.last_heartbeat = time.time()
-
-
-
         self.thread = threading.Thread(
 
-            target=self.run,
+            target=self.loop,
 
             daemon=True
 
         )
 
 
-
         self.thread.start()
-
-
-
-        print(
-
-            "[WATCHDOG START]"
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # LOOP
-    # =====================================================
-
-    def run(self):
-
-
-        while self.running:
-
-
-            try:
-
-
-                self.check()
-
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "[WATCHDOG ERROR]",
-
-                    e
-
-                )
-
-
-
-            time.sleep(
-
-                WATCHDOG_INTERVAL
-
-            )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # CHECK
-    # =====================================================
-
-    def check(self):
-
-
-        now = time.time()
-
-
-
-        diff = (
-
-            now
-
-            -
-
-            self.last_heartbeat
-
-        )
-
-
-
-
-
-        if diff > (
-
-            WATCHDOG_INTERVAL * 3
-
-        ):
-
-
-            print(
-
-                "[WATCHDOG WARNING]"
-
-                ,
-
-                "NO HEARTBEAT",
-
-                round(diff,1),
-
-                "sec"
-
-            )
-
-
-
-
-
-
-
-        if self.api_errors >= MAX_API_ERROR:
-
-
-            print(
-
-                "[WATCHDOG] TOO MANY API ERRORS"
-
-            )
-
-
-
-            self.api_errors = 0
-
-
-
-
-
-
-
-        print(
-
-            "[WATCHDOG OK]",
-
-            "heartbeat:",
-
-            round(diff,1),
-
-            "sec",
-
-            "api_error:",
-
-            self.api_errors
-
-        )
-
-
-
-
 
 
 
@@ -249,16 +93,7 @@ class Watchdog:
     def heartbeat(self):
 
 
-        with self.lock:
-
-
-            self.last_heartbeat = time.time()
-
-
-
-            self.api_errors = 0
-
-
+        self.last_heartbeat = time.time()
 
 
 
@@ -267,49 +102,117 @@ class Watchdog:
 
 
     # =====================================================
-    # API ERROR
+    # LOOP
     # =====================================================
 
-    def api_error(self):
+    def loop(self):
 
 
-        with self.lock:
+        print(
 
+            "[WATCHDOG RUNNING]"
 
-            self.api_errors += 1
-
-
-
-
+        )
 
 
 
-    # =====================================================
-    # STATUS
-    # =====================================================
-
-    def status(self):
+        while self.running:
 
 
-        return {
+
+            try:
 
 
-            "running":
 
-                self.running,
+                diff = (
 
+                    time.time()
 
-            "last_heartbeat":
+                    -
 
-                self.last_heartbeat,
+                    self.last_heartbeat
 
-
-            "api_errors":
-
-                self.api_errors
+                )
 
 
-        }
+
+
+
+
+                if diff > self.timeout:
+
+
+
+                    print(
+
+                        "[WATCHDOG WARNING] MARKET THREAD STOP"
+
+                    )
+
+
+                    add_log(
+
+                        "WATCHDOG MARKET TIMEOUT"
+
+                    )
+
+
+
+                    update_status({
+
+                        "bot":
+
+                            "WARNING"
+
+                    })
+
+
+
+
+
+
+                else:
+
+
+
+                    update_status({
+
+                        "bot":
+
+                            "RUNNING"
+
+                    })
+
+
+
+
+
+
+            except Exception as e:
+
+
+
+                print(
+
+                    "[WATCHDOG ERROR]",
+
+                    e
+
+                )
+
+
+
+                add_log(
+
+                    str(e)
+
+                )
+
+
+
+
+
+            time.sleep(10)
 
 
 
@@ -335,6 +238,7 @@ class Watchdog:
             "[WATCHDOG STOP]"
 
         )
+
 
 
 
