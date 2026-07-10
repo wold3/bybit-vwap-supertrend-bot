@@ -1,94 +1,94 @@
 import os
-from dotenv import load_dotenv
 
 
-# ==========================================================
-# ENV LOAD
-# ==========================================================
+# =====================================================
+# ENVIRONMENT
+# =====================================================
 
-load_dotenv()
+LIVE_TRADING = False
+
+
+TESTNET = False
+
+
+DEMO_TRADING = True
 
 
 
-# ==========================================================
+
+
+# =====================================================
 # BYBIT API
-# ==========================================================
+# =====================================================
 
 BYBIT_API_KEY = os.getenv(
     "BYBIT_API_KEY",
-    ""
+    "YOUR_API_KEY"
 )
 
 
 BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
-    ""
+    "YOUR_API_SECRET"
 )
 
 
 
-# ==========================================================
-# ENV MODE
-# ==========================================================
-
-BYBIT_TESTNET = (
-    os.getenv(
-        "BYBIT_TESTNET",
-        "true"
-    ).lower()
-    == "true"
-)
 
 
-
-LIVE_TRADING = (
-    os.getenv(
-        "LIVE_TRADING",
-        "false"
-    ).lower()
-    == "true"
-)
-
-
-
-# ==========================================================
+# =====================================================
 # ACCOUNT
-# ==========================================================
+# =====================================================
 
-# Bybit Unified Account
-ACCOUNT_TYPE = os.getenv(
-    "ACCOUNT_TYPE",
-    "UNIFIED"
-)
+ACCOUNT_TYPE = "UNIFIED"
 
 
 
-# ==========================================================
+
+
+# =====================================================
 # SYMBOL
-# ==========================================================
+# =====================================================
 
-DEFAULT_SYMBOL = os.getenv(
-    "DEFAULT_SYMBOL",
-    "BTCUSDT"
-)
+DEFAULT_SYMBOL = "BTCUSDT"
 
 
+
+
+
+# =====================================================
+# CATEGORY
+# =====================================================
 
 CATEGORY = "linear"
 
 
 
-# ==========================================================
-# REST API
-# ==========================================================
 
-if BYBIT_TESTNET:
+
+# =====================================================
+# REST API
+# =====================================================
+
+
+if DEMO_TRADING:
+
 
     BYBIT_BASE_URL = (
         "https://api-demo.bybit.com"
     )
 
+
+elif TESTNET:
+
+
+    BYBIT_BASE_URL = (
+        "https://api-testnet.bybit.com"
+    )
+
+
 else:
+
 
     BYBIT_BASE_URL = (
         "https://api.bybit.com"
@@ -96,11 +96,16 @@ else:
 
 
 
-# ==========================================================
-# WEBSOCKET
-# ==========================================================
 
-if BYBIT_TESTNET:
+
+
+
+# =====================================================
+# WEBSOCKET
+# =====================================================
+
+
+if DEMO_TRADING:
 
 
     BYBIT_PUBLIC_WS = (
@@ -111,6 +116,21 @@ if BYBIT_TESTNET:
     BYBIT_PRIVATE_WS = (
         "wss://stream-demo.bybit.com/v5/private"
     )
+
+
+
+elif TESTNET:
+
+
+    BYBIT_PUBLIC_WS = (
+        "wss://stream-testnet.bybit.com/v5/public/linear"
+    )
+
+
+    BYBIT_PRIVATE_WS = (
+        "wss://stream-testnet.bybit.com/v5/private"
+    )
+
 
 
 else:
@@ -127,63 +147,82 @@ else:
 
 
 
-# ==========================================================
-# TRADE SETTINGS
-# ==========================================================
-
-
-DEFAULT_QTY = float(
-    os.getenv(
-        "DEFAULT_QTY",
-        "0.001"
-    )
-)
 
 
 
-MAX_POSITION_SIZE = float(
-    os.getenv(
-        "MAX_POSITION_SIZE",
-        "0.01"
-    )
-)
 
 
 
-# ==========================================================
+# =====================================================
+# TRADING SETTINGS
+# =====================================================
+
+
+LEVERAGE = 5
+
+
+DEFAULT_QTY = 0.001
+
+
+
+TIMEFRAME = "1"
+
+
+
+
+
+# =====================================================
+# STRATEGY
+# =====================================================
+
+
+VWAP_LENGTH = 20
+
+
+SUPERTREND_PERIOD = 10
+
+
+SUPERTREND_MULTIPLIER = 3
+
+
+
+
+
+
+
+# =====================================================
 # RISK
-# ==========================================================
+# =====================================================
 
 
-DAILY_LOSS_LIMIT = float(
-    os.getenv(
-        "DAILY_LOSS_LIMIT",
-        "-100"
-    )
-)
+MAX_POSITION_SIZE = 0.01
 
 
+DAILY_LOSS_LIMIT = -100
 
-ORDER_COOLDOWN = int(
-    os.getenv(
-        "ORDER_COOLDOWN",
-        "30"
-    )
-)
+
+ORDER_COOLDOWN = 30
 
 
 
-# ==========================================================
-# DEBUG
-# ==========================================================
 
-DEBUG = True
+
+
+
+# =====================================================
+# LOG
+# =====================================================
+
+LOG_LEVEL = "INFO"
+
+
 
 
 
 print("==============================")
 print("[CONFIG LOADED]")
-print("TESTNET :", BYBIT_TESTNET)
+print("DEMO :", DEMO_TRADING)
+print("TESTNET :", TESTNET)
 print("LIVE :", LIVE_TRADING)
 print("ACCOUNT :", ACCOUNT_TYPE)
 print("SYMBOL :", DEFAULT_SYMBOL)
