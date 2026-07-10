@@ -81,7 +81,7 @@ class TradingApp:
 
 
 
-        # Risk
+        # Risk Manager
 
         try:
 
@@ -111,8 +111,7 @@ class TradingApp:
 
 
 
-
-        # Websocket 시작
+        # Websocket Thread
 
         threading.Thread(
 
@@ -147,8 +146,10 @@ class TradingApp:
 
 
 
+
+
     # =====================================================
-    # CANDLE PROCESS
+    # CANDLE HANDLER
     # =====================================================
 
     def on_candle(
@@ -180,11 +181,9 @@ class TradingApp:
 
 
 
-            signal = strategy_engine.analyze(
+            signal = strategy_engine.on_candle(
 
-                candle,
-
-                indicators
+                candle
 
             )
 
@@ -194,7 +193,7 @@ class TradingApp:
 
 
                 print(
-                    "[BUY SIGNAL]"
+                    "[SIGNAL BUY]"
                 )
 
 
@@ -206,7 +205,7 @@ class TradingApp:
 
 
                 print(
-                    "[SELL SIGNAL]"
+                    "[SIGNAL SELL]"
                 )
 
 
@@ -274,6 +273,7 @@ class TradingApp:
 
 
 
+
     # =====================================================
     # STOP
     # =====================================================
@@ -294,7 +294,7 @@ class TradingApp:
 
             bot_guard.stop()
 
-        except:
+        except Exception:
 
             pass
 
@@ -304,7 +304,7 @@ class TradingApp:
 
             watchdog.stop()
 
-        except:
+        except Exception:
 
             pass
 
