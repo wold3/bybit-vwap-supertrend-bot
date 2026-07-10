@@ -1,11 +1,9 @@
 from config import (
     ACCOUNT_TYPE,
-    CATEGORY,
 )
 
-
 from api.bybit_client import (
-    bybit_client
+    bybit_client,
 )
 
 
@@ -22,10 +20,13 @@ class BybitWallet:
         self.account_type = ACCOUNT_TYPE
 
 
+
         print("==============================")
         print("[WALLET INIT]")
         print("ACCOUNT :", self.account_type)
         print("==============================")
+
+
 
 
 
@@ -43,12 +44,13 @@ class BybitWallet:
         try:
 
 
+
             params = {
 
 
                 "accountType":
 
-                    self.account_type
+                    self.account_type,
 
 
             }
@@ -56,7 +58,7 @@ class BybitWallet:
 
 
 
-            result = bybit_client.get(
+            response = bybit_client.get(
 
                 "/v5/account/wallet-balance",
 
@@ -68,7 +70,7 @@ class BybitWallet:
 
 
 
-            if not result:
+            if not response:
 
 
                 return None
@@ -78,15 +80,14 @@ class BybitWallet:
 
 
 
-            if result.get(
+            if response.get(
                 "retCode"
             ) != 0:
 
 
-
                 print(
                     "[WALLET ERROR]",
-                    result
+                    response
                 )
 
 
@@ -96,7 +97,9 @@ class BybitWallet:
 
 
 
-            return result["result"]
+
+            return response["result"]["list"][0]
+
 
 
 
@@ -107,12 +110,18 @@ class BybitWallet:
 
 
             print(
-                "[WALLET EXCEPTION]",
+
+                "[WALLET GET ERROR]",
+
                 e
+
             )
 
 
             return None
+
+
+
 
 
 
@@ -130,20 +139,16 @@ class BybitWallet:
         try:
 
 
-            data = self.get_balance()
+
+            account = self.get_balance()
 
 
 
-            if data is None:
+            if not account:
 
 
                 return 0
 
-
-
-
-
-            account = data["list"][0]
 
 
 
@@ -176,12 +181,18 @@ class BybitWallet:
 
 
             print(
+
                 "[EQUITY ERROR]",
+
                 e
+
             )
 
 
             return 0
+
+
+
 
 
 
@@ -199,11 +210,12 @@ class BybitWallet:
         try:
 
 
-            data = self.get_balance()
+
+            account = self.get_balance()
 
 
 
-            if data is None:
+            if not account:
 
 
                 return 0
@@ -212,13 +224,8 @@ class BybitWallet:
 
 
 
-            account = data["list"][0]
 
-
-
-
-
-            return float(
+            balance = float(
 
                 account.get(
 
@@ -234,16 +241,31 @@ class BybitWallet:
 
 
 
+            return balance
+
+
+
+
+
+
+
         except Exception as e:
 
 
             print(
-                "[AVAILABLE BALANCE ERROR]",
+
+                "[AVAILABLE ERROR]",
+
                 e
+
             )
 
 
             return 0
+
+
+
+
 
 
 
@@ -258,25 +280,48 @@ class BybitWallet:
     def status(self):
 
 
+        account = self.get_balance()
+
+
+
+        if not account:
+
+
+            return {}
+
+
+
         return {
-
-
-            "account":
-
-                self.account_type,
 
 
             "equity":
 
-                self.get_equity(),
+                account.get(
+                    "totalEquity"
+                ),
 
 
             "available":
 
-                self.get_available_balance(),
+                account.get(
+                    "totalAvailableBalance"
+                ),
+
+
+            "wallet":
+
+                account.get(
+                    "totalWalletBalance"
+                ),
 
 
         }
+
+
+
+
+
+
 
 
 
