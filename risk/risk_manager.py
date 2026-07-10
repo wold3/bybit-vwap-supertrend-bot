@@ -1,9 +1,9 @@
 import time
 
 from config import (
+    MAX_DAILY_LOSS_PERCENT,
     ORDER_COOLDOWN,
     MAX_POSITION_SIZE,
-    MAX_DAILY_LOSS_PERCENT,
 )
 
 
@@ -17,20 +17,30 @@ class RiskManager:
 
     def __init__(self):
 
+
         self.start_equity = 0
 
         self.current_equity = 0
 
-        self.last_order_time = 0
-
         self.daily_loss = 0
+
+
+        self.last_order_time = 0
 
 
         print("==============================")
         print("[RISK MANAGER INIT]")
-        print("MAX DAILY LOSS :", MAX_DAILY_LOSS_PERCENT, "%")
-        print("ORDER COOLDOWN :", ORDER_COOLDOWN)
+        print(
+            "MAX DAILY LOSS :",
+            MAX_DAILY_LOSS_PERCENT,
+            "%"
+        )
+        print(
+            "ORDER COOLDOWN :",
+            ORDER_COOLDOWN
+        )
         print("==============================")
+
 
 
 
@@ -38,29 +48,36 @@ class RiskManager:
     # INITIALIZE
     # ======================================
 
-    def initialize(self, equity=None):
+    def initialize(
+        self,
+        equity=0
+    ):
 
 
         try:
 
-            if equity is None:
 
-                equity = 0
+            self.start_equity = float(
+                equity
+            )
 
 
+            self.current_equity = float(
+                equity
+            )
 
-            self.start_equity = float(equity)
 
-            self.current_equity = float(equity)
+            self.daily_loss = 0
+
 
 
             print("==============================")
             print("[RISK INITIALIZED]")
-            print("START EQUITY :", self.start_equity)
+            print(
+                "START EQUITY :",
+                self.start_equity
+            )
             print("==============================")
-
-
-            return True
 
 
 
@@ -73,26 +90,61 @@ class RiskManager:
             )
 
 
+
+
+
+    # ======================================
+    # UPDATE EQUITY
+    # ======================================
+
+    def update_equity(
+        self,
+        equity
+    ):
+
+
+        self.current_equity = float(
+            equity
+        )
+
+
+
+        self.daily_loss = (
+
+            (
+                self.start_equity
+                -
+                self.current_equity
+            )
+            /
+            self.start_equity
+
+        ) * 100
+
+
+
+
+
+    # ======================================
+    # DAILY LOSS CHECK
+    # ======================================
+
+    def allow_trade(self):
+
+
+        if self.start_equity <= 0:
+
             return False
 
 
 
-
-    # ======================================
-    # ORDER COOLDOWN CHECK
-    # ======================================
-
-    def order_allowed(self):
+        if self.daily_loss >= MAX_DAILY_LOSS_PERCENT:
 
 
-        now = time.time()
-
-
-        elapsed = now - self.last_order_time
-
-
-
-        if elapsed < ORDER_COOLDOWN:
+            print(
+                "[RISK BLOCK]",
+                "DAILY LOSS LIMIT"
+            )
 
 
             return False
@@ -105,10 +157,63 @@ class RiskManager:
 
 
     # ======================================
-    # UPDATE ORDER TIME
+    # ORDER COOLDOWN
     # ======================================
 
-    def update_order_time(self):
+    def check_cooldown(self):
+
+
+        now = time.time()
+
+
+
+        if (
+
+            now - self.last_order_time
+
+            <
+            
+            ORDER_COOLDOWN
+
+        ):
+
+
+            remain = int(
+
+                ORDER_COOLDOWN
+
+                -
+
+                (
+                    now
+                    -
+                    self.last_order_time
+                )
+
+            )
+
+
+            print(
+                "[COOLDOWN]",
+                remain,
+                "sec"
+            )
+
+
+            return False
+
+
+
+        return True
+
+
+
+
+    # ======================================
+    # ORDER REGISTER
+    # ======================================
+
+    def register_order(self):
 
 
         self.last_order_time = time.time()
@@ -120,38 +225,18 @@ class RiskManager:
     # POSITION SIZE CHECK
     # ======================================
 
-    def check_position_size(self, qty):
+    def check_position_size(
+        self,
+        qty
+    ):
 
 
-        try:
-
-
-            qty = float(qty)
-
-
-
-            if qty > MAX_POSITION_SIZE:
-
-
-                print(
-                    "[RISK BLOCK] POSITION SIZE LIMIT"
-                )
-
-
-                return False
-
-
-
-            return True
-
-
-
-        except Exception as e:
+        if float(qty) > MAX_POSITION_SIZE:
 
 
             print(
-                "[POSITION SIZE ERROR]",
-                e
+                "[RISK BLOCK]",
+                "POSITION SIZE"
             )
 
 
@@ -159,105 +244,7 @@ class RiskManager:
 
 
 
-
-    # ======================================
-    # DAILY LOSS CHECK
-    # ======================================
-
-    def check_daily_loss(self, equity):
-
-
-        try:
-
-
-            self.current_equity = float(equity)
-
-
-
-            if self.start_equity <= 0:
-
-                return True
-
-
-
-            loss_percent = (
-
-                (
-                    self.start_equity
-                    -
-                    self.current_equity
-                )
-
-                /
-
-                self.start_equity
-
-                *
-
-                100
-
-            )
-
-
-
-            self.daily_loss = loss_percent
-
-
-
-            if loss_percent >= MAX_DAILY_LOSS_PERCENT:
-
-
-                print(
-                    "[RISK BLOCK] DAILY LOSS LIMIT",
-                    loss_percent,
-                    "%"
-                )
-
-
-                return False
-
-
-
-            return True
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[LOSS CHECK ERROR]",
-                e
-            )
-
-
-            return False
-
-
-
-
-    # ======================================
-    # STATUS
-    # ======================================
-
-    def status(self):
-
-
-        return {
-
-            "start_equity":
-                self.start_equity,
-
-            "current_equity":
-                self.current_equity,
-
-            "daily_loss":
-                self.daily_loss,
-
-            "last_order":
-                self.last_order_time
-
-        }
+        return True
 
 
 
