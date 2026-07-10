@@ -1,382 +1,121 @@
 import time
 
-
 from config import (
-    MAX_POSITION_SIZE,
     DAILY_LOSS_LIMIT,
-    ORDER_COOLDOWN,
+    MAX_POSITION_SIZE,
 )
 
-
-from portfolio.bybit_wallet import (
-    wallet,
-)
+from api.bybit_api import bybit_api
 
 
-from position.position_manager import (
-    position_manager,
-)
-
-
-
-
+# ==========================================
+# RISK MANAGER
+# ==========================================
 
 class RiskManager:
 
 
-
     def __init__(self):
 
+        self.start_equity = self.get_equity()
 
-        self.enabled = True
-
-
-
-        self.max_position_size = (
-
-            MAX_POSITION_SIZE
-
-        )
-
-
-        self.cooldown_seconds = (
-
-            ORDER_COOLDOWN
-
-        )
-
-
-        self.daily_loss_limit = (
-
-            DAILY_LOSS_LIMIT
-
-        )
-
-
+        self.daily_start_equity = self.start_equity
 
         self.last_order_time = 0
 
 
-
-        self.start_equity = None
-
-
-
-
         print("==============================")
-        print("[RISK MANAGER READY]")
+        print("[RISK INIT EQUITY]", self.start_equity)
         print("==============================")
 
 
+    # ======================================
+    # EQUITY
+    # ======================================
 
-
-
-
-
-
-
-    # =====================================================
-    # INIT
-    # =====================================================
-
-    def initialize(self):
-
+    def get_equity(self):
 
         try:
 
-
-            equity = wallet.get_equity()
-
+            wallet = bybit_api.get_wallet_balance()
 
 
-            self.start_equity = float(
+            if not wallet:
+                return 0.0
 
-                equity
 
+            if wallet.get("retCode") != 0:
+                return 0.0
+
+
+            data = wallet["result"]["list"][0]
+
+
+            equity = float(
+                data.get(
+                    "totalEquity",
+                    0
+                )
             )
 
 
-
-            print(
-                "[RISK INIT EQUITY]",
-                self.start_equity
-            )
-
-
+            return equity
 
 
         except Exception as e:
 
-
             print(
-                "[RISK INIT ERROR]",
+                "[EQUITY ERROR]",
                 e
             )
 
+            return 0.0
 
 
 
-
-
-
-
-
-    # =====================================================
-    # ORDER CHECK
-    # =====================================================
-
-    def allow_order(
-        self,
-        qty
-    ):
-
-
-
-        if not self.enabled:
-
-
-            print(
-                "[RISK BLOCK] DISABLED"
-            )
-
-
-            return False
-
-
-
-
-
-
-
-        try:
-
-
-            qty = float(qty)
-
-
-
-        except:
-
-
-            print(
-                "[RISK BLOCK] INVALID QTY"
-            )
-
-
-            return False
-
-
-
-
-
-
-
-
-        if qty <= 0:
-
-
-            print(
-                "[RISK BLOCK] ZERO SIZE"
-            )
-
-
-            return False
-
-
-
-
-
-
-
-
-        if qty > self.max_position_size:
-
-
-            print(
-                "[RISK BLOCK] MAX SIZE"
-            )
-
-
-            return False
-
-
-
-
-
-
-
-        # 현재 포지션 확인
-
-        position_manager.sync()
-
-
-
-        if position_manager.has_position():
-
-
-            print(
-                "[RISK BLOCK] POSITION EXISTS"
-            )
-
-
-            return False
-
-
-
-
-
-
-
-        # cooldown
-
-
-        elapsed = (
-
-            time.time()
-
-            -
-
-            self.last_order_time
-
-        )
-
-
-
-        if elapsed < self.cooldown_seconds:
-
-
-            remain = round(
-
-                self.cooldown_seconds
-
-                -
-
-                elapsed,
-
-                1
-
-            )
-
-
-            print(
-
-                "[RISK BLOCK] COOLDOWN",
-
-                remain
-
-            )
-
-
-            return False
-
-
-
-
-
-
-
-        return True
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # RECORD
-    # =====================================================
-
-    def record_order(self):
-
-
-        self.last_order_time = time.time()
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # DAILY LOSS
-    # =====================================================
+    # ======================================
+    # DAILY LOSS CHECK
+    # ======================================
 
     def check_daily_loss(self):
 
-
-        if self.start_equity is None:
-
-
-            return True
-
-
-
-
-
-
         try:
 
-
-            current = float(
-
-                wallet.get_equity()
-
-            )
+            current = self.get_equity()
 
 
-
-            pnl = (
-
-                current
-
-                -
-
-                self.start_equity
-
-            )
-
-
-
-            print(
-
-                "[DAILY PNL]",
-
-                round(pnl,2)
-
-            )
-
-
-
-
-
-            if pnl <= self.daily_loss_limit:
-
-
-                print(
-
-                    "[RISK STOP] DAILY LOSS LIMIT",
-
-                    pnl
-
-                )
-
-
-
-                self.enabled = False
-
-
+            if self.daily_start_equity <= 0:
 
                 return False
 
 
 
+            loss_percent = (
+
+                self.daily_start_equity - current
+
+            ) / self.daily_start_equity
+
+
+
+            print(
+                "[DAILY LOSS]",
+                round(loss_percent * 100, 4),
+                "%"
+            )
+
+
+            if loss_percent >= DAILY_LOSS_LIMIT:
+
+                print(
+                    "[RISK STOP] DAILY LOSS LIMIT"
+                )
+
+                return True
+
+
+
+            return False
 
 
 
@@ -384,15 +123,54 @@ class RiskManager:
 
 
             print(
-
-                "[LOSS CHECK ERROR]",
-
+                "[DAILY LOSS ERROR]",
                 e
-
             )
 
+            return False
 
 
+
+    # ======================================
+    # ORDER COOLDOWN
+    # ======================================
+
+    def order_allowed(self):
+
+        now = time.time()
+
+
+        if now - self.last_order_time < 60:
+
+            return False
+
+
+        return True
+
+
+
+    def update_order_time(self):
+
+        self.last_order_time = time.time()
+
+
+
+    # ======================================
+    # POSITION SIZE
+    # ======================================
+
+    def check_position_size(
+        self,
+        qty
+    ):
+
+        if qty > MAX_POSITION_SIZE:
+
+            print(
+                "[RISK BLOCK] POSITION SIZE"
+            )
+
+            return False
 
 
         return True
@@ -400,127 +178,8 @@ class RiskManager:
 
 
 
-
-
-
-
-
-
-    # =====================================================
-    # RESET
-    # =====================================================
-
-    def reset_daily(self):
-
-
-        self.enabled = True
-
-
-        self.last_order_time = 0
-
-
-        self.initialize()
-
-
-
-        print(
-            "[RISK RESET]"
-        )
-
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # STATUS
-    # =====================================================
-
-    def status(self):
-
-
-        pnl = None
-
-
-
-        try:
-
-
-            if self.start_equity:
-
-
-                pnl = (
-
-                    float(
-                        wallet.get_equity()
-                    )
-
-                    -
-
-                    self.start_equity
-
-                )
-
-
-
-        except:
-
-
-            pass
-
-
-
-
-
-
-        return {
-
-
-            "enabled":
-
-                self.enabled,
-
-
-            "max_position":
-
-                self.max_position_size,
-
-
-            "cooldown":
-
-                self.cooldown_seconds,
-
-
-            "daily_loss_limit":
-
-                self.daily_loss_limit,
-
-
-            "start_equity":
-
-                self.start_equity,
-
-
-            "current_pnl":
-
-                pnl,
-
-
-        }
-
-
-
-
-
-
-
-
-
-
+# ==========================================
+# SINGLETON
+# ==========================================
 
 risk_manager = RiskManager()
