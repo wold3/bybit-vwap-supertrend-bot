@@ -8,25 +8,120 @@ class Indicators:
     # VWAP
     # =====================================================
 
-    def vwap(self, prices, volumes):
+    def vwap(
+        self,
+        highs,
+        lows,
+        closes,
+        volumes
+    ):
 
-        if len(prices) == 0:
+        if len(closes) == 0:
             return None
+
+
+        typical_prices = (
+
+            (
+                np.array(highs)
+                +
+                np.array(lows)
+                +
+                np.array(closes)
+            )
+            /
+            3
+
+        )
+
+
+        volumes = np.array(volumes)
+
 
         volume_sum = np.sum(volumes)
 
+
         if volume_sum == 0:
+
             return None
 
-        return np.sum(
-            np.array(prices) *
-            np.array(volumes)
-        ) / volume_sum
+
+
+        return float(
+
+            np.sum(
+                typical_prices * volumes
+            )
+            /
+            volume_sum
+
+        )
 
 
 
     # =====================================================
-    # ATR
+    # TRUE RANGE
+    # =====================================================
+
+    def true_range(
+        self,
+        highs,
+        lows,
+        closes
+    ):
+
+
+        tr = []
+
+
+        for i in range(len(closes)):
+
+
+            if i == 0:
+
+                value = (
+
+                    highs[i]
+                    -
+                    lows[i]
+
+                )
+
+
+            else:
+
+                prev_close = closes[i-1]
+
+
+                value = max(
+
+                    highs[i] - lows[i],
+
+                    abs(
+                        highs[i]
+                        -
+                        prev_close
+                    ),
+
+                    abs(
+                        lows[i]
+                        -
+                        prev_close
+                    )
+
+                )
+
+
+            tr.append(value)
+
+
+
+        return tr
+
+
+
+    # =====================================================
+    # ATR - WILDER
     # =====================================================
 
     def atr(
@@ -37,37 +132,45 @@ class Indicators:
         period=14
     ):
 
+
         if len(closes) < period + 1:
+
             return None
 
 
-        tr = []
 
+        tr = self.true_range(
 
-        for i in range(1, len(closes)):
+            highs,
+            lows,
+            closes
 
-            high = highs[i]
-            low = lows[i]
-            prev_close = closes[i-1]
-
-
-            true_range = max(
-
-                high - low,
-
-                abs(high - prev_close),
-
-                abs(low - prev_close)
-
-            )
-
-
-            tr.append(true_range)
-
-
-        return np.mean(
-            tr[-period:]
         )
+
+
+
+        atr = np.mean(
+
+            tr[:period]
+
+        )
+
+
+
+        for value in tr[period:]:
+
+
+            atr = (
+
+                (atr * (period - 1))
+                +
+                value
+
+            ) / period
+
+
+
+        return float(atr)
 
 
 
@@ -86,103 +189,213 @@ class Indicators:
 
 
         if len(closes) < period + 2:
+
             return None
 
 
 
-        atr_value = self.atr(
+        tr = self.true_range(
 
             highs,
             lows,
-            closes,
-            period
+            closes
 
         )
 
 
-        if atr_value is None:
-            return None
+        atr_values = []
 
+        atr = np.mean(
 
-
-        hl2 = (
-
-            highs[-1]
-
-            +
-
-            lows[-1]
-
-        ) / 2
-
-
-
-        upper_band = (
-
-            hl2
-
-            +
-
-            multiplier * atr_value
+            tr[:period]
 
         )
 
 
-        lower_band = (
+        atr_values.append(atr)
 
-            hl2
 
-            -
 
-            multiplier * atr_value
+        for value in tr[period:]:
+
+
+            atr = (
+
+                (atr * (period - 1))
+                +
+                value
+
+            ) / period
+
+
+            atr_values.append(atr)
+
+
+
+        final_upper = None
+
+        final_lower = None
+
+
+        trend = 1
+
+
+        previous_trend = trend
+
+
+
+        for i in range(
+            period,
+            len(closes)
+        ):
+
+
+            hl2 = (
+
+                highs[i]
+                +
+                lows[i]
+
+            ) / 2
+
+
+
+            atr_value = atr_values[
+                i - period
+            ]
+
+
+
+            basic_upper = (
+
+                hl2
+                +
+                multiplier
+                *
+                atr_value
+
+            )
+
+
+            basic_lower = (
+
+                hl2
+                -
+                multiplier
+                *
+                atr_value
+
+            )
+
+
+
+            if final_upper is None:
+
+
+                final_upper = basic_upper
+
+                final_lower = basic_lower
+
+
+
+            else:
+
+
+                if (
+
+                    basic_upper < final_upper
+
+                    or
+
+                    closes[i-1] > final_upper
+
+                ):
+
+                    final_upper = basic_upper
+
+
+
+                if (
+
+                    basic_lower > final_lower
+
+                    or
+
+                    closes[i-1] < final_lower
+
+                ):
+
+                    final_lower = basic_lower
+
+
+
+
+            if closes[i] > final_upper:
+
+
+                trend = 1
+
+
+
+            elif closes[i] < final_lower:
+
+
+                trend = -1
+
+
+
+            else:
+
+
+                trend = previous_trend
+
+
+
+            previous_trend = trend
+
+
+
+
+        changed = (
+
+            trend != previous_trend
 
         )
 
 
 
-        close = closes[-1]
+        return {
 
 
+            "trend":
 
-        if close > upper_band:
-
-            return {
-
-                "trend": "UP",
-
-                "direction": 1,
-
-                "value": lower_band
-
-            }
+                "UP"
+                if trend == 1
+                else "DOWN",
 
 
+            "direction":
 
-        elif close < lower_band:
-
-            return {
-
-                "trend": "DOWN",
-
-                "direction": -1,
-
-                "value": upper_band
-
-            }
+                trend,
 
 
+            "value":
 
-        else:
+                final_lower
+                if trend == 1
+                else final_upper,
 
-            return {
 
-                "trend": "NEUTRAL",
+            "atr":
 
-                "direction": 0,
+                float(atr_value),
 
-                "value": hl2
 
-            }
+            "changed":
+
+                changed
+
+        }
 
 
 
@@ -195,19 +408,26 @@ class Indicators:
         prices
     ):
 
+
         if len(prices) < 30:
 
             return 0.0
 
 
+
         short = np.mean(
+
             prices[-10:]
+
         )
 
 
         long = np.mean(
+
             prices[-30:]
+
         )
+
 
 
         if long == 0:
@@ -215,9 +435,13 @@ class Indicators:
             return 0.0
 
 
+
         return abs(
+
             short - long
+
         ) / long
+
 
 
 
