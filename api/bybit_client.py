@@ -19,9 +19,7 @@ class BybitClient:
     def __init__(self):
 
         self.base_url = BYBIT_BASE_URL
-
         self.api_key = BYBIT_API_KEY
-
         self.api_secret = BYBIT_API_SECRET
 
 
@@ -30,14 +28,16 @@ class BybitClient:
         print("BASE :", self.base_url)
         print(
             "KEY :",
-            self.api_key[:6] if self.api_key else "NONE"
+            self.api_key[:6]
+            if self.api_key
+            else "NONE"
         )
         print("==============================")
 
 
 
     # ==========================================
-    # SIGN V5
+    # SIGN
     # ==========================================
 
     def _sign(
@@ -51,19 +51,19 @@ class BybitClient:
 
 
 
-        # GET Query String
-        if isinstance(params, dict):
+        if params:
 
             param_str = "&".join(
-                f"{key}={value}"
-                for key, value in params.items()
+
+                f"{k}={v}"
+
+                for k, v in params.items()
+
             )
 
-
-        # POST Body
         else:
 
-            param_str = str(params)
+            param_str = ""
 
 
 
@@ -103,6 +103,13 @@ class BybitClient:
 
 
 
+        print("==============================")
+        print("[SIGN DEBUG]")
+        print("ORIGIN :", origin_string)
+        print("SIGN   :", signature)
+        print("==============================")
+
+
         return signature
 
 
@@ -127,7 +134,6 @@ class BybitClient:
 
 
         recv_window = "5000"
-
 
 
         sign = self._sign(
@@ -213,13 +219,30 @@ class BybitClient:
 
 
 
+            # Bybit V5 GET query 직접 연결
+
+            if params:
+
+
+                query_string = "&".join(
+
+                    f"{k}={v}"
+
+                    for k, v in params.items()
+
+                )
+
+
+                url += "?" + query_string
+
+
+
+
             response = requests.get(
 
                 url,
 
                 headers=headers,
-
-                params=params,
 
                 timeout=10
 
@@ -235,7 +258,7 @@ class BybitClient:
 
             print(
                 "[BYBIT TEXT]",
-                response.text[:300]
+                response.text[:500]
             )
 
 
@@ -254,6 +277,7 @@ class BybitClient:
 
 
             return None
+
 
 
 
@@ -334,7 +358,7 @@ class BybitClient:
 
             print(
                 "[BYBIT TEXT]",
-                response.text[:300]
+                response.text[:500]
             )
 
 
