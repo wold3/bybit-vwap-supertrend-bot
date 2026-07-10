@@ -1,19 +1,13 @@
-import time
+from api.bybit_api import bybit_api
+
+from config import DEFAULT_SYMBOL
+
 
 
 class PositionManager:
 
 
-    def __init__(
-
-        self,
-
-        bybit_api
-
-    ):
-
-
-        self.api = bybit_api
+    def __init__(self):
 
 
         self.position = {
@@ -24,17 +18,15 @@ class PositionManager:
 
             "entry_price": 0,
 
-            "unrealized_pnl": 0,
-
-            "updated": 0
+            "unrealized_pnl": 0
 
         }
 
 
 
-    # =====================================================
+    # =====================================
     # SYNC FROM EXCHANGE
-    # =====================================================
+    # =====================================
 
     def sync(self):
 
@@ -42,8 +34,12 @@ class PositionManager:
         try:
 
 
-            response = self.api.get_position()
+            response = (
 
+                bybit_api
+                .get_position()
+
+            )
 
 
             if not response:
@@ -52,92 +48,67 @@ class PositionManager:
 
 
 
-            data = (
+            positions = (
 
                 response
-                .get("result", {})
-                .get("list", [])
+                ["result"]
+                ["list"]
 
             )
 
 
-            if not data:
 
-                self.clear()
-
-                return True
+            for pos in positions:
 
 
 
-            pos = data[0]
+                size = float(
 
+                    pos["size"]
 
-
-            size = float(
-
-                pos.get(
-                    "size",
-                    0
                 )
 
-            )
+
+
+                if size > 0:
 
 
 
-            if size <= 0:
+                    self.position = {
 
 
-                self.clear()
-
-                return True
-
+                        "side":
+                            pos["side"],
 
 
-            self.position = {
+                        "size":
+                            size,
 
 
-                "side":
-
-                    pos.get(
-                        "side"
-                    ),
-
-
-                "size":
-
-                    size,
+                        "entry_price":
+                            float(
+                                pos["avgPrice"]
+                            ),
 
 
-                "entry_price":
-
-                    float(
-
-                        pos.get(
-                            "avgPrice",
-                            0
-                        )
-
-                    ),
+                        "unrealized_pnl":
+                            float(
+                                pos["unrealisedPnl"]
+                            )
 
 
-                "unrealized_pnl":
-
-                    float(
-
-                        pos.get(
-                            "unrealisedPnl",
-                            0
-                        )
-
-                    ),
+                    }
 
 
-                "updated":
+                    return True
 
-                    time.time()
 
-            }
 
+
+            # NO POSITION
+
+
+            self.clear()
 
 
             return True
@@ -160,38 +131,30 @@ class PositionManager:
 
 
 
-    # =====================================================
-    # CURRENT POSITION
-    # =====================================================
+    # =====================================
+    # GET
+    # =====================================
 
-    def get_position(self):
+    def get(self):
 
         return self.position
 
 
 
-    # =====================================================
-    # HAS POSITION
-    # =====================================================
+    # =====================================
+    # CHECK
+    # =====================================
 
     def has_position(self):
 
 
         return (
 
-            self.position["size"]
-
-            >
-
-            0
+            self.position["size"] > 0
 
         )
 
 
-
-    # =====================================================
-    # SIDE
-    # =====================================================
 
     def side(self):
 
@@ -200,31 +163,9 @@ class PositionManager:
 
 
 
-    # =====================================================
-    # SIZE
-    # =====================================================
-
-    def size(self):
-
-
-        return self.position["size"]
-
-
-
-    # =====================================================
-    # ENTRY PRICE
-    # =====================================================
-
-    def entry_price(self):
-
-
-        return self.position["entry_price"]
-
-
-
-    # =====================================================
+    # =====================================
     # CLEAR
-    # =====================================================
+    # =====================================
 
     def clear(self):
 
@@ -238,23 +179,46 @@ class PositionManager:
 
             "entry_price": 0,
 
-            "unrealized_pnl": 0,
+            "unrealized_pnl": 0
 
-            "updated": time.time()
 
         }
 
 
 
-    # =====================================================
-    # STATUS
-    # =====================================================
+    # =====================================
+    # UPDATE
+    # =====================================
 
-    def status(self):
+    def update_fill(
+
+        self,
+
+        side,
+
+        qty,
+
+        price
+
+    ):
 
 
-        return self.position
+        self.position = {
+
+
+            "side": side,
+
+            "size": qty,
+
+            "entry_price": price,
+
+            "unrealized_pnl":0
+
+
+        }
 
 
 
-position_manager = None
+# Singleton
+
+position_manager = PositionManager()
