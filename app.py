@@ -30,11 +30,6 @@ from watchdog.watchdog import (
 )
 
 
-from guard.bot_guard import (
-    bot_guard,
-)
-
-
 from portfolio.bybit_wallet import (
     wallet,
 )
@@ -56,6 +51,8 @@ class TradingApp:
         self.running = False
 
         self.thread = None
+
+
 
 
 
@@ -111,7 +108,7 @@ class TradingApp:
 
 
 
-        # Websocket Thread
+        # WebSocket Start
 
         threading.Thread(
 
@@ -149,19 +146,13 @@ class TradingApp:
 
 
     # =====================================================
-    # CANDLE HANDLER
+    # CANDLE PROCESS
     # =====================================================
 
-    def on_candle(
+    def process_candle(
         self,
         candle
     ):
-
-
-        if not bot_guard.is_running():
-
-            return
-
 
 
         try:
@@ -287,16 +278,6 @@ class TradingApp:
 
 
         self.running = False
-
-
-
-        try:
-
-            bot_guard.stop()
-
-        except Exception:
-
-            pass
 
 
 
