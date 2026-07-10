@@ -1,44 +1,30 @@
 # =====================================================
 # config.py
-# BYBIT VWAP SUPERTREND BOT CONFIG
+# Bybit VWAP SuperTrend Bot Configuration
 # =====================================================
+
 
 import os
 
 
 
-print("==============================")
-print("[CONFIG LOADED]")
-print()
-
-
-
 # =====================================================
-# MODE
+# BOT MODE
 # =====================================================
+
 
 LIVE = False
 
 
-# True  = 실제 주문
-# False = 테스트용
-
-
-CATEGORY = "linear"
-
-
-DEFAULT_SYMBOL = "BTCUSDT"
-
-
-ACCOUNT_TYPE = "UNIFIED"
-
+TESTNET = False
 
 
 
 
 # =====================================================
-# BYBIT API
+# BYBIT
 # =====================================================
+
 
 BYBIT_API_KEY = os.getenv(
 
@@ -59,11 +45,12 @@ BYBIT_API_SECRET = os.getenv(
 
 
 
-BYBIT_REST_URL = (
+BYBIT_BASE_URL = (
 
     "https://api.bybit.com"
 
 )
+
 
 
 BYBIT_PRIVATE_WS = (
@@ -79,8 +66,28 @@ BYBIT_PRIVATE_WS = (
 
 
 # =====================================================
+# MARKET
+# =====================================================
+
+
+CATEGORY = "linear"
+
+
+DEFAULT_SYMBOL = "BTCUSDT"
+
+
+TIMEFRAME = "60"
+
+
+
+
+
+
+
+# =====================================================
 # LEVERAGE
 # =====================================================
+
 
 LEVERAGE = 3
 
@@ -89,14 +96,21 @@ LEVERAGE = 3
 
 
 
+
 # =====================================================
-# ORDER
+# RISK MANAGEMENT
 # =====================================================
 
-DEFAULT_QTY = 0.001
+
+RISK_PER_TRADE_PERCENT = 0.5
 
 
-ORDER_COOLDOWN = 60
+
+STOP_LOSS_PERCENT = 1.5
+
+
+
+TAKE_PROFIT_PERCENT = 3.0
 
 
 
@@ -109,47 +123,9 @@ MAX_POSITION_SIZE = 0.01
 
 
 # =====================================================
-# RISK MANAGEMENT
+# INDICATORS
 # =====================================================
 
-RISK_PER_TRADE_PERCENT = 1.0
-
-
-
-MAX_DAILY_LOSS_PERCENT = 5
-
-
-
-MAX_DRAWDOWN_PERCENT = 10
-
-
-
-MAX_LOSS_STREAK = 3
-
-
-
-
-
-
-
-# =====================================================
-# STOP / TAKE PROFIT
-# =====================================================
-
-STOP_LOSS_PERCENT = 1.5
-
-
-TAKE_PROFIT_PERCENT = 3.0
-
-
-
-
-
-
-
-# =====================================================
-# INDICATOR
-# =====================================================
 
 ATR_PERIOD = 14
 
@@ -159,7 +135,7 @@ SUPERTREND_MULTIPLIER = 3
 
 
 
-VWAP_PERIOD = 20
+VWAP_PERIOD = 0
 
 
 
@@ -171,11 +147,12 @@ VWAP_PERIOD = 20
 # VOLUME FILTER
 # =====================================================
 
-USE_VOLUME_FILTER = False
+
+USE_VOLUME_FILTER = True
 
 
 
-MIN_VOLUME_MULTIPLIER = 0.8
+MIN_VOLUME_MULTIPLIER = 1.1
 
 
 
@@ -187,7 +164,9 @@ MIN_VOLUME_MULTIPLIER = 0.8
 # WATCHDOG
 # =====================================================
 
-WATCHDOG_INTERVAL = 30
+
+WATCHDOG_INTERVAL = 10
+
 
 
 MAX_API_ERROR = 5
@@ -202,11 +181,13 @@ MAX_API_ERROR = 5
 # TELEGRAM
 # =====================================================
 
+
 TELEGRAM_ENABLED = False
 
 
 
 TELEGRAM_TOKEN = ""
+
 
 
 TELEGRAM_CHAT_ID = ""
@@ -221,9 +202,10 @@ TELEGRAM_CHAT_ID = ""
 # DATABASE
 # =====================================================
 
+
 DATABASE_FILE = (
 
-    "trading.db"
+    "database/trading.db"
 
 )
 
@@ -234,12 +216,30 @@ DATABASE_FILE = (
 
 
 # =====================================================
-# PRINT
+# ORDER SETTINGS
 # =====================================================
+
+
+ORDER_TYPE = "Market"
+
+
+
+POSITION_MODE = "OneWay"
+
+
+
+
+
+
+
+print("==============================")
+
+print("[CONFIG LOADED]")
 
 print(
 
     "LIVE :",
+
 
     LIVE
 
@@ -250,6 +250,7 @@ print(
 
     "CATEGORY :",
 
+
     CATEGORY
 
 )
@@ -259,6 +260,7 @@ print(
 
     "SYMBOL :",
 
+
     DEFAULT_SYMBOL
 
 )
@@ -267,6 +269,7 @@ print(
 print(
 
     "LEVERAGE :",
+
 
     LEVERAGE
 
