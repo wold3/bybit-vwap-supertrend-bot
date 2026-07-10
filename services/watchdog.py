@@ -5,14 +5,51 @@ import time
 import threading
 
 
-from api.bybit_api import bybit_api
 
-from portfolio.position_manager import (
-    position_manager
+from config import (
+    WATCHDOG_INTERVAL,
+    MAX_API_ERROR,
 )
 
 
+
+from api.bybit_api import (
+    bybit_api
+)
+
+
+
+from risk.risk_manager import (
+    risk_manager
+)
+
+
+
+from services.private_ws import (
+    private_ws
+)
+
+
+
+
+try:
+
+    from services.telegram_bot import (
+        telegram_bot
+    )
+
+except:
+
+
+    telegram_bot = None
+
+
+
+
+
+
 class Watchdog:
+
 
 
     def __init__(self):
@@ -24,13 +61,13 @@ class Watchdog:
         self.thread = None
 
 
+        self.api_errors = 0
+
+
         self.last_check = 0
 
 
-        self.error_count = 0
 
-
-        self.max_error = 5
 
 
 
@@ -43,13 +80,9 @@ class Watchdog:
 
         if self.running:
 
+
             return
 
-
-
-        print(
-            "[WATCHDOG START]"
-        )
 
 
         self.running = True
@@ -58,7 +91,7 @@ class Watchdog:
 
         self.thread = threading.Thread(
 
-            target=self.monitor,
+            target=self.loop,
 
             daemon=True
 
@@ -69,27 +102,38 @@ class Watchdog:
 
 
 
+        print(
+
+            "[WATCHDOG START]"
+
+        )
+
+
+
+
+
+
+
     # =====================================
-    # MONITOR LOOP
+    # LOOP
     # =====================================
 
-    def monitor(self):
+    def loop(self):
 
 
         while self.running:
 
 
+
             try:
 
 
-                self.health_check()
+                self.check()
 
 
 
             except Exception as e:
 
-
-                self.error_count += 1
 
 
                 print(
@@ -102,7 +146,14 @@ class Watchdog:
 
 
 
-            time.sleep(30)
+            time.sleep(
+
+                WATCHDOG_INTERVAL
+
+            )
+
+
+
 
 
 
@@ -111,10 +162,14 @@ class Watchdog:
     # HEALTH CHECK
     # =====================================
 
-    def health_check(self):
+    def check(self):
 
 
-        self.last_check = time.time()
+        print(
+
+            "[WATCHDOG CHECK]"
+
+        )
 
 
 
@@ -122,79 +177,101 @@ class Watchdog:
         # API CHECK
         # -----------------------------
 
+
         if not bybit_api.ping():
 
 
-            self.error_count += 1
+
+            self.api_errors += 1
+
 
 
             print(
 
-                "[WATCHDOG] API FAIL"
+                "[API FAILURE]",
+
+                self.api_errors
 
             )
+
 
 
         else:
 
 
-            self.error_count = max(
 
-                0,
+            self.api_errors = 0
 
-                self.error_count - 1
 
-            )
+
 
 
 
         # -----------------------------
-        # POSITION CHECK
+        # API FAILURE LIMIT
         # -----------------------------
 
 
-        position = (
+        if self.api_errors >= MAX_API_ERROR:
 
-            position_manager.get()
+
+
+            self.emergency_stop()
+
+
+
+            return
+
+
+
+
+
+
+
+        # -----------------------------
+        # WS CHECK
+        # -----------------------------
+
+
+        ws_delay = (
+
+            private_ws.heartbeat()
 
         )
 
 
 
-        if position:
+        if ws_delay > 120:
 
 
-            size = float(
 
-                position.get(
-                    "size",
-                    0
-                )
+            print(
+
+                "[WS DELAY]",
+
+                ws_delay
 
             )
 
 
-            if size < 0:
 
+            self.notify(
 
-                print(
+                "PRIVATE WS DELAY"
 
-                    "[WATCHDOG] INVALID POSITION"
-
-                )
-
+            )
 
 
 
-        # -----------------------------
-        # ERROR LIMIT
-        # -----------------------------
 
 
-        if self.error_count >= self.max_error:
 
 
-            self.emergency_state()
+
+        self.last_check = time.time()
+
+
+
 
 
 
@@ -203,59 +280,75 @@ class Watchdog:
     # EMERGENCY
     # =====================================
 
-    def emergency_state(self):
+    def emergency_stop(self):
 
 
         print(
-            "=========================="
-        )
 
-        print(
-            "[WATCHDOG EMERGENCY]"
-        )
+            "[WATCHDOG KILL SWITCH]"
 
-        print(
-            "TRADING SHOULD STOP"
-        )
-
-        print(
-            "=========================="
         )
 
 
-        # 실제 구현에서는
-        # risk_manager.kill_switch()
-        # telegram 알림
-        # position close
-        # 연결 재시작
+
+        try:
+
+
+
+            risk_manager.emergency_stop()
+
+
+
+        except Exception:
+
+
+
+            pass
+
+
+
+        self.notify(
+
+            "BOT STOPPED BY WATCHDOG"
+
+        )
+
+
+
+
+
 
 
     # =====================================
-    # STATUS
+    # TELEGRAM
     # =====================================
 
-    def status(self):
+    def notify(
+        self,
+        message
+    ):
 
 
-        return {
+        try:
 
 
-            "running":
-
-                self.running,
+            if telegram_bot:
 
 
-            "last_check":
+                telegram_bot.send(
 
-                self.last_check,
+                    message
 
-
-            "error_count":
-
-                self.error_count
+                )
 
 
-        }
+        except Exception:
+
+
+            pass
+
+
+
 
 
 
@@ -274,6 +367,8 @@ class Watchdog:
 
 
         self.running = False
+
+
 
 
 
