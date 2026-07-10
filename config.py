@@ -1,22 +1,11 @@
 # =====================================================
 # config.py
-# Bybit VWAP SuperTrend Bot Configuration
+# Global Configuration
 # =====================================================
 
 
 import os
 
-
-
-# =====================================================
-# BOT MODE
-# =====================================================
-
-
-LIVE = False
-
-
-TESTNET = False
 
 
 
@@ -45,29 +34,16 @@ BYBIT_API_SECRET = os.getenv(
 
 
 
-BYBIT_BASE_URL = (
-
-    "https://api.bybit.com"
-
-)
 
 
+# True = Real Trading
+# False = Test Order
 
-BYBIT_PRIVATE_WS = (
-
-    "wss://stream.bybit.com/v5/private"
-
-)
+LIVE = False
 
 
 
 
-
-
-
-# =====================================================
-# MARKET
-# =====================================================
 
 
 CATEGORY = "linear"
@@ -76,17 +52,9 @@ CATEGORY = "linear"
 DEFAULT_SYMBOL = "BTCUSDT"
 
 
-TIMEFRAME = "60"
+INTERVAL = "5"
 
 
-
-
-
-
-
-# =====================================================
-# LEVERAGE
-# =====================================================
 
 
 LEVERAGE = 3
@@ -105,16 +73,10 @@ LEVERAGE = 3
 RISK_PER_TRADE_PERCENT = 0.5
 
 
-
-STOP_LOSS_PERCENT = 1.5
-
+STOP_LOSS_PERCENT = 1.0
 
 
-TAKE_PROFIT_PERCENT = 3.0
-
-
-
-MAX_POSITION_SIZE = 0.01
+MAX_POSITION_SIZE = 1.0
 
 
 
@@ -123,74 +85,43 @@ MAX_POSITION_SIZE = 0.01
 
 
 # =====================================================
-# INDICATORS
+# INDICATOR
 # =====================================================
 
 
-ATR_PERIOD = 14
-
+ATR_PERIOD = 10
 
 
 SUPERTREND_MULTIPLIER = 3
 
 
 
-VWAP_PERIOD = 0
 
 
+VOLUME_PERIOD = 20
 
 
-
-
-
-# =====================================================
-# VOLUME FILTER
-# =====================================================
+MIN_VOLUME_MULTIPLIER = 1.2
 
 
 USE_VOLUME_FILTER = True
 
 
 
-MIN_VOLUME_MULTIPLIER = 1.1
-
-
-
-
-
-
-
-# =====================================================
-# WATCHDOG
-# =====================================================
-
-
-WATCHDOG_INTERVAL = 10
-
-
-
-MAX_API_ERROR = 5
-
-
-
 
 
 
 
 # =====================================================
-# TELEGRAM
+# ORDER
 # =====================================================
 
 
-TELEGRAM_ENABLED = False
+ORDER_TYPE = "Market"
 
 
+TIME_IN_FORCE = "IOC"
 
-TELEGRAM_TOKEN = ""
-
-
-
-TELEGRAM_CHAT_ID = ""
 
 
 
@@ -215,16 +146,58 @@ DATABASE_FILE = (
 
 
 
+
 # =====================================================
-# ORDER SETTINGS
+# TELEGRAM
 # =====================================================
 
 
-ORDER_TYPE = "Market"
+TELEGRAM_ENABLED = False
+
+
+TELEGRAM_TOKEN = ""
+
+
+TELEGRAM_CHAT_ID = ""
 
 
 
-POSITION_MODE = "OneWay"
+
+
+
+
+
+# =====================================================
+# WEBSERVER
+# =====================================================
+
+
+WEB_HOST = "0.0.0.0"
+
+
+WEB_PORT = 8000
+
+
+
+
+
+
+
+
+# =====================================================
+# SYSTEM
+# =====================================================
+
+
+DEBUG = True
+
+
+BOT_NAME = (
+
+    "VWAP-SUPERTREND-BOT"
+
+)
+
 
 
 
@@ -236,44 +209,12 @@ print("==============================")
 
 print("[CONFIG LOADED]")
 
-print(
+print("LIVE :", LIVE)
 
-    "LIVE :",
+print("CATEGORY :", CATEGORY)
 
+print("SYMBOL :", DEFAULT_SYMBOL)
 
-    LIVE
-
-)
-
-
-print(
-
-    "CATEGORY :",
-
-
-    CATEGORY
-
-)
-
-
-print(
-
-    "SYMBOL :",
-
-
-    DEFAULT_SYMBOL
-
-)
-
-
-print(
-
-    "LEVERAGE :",
-
-
-    LEVERAGE
-
-)
-
+print("LEVERAGE :", LEVERAGE)
 
 print("==============================")
