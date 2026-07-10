@@ -16,123 +16,290 @@ from indicators.indicator_engine import (
 
 
 
+
+
 class VWAPSuperTrendStrategy:
+
 
 
     def __init__(self, engine):
 
+
         self.engine = engine
 
+
         print(
+
             "[VWAP SUPERTREND STRATEGY READY]"
+
         )
 
 
 
-    # =================================================
-    # APP CALL
-    # =================================================
 
-    def analyze(self, candles):
+
+    # =====================================================
+    # APP ENTRY
+    # =====================================================
+
+    def analyze(
+        self,
+        candles
+    ):
+
 
         return self.generate_signal(
+
             candles
+
         )
 
 
 
-    # =================================================
-    # SIGNAL
-    # =================================================
 
-    def generate_signal(self, candles):
+
+    # =====================================================
+    # NORMALIZE CANDLE
+    # =====================================================
+
+    def normalize_candle(
+        self,
+        candle
+    ):
+
+
+        return {
+
+
+            "timestamp":
+
+                int(
+
+                    candle["timestamp"]
+
+                ),
+
+
+            "open":
+
+                float(
+
+                    candle["open"]
+
+                ),
+
+
+            "high":
+
+                float(
+
+                    candle["high"]
+
+                ),
+
+
+            "low":
+
+                float(
+
+                    candle["low"]
+
+                ),
+
+
+            "close":
+
+                float(
+
+                    candle["close"]
+
+                ),
+
+
+            "volume":
+
+                float(
+
+                    candle["volume"]
+
+                )
+
+        }
+
+
+
+
+
+    # =====================================================
+    # SIGNAL GENERATOR
+    # =====================================================
+
+    def generate_signal(
+        self,
+        candles
+    ):
+
 
         try:
 
-            if candles is None:
+
+
+            if not candles:
+
 
                 return None
+
 
 
 
             if len(candles) < 30:
 
+
                 return None
 
 
 
-            # ---------------------------------
-            # Indicator update
-            # ---------------------------------
+
+
+            clean = []
+
+
+
+            for c in candles:
+
+
+                try:
+
+
+                    clean.append(
+
+                        self.normalize_candle(c)
+
+                    )
+
+
+                except Exception:
+
+
+                    continue
+
+
+
+
+
+            if len(clean) < 30:
+
+
+                return None
+
+
+
+
+
+            # reset engine
+
 
             self.engine.candles.clear()
 
 
-            for candle in candles:
+            self.engine.last_market = None
+
+
+
+
+
+            for candle in clean:
+
 
                 self.engine.update(
+
                     candle
+
                 )
 
 
 
+
+
             market = (
+
                 self.engine
                 .get_market_data()
+
             )
 
 
 
-            if market is None:
+
+
+            if not market:
+
 
                 return None
+
+
 
 
 
             vwap = market.get(
+
                 "vwap"
+
             )
 
 
             trend = market.get(
+
                 "supertrend"
+
             )
 
 
 
-            if vwap is None:
+
+
+            if vwap is None or trend is None:
+
 
                 return None
 
 
-            if trend is None:
-
-                return None
 
 
 
-            candle = candles[-1]
+            last = clean[-1]
+
 
 
             close = float(
-                candle["close"]
+
+                last["close"]
+
             )
 
 
             volume = float(
-                candle["volume"]
+
+                last["volume"]
+
             )
+
 
 
             vwap = float(
+
                 vwap
+
             )
 
 
 
-            # ---------------------------------
-            # Volume filter
-            # ---------------------------------
+
+
+            # =================================================
+            # VOLUME FILTER
+            # =================================================
+
 
             volume_ok = True
 
@@ -141,183 +308,222 @@ class VWAPSuperTrendStrategy:
             if USE_VOLUME_FILTER:
 
 
-                volumes = []
-
-
-                for c in candles[-20:]:
-
-                    try:
-
-                        volumes.append(
-                            float(
-                                c["volume"]
-                            )
-                        )
-
-                    except:
-
-                        pass
+                volumes = [
 
 
 
-                if volumes:
+                    float(c["volume"])
+
+                    for c in clean[-20:]
 
 
-                    avg_volume = (
-
-                        sum(volumes)
-
-                        /
-
-                        len(volumes)
-
-                    )
+                ]
 
 
-                    if volume < (
 
-                        avg_volume
+                avg_volume = (
 
-                        *
+                    sum(volumes)
 
-                        MIN_VOLUME_MULTIPLIER
+                    /
 
-                    ):
+                    len(volumes)
 
-                        volume_ok = False
+                )
+
+
+
+                if volume < (
+
+                    avg_volume
+
+                    *
+
+                    MIN_VOLUME_MULTIPLIER
+
+                ):
+
+
+                    volume_ok = False
+
+
 
 
 
             print(
+
                 "[INDICATOR]",
+
                 "PRICE:",
-                round(close, 2),
+
+                round(close,2),
+
                 "VWAP:",
-                round(vwap, 2),
+
+                round(vwap,2),
+
                 "TREND:",
+
                 trend,
+
                 "VOLUME:",
+
                 volume_ok
+
             )
+
+
 
 
 
             if not volume_ok:
 
+
                 print(
+
                     "[NO SIGNAL] VOLUME"
+
                 )
+
 
                 return None
 
 
 
-            # ---------------------------------
+
+
+            # =================================================
             # BUY
-            # ---------------------------------
+            # =================================================
 
-            if (
 
-                close > vwap
+            if close > vwap and trend == "UP":
 
-                and
-
-                trend == "UP"
-
-            ):
 
 
                 signal = {
 
 
                     "signal":
-                    "BUY",
+
+                        "BUY",
+
+
+                    "type":
+
+                        "ENTRY",
 
 
                     "side":
-                    "Buy",
+
+                        "Buy",
 
 
                     "price":
-                    close,
+
+                        close,
 
 
                     "vwap":
-                    vwap,
+
+                        vwap,
 
 
                     "trend":
-                    trend
+
+                        trend
 
                 }
 
 
+
                 print(
+
                     "[SIGNAL BUY]",
+
                     signal
+
                 )
+
 
 
                 return signal
 
 
 
-            # ---------------------------------
+
+
+            # =================================================
             # SELL
-            # ---------------------------------
+            # =================================================
 
-            if (
 
-                close < vwap
+            if close < vwap and trend == "DOWN":
 
-                and
-
-                trend == "DOWN"
-
-            ):
 
 
                 signal = {
 
 
                     "signal":
-                    "SELL",
+
+                        "SELL",
+
+
+                    "type":
+
+                        "ENTRY",
 
 
                     "side":
-                    "Sell",
+
+                        "Sell",
 
 
                     "price":
-                    close,
+
+                        close,
 
 
                     "vwap":
-                    vwap,
+
+                        vwap,
 
 
                     "trend":
-                    trend
+
+                        trend
 
                 }
 
 
+
                 print(
+
                     "[SIGNAL SELL]",
+
                     signal
+
                 )
 
 
+
                 return signal
+
+
 
 
 
             print(
+
                 "[NO SIGNAL]"
+
             )
 
 
             return None
+
+
 
 
 
@@ -325,8 +531,11 @@ class VWAPSuperTrendStrategy:
 
 
             print(
+
                 "[STRATEGY ERROR]",
+
                 e
+
             )
 
 
@@ -336,11 +545,14 @@ class VWAPSuperTrendStrategy:
 
 
 
+
 # =====================================================
-# Singleton
+# SINGLETON
 # =====================================================
 
 
 vwap_supertrend_strategy = VWAPSuperTrendStrategy(
+
     indicator_engine
+
 )
