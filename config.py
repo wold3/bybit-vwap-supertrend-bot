@@ -11,11 +11,10 @@ BYBIT_DEMO = True
 BYBIT_TESTNET = False
 LIVE = False
 
-# 기존 코드 호환
 DEMO = BYBIT_DEMO
 
 # ==================================================
-# API KEY
+# API
 # ==================================================
 
 BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
@@ -34,7 +33,7 @@ SYMBOL = "BTCUSDT"
 DEFAULT_SYMBOL = SYMBOL
 
 # ==================================================
-# REST
+# REST URL
 # ==================================================
 
 if BYBIT_DEMO:
@@ -44,17 +43,14 @@ elif BYBIT_TESTNET:
 else:
     REST_URL = "https://api.bybit.com"
 
-# 기존 코드 호환
 BYBIT_BASE_URL = REST_URL
 
 # ==================================================
 # WEBSOCKET
 # ==================================================
 
-# Public Market Data
 PUBLIC_WS = "wss://stream.bybit.com/v5/public"
 
-# Private Account
 if BYBIT_DEMO:
     PRIVATE_WS = "wss://stream-demo.bybit.com/v5/private"
 elif BYBIT_TESTNET:
@@ -77,38 +73,30 @@ TIME_IN_FORCE = "GTC"
 ORDER_COOLDOWN = 60
 
 # ==================================================
-# INDICATOR
+# STRATEGY
 # ==================================================
 
 VWAP_LENGTH = 20
-VWAP = VWAP_LENGTH
 
 SUPERTREND_PERIOD = 5
 SUPERTREND_MULTIPLIER = 2.0
-
-SUPERTREND = (
-    SUPERTREND_PERIOD,
-    SUPERTREND_MULTIPLIER,
-)
-
-# ==================================================
-# RISK
-# ==================================================
-
-MAX_DAILY_LOSS_PERCENT = 5.0
 
 # ==================================================
 # POSITION / EXIT
 # ==================================================
 
 TAKE_PROFIT_PERCENT = 1.0
-
 STOP_LOSS_PERCENT = 0.5
 
+# ==================================================
+# RISK
+# ==================================================
+
 MAX_POSITION_SIZE = 0.01
+MAX_DAILY_LOSS_PERCENT = 5.0
 
 # ==================================================
-# DEBUG
+# LOG
 # ==================================================
 
 print("==============================")
@@ -129,4 +117,3 @@ print("REST :", BYBIT_BASE_URL)
 print("PUBLIC WS :", PUBLIC_WS)
 print("PRIVATE WS :", PRIVATE_WS)
 print("==============================")
-
