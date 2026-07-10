@@ -1,23 +1,27 @@
 # =====================================================
 # api/bybit_api.py
-# Bybit V5 Unified API Wrapper
+# Bybit V5 REST API Wrapper
 # =====================================================
 
-from pybit.unified_trading import HTTP
+import time
+import hmac
+import hashlib
+import requests
+import json
+
 
 
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
-
-    BYBIT_TESTNET,
-    BYBIT_DEMO,
-
+    BYBIT_REST_URL,
     CATEGORY,
     DEFAULT_SYMBOL,
-
+    ACCOUNT_TYPE,
     LEVERAGE
 )
+
+
 
 
 
@@ -30,27 +34,234 @@ class BybitAPI:
     def __init__(self):
 
 
+        self.base_url = BYBIT_REST_URL
+
+
         print("==============================")
         print("[BYBIT API INIT]")
-        print("TESTNET :", BYBIT_TESTNET)
-        print("DEMO    :", BYBIT_DEMO)
-        print("ACCOUNT : UNIFIED")
-        print("CATEGORY:", CATEGORY)
-        print("SYMBOL  :", DEFAULT_SYMBOL)
+        print("URL :", self.base_url)
+        print("ACCOUNT :", ACCOUNT_TYPE)
+        print("CATEGORY :", CATEGORY)
+        print("SYMBOL :", DEFAULT_SYMBOL)
         print("==============================")
 
 
-        self.session = HTTP(
 
-            testnet=BYBIT_TESTNET,
 
-            demo=BYBIT_DEMO,
 
-            api_key=BYBIT_API_KEY,
 
-            api_secret=BYBIT_API_SECRET
+
+    # =====================================================
+    # SIGN
+    # =====================================================
+
+    def sign(
+        self,
+        timestamp,
+        params
+    ):
+
+
+        recv_window = "5000"
+
+
+        param_str = json.dumps(
+
+            params,
+
+            separators=(",", ":")
 
         )
+
+
+        payload = (
+
+            str(timestamp)
+
+            +
+
+            BYBIT_API_KEY
+
+            +
+
+            recv_window
+
+            +
+
+            param_str
+
+        )
+
+
+
+        return hmac.new(
+
+            BYBIT_API_SECRET.encode(),
+
+            payload.encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+
+
+
+
+
+    # =====================================================
+    # REQUEST
+    # =====================================================
+
+    def request(
+        self,
+        method,
+        endpoint,
+        params=None
+    ):
+
+
+        if params is None:
+
+            params = {}
+
+
+
+        timestamp = int(
+
+            time.time()*1000
+
+        )
+
+
+        recv_window = "5000"
+
+
+
+        headers = {
+
+
+            "X-BAPI-API-KEY":
+
+                BYBIT_API_KEY,
+
+
+            "X-BAPI-SIGN":
+
+                self.sign(
+
+                    timestamp,
+
+                    params
+
+                ),
+
+
+            "X-BAPI-TIMESTAMP":
+
+                str(timestamp),
+
+
+            "X-BAPI-RECV-WINDOW":
+
+                recv_window,
+
+
+            "Content-Type":
+
+                "application/json"
+
+
+        }
+
+
+
+        url = (
+
+            self.base_url
+
+            +
+
+            endpoint
+
+        )
+
+
+
+        try:
+
+
+            if method == "GET":
+
+
+                response = requests.get(
+
+                    url,
+
+                    headers=headers,
+
+                    params=params,
+
+                    timeout=10
+
+                )
+
+
+            else:
+
+
+                response = requests.post(
+
+                    url,
+
+                    headers=headers,
+
+                    json=params,
+
+                    timeout=10
+
+                )
+
+
+
+            data = response.json()
+
+
+
+            if data.get("retCode") != 0:
+
+
+                print(
+
+                    "[BYBIT ERROR]",
+
+                    data
+
+                )
+
+
+                return None
+
+
+
+            return data
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[REQUEST ERROR]",
+
+                e
+
+            )
+
+
+            return None
 
 
 
@@ -64,34 +275,28 @@ class BybitAPI:
 
     def ping(self):
 
+
         try:
 
-            result = (
-                self.session
-                .get_server_time()
-            )
 
+            r = requests.get(
 
-            return (
+                self.base_url
 
-                result.get(
-                    "retCode"
-                )
+                +
 
-                ==
+                "/v5/market/time",
 
-                0
+                timeout=5
 
             )
 
 
-        except Exception as e:
+            return r.status_code == 200
 
 
-            print(
-                "[PING ERROR]",
-                e
-            )
+
+        except:
 
 
             return False
@@ -109,50 +314,23 @@ class BybitAPI:
     def get_wallet_balance(self):
 
 
-        try:
+        return self.request(
+
+            "GET",
+
+            "/v5/account/wallet-balance",
+
+            {
 
 
-            result = (
+                "accountType":
 
-                self.session
-                .get_wallet_balance(
-
-                    accountType="UNIFIED"
-
-                )
-
-            )
+                    ACCOUNT_TYPE
 
 
-            if result.get(
-                "retCode"
-            ) != 0:
+            }
 
-
-                print(
-                    "[WALLET ERROR]",
-                    result
-                )
-
-
-                return None
-
-
-
-            return result
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[WALLET EXCEPTION]",
-                e
-            )
-
-
-            return None
+        )
 
 
 
@@ -164,143 +342,123 @@ class BybitAPI:
     # KLINE
     # =====================================================
 
-    def get_kline(
-        self,
-        interval="1"
-    ):
+    def get_kline(self):
 
 
-        try:
+        result = self.request(
+
+            "GET",
+
+            "/v5/market/kline",
+
+            {
 
 
-            result = (
+                "category":
 
-                self.session
-                .get_kline(
-
-                    category=CATEGORY,
-
-                    symbol=DEFAULT_SYMBOL,
-
-                    interval=interval,
-
-                    limit=200
-
-                )
-
-            )
+                    CATEGORY,
 
 
+                "symbol":
 
-            if result.get(
-                "retCode"
-            ) != 0:
-
-
-                print(
-                    "[KLINE ERROR]",
-                    result
-                )
+                    DEFAULT_SYMBOL,
 
 
-                return None
+                "interval":
+
+                    "1",
+
+
+                "limit":
+
+                    200
+
+
+            }
+
+        )
 
 
 
+        if not result:
 
 
-            rows = (
-
-                result
-                ["result"]
-                ["list"]
-
-            )
+            return []
 
 
 
-            candles = []
+        rows = (
+
+            result
+
+            .get("result",{})
+
+            .get("list",[])
+
+        )
 
 
 
-            for row in reversed(rows):
+        candles = []
 
 
-                candles.append(
+
+        for x in reversed(rows):
 
 
-                    {
+            candles.append(
+
+
+                {
 
 
                     "timestamp":
 
-                        int(
-                            row[0]
-                        ),
+                        int(x[0]),
 
 
                     "open":
 
-                        float(
-                            row[1]
-                        ),
+                        float(x[1]),
 
 
                     "high":
 
-                        float(
-                            row[2]
-                        ),
+                        float(x[2]),
 
 
                     "low":
 
-                        float(
-                            row[3]
-                        ),
+                        float(x[3]),
 
 
                     "close":
 
-                        float(
-                            row[4]
-                        ),
+                        float(x[4]),
 
 
                     "volume":
 
-                        float(
-                            row[5]
-                        )
+                        float(x[5])
 
 
-                    }
-
-                )
+                }
 
 
-
-            print(
-                "[KLINE]",
-                len(candles)
             )
 
 
-            return candles
+
+        print(
+
+            "[KLINE]",
+
+            len(candles)
+
+        )
 
 
-
-
-        except Exception as e:
-
-
-            print(
-                "[KLINE ERROR]",
-                e
-            )
-
-
-            return None
+        return candles
 
 
 
@@ -309,131 +467,165 @@ class BybitAPI:
 
 
     # =====================================================
-    # LEVERAGE
-    # =====================================================
-
-    def set_leverage(self):
-
-
-        try:
-
-
-            result = (
-
-                self.session
-                .set_leverage(
-
-                    category=CATEGORY,
-
-                    symbol=DEFAULT_SYMBOL,
-
-                    buyLeverage=str(
-                        LEVERAGE
-                    ),
-
-                    sellLeverage=str(
-                        LEVERAGE
-                    )
-
-                )
-
-            )
-
-
-
-            if result.get(
-                "retCode"
-            ) == 0:
-
-
-                print(
-                    "[LEVERAGE SET]"
-                )
-
-
-                return True
-
-
-
-            return False
-
-
-
-
-        except Exception as e:
-
-
-            if "110043" in str(e):
-
-
-                print(
-                    "[LEVERAGE ALREADY SET]"
-                )
-
-
-                return True
-
-
-
-            print(
-                "[LEVERAGE ERROR]",
-                e
-            )
-
-
-            return False
-
-
-
-
-
-
-
-    # =====================================================
-    # PRICE
+    # LAST PRICE
     # =====================================================
 
     def get_last_price(self):
 
 
+        result = self.request(
+
+            "GET",
+
+            "/v5/market/tickers",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+
+            }
+
+        )
+
+
+
         try:
-
-
-            result = (
-
-                self.session
-                .get_tickers(
-
-                    category=CATEGORY,
-
-                    symbol=DEFAULT_SYMBOL
-
-                )
-
-            )
-
 
 
             return float(
 
                 result
+
                 ["result"]
+
                 ["list"][0]
+
                 ["lastPrice"]
 
             )
 
 
-        except Exception as e:
-
-
-            print(
-                "[PRICE ERROR]",
-                e
-            )
+        except:
 
 
             return None
+
+
+
+
+
+
+
+    # =====================================================
+    # POSITION
+    # =====================================================
+
+    def get_position(self):
+
+
+        return self.request(
+
+            "GET",
+
+            "/v5/position/list",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+
+            }
+
+        )
+
+
+
+
+
+
+
+    # =====================================================
+    # SET LEVERAGE
+    # =====================================================
+
+    def set_leverage(self):
+
+
+        result = self.request(
+
+            "POST",
+
+            "/v5/position/set-leverage",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL,
+
+
+                "buyLeverage":
+
+                    str(LEVERAGE),
+
+
+                "sellLeverage":
+
+                    str(LEVERAGE)
+
+
+            }
+
+        )
+
+
+        if result:
+
+
+            print(
+
+                "[LEVERAGE SET]",
+
+                LEVERAGE
+
+            )
+
+
+        else:
+
+
+            print(
+
+                "[LEVERAGE ALREADY SET]"
+
+            )
+
+
+
+        return result
 
 
 
@@ -448,17 +640,17 @@ class BybitAPI:
     def create_order(
         self,
         side,
-        qty,
-        stop_loss=None,
-        take_profit=None,
-        reduce_only=False
+        qty
     ):
 
 
-        try:
+        return self.request(
 
+            "POST",
 
-            params = {
+            "/v5/order/create",
+
+            {
 
 
                 "category":
@@ -486,78 +678,14 @@ class BybitAPI:
                     str(qty),
 
 
-                "positionIdx":
+                "timeInForce":
 
-                    0
+                    "IOC"
 
 
             }
 
-
-
-            if stop_loss:
-
-
-                params["stopLoss"] = str(
-                    stop_loss
-                )
-
-
-
-            if take_profit:
-
-
-                params["takeProfit"] = str(
-                    take_profit
-                )
-
-
-
-            if reduce_only:
-
-
-                params["reduceOnly"] = True
-
-
-
-
-
-
-            result = (
-
-                self.session
-                .place_order(
-
-                    **params
-
-                )
-
-            )
-
-
-
-            print(
-                "[ORDER RESULT]",
-                result
-            )
-
-
-
-            return result
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[ORDER ERROR]",
-                e
-            )
-
-
-            return None
+        )
 
 
 
@@ -572,112 +700,39 @@ class BybitAPI:
     def close_position(self):
 
 
-        try:
-
-
-            position = (
-
-                self.get_position()
-
-            )
+        position = self.get_position()
 
 
 
-            rows = (
-
-                position
-                ["result"]
-                ["list"]
-
-            )
-
-
-
-            for p in rows:
-
-
-                size = float(
-
-                    p.get(
-                        "size",
-                        0
-                    )
-
-                )
-
-
-
-                if size <= 0:
-
-                    continue
-
-
-
-                if p["side"] == "Buy":
-
-                    side = "Sell"
-
-
-                else:
-
-                    side = "Buy"
-
-
-
-
-
-                return self.create_order(
-
-                    side,
-
-                    size,
-
-                    reduce_only=True
-
-                )
-
-
-
-
-            return True
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[CLOSE ERROR]",
-                e
-            )
+        if not position:
 
 
             return False
 
 
 
+        rows = (
+
+            position
+
+            .get("result",{})
+
+            .get("list",[])
+
+        )
 
 
 
-
-    # =====================================================
-    # POSITION
-    # =====================================================
-
-    def get_position(self):
+        for p in rows:
 
 
-        try:
+            size = float(
 
+                p.get(
 
-            return (
+                    "size",
 
-                self.session
-                .get_positions(
-
-                    category=CATEGORY,
-
-                    symbol=DEFAULT_SYMBOL
+                    0
 
                 )
 
@@ -685,16 +740,38 @@ class BybitAPI:
 
 
 
-        except Exception as e:
+            if size > 0:
 
 
-            print(
-                "[POSITION ERROR]",
-                e
-            )
+                side = p.get("side")
 
 
-            return None
+
+                close_side = (
+
+                    "Sell"
+
+                    if side == "Buy"
+
+                    else
+
+                    "Buy"
+
+                )
+
+
+
+                return self.create_order(
+
+                    close_side,
+
+                    size
+
+                )
+
+
+
+        return False
 
 
 
