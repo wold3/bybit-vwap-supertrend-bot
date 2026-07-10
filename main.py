@@ -1,4 +1,5 @@
 import time
+import traceback
 
 
 from api.bybit_api import bybit_api
@@ -14,10 +15,14 @@ from signal.vwap_supertrend import vwap_supertrend
 
 from config import (
     ACCOUNT_TYPE,
-    DEFAULT_SYMBOL,
+    LEVERAGE,
 )
 
 
+
+# ==================================================
+# TRADING BOT
+# ==================================================
 
 class TradingBot:
 
@@ -25,44 +30,63 @@ class TradingBot:
     def __init__(self):
 
 
+        self.running = False
+
+
         print("==============================")
         print("[APP INIT]")
         print("==============================")
 
 
-        self.running = False
 
 
+    # ==================================================
+    # INIT
+    # ==================================================
 
-
-    # ==========================================
-    # WALLET INIT
-    # ==========================================
-
-    def initialize_wallet(self):
-
-
-        print("==============================")
-        print("[WALLET INIT]")
-        print(
-            "ACCOUNT :",
-            ACCOUNT_TYPE
-        )
-        print("==============================")
-
-
-
-        wallet = bybit_api.get_wallet_balance()
-
-
-
-        if wallet is None:
-
-            return False
-
+    def initialize(self):
 
 
         try:
+
+
+            print("==============================")
+            print("[SYSTEM INITIALIZE]")
+            print("==============================")
+
+
+
+            # leverage
+
+            bybit_api.set_leverage(
+
+                LEVERAGE
+
+            )
+
+
+
+            # wallet
+
+            wallet = (
+
+                bybit_api
+                .get_wallet_balance()
+
+            )
+
+
+
+            if wallet is None:
+
+
+                print(
+                    "[WALLET INIT FAILED]"
+                )
+
+                return False
+
+
 
 
             equity = float(
@@ -87,6 +111,8 @@ class TradingBot:
 
 
 
+            # risk init
+
             risk_manager.initialize(
 
                 equity
@@ -94,7 +120,22 @@ class TradingBot:
             )
 
 
+
+            print(
+
+                "[RISK INIT OK]"
+
+            )
+
+
+
+            print("==============================")
+            print("[INIT COMPLETE]")
+            print("==============================")
+
+
             return True
+
 
 
 
@@ -102,12 +143,12 @@ class TradingBot:
 
 
             print(
-
-                "[WALLET ERROR]",
-
+                "[INIT ERROR]",
                 e
-
             )
+
+
+            traceback.print_exc()
 
 
             return False
@@ -115,34 +156,97 @@ class TradingBot:
 
 
 
-    # ==========================================
-    # MAIN LOOP
-    # ==========================================
+    # ==================================================
+    # PRICE DATA
+    # ==================================================
+
+    def get_prices(self):
+
+
+        try:
+
+
+            result = bybit_api.get_kline(
+
+                interval="1",
+
+                limit=200
+
+            )
+
+
+
+            if result is None:
+
+                return None
+
+
+
+            candles = (
+
+                result
+                ["result"]
+                ["list"]
+
+            )
+
+
+
+            prices = []
+
+
+
+            for candle in candles:
+
+
+                prices.append(
+
+                    float(
+                        candle[4]
+                    )
+
+                )
+
+
+
+            return candles, prices
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[PRICE ERROR]",
+                e
+            )
+
+
+            return None
+
+
+
+
+    # ==================================================
+    # LOOP
+    # ==================================================
 
     def run(self):
 
 
-        print("====================================")
-        print("VWAP SUPERTREND BOT START")
-        print("====================================")
-
-
-
-        if not self.initialize_wallet():
-
-
-            print(
-                "[INIT FAILED]"
-            )
+        if not self.initialize():
 
             return
-
 
 
 
         self.running = True
 
 
+
+        print("====================================")
+        print("VWAP SUPERTREND BOT START")
+        print("====================================")
 
         print(
             "[BOT RUNNING]"
@@ -157,16 +261,7 @@ class TradingBot:
             try:
 
 
-
-                # ==================================
-                # GET KLINE
-                # ==================================
-
-                data = bybit_api.get_kline(
-
-                    interval="1"
-
-                )
+                data = self.get_prices()
 
 
 
@@ -180,37 +275,14 @@ class TradingBot:
 
 
 
-                candles = (
-
-                    data
-                    ["result"]
-                    ["list"]
-
-                )
+                candles, prices = data
 
 
 
 
-                prices = []
-
-
-
-                for c in candles:
-
-
-                    prices.append(
-
-                        float(c[4])
-
-                    )
-
-
-
-
-
-                # ==================================
-                # POSITION EXIT CHECK
-                # ==================================
+                # ----------------------------------
+                # EXIT CHECK
+                # ----------------------------------
 
                 exit_signal = (
 
@@ -226,7 +298,6 @@ class TradingBot:
 
 
                 if exit_signal:
-
 
 
                     print(
@@ -250,10 +321,9 @@ class TradingBot:
 
 
 
-
-                # ==================================
-                # SIGNAL CHECK
-                # ==================================
+                # ----------------------------------
+                # SIGNAL
+                # ----------------------------------
 
                 signal = (
 
@@ -280,21 +350,18 @@ class TradingBot:
 
 
 
-                # ==================================
-                # ORDER EXECUTION
-                # ==================================
+                # ----------------------------------
+                # ORDER
+                # ----------------------------------
 
                 if signal == "BUY":
-
 
 
                     order_manager.buy()
 
 
 
-
                 elif signal == "SELL":
-
 
 
                     order_manager.sell()
@@ -302,10 +369,9 @@ class TradingBot:
 
 
 
-
-                # ==================================
-                # UPDATE RISK
-                # ==================================
+                # ----------------------------------
+                # RISK UPDATE
+                # ----------------------------------
 
                 wallet = (
 
@@ -317,7 +383,6 @@ class TradingBot:
 
 
                 if wallet:
-
 
 
                     equity = float(
@@ -341,13 +406,12 @@ class TradingBot:
 
 
 
-
                 time.sleep(5)
 
 
 
-            except KeyboardInterrupt:
 
+            except KeyboardInterrupt:
 
 
                 self.stop()
@@ -357,14 +421,16 @@ class TradingBot:
             except Exception as e:
 
 
-
                 print(
 
-                    "[MAIN LOOP ERROR]",
+                    "[LOOP ERROR]",
 
                     e
 
                 )
+
+
+                traceback.print_exc()
 
 
 
@@ -374,10 +440,9 @@ class TradingBot:
 
 
 
-
-    # ==========================================
+    # ==================================================
     # STOP
-    # ==========================================
+    # ==================================================
 
     def stop(self):
 
@@ -390,7 +455,6 @@ class TradingBot:
         self.running = False
 
 
-
         print(
             "[BOT STOPPED]"
         )
@@ -399,10 +463,9 @@ class TradingBot:
 
 
 
-
-# ==========================================
+# ==================================================
 # START
-# ==========================================
+# ==================================================
 
 if __name__ == "__main__":
 
