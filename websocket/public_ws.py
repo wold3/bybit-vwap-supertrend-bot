@@ -1,24 +1,20 @@
-import json
 import threading
 import time
 
-from websocket import WebSocketApp
+from pybit.unified_trading import WebSocket
 
 from config import (
-    BYBIT_PUBLIC_WS,
+    BYBIT_TESTNET,
     CATEGORY,
     DEFAULT_SYMBOL,
 )
 
 
-
 # ==========================================
-# BYBIT PUBLIC WEBSOCKET
+# BYBIT PUBLIC WEBSOCKET V5
 # ==========================================
-
 
 class PublicWS:
-
 
 
     def __init__(self):
@@ -27,19 +23,70 @@ class PublicWS:
 
         self.running = False
 
-        self.thread = None
+        self.kline = []
 
-
-        self.candles = []
+        self.last_price = None
 
 
         print("==============================")
         print("[PUBLIC WS INIT]")
-        print("URL :", BYBIT_PUBLIC_WS)
+        print("CATEGORY :", CATEGORY)
         print("SYMBOL :", DEFAULT_SYMBOL)
         print("==============================")
 
 
+
+    # ======================================
+    # KLINE CALLBACK
+    # ======================================
+
+    def handle_kline(self, message):
+
+        try:
+
+            data = message.get("data")
+
+
+            if not data:
+                return
+
+
+            for candle in data:
+
+                close = float(
+                    candle["close"]
+                )
+
+
+                self.last_price = close
+
+
+                self.kline.append(
+                    candle
+                )
+
+
+                # 최근 200개 유지
+
+                if len(self.kline) > 200:
+
+                    self.kline.pop(0)
+
+
+
+                print(
+                    "[KLINE]",
+                    close
+                )
+
+
+
+        except Exception as e:
+
+            print(
+                "[PUBLIC WS ERROR]",
+                e
+            )
 
 
 
@@ -60,315 +107,57 @@ class PublicWS:
 
 
 
-        self.thread = threading.Thread(
+        self.ws = WebSocket(
 
-            target=self._run,
+            testnet=BYBIT_TESTNET,
+
+            channel_type="linear"
+
+        )
+
+
+
+        self.ws.kline_stream(
+
+            interval=1,
+
+            symbol=DEFAULT_SYMBOL,
+
+            callback=self.handle_kline
+
+        )
+
+
+
+        print(
+            "[PUBLIC WS STARTED]"
+        )
+
+
+
+        while self.running:
+
+            time.sleep(1)
+
+
+
+    # ======================================
+    # THREAD
+    # ======================================
+
+    def run_thread(self):
+
+
+        thread = threading.Thread(
+
+            target=self.start,
 
             daemon=True
 
         )
 
 
-        self.thread.start()
-
-
-
-        print(
-            "[PUBLIC WS START]"
-        )
-
-
-
-
-
-
-    # ======================================
-    # CONNECT
-    # ======================================
-
-    def _run(self):
-
-
-        while self.running:
-
-
-            try:
-
-
-                self.ws = WebSocketApp(
-
-                    BYBIT_PUBLIC_WS,
-
-                    on_open=self.on_open,
-
-                    on_message=self.on_message,
-
-                    on_error=self.on_error,
-
-                    on_close=self.on_close
-
-                )
-
-
-
-                self.ws.run_forever()
-
-
-
-            except Exception as e:
-
-
-                print(
-                    "[PUBLIC WS ERROR]",
-                    e
-                )
-
-
-
-            time.sleep(3)
-
-
-
-
-
-
-
-    # ======================================
-    # OPEN
-    # ======================================
-
-    def on_open(
-        self,
-        ws
-    ):
-
-
-        topic = (
-
-            "kline.1."
-
-            +
-
-            DEFAULT_SYMBOL
-
-        )
-
-
-        request = {
-
-
-            "op":
-            "subscribe",
-
-
-            "args":
-            [
-                topic
-            ]
-
-        }
-
-
-
-        ws.send(
-
-            json.dumps(request)
-
-        )
-
-
-        print(
-            "[PUBLIC WS CONNECTED]"
-        )
-
-
-
-
-
-
-
-    # ======================================
-    # MESSAGE
-    # ======================================
-
-    def on_message(
-
-        self,
-
-        ws,
-
-        message
-
-    ):
-
-
-        try:
-
-
-            data = json.loads(
-                message
-            )
-
-
-
-            if "data" not in data:
-
-                return
-
-
-
-            topic = data.get(
-                "topic",
-                ""
-            )
-
-
-
-            if "kline" not in topic:
-
-                return
-
-
-
-
-
-            for item in data["data"]:
-
-
-
-                candle = {
-
-
-                    "start":
-                    item["start"],
-
-
-                    "open":
-                    float(
-                        item["open"]
-                    ),
-
-
-                    "high":
-                    float(
-                        item["high"]
-                    ),
-
-
-                    "low":
-                    float(
-                        item["low"]
-                    ),
-
-
-                    "close":
-                    float(
-                        item["close"]
-                    ),
-
-
-                    "volume":
-                    float(
-                        item["volume"]
-                    )
-
-                }
-
-
-
-
-                self.candles.append(
-                    candle
-                )
-
-
-
-                if len(self.candles) > 200:
-
-
-                    self.candles.pop(0)
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[WS MESSAGE ERROR]",
-                e
-            )
-
-
-
-
-
-
-
-    # ======================================
-    # ERROR
-    # ======================================
-
-    def on_error(
-
-        self,
-
-        ws,
-
-        error
-
-    ):
-
-
-        print(
-            "[PUBLIC WS ERROR]",
-            error
-        )
-
-
-
-
-
-
-
-    # ======================================
-    # CLOSE
-    # ======================================
-
-    def on_close(
-
-        self,
-
-        ws,
-
-        code,
-
-        msg
-
-    ):
-
-
-        print(
-            "[PUBLIC WS CLOSED]"
-        )
-
-
-
-
-
-
-
-    # ======================================
-    # GET CANDLES
-    # ======================================
-
-    def get_candles(self):
-
-        return self.candles
-
-
-
-
+        thread.start()
 
 
 
@@ -382,19 +171,47 @@ class PublicWS:
         self.running = False
 
 
-
-        if self.ws:
-
-
-            self.ws.close()
-
-
-
         print(
-            "[PUBLIC WS STOP]"
+            "[PUBLIC WS STOPPED]"
         )
 
 
+
+    # ======================================
+    # DATA GETTER
+    # ======================================
+
+    def get_prices(self):
+
+
+        prices = []
+
+
+        for candle in self.kline:
+
+            try:
+
+                prices.append(
+
+                    float(
+                        candle["close"]
+                    )
+
+                )
+
+            except:
+
+                pass
+
+
+
+        return prices
+
+
+
+    def get_last_price(self):
+
+        return self.last_price
 
 
 
