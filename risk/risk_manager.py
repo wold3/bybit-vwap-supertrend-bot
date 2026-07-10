@@ -1,9 +1,12 @@
-import datetime
+import time
 
 
 from config import (
     MAX_DAILY_LOSS_PERCENT,
+    MAX_POSITION_SIZE,
 )
+
+
 
 
 
@@ -19,13 +22,18 @@ class RiskManager:
 
         self.start_equity = 0
 
+
         self.current_equity = 0
 
 
-        self.start_time = None
+        self.initialized = False
 
 
-        self.block_trading = False
+        self.daily_loss_limit = (
+
+            MAX_DAILY_LOSS_PERCENT
+
+        )
 
 
 
@@ -33,7 +41,7 @@ class RiskManager:
         print("[RISK MANAGER INIT]")
         print(
             "MAX DAILY LOSS :",
-            MAX_DAILY_LOSS_PERCENT,
+            self.daily_loss_limit,
             "%"
         )
         print("==============================")
@@ -53,16 +61,20 @@ class RiskManager:
 
 
             self.start_equity = float(
+
                 equity
+
             )
 
 
             self.current_equity = float(
+
                 equity
+
             )
 
 
-            self.start_time = datetime.datetime.now()
+            self.initialized = True
 
 
 
@@ -73,6 +85,8 @@ class RiskManager:
                 self.start_equity
             )
             print("==============================")
+
+
 
 
 
@@ -99,119 +113,75 @@ class RiskManager:
 
 
             self.current_equity = float(
+
                 equity
+
             )
 
 
 
-        except Exception as e:
+        except:
 
 
-            print(
-                "[EQUITY UPDATE ERROR]",
-                e
-            )
+            pass
 
 
 
 
 
     # ======================================
-    # LOSS CHECK
+    # LOSS PERCENT
     # ======================================
 
-    def check_daily_loss(self):
+    def loss_percent(self):
 
 
-        try:
+        if self.start_equity <= 0:
 
 
-            if self.start_equity <= 0:
-
-                return False
-
-
-
-
-            loss_percent = (
-
-                (
-
-                    self.start_equity
-
-                    -
-
-                    self.current_equity
-
-                )
-
-                /
-
-                self.start_equity
-
-                *
-
-                100
-
-            )
+            return 0
 
 
 
 
-            if loss_percent >= MAX_DAILY_LOSS_PERCENT:
+        loss = (
+
+            self.start_equity
+
+            -
+
+            self.current_equity
+
+        )
 
 
 
-                self.block_trading = True
+        return (
 
+            loss
 
+            /
 
-                print(
-                    "[RISK BLOCK]",
-                    "LOSS:",
-                    round(loss_percent,2),
-                    "%"
-                )
+            self.start_equity
 
-
-
-                return True
-
-
-
-
-            return False
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[LOSS CHECK ERROR]",
-                e
-            )
-
-
-            return False
+        ) * 100
 
 
 
 
 
     # ======================================
-    # CAN TRADE
+    # TRADE CHECK
     # ======================================
 
     def can_trade(self):
 
 
-        if self.block_trading:
+        if not self.initialized:
 
 
             print(
-                "[TRADE BLOCKED BY RISK]"
+                "[RISK BLOCK] NOT INITIALIZED"
             )
 
 
@@ -220,10 +190,31 @@ class RiskManager:
 
 
 
-        if self.check_daily_loss():
+
+        loss = self.loss_percent()
+
+
+
+
+
+        if loss >= self.daily_loss_limit:
+
+
+
+            print(
+                "[RISK BLOCK]"
+            )
+
+
+            print(
+                "LOSS :",
+                round(loss,2),
+                "%"
+            )
 
 
             return False
+
 
 
 
@@ -235,22 +226,89 @@ class RiskManager:
 
 
     # ======================================
-    # RESET
+    # POSITION SIZE CHECK
     # ======================================
 
-    def reset(self):
+    def check_position_size(
+
+        self,
+
+        qty
+
+    ):
 
 
-        self.block_trading = False
+        try:
 
 
-        self.start_equity = self.current_equity
+            qty = float(qty)
 
 
 
-        print(
-            "[RISK RESET]"
-        )
+            if qty > MAX_POSITION_SIZE:
+
+
+                print(
+                    "[RISK BLOCK] POSITION SIZE"
+                )
+
+
+                return False
+
+
+
+
+            return True
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[POSITION SIZE ERROR]",
+                e
+            )
+
+
+            return False
+
+
+
+
+
+    # ======================================
+    # STATUS
+    # ======================================
+
+    def status(self):
+
+
+        return {
+
+
+            "start_equity":
+
+                self.start_equity,
+
+
+            "current_equity":
+
+                self.current_equity,
+
+
+            "loss_percent":
+
+                self.loss_percent(),
+
+
+            "can_trade":
+
+                self.can_trade()
+
+        }
 
 
 
