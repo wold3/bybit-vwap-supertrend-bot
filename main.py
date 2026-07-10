@@ -20,7 +20,7 @@ from ws.private_ws import private_ws
 
 
 # ==========================================
-# TRADING BOT
+# BOT CLASS
 # ==========================================
 
 class TradingBot:
@@ -30,14 +30,9 @@ class TradingBot:
 
         self.running = False
 
-        self.prices = []
-
-        self.volumes = []
-
         self.entry_price = None
 
         self.position_side = None
-
 
 
         print("==============================")
@@ -47,7 +42,7 @@ class TradingBot:
 
 
     # ======================================
-    # STARTUP
+    # INITIALIZE
     # ======================================
 
     def initialize(self):
@@ -63,7 +58,9 @@ class TradingBot:
         wallet = bybit_api.get_wallet_balance()
 
 
+
         equity = 0
+
 
 
         try:
@@ -77,16 +74,17 @@ class TradingBot:
             )
 
 
-        except:
+        except Exception as e:
 
-            pass
+            print(
+                "[EQUITY ERROR]",
+                e
+            )
 
 
 
         risk_manager.initialize(
-
             equity
-
         )
 
 
@@ -107,210 +105,186 @@ class TradingBot:
 
 
     # ======================================
-    # PRICE UPDATE
-    # ======================================
-
-    def update_market(self):
-
-
-        price = public_ws.get_price()
-
-
-
-        if price:
-
-
-            self.prices.append(
-
-                price
-
-            )
-
-
-            self.volumes.append(
-
-                1
-
-            )
-
-
-            print(
-                "[PRICE]",
-                price
-            )
-
-
-
-            if len(self.prices) > 300:
-
-
-                self.prices = self.prices[-300:]
-
-                self.volumes = self.volumes[-300:]
-
-
-
-
-    # ======================================
-    # POSITION STATUS
-    # ======================================
-
-    def update_position(self):
-
-
-        try:
-
-
-            pos = private_ws.get_position()
-
-
-
-            if not pos:
-
-                return
-
-
-
-            data = pos.get(
-                "data",
-                {}
-            )
-
-
-
-        except Exception:
-
-            pass
-
-
-
-
-    # ======================================
-    # ENTRY CHECK
+    # ENTRY
     # ======================================
 
     def check_entry(self):
 
 
-        if len(self.prices) < 30:
-
-            return
+        try:
 
 
-
-        if order_manager.has_position():
-
-            return
-
-
-
-        signal = signal_engine.check_signal(
-
-            self.prices,
-
-            self.volumes
-
-        )
-
-
-
-        if signal == "Buy":
-
-
-            print(
-                "[SIGNAL] BUY"
+            opens, highs, lows, closes, volumes = (
+                public_ws.get_ohlcv()
             )
 
 
-            result = order_manager.buy()
 
+            if len(closes) < 30:
 
-
-            if result:
-
-
-                self.position_side = "Buy"
-
-                self.entry_price = self.prices[-1]
+                return
 
 
 
 
-        elif signal == "Sell":
+            if order_manager.has_position():
+
+                return
 
 
-            print(
-                "[SIGNAL] SELL"
+
+
+            signal = signal_engine.check_signal(
+
+                closes,
+
+                volumes,
+
+                highs,
+
+                lows,
+
+                closes
+
             )
 
 
-            result = order_manager.sell()
+
+            if signal == "Buy":
+
+
+                print(
+                    "[SIGNAL] BUY"
+                )
+
+
+                result = order_manager.buy()
 
 
 
-            if result:
+                if result:
 
 
-                self.position_side = "Sell"
+                    self.position_side = "Buy"
 
-                self.entry_price = self.prices[-1]
+                    self.entry_price = closes[-1]
+
+
+
+
+            elif signal == "Sell":
+
+
+                print(
+                    "[SIGNAL] SELL"
+                )
+
+
+                result = order_manager.sell()
+
+
+
+                if result:
+
+
+                    self.position_side = "Sell"
+
+                    self.entry_price = closes[-1]
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[ENTRY ERROR]",
+                e
+            )
 
 
 
 
     # ======================================
-    # EXIT CHECK
+    # EXIT
     # ======================================
 
     def check_exit(self):
 
 
-        if not self.entry_price:
-
-            return
+        try:
 
 
+            if self.entry_price is None:
 
-        if not self.position_side:
-
-            return
+                return
 
 
 
-        result = position_manager.evaluate_exit(
+            if self.position_side is None:
 
-            self.entry_price,
-
-            self.position_side,
-
-            self.prices
-
-        )
+                return
 
 
 
-        if result:
+
+            _, _, _, closes, _ = public_ws.get_ohlcv()
 
 
-            print(
-                "[EXIT]",
-                result
+
+            if len(closes) < 20:
+
+                return
+
+
+
+
+            result = position_manager.evaluate_exit(
+
+                self.entry_price,
+
+                self.position_side,
+
+                closes
+
             )
 
 
-            bybit_api.cancel_all_orders()
+
+            if result:
+
+
+                print(
+                    "[EXIT SIGNAL]",
+                    result
+                )
 
 
 
-            self.entry_price = None
+                bybit_api.cancel_all_orders()
 
-            self.position_side = None
+
+
+                self.entry_price = None
+
+                self.position_side = None
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[EXIT ERROR]",
+                e
+            )
 
 
 
 
     # ======================================
-    # MAIN LOOP
+    # LOOP
     # ======================================
 
     def run(self):
@@ -331,9 +305,6 @@ class TradingBot:
             try:
 
 
-                self.update_market()
-
-
                 self.check_exit()
 
 
@@ -342,7 +313,6 @@ class TradingBot:
 
 
                 time.sleep(1)
-
 
 
 
@@ -367,12 +337,19 @@ class TradingBot:
     def stop(self):
 
 
+        if not self.running:
+
+            return
+
+
+
         print(
             "[BOT STOPPING]"
         )
 
 
         self.running = False
+
 
 
         public_ws.stop()
@@ -390,12 +367,17 @@ class TradingBot:
 
 
 # ==========================================
-# RUN
+# INSTANCE
 # ==========================================
 
 bot = TradingBot()
 
 
+
+
+# ==========================================
+# SIGNAL HANDLER
+# ==========================================
 
 def shutdown(
     sig,
@@ -429,9 +411,23 @@ system_signal.signal(
 
 
 
+# ==========================================
+# START
+# ==========================================
+
 if __name__ == "__main__":
 
 
-    bot.initialize()
+    try:
 
-    bot.run()
+
+        bot.initialize()
+
+        bot.run()
+
+
+
+    except KeyboardInterrupt:
+
+
+        bot.stop()
