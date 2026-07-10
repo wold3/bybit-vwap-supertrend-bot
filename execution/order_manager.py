@@ -1,9 +1,14 @@
+import time
+
+
 from api.bybit_api import bybit_api
+
 
 from config import (
     DEFAULT_QTY,
     CATEGORY,
     DEFAULT_SYMBOL,
+    ORDER_COOLDOWN,
 )
 
 
@@ -23,11 +28,59 @@ class OrderManager:
         self.position_qty = 0
 
 
+        self.last_order_time = 0
+
+
+
         print("==============================")
         print("[EXECUTION ORDER MANAGER INIT]")
         print("CATEGORY :", CATEGORY)
         print("SYMBOL :", DEFAULT_SYMBOL)
         print("==============================")
+
+
+
+
+
+    # ======================================
+    # COOLDOWN CHECK
+    # ======================================
+
+    def can_order(self):
+
+
+        now = time.time()
+
+
+
+        elapsed = now - self.last_order_time
+
+
+
+        if elapsed < ORDER_COOLDOWN:
+
+
+            remain = int(
+
+                ORDER_COOLDOWN - elapsed
+
+            )
+
+
+            print(
+                "[ORDER COOLDOWN]",
+                remain,
+                "sec"
+            )
+
+
+            return False
+
+
+
+
+        return True
+
 
 
 
@@ -42,18 +95,12 @@ class OrderManager:
         try:
 
 
-            if not position:
-
-                return
-
-
-
-            self.position_side = position.get(
+            side = position.get(
                 "side"
             )
 
 
-            self.position_qty = float(
+            size = float(
 
                 position.get(
                     "size",
@@ -64,13 +111,42 @@ class OrderManager:
 
 
 
+            if size > 0:
+
+
+                self.position_side = side
+
+                self.position_qty = size
+
+
+
+            else:
+
+
+                self.position_side = None
+
+                self.position_qty = 0
+
+
+
+
+
+            print(
+                "[ORDER POSITION SYNC]",
+                self.position_side,
+                self.position_qty
+            )
+
+
+
         except Exception as e:
 
 
             print(
-                "[POSITION UPDATE ERROR]",
+                "[ORDER POSITION UPDATE ERROR]",
                 e
             )
+
 
 
 
@@ -85,13 +161,25 @@ class OrderManager:
         try:
 
 
-            if self.has_position():
 
-                print(
-                    "[ORDER BLOCKED] EXIST POSITION"
-                )
+            if not self.can_order():
 
                 return False
+
+
+
+
+
+            if self.has_position():
+
+
+                print(
+                    "[BUY BLOCKED] EXIST POSITION"
+                )
+
+
+                return False
+
 
 
 
@@ -112,9 +200,23 @@ class OrderManager:
 
 
 
-            if result and result.get(
-                "retCode"
-            ) == 0:
+
+
+            if (
+
+                result
+
+                and
+
+                result.get(
+                    "retCode"
+                )
+
+                ==
+
+                0
+
+            ):
 
 
 
@@ -123,13 +225,19 @@ class OrderManager:
                 self.position_qty = DEFAULT_QTY
 
 
+                self.last_order_time = time.time()
+
+
 
                 print(
                     "[BUY SUCCESS]"
                 )
 
 
+
                 return True
+
+
 
 
 
@@ -140,7 +248,9 @@ class OrderManager:
             )
 
 
+
             return False
+
 
 
 
@@ -170,13 +280,25 @@ class OrderManager:
         try:
 
 
-            if self.has_position():
 
-                print(
-                    "[ORDER BLOCKED] EXIST POSITION"
-                )
+            if not self.can_order():
 
                 return False
+
+
+
+
+
+            if self.has_position():
+
+
+                print(
+                    "[SELL BLOCKED] EXIST POSITION"
+                )
+
+
+                return False
+
 
 
 
@@ -184,6 +306,7 @@ class OrderManager:
             print(
                 "[ORDER REQUEST] SELL"
             )
+
 
 
 
@@ -197,9 +320,23 @@ class OrderManager:
 
 
 
-            if result and result.get(
-                "retCode"
-            ) == 0:
+
+
+            if (
+
+                result
+
+                and
+
+                result.get(
+                    "retCode"
+                )
+
+                ==
+
+                0
+
+            ):
 
 
 
@@ -208,13 +345,18 @@ class OrderManager:
                 self.position_qty = DEFAULT_QTY
 
 
+                self.last_order_time = time.time()
+
+
 
                 print(
                     "[SELL SUCCESS]"
                 )
 
 
+
                 return True
+
 
 
 
@@ -225,7 +367,9 @@ class OrderManager:
             )
 
 
+
             return False
+
 
 
 
@@ -258,6 +402,7 @@ class OrderManager:
 
             if not self.has_position():
 
+
                 return False
 
 
@@ -267,14 +412,14 @@ class OrderManager:
             if self.position_side == "Buy":
 
 
-                close_side = "Sell"
+                side = "Sell"
 
 
 
             else:
 
 
-                close_side = "Buy"
+                side = "Buy"
 
 
 
@@ -282,14 +427,16 @@ class OrderManager:
 
             print(
                 "[CLOSE REQUEST]",
-                close_side
+                side
             )
+
+
 
 
 
             result = bybit_api.create_order(
 
-                close_side,
+                side,
 
                 self.position_qty
 
@@ -297,20 +444,39 @@ class OrderManager:
 
 
 
-            if result and result.get(
-                "retCode"
-            ) == 0:
+
+
+            if (
+
+                result
+
+                and
+
+                result.get(
+                    "retCode"
+                )
+
+                ==
+
+                0
+
+            ):
+
+
+
+                self.position_side = None
+
+                self.position_qty = 0
+
+
+
+                self.last_order_time = time.time()
 
 
 
                 print(
                     "[POSITION CLOSED]"
                 )
-
-
-                self.position_side = None
-
-                self.position_qty = 0
 
 
 
@@ -320,10 +486,12 @@ class OrderManager:
 
 
 
+
             print(
                 "[CLOSE FAILED]",
                 result
             )
+
 
 
             return False
@@ -369,19 +537,48 @@ class OrderManager:
 
 
     # ======================================
-    # GET POSITION
+    # STATUS
     # ======================================
 
-    def get_position(self):
+    def get_status(self):
 
 
         return {
 
+
             "side":
+
                 self.position_side,
 
+
             "qty":
-                self.position_qty
+
+                self.position_qty,
+
+
+            "cooldown":
+
+                max(
+
+                    0,
+
+                    int(
+
+                        ORDER_COOLDOWN -
+
+                        (
+
+                            time.time()
+
+                            -
+
+                            self.last_order_time
+
+                        )
+
+                    )
+
+                )
 
         }
 
