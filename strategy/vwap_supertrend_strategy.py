@@ -1,3 +1,5 @@
+# strategy/vwap_supertrend_strategy.py
+
 import pandas as pd
 
 
@@ -10,6 +12,8 @@ from config import (
 from indicators.indicator_engine import (
     IndicatorEngine
 )
+
+
 
 
 
@@ -35,7 +39,7 @@ class VWAPSupertrendStrategy:
         try:
 
 
-            if not candles:
+            if candles is None:
 
                 return None
 
@@ -52,21 +56,35 @@ class VWAPSupertrendStrategy:
             )
 
 
-            df["open"] = df["open"].astype(float)
 
-            df["high"] = df["high"].astype(float)
+            # ================================
+            # DATA TYPE
+            # ================================
 
-            df["low"] = df["low"].astype(float)
+            for col in [
 
-            df["close"] = df["close"].astype(float)
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume"
 
-            df["volume"] = df["volume"].astype(float)
+            ]:
+
+                df[col] = (
+
+                    df[col]
+                    .astype(float)
+
+                )
 
 
 
-            # =================================
-            # UPDATE INDICATOR ENGINE
-            # =================================
+
+
+            # ================================
+            # UPDATE ENGINE
+            # ================================
 
             self.indicator.update(
                 df
@@ -74,9 +92,11 @@ class VWAPSupertrendStrategy:
 
 
 
-            # =================================
+
+
+            # ================================
             # VWAP
-            # =================================
+            # ================================
 
             vwap = (
 
@@ -87,9 +107,11 @@ class VWAPSupertrendStrategy:
 
 
 
-            # =================================
+
+
+            # ================================
             # SUPERTREND
-            # =================================
+            # ================================
 
             supertrend = (
 
@@ -100,49 +122,84 @@ class VWAPSupertrendStrategy:
 
 
 
-            price = (
 
-                float(
-                    df["close"]
-                    .iloc[-1]
-                )
+
+            # ================================
+            # LAST VALUE PARSER
+            # ================================
+
+            def last_value(data):
+
+
+                if isinstance(
+                    data,
+                    pd.Series
+                ):
+
+                    return float(
+                        data.iloc[-1]
+                    )
+
+
+
+                if isinstance(
+                    data,
+                    pd.DataFrame
+                ):
+
+                    return float(
+                        data.iloc[-1, -1]
+                    )
+
+
+
+                if isinstance(
+                    data,
+                    list
+                ):
+
+                    return float(
+                        data[-1]
+                    )
+
+
+
+                return float(data)
+
+
+
+
+
+            current_vwap = last_value(
+                vwap
+            )
+
+
+            current_supertrend = last_value(
+                supertrend
+            )
+
+
+
+            current_price = float(
+
+                df["close"]
+                .iloc[-1]
 
             )
 
 
 
-            current_vwap = (
-
-                float(
-                    vwap
-                    if isinstance(vwap, (int,float))
-                    else vwap[-1]
-                )
-
-            )
 
 
-
-            current_supertrend = (
-
-                float(
-                    supertrend
-                    if isinstance(supertrend, (int,float))
-                    else supertrend[-1]
-                )
-
-            )
-
-
-
-            # =================================
+            # ================================
             # VOLUME FILTER
-            # =================================
+            # ================================
 
             if USE_VOLUME_FILTER:
 
 
-                avg_volume = (
+                avg_volume = float(
 
                     df["volume"]
                     .tail(20)
@@ -151,12 +208,16 @@ class VWAPSupertrendStrategy:
                 )
 
 
-                if (
+                current_volume = float(
 
                     df["volume"]
                     .iloc[-1]
 
-                    <
+                )
+
+
+
+                if current_volume < (
 
                     avg_volume *
                     MIN_VOLUME_MULTIPLIER
@@ -169,17 +230,17 @@ class VWAPSupertrendStrategy:
 
 
 
-            # =================================
+            # ================================
             # LONG ENTRY
-            # =================================
+            # ================================
 
             if (
 
-                price > current_vwap
+                current_price > current_vwap
 
                 and
 
-                price > current_supertrend
+                current_price > current_supertrend
 
             ):
 
@@ -196,7 +257,7 @@ class VWAPSupertrendStrategy:
 
 
                     "price":
-                    price,
+                    current_price,
 
 
                     "strategy":
@@ -208,17 +269,17 @@ class VWAPSupertrendStrategy:
 
 
 
-            # =================================
+            # ================================
             # SHORT ENTRY
-            # =================================
+            # ================================
 
             if (
 
-                price < current_vwap
+                current_price < current_vwap
 
                 and
 
-                price < current_supertrend
+                current_price < current_supertrend
 
             ):
 
@@ -235,7 +296,7 @@ class VWAPSupertrendStrategy:
 
 
                     "price":
-                    price,
+                    current_price,
 
 
                     "strategy":
@@ -246,6 +307,10 @@ class VWAPSupertrendStrategy:
 
 
 
+
+            # ================================
+            # NO SIGNAL
+            # ================================
 
             return None
 
@@ -268,6 +333,12 @@ class VWAPSupertrendStrategy:
 
 
 
+
+
+# Singleton
+
 vwap_supertrend_strategy = (
+
     VWAPSupertrendStrategy()
+
 )
