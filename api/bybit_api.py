@@ -1,6 +1,6 @@
 # =====================================================
 # api/bybit_api.py
-# Bybit V5 REST API
+# Bybit V5 REST API Manager
 # =====================================================
 
 import time
@@ -8,8 +8,8 @@ import hmac
 import hashlib
 import json
 import requests
-from urllib.parse import urlencode
 
+from urllib.parse import urlencode
 
 
 from config import (
@@ -35,51 +35,41 @@ BASE_URL = "https://api.bybit.com"
 class BybitAPI:
 
 
-
     def __init__(self):
 
+        self.api_key = BYBIT_API_KEY
 
-        self.key = BYBIT_API_KEY
-
-        self.secret = BYBIT_API_SECRET
-
+        self.api_secret = BYBIT_API_SECRET
 
         self.recv_window = "5000"
 
 
-
         print(
-
             "[BYBIT API READY]"
-
         )
 
 
 
 
 
-
-
-
-
     # =====================================================
-    # SIGNATURE
+    # SIGN
     # =====================================================
 
-    def sign(
+    def generate_signature(
         self,
         timestamp,
-        query=""
+        payload
     ):
 
 
-        payload = (
+        origin = (
 
             str(timestamp)
 
             +
 
-            self.key
+            self.api_key
 
             +
 
@@ -87,28 +77,19 @@ class BybitAPI:
 
             +
 
-            query
+            payload
 
         )
 
 
-
         return hmac.new(
 
-            bytes(
-
-                self.secret,
-
+            self.api_secret.encode(
                 "utf-8"
-
             ),
 
-            bytes(
-
-                payload,
-
+            origin.encode(
                 "utf-8"
-
             ),
 
             hashlib.sha256
@@ -135,7 +116,9 @@ class BybitAPI:
 
         timestamp = str(
 
-            int(time.time()*1000)
+            int(
+                time.time() * 1000
+            )
 
         )
 
@@ -145,7 +128,7 @@ class BybitAPI:
 
             "X-BAPI-API-KEY":
 
-                self.key,
+                self.api_key,
 
 
             "X-BAPI-TIMESTAMP":
@@ -178,8 +161,10 @@ class BybitAPI:
             )
 
 
+            payload = query
 
-            sign_payload = query
+
+            body = None
 
 
 
@@ -203,17 +188,19 @@ class BybitAPI:
             )
 
 
-            sign_payload = body
+            payload = body
 
 
 
 
 
-        signature = self.sign(
+
+
+        signature = self.generate_signature(
 
             timestamp,
 
-            sign_payload
+            payload
 
         )
 
@@ -229,36 +216,37 @@ class BybitAPI:
 
 
 
-
         try:
+
 
 
             if method == "GET":
 
 
-                r = requests.get(
+                response = requests.get(
 
                     BASE_URL + endpoint,
 
-                    headers=headers,
-
                     params=params,
+
+                    headers=headers,
 
                     timeout=10
 
                 )
+
 
 
             else:
 
 
-                r = requests.post(
+                response = requests.post(
 
                     BASE_URL + endpoint,
 
-                    headers=headers,
-
                     data=body,
+
+                    headers=headers,
 
                     timeout=10
 
@@ -268,15 +256,46 @@ class BybitAPI:
 
 
 
-            data = r.json()
+
+
+            print(
+
+                "[BYBIT STATUS]",
+
+                response.status_code
+
+            )
+
+
+
+            try:
+
+
+                data = response.json()
+
+
+
+            except Exception:
+
+
+                print(
+
+                    "[BYBIT RAW]",
+
+                    response.text[:500]
+
+                )
+
+
+                return None
+
+
 
 
 
             if data.get(
 
-                "retCode",
-
-                0
+                "retCode"
 
             ) != 0:
 
@@ -293,6 +312,8 @@ class BybitAPI:
 
 
             return data
+
+
 
 
 
@@ -319,14 +340,13 @@ class BybitAPI:
 
 
 
-
-
-
     # =====================================================
     # WALLET
     # =====================================================
 
-    def get_wallet_balance(self):
+    def get_wallet_balance(
+        self
+    ):
 
 
         return self.request(
@@ -337,16 +357,13 @@ class BybitAPI:
 
             {
 
+                "accountType":
 
-            "accountType":
-
-                "UNIFIED"
-
+                    "UNIFIED"
 
             }
 
         )
-
 
 
 
@@ -364,7 +381,7 @@ class BybitAPI:
     ):
 
 
-        data = self.request(
+        result = self.request(
 
             "GET",
 
@@ -373,24 +390,24 @@ class BybitAPI:
             {
 
 
-            "category":
+                "category":
 
-                CATEGORY,
-
-
-            "symbol":
-
-                DEFAULT_SYMBOL,
+                    CATEGORY,
 
 
-            "interval":
+                "symbol":
 
-                INTERVAL,
+                    DEFAULT_SYMBOL,
 
 
-            "limit":
+                "interval":
 
-                200
+                    INTERVAL,
+
+
+                "limit":
+
+                    200
 
 
             }
@@ -402,7 +419,7 @@ class BybitAPI:
         try:
 
 
-            return data[
+            return result[
 
                 "result"
 
@@ -414,7 +431,8 @@ class BybitAPI:
 
 
 
-        except:
+        except Exception:
+
 
 
             return []
@@ -431,10 +449,12 @@ class BybitAPI:
     # LEVERAGE
     # =====================================================
 
-    def set_leverage(self):
+    def set_leverage(
+        self
+    ):
 
 
-        result = self.request(
+        return self.request(
 
             "POST",
 
@@ -443,33 +463,34 @@ class BybitAPI:
             {
 
 
-            "category":
+                "category":
 
-                CATEGORY,
-
-
-            "symbol":
-
-                DEFAULT_SYMBOL,
+                    CATEGORY,
 
 
-            "buyLeverage":
+                "symbol":
 
-                str(LEVERAGE),
+                    DEFAULT_SYMBOL,
 
 
-            "sellLeverage":
+                "buyLeverage":
 
-                str(LEVERAGE)
+                    str(
+                        LEVERAGE
+                    ),
 
+
+                "sellLeverage":
+
+                    str(
+                        LEVERAGE
+                    )
 
             }
 
         )
 
 
-
-        return result
 
 
 
@@ -488,7 +509,6 @@ class BybitAPI:
     ):
 
 
-
         if not LIVE:
 
 
@@ -504,6 +524,7 @@ class BybitAPI:
             )
 
 
+
             return {
 
 
@@ -512,12 +533,14 @@ class BybitAPI:
                     0,
 
 
-                "test":
+                "mode":
 
-                    True
-
+                    "TEST"
 
             }
+
+
+
 
 
 
@@ -532,29 +555,29 @@ class BybitAPI:
             {
 
 
-            "category":
+                "category":
 
-                CATEGORY,
-
-
-            "symbol":
-
-                DEFAULT_SYMBOL,
+                    CATEGORY,
 
 
-            "side":
+                "symbol":
 
-                side,
-
-
-            "orderType":
-
-                "Market",
+                    DEFAULT_SYMBOL,
 
 
-            "qty":
+                "side":
 
-                str(qty)
+                    side,
+
+
+                "orderType":
+
+                    "Market",
+
+
+                "qty":
+
+                    str(qty)
 
 
             }
@@ -572,6 +595,5 @@ class BybitAPI:
 # =====================================================
 # SINGLETON
 # =====================================================
-
 
 bybit_api = BybitAPI()
