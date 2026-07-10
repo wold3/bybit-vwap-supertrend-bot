@@ -1,7 +1,6 @@
 import json
-import threading
 import time
-
+import threading
 import websocket
 
 
@@ -12,7 +11,10 @@ from config import (
 
 
 
+
+
 class PublicWebSocketClient:
+
 
 
     def __init__(self):
@@ -47,6 +49,8 @@ class PublicWebSocketClient:
 
 
 
+
+
     # =====================================================
     # CALLBACK
     # =====================================================
@@ -63,6 +67,8 @@ class PublicWebSocketClient:
 
 
 
+
+
     # =====================================================
     # START
     # =====================================================
@@ -71,6 +77,7 @@ class PublicWebSocketClient:
 
 
         if self.running:
+
 
             return
 
@@ -95,8 +102,10 @@ class PublicWebSocketClient:
 
 
 
+
+
     # =====================================================
-    # RUN
+    # LOOP
     # =====================================================
 
     def _run(self):
@@ -106,6 +115,7 @@ class PublicWebSocketClient:
 
 
             try:
+
 
 
                 self.ws = websocket.WebSocketApp(
@@ -131,16 +141,16 @@ class PublicWebSocketClient:
 
 
 
-                self.ws.run_forever(
 
+                self.ws.run_forever(
 
                     ping_interval=20,
 
-
                     ping_timeout=10,
 
-
                 )
+
+
 
 
 
@@ -148,9 +158,13 @@ class PublicWebSocketClient:
 
 
                 print(
-                    "[PUBLIC LOOP ERROR]",
+
+                    "[PUBLIC WS LOOP ERROR]",
+
                     e
+
                 )
+
 
 
 
@@ -159,11 +173,17 @@ class PublicWebSocketClient:
 
 
                 print(
-                    "[PUBLIC RECONNECT]"
+
+                    "[PUBLIC WS RECONNECT]"
+
                 )
 
 
                 time.sleep(5)
+
+
+
+
 
 
 
@@ -181,8 +201,12 @@ class PublicWebSocketClient:
 
 
         print(
+
             "[PUBLIC WS CONNECTED]"
+
         )
+
+
 
 
 
@@ -192,7 +216,6 @@ class PublicWebSocketClient:
             "op":
 
                 "subscribe",
-
 
 
             "args":
@@ -207,6 +230,8 @@ class PublicWebSocketClient:
 
 
 
+
+
         ws.send(
 
             json.dumps(
@@ -218,8 +243,12 @@ class PublicWebSocketClient:
 
 
         print(
+
             "[PUBLIC SUBSCRIBED]"
+
         )
+
+
 
 
 
@@ -274,14 +303,23 @@ class PublicWebSocketClient:
 
 
 
+
         candles = data.get(
+
             "data",
+
             []
+
         )
 
 
 
+
+
+
+
         for c in candles:
+
 
 
             try:
@@ -360,21 +398,25 @@ class PublicWebSocketClient:
 
 
 
-                print(
-                    "[CANDLE]",
-                    candle
-                )
+                if candle["confirm"]:
 
 
+                    print(
 
+                        "[CONFIRMED CANDLE]",
 
-
-                if self.callback:
-
-
-                    self.callback(
                         candle
+
                     )
+
+
+
+                    if self.callback:
+
+
+                        self.callback(
+                            candle
+                        )
 
 
 
@@ -384,9 +426,13 @@ class PublicWebSocketClient:
 
 
                 print(
-                    "[CANDLE PARSE ERROR]",
+
+                    "[CANDLE ERROR]",
+
                     e
+
                 )
+
 
 
 
@@ -407,9 +453,13 @@ class PublicWebSocketClient:
 
 
         print(
+
             "[PUBLIC WS ERROR]",
+
             error
+
         )
+
 
 
 
@@ -429,10 +479,16 @@ class PublicWebSocketClient:
 
 
         print(
+
             "[PUBLIC WS CLOSED]",
+
             code,
+
             msg
+
         )
+
+
 
 
 
@@ -467,10 +523,14 @@ class PublicWebSocketClient:
 
 
 
-
         print(
+
             "[PUBLIC WS STOPPED]"
+
         )
+
+
+
 
 
 
