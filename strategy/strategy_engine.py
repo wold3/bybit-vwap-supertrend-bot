@@ -1,9 +1,14 @@
-from indicators.indicator_engine import indicator_engine
+import time
 
-from position.position_manager import position_manager
 
-from config import DEFAULT_QTY
+from indicators.indicator_engine import (
+    indicator_engine
+)
 
+
+from config import (
+    DEFAULT_SYMBOL,
+)
 
 
 
@@ -13,22 +18,25 @@ class StrategyEngine:
     def __init__(self):
 
 
-        self.last_signal = None
+        self.symbol = DEFAULT_SYMBOL
+
 
         self.last_timestamp = None
 
+        self.last_signal = None
 
-        print(
-            "[STRATEGY ENGINE READY]"
-        )
+
+        print("==============================")
+        print("[STRATEGY ENGINE READY]")
+        print("SYMBOL :", self.symbol)
+        print("==============================")
 
 
 
 
     # =====================================================
-    # CANDLE EVENT
+    # CANDLE PROCESS
     # =====================================================
-
 
     def on_candle(
         self,
@@ -39,19 +47,16 @@ class StrategyEngine:
         try:
 
 
-
-            # ---------------------------------
-            # 완성 캔들만 처리
-            # ---------------------------------
+            # -----------------------------
+            # CONFIRM CHECK
+            # -----------------------------
 
             if not candle.get(
                 "confirm",
                 False
             ):
 
-
                 return None
-
 
 
 
@@ -62,8 +67,11 @@ class StrategyEngine:
 
 
 
-            if timestamp == self.last_timestamp:
+            # -----------------------------
+            # DUPLICATE CANDLE
+            # -----------------------------
 
+            if timestamp == self.last_timestamp:
 
                 return None
 
@@ -75,10 +83,9 @@ class StrategyEngine:
 
 
 
-            # ---------------------------------
-            # Indicator Update
-            # ---------------------------------
-
+            # -----------------------------
+            # UPDATE INDICATOR
+            # -----------------------------
 
             indicator_engine.update(
                 candle
@@ -86,14 +93,22 @@ class StrategyEngine:
 
 
 
-            market = indicator_engine.get_market_data(
-                candle
+            market = (
+
+                indicator_engine
+                .get_market_data(
+                    candle
+                )
+
             )
 
 
 
             if market is None:
 
+                print(
+                    "[STRATEGY WAIT] INDICATOR"
+                )
 
                 return None
 
@@ -106,54 +121,23 @@ class StrategyEngine:
             )
 
 
-
-            vwap = market["vwap"]
-
-
-            trend = market["supertrend"]
+            vwap = market.get(
+                "vwap"
+            )
 
 
-            atr = market["atr"]
-
-
-
-
-            print(
-
-                "[MARKET]",
-
-                "PRICE:",
-                close,
-
-                "VWAP:",
-                vwap,
-
-                "TREND:",
-                trend
-
+            trend = market.get(
+                "supertrend"
             )
 
 
 
+            if vwap is None:
+
+                return None
 
 
-
-            # ---------------------------------
-            # POSITION CHECK
-            # ---------------------------------
-
-
-            position_manager.sync()
-
-
-
-            if position_manager.has_position():
-
-
-                print(
-                    "[STRATEGY BLOCK] POSITION EXISTS"
-                )
-
+            if trend is None:
 
                 return None
 
@@ -161,10 +145,18 @@ class StrategyEngine:
 
 
 
+            print(
+                "[MARKET]",
+                "PRICE:",
+                close,
+                "VWAP:",
+                round(vwap,2),
+                "TREND:",
+                trend
+            )
 
-            # ---------------------------------
-            # SIGNAL
-            # ---------------------------------
+
+
 
 
             signal = None
@@ -172,17 +164,40 @@ class StrategyEngine:
 
 
 
-            if close > vwap and trend == "UP":
 
+            # =================================================
+            # ENTRY RULE
+            # =================================================
+
+
+            # LONG
+
+            if (
+
+                close > vwap
+
+                and
+
+                trend == "UP"
+
+            ):
 
                 signal = "BUY"
 
 
 
 
+            # SHORT
 
-            elif close < vwap and trend == "DOWN":
+            elif (
 
+                close < vwap
+
+                and
+
+                trend == "DOWN"
+
+            ):
 
                 signal = "SELL"
 
@@ -191,9 +206,7 @@ class StrategyEngine:
 
 
 
-
             if signal is None:
-
 
                 return None
 
@@ -201,21 +214,21 @@ class StrategyEngine:
 
 
 
-            # ---------------------------------
-            # DUPLICATE SIGNAL
-            # ---------------------------------
+            # =================================================
+            # DUPLICATE SIGNAL BLOCK
+            # =================================================
 
 
             if signal == self.last_signal:
 
 
                 print(
-                    "[SIGNAL DUPLICATE]"
+                    "[SIGNAL BLOCK] SAME SIGNAL",
+                    signal
                 )
 
 
                 return None
-
 
 
 
@@ -225,103 +238,23 @@ class StrategyEngine:
 
 
 
-
-            # ---------------------------------
-            # TP / SL
-            # ---------------------------------
-
-
-            tp = None
-
-            sl = None
-
-
-
-
-            if atr:
-
-
-                atr = float(
-                    atr
-                )
-
-
-
-                if signal == "BUY":
-
-
-                    tp = close + (
-                        atr * 2
-                    )
-
-
-                    sl = close - (
-                        atr * 1.5
-                    )
-
-
-
-
-                elif signal == "SELL":
-
-
-                    tp = close - (
-                        atr * 2
-                    )
-
-
-                    sl = close + (
-                        atr * 1.5
-                    )
-
-
-
-
-
-            result = {
-
-
-                "signal":
-
-                    signal,
-
-
-                "qty":
-
-                    DEFAULT_QTY,
-
-
-                "take_profit":
-
-                    round(tp,2)
-                    if tp
-                    else None,
-
-
-                "stop_loss":
-
-                    round(sl,2)
-                    if sl
-                    else None,
-
-            }
-
-
-
-
+            print(
+                "=============================="
+            )
 
             print(
-
                 "[TRADE SIGNAL]",
+                signal
+            )
 
-                result
-
+            print(
+                "=============================="
             )
 
 
 
+            return signal
 
-            return result
 
 
 
@@ -331,11 +264,8 @@ class StrategyEngine:
 
 
             print(
-
                 "[STRATEGY ERROR]",
-
                 e
-
             )
 
 
@@ -345,23 +275,23 @@ class StrategyEngine:
 
 
 
+
     # =====================================================
     # RESET
     # =====================================================
 
-
     def reset(self):
 
 
-        self.last_signal = None
-
         self.last_timestamp = None
 
+        self.last_signal = None
 
 
         print(
             "[STRATEGY RESET]"
         )
+
 
 
 
