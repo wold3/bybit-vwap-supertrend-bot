@@ -1,6 +1,6 @@
 # =====================================================
 # main.py
-# BYBIT VWAP SUPERTREND BOT
+# Bot Launcher
 # =====================================================
 
 
@@ -10,16 +10,8 @@ import traceback
 
 
 from app import (
-    TradingApp
+    app
 )
-
-
-
-from database.database import (
-    database
-)
-
-
 
 
 
@@ -28,28 +20,17 @@ from database.database import (
 def main():
 
 
-
-    app = TradingApp()
-
-
-
     try:
-
 
 
         app.start()
 
 
 
-
-
         while True:
 
 
-
             time.sleep(1)
-
-
 
 
 
@@ -59,19 +40,15 @@ def main():
 
 
 
-        print()
-
         print(
 
-            "[USER STOP]"
+            "\n[USER STOP]"
 
         )
 
 
 
         app.stop()
-
-
 
 
 
@@ -98,45 +75,8 @@ def main():
         try:
 
 
-            database.save_error(
-
-                str(e)
-
-            )
-
-
-        except:
-
-
-            pass
-
-
-
-        try:
-
-
             app.stop()
 
-
-        except:
-
-
-            pass
-
-
-
-
-
-
-
-    finally:
-
-
-
-        try:
-
-
-            database.close()
 
 
         except:
@@ -151,7 +91,6 @@ def main():
 
 
 if __name__ == "__main__":
-
 
 
     main()
