@@ -1,13 +1,13 @@
 import time
 
 from config import (
+    DEFAULT_QTY,
     CATEGORY,
     DEFAULT_SYMBOL,
-    DEFAULT_QTY,
-    ORDER_COOLDOWN,
 )
 
 from api.bybit_api import bybit_api
+
 from risk.risk_manager import risk_manager
 
 
@@ -16,9 +16,7 @@ from risk.risk_manager import risk_manager
 # ORDER MANAGER
 # ==========================================
 
-
 class OrderManager:
-
 
 
     def __init__(self):
@@ -34,45 +32,58 @@ class OrderManager:
 
 
 
-
-
     # ======================================
-    # COOLDOWN CHECK
+    # POSITION CHECK
     # ======================================
 
-    def cooldown_check(self):
+    def has_position(self):
+
+        try:
+
+            position = bybit_api.get_position()
 
 
-        elapsed = (
-            time.time()
-            -
-            self.last_order_time
-        )
+            if not position:
+
+                return False
 
 
-        if elapsed < ORDER_COOLDOWN:
 
-            print(
-                "[ORDER BLOCK]"
-            )
+            data = position["result"]["list"]
 
-            print(
-                "COOLDOWN:",
-                round(
-                    ORDER_COOLDOWN - elapsed,
-                    1
-                ),
-                "sec"
-            )
+
+
+            for p in data:
+
+
+                size = float(
+                    p.get(
+                        "size",
+                        0
+                    )
+                )
+
+
+                if size > 0:
+
+                    return True
+
+
 
             return False
 
 
 
-        return True
+        except Exception as e:
 
 
+            print(
+                "[POSITION CHECK ERROR]",
+                e
+            )
 
+
+            return False
 
 
 
@@ -81,13 +92,9 @@ class OrderManager:
     # ======================================
 
     def execute_order(
-
         self,
-
         side,
-
         qty=None
-
     ):
 
 
@@ -100,21 +107,10 @@ class OrderManager:
 
 
 
-
-
-            # risk check
-
-            if not self.cooldown_check():
-
-                return None
-
-
-
-
             if not risk_manager.order_allowed():
 
                 print(
-                    "[RISK BLOCK]"
+                    "[ORDER BLOCK] COOLDOWN"
                 )
 
                 return None
@@ -122,16 +118,22 @@ class OrderManager:
 
 
 
-
-            if not risk_manager.check_position_size(qty):
+            if self.has_position():
 
                 print(
-                    "[SIZE BLOCK]"
+                    "[ORDER BLOCK] EXIST POSITION"
                 )
 
                 return None
 
 
+
+
+            if not risk_manager.check_position_size(
+                qty
+            ):
+
+                return None
 
 
 
@@ -141,7 +143,6 @@ class OrderManager:
             print("SIDE :", side)
             print("QTY :", qty)
             print("==============================")
-
 
 
 
@@ -156,13 +157,7 @@ class OrderManager:
 
 
 
-
-
-
             if result:
-
-
-                self.last_order_time = time.time()
 
 
                 risk_manager.update_order_time()
@@ -176,8 +171,6 @@ class OrderManager:
 
 
             return result
-
-
 
 
 
@@ -195,88 +188,56 @@ class OrderManager:
 
 
 
-
-
     # ======================================
-    # LONG ENTRY
+    # BUY
     # ======================================
 
     def buy(
-
         self,
-
         qty=None
-
     ):
 
 
         return self.execute_order(
 
-            side="Buy",
+            "Buy",
 
-            qty=qty
+            qty
 
         )
 
 
 
 
-
-
-
     # ======================================
-    # SHORT ENTRY
+    # SELL
     # ======================================
 
     def sell(
-
         self,
-
         qty=None
-
     ):
 
 
         return self.execute_order(
 
-            side="Sell",
+            "Sell",
 
-            qty=qty
+            qty
 
         )
 
 
 
 
-
-
-
     # ======================================
-    # CANCEL ALL ORDERS
+    # CANCEL
     # ======================================
 
     def cancel_all(self):
 
 
-        try:
-
-
-            return bybit_api.cancel_all_orders()
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[CANCEL ERROR]",
-                e
-            )
-
-
-            return None
-
-
+        return bybit_api.cancel_all_orders()
 
 
 
