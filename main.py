@@ -1,48 +1,142 @@
 import time
+import signal
+import sys
 
 
 from app import (
-    start_bot,
-    stop_bot,
-)
-
-
-from core.bot_guard import (
-    bot_guard
+    app,
 )
 
 
 from utils.logger import (
-    error_logger,
+    bot_logger,
 )
 
 
 
 
 
-# ==========================================================
-# MAIN
-# ==========================================================
+# =====================================================
+# SHUTDOWN HANDLER
+# =====================================================
 
-def main():
+def shutdown(
+    signum=None,
+    frame=None
+):
+
+
+    print()
+
+
+    print(
+        "[MAIN SHUTDOWN]"
+    )
+
 
 
     try:
 
 
-        start_bot()
+        app.stop()
 
+
+
+    except Exception as e:
 
 
         print(
-            "[MAIN LOOP START]"
+
+            "[STOP ERROR]",
+
+            e
+
         )
 
 
 
 
 
-        while bot_guard.is_running():
+    bot_logger.info(
+        "BOT STOPPED"
+    )
+
+
+
+    sys.exit(0)
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SIGNAL
+# =====================================================
+
+signal.signal(
+
+    signal.SIGINT,
+
+    shutdown
+
+)
+
+
+signal.signal(
+
+    signal.SIGTERM,
+
+    shutdown
+
+)
+
+
+
+
+
+
+
+
+
+# =====================================================
+# MAIN
+# =====================================================
+
+def main():
+
+
+
+    print("====================================")
+    print("VWAP SUPERTREND BOT START")
+    print("====================================")
+
+
+
+
+    bot_logger.info(
+        "BOT START"
+    )
+
+
+
+
+
+    try:
+
+
+
+        app.start()
+
+
+
+
+
+        while True:
+
 
 
             time.sleep(1)
@@ -55,14 +149,7 @@ def main():
     except KeyboardInterrupt:
 
 
-        print(
-            "\n[KEYBOARD INTERRUPT]"
-        )
-
-
-
-        stop_bot()
-
+        shutdown()
 
 
 
@@ -80,28 +167,14 @@ def main():
         )
 
 
-
-        error_logger.exception(
-
+        bot_logger.exception(
             str(e)
-
         )
 
 
-
-        stop_bot()
-
+        shutdown()
 
 
-
-
-
-    finally:
-
-
-        print(
-            "[MAIN EXIT]"
-        )
 
 
 
