@@ -1,3 +1,5 @@
+# config.py
+
 import os
 from dotenv import load_dotenv
 
@@ -5,7 +7,25 @@ load_dotenv()
 
 
 # =====================================================
-# BYBIT
+# MODE
+# =====================================================
+
+LIVE = (
+    os.getenv("LIVE", "False")
+    .lower()
+    == "true"
+)
+
+DEMO = (
+    os.getenv("DEMO", "True")
+    .lower()
+    == "true"
+)
+
+
+
+# =====================================================
+# BYBIT API
 # =====================================================
 
 BYBIT_API_KEY = os.getenv(
@@ -20,31 +40,31 @@ BYBIT_API_SECRET = os.getenv(
 
 
 BYBIT_TESTNET = (
-    os.getenv(
-        "BYBIT_TESTNET",
-        "False"
-    ).lower()
+    os.getenv("BYBIT_TESTNET", "False")
+    .lower()
     == "true"
 )
 
 
 BYBIT_DEMO = (
-    os.getenv(
-        "BYBIT_DEMO",
-        "True"
-    ).lower()
+    os.getenv("BYBIT_DEMO", "True")
+    .lower()
     == "true"
 )
 
 
 
 # =====================================================
-# ACCOUNT
+# ACCOUNT / MARKET
 # =====================================================
 
 ACCOUNT_TYPE = "UNIFIED"
 
-CATEGORY = "linear"
+CATEGORY = os.getenv(
+    "CATEGORY",
+    "linear"
+)
+
 
 DEFAULT_SYMBOL = os.getenv(
     "SYMBOL",
@@ -52,13 +72,12 @@ DEFAULT_SYMBOL = os.getenv(
 )
 
 
-
 SYMBOL = DEFAULT_SYMBOL
 
 
 
 # =====================================================
-# TRADING
+# ORDER SETTINGS
 # =====================================================
 
 LEVERAGE = int(
@@ -77,15 +96,63 @@ DEFAULT_QTY = float(
 )
 
 
+MAX_POSITION_SIZE = float(
+    os.getenv(
+        "MAX_POSITION_SIZE",
+        "0.01"
+    )
+)
+
+
+ORDER_COOLDOWN = int(
+    os.getenv(
+        "ORDER_COOLDOWN",
+        "60"
+    )
+)
+
+
 
 # =====================================================
-# STRATEGY
+# VWAP SETTINGS
 # =====================================================
 
 VWAP_LENGTH = int(
     os.getenv(
         "VWAP_LENGTH",
         "50"
+    )
+)
+
+
+USE_VOLUME_FILTER = (
+    os.getenv(
+        "USE_VOLUME_FILTER",
+        "True"
+    )
+    .lower()
+    ==
+    "true"
+)
+
+
+MIN_VOLUME_MULTIPLIER = float(
+    os.getenv(
+        "MIN_VOLUME_MULTIPLIER",
+        "1.2"
+    )
+)
+
+
+
+# =====================================================
+# SUPERTREND SETTINGS
+# =====================================================
+
+ST_LENGTH = int(
+    os.getenv(
+        "ST_LENGTH",
+        "10"
     )
 )
 
@@ -107,30 +174,9 @@ SUPERTREND_MULTIPLIER = float(
 
 
 
-# Volume Filter
-
-USE_VOLUME_FILTER = (
-    os.getenv(
-        "USE_VOLUME_FILTER",
-        "True"
-    ).lower()
-    == "true"
-)
-
-
-MIN_VOLUME_MULTIPLIER = float(
-    os.getenv(
-        "MIN_VOLUME_MULTIPLIER",
-        "1.2"
-    )
-)
-
-
-
 # =====================================================
 # RISK MANAGEMENT
 # =====================================================
-
 
 RISK_PER_TRADE_PERCENT = float(
     os.getenv(
@@ -148,7 +194,6 @@ MAX_DRAWDOWN_PERCENT = float(
 )
 
 
-
 MAX_DAILY_LOSS_PERCENT = float(
     os.getenv(
         "MAX_DAILY_LOSS_PERCENT",
@@ -157,20 +202,10 @@ MAX_DAILY_LOSS_PERCENT = float(
 )
 
 
-
 MAX_LOSS_STREAK = int(
     os.getenv(
         "MAX_LOSS_STREAK",
-        "3"
-    )
-)
-
-
-
-MAX_POSITION_SIZE = float(
-    os.getenv(
-        "MAX_POSITION_SIZE",
-        "0.01"
+        "5"
     )
 )
 
@@ -180,14 +215,12 @@ MAX_POSITION_SIZE = float(
 # WATCHDOG
 # =====================================================
 
-
 WATCHDOG_INTERVAL = int(
     os.getenv(
         "WATCHDOG_INTERVAL",
-        "10"
+        "30"
     )
 )
-
 
 
 MAX_API_ERROR = int(
@@ -203,13 +236,14 @@ MAX_API_ERROR = int(
 # TELEGRAM
 # =====================================================
 
-
 TELEGRAM_ENABLED = (
     os.getenv(
         "TELEGRAM_ENABLED",
         "False"
-    ).lower()
-    == "true"
+    )
+    .lower()
+    ==
+    "true"
 )
 
 
@@ -232,23 +266,55 @@ TELEGRAM_CHAT_ID = os.getenv(
 
 DATABASE_ENABLED = True
 
+DATABASE_PATH = os.getenv(
+    "DATABASE_PATH",
+    "trading.db"
+)
 
-DATABASE_PATH = "bot.db"
+
+DATABASE_FILE = DATABASE_PATH
 
 
 
 # =====================================================
-# LOG
+# LOOP
 # =====================================================
 
-DEBUG = True
+KLINE_INTERVAL = os.getenv(
+    "KLINE_INTERVAL",
+    "1"
+)
+
+
+LOOP_INTERVAL = int(
+    os.getenv(
+        "LOOP_INTERVAL",
+        "5"
+    )
+)
+
+
+
+# =====================================================
+# DEBUG
+# =====================================================
+
+DEBUG = (
+    os.getenv(
+        "DEBUG",
+        "False"
+    )
+    .lower()
+    ==
+    "true"
+)
 
 
 
 print("==============================")
 print("[CONFIG LOADED]")
-print("LIVE :", not BYBIT_DEMO)
-print("DEMO :", BYBIT_DEMO)
+print("LIVE :", LIVE)
+print("DEMO :", DEMO)
 print("CATEGORY :", CATEGORY)
 print("SYMBOL :", DEFAULT_SYMBOL)
 print("==============================")
