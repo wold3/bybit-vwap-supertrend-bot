@@ -38,26 +38,21 @@ BYBIT_BASE_URL = os.getenv(
 # ==================================
 
 LIVE_TRADING = (
-    os.getenv(
-        "LIVE_TRADING",
-        "false"
-    ).lower()
+    os.getenv("LIVE_TRADING", "false")
+    .lower()
     == "true"
 )
 
 
 BYBIT_TESTNET = (
-    os.getenv(
-        "BYBIT_TESTNET",
-        "false"
-    ).lower()
+    os.getenv("BYBIT_TESTNET", "false")
+    .lower()
     == "true"
 )
 
 
 BYBIT_DEMO = (
-    "demo"
-    in BYBIT_BASE_URL.lower()
+    "demo" in BYBIT_BASE_URL.lower()
 )
 
 
@@ -162,7 +157,7 @@ LEVERAGE = int(
 
 
 # ==================================
-# RISK MANAGEMENT
+# RISK
 # ==================================
 
 MAX_POSITION_SIZE = float(
@@ -344,6 +339,22 @@ WATCHDOG_TIMEOUT = int(
 )
 
 
+MAX_API_ERROR = int(
+    os.getenv(
+        "MAX_API_ERROR",
+        "5"
+    )
+)
+
+
+MAX_HEARTBEAT_DELAY = int(
+    os.getenv(
+        "MAX_HEARTBEAT_DELAY",
+        "180"
+    )
+)
+
+
 
 # ==================================
 # TELEGRAM
@@ -391,7 +402,7 @@ LOG_LEVEL = os.getenv(
 
 
 # ==================================
-# START MESSAGE
+# DEBUG
 # ==================================
 
 print("==============================")
