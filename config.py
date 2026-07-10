@@ -1,10 +1,12 @@
 # =====================================================
 # config.py
-# Bybit VWAP SuperTrend Bot Configuration
+# BOT GLOBAL CONFIG
 # =====================================================
+
 
 import os
 from dotenv import load_dotenv
+
 
 
 load_dotenv()
@@ -13,62 +15,53 @@ load_dotenv()
 
 
 
+
+
 # =====================================================
-# ENV
+# BYBIT API
 # =====================================================
 
+
 BYBIT_API_KEY = os.getenv(
+
     "BYBIT_API_KEY",
+
     ""
+
 )
 
 
 BYBIT_API_SECRET = os.getenv(
+
     "BYBIT_API_SECRET",
+
     ""
-)
 
-
-
-TELEGRAM_TOKEN = os.getenv(
-    "TELEGRAM_TOKEN",
-    ""
-)
-
-
-TELEGRAM_CHAT_ID = os.getenv(
-    "TELEGRAM_CHAT_ID",
-    ""
 )
 
 
 
 
 
+# Demo Trading
 
+BYBIT_REST_URL = os.getenv(
 
-# =====================================================
-# MODE
-# =====================================================
+    "BYBIT_REST_URL",
 
-LIVE = os.getenv(
-    "LIVE",
-    "False"
-).lower() == "true"
+    "https://api-demo.bybit.com"
 
-
-
-DEMO = os.getenv(
-    "DEMO",
-    "True"
-).lower() == "true"
+)
 
 
 
-TESTNET = os.getenv(
-    "TESTNET",
-    "False"
-).lower() == "true"
+BYBIT_PRIVATE_WS = os.getenv(
+
+    "BYBIT_PRIVATE_WS",
+
+    "wss://stream-demo.bybit.com/v5/private"
+
+)
 
 
 
@@ -77,134 +70,27 @@ TESTNET = os.getenv(
 
 
 # =====================================================
-# BYBIT
+# MARKET
 # =====================================================
+
+
+CATEGORY = "linear"
+
+
+DEFAULT_SYMBOL = "BTCUSDT"
+
 
 ACCOUNT_TYPE = "UNIFIED"
 
 
 
-CATEGORY = os.getenv(
-
-    "CATEGORY",
-
-    "linear"
-
-)
-
-
-
-DEFAULT_SYMBOL = os.getenv(
-
-    "SYMBOL",
-
-    "BTCUSDT"
-
-)
-
-
-
-SYMBOL = DEFAULT_SYMBOL
-
-
-
-
-
-# REST URL
-
-if TESTNET:
-
-
-    BYBIT_REST_URL = (
-
-        "https://api-testnet.bybit.com"
-
-    )
-
-
-else:
-
-
-    if DEMO:
-
-
-        BYBIT_REST_URL = (
-
-            "https://api-demo.bybit.com"
-
-        )
-
-    else:
-
-
-        BYBIT_REST_URL = (
-
-            "https://api.bybit.com"
-
-        )
-
-
-
-
-
-
-
-# PRIVATE WS
-
-if TESTNET:
-
-
-    BYBIT_PRIVATE_WS = (
-
-        "wss://stream-testnet.bybit.com/v5/private"
-
-    )
-
-
-else:
-
-
-    if DEMO:
-
-
-        BYBIT_PRIVATE_WS = (
-
-            "wss://stream-demo.bybit.com/v5/private"
-
-        )
-
-
-    else:
-
-
-        BYBIT_PRIVATE_WS = (
-
-            "wss://stream.bybit.com/v5/private"
-
-        )
-
-
-
 
 
 
 
 # =====================================================
-# TRADING
+# LEVERAGE
 # =====================================================
-
-DEFAULT_QTY = float(
-
-    os.getenv(
-
-        "DEFAULT_QTY",
-
-        "0.001"
-
-    )
-
-)
-
 
 
 LEVERAGE = int(
@@ -213,7 +99,30 @@ LEVERAGE = int(
 
         "LEVERAGE",
 
-        "3"
+        5
+
+    )
+
+)
+
+
+
+
+
+
+
+# =====================================================
+# ORDER
+# =====================================================
+
+
+DEFAULT_QTY = float(
+
+    os.getenv(
+
+        "DEFAULT_QTY",
+
+        0.001
 
     )
 
@@ -229,13 +138,14 @@ LEVERAGE = int(
 # RISK MANAGEMENT
 # =====================================================
 
+
 RISK_PER_TRADE_PERCENT = float(
 
     os.getenv(
 
         "RISK_PER_TRADE_PERCENT",
 
-        "1"
+        1
 
     )
 
@@ -249,7 +159,7 @@ MAX_POSITION_SIZE = float(
 
         "MAX_POSITION_SIZE",
 
-        "0.05"
+        0.01
 
     )
 
@@ -263,7 +173,7 @@ MAX_DAILY_LOSS_PERCENT = float(
 
         "MAX_DAILY_LOSS_PERCENT",
 
-        "5"
+        5
 
     )
 
@@ -277,7 +187,7 @@ MAX_DRAWDOWN_PERCENT = float(
 
         "MAX_DRAWDOWN_PERCENT",
 
-        "10"
+        10
 
     )
 
@@ -291,7 +201,7 @@ MAX_LOSS_STREAK = int(
 
         "MAX_LOSS_STREAK",
 
-        "5"
+        3
 
     )
 
@@ -305,7 +215,7 @@ ORDER_COOLDOWN = int(
 
         "ORDER_COOLDOWN",
 
-        "300"
+        300
 
     )
 
@@ -318,8 +228,9 @@ ORDER_COOLDOWN = int(
 
 
 # =====================================================
-# STOP LOSS / TAKE PROFIT
+# STOP / TAKE PROFIT
 # =====================================================
+
 
 STOP_LOSS_PERCENT = float(
 
@@ -327,7 +238,7 @@ STOP_LOSS_PERCENT = float(
 
         "STOP_LOSS_PERCENT",
 
-        "1"
+        1
 
     )
 
@@ -341,7 +252,7 @@ TAKE_PROFIT_PERCENT = float(
 
         "TAKE_PROFIT_PERCENT",
 
-        "2"
+        2
 
     )
 
@@ -354,8 +265,9 @@ TAKE_PROFIT_PERCENT = float(
 
 
 # =====================================================
-# INDICATORS
+# INDICATOR
 # =====================================================
+
 
 ATR_PERIOD = int(
 
@@ -363,7 +275,7 @@ ATR_PERIOD = int(
 
         "ATR_PERIOD",
 
-        "14"
+        14
 
     )
 
@@ -377,21 +289,7 @@ SUPERTREND_MULTIPLIER = float(
 
         "SUPERTREND_MULTIPLIER",
 
-        "3"
-
-    )
-
-)
-
-
-
-VWAP_PERIOD = int(
-
-    os.getenv(
-
-        "VWAP_PERIOD",
-
-        "50"
+        3
 
     )
 
@@ -407,21 +305,8 @@ VWAP_PERIOD = int(
 # VOLUME FILTER
 # =====================================================
 
-USE_VOLUME_FILTER = (
 
-    os.getenv(
-
-        "USE_VOLUME_FILTER",
-
-        "True"
-
-    ).lower()
-
-    ==
-
-    "true"
-
-)
+USE_VOLUME_FILTER = True
 
 
 
@@ -431,7 +316,7 @@ MIN_VOLUME_MULTIPLIER = float(
 
         "MIN_VOLUME_MULTIPLIER",
 
-        "1.2"
+        1.2
 
     )
 
@@ -447,13 +332,14 @@ MIN_VOLUME_MULTIPLIER = float(
 # WATCHDOG
 # =====================================================
 
+
 WATCHDOG_INTERVAL = int(
 
     os.getenv(
 
         "WATCHDOG_INTERVAL",
 
-        "30"
+        30
 
     )
 
@@ -467,7 +353,7 @@ MAX_API_ERROR = int(
 
         "MAX_API_ERROR",
 
-        "5"
+        5
 
     )
 
@@ -482,6 +368,7 @@ MAX_API_ERROR = int(
 # =====================================================
 # DATABASE
 # =====================================================
+
 
 DATABASE_PATH = os.getenv(
 
@@ -498,14 +385,44 @@ DATABASE_PATH = os.getenv(
 
 
 # =====================================================
-# OUTPUT
+# TELEGRAM
 # =====================================================
 
+
+TELEGRAM_TOKEN = os.getenv(
+
+    "TELEGRAM_TOKEN",
+
+    ""
+
+)
+
+
+
+TELEGRAM_CHAT_ID = os.getenv(
+
+    "TELEGRAM_CHAT_ID",
+
+    ""
+
+)
+
+
+
+
+
+
+
 print("==============================")
+
 print("[CONFIG LOADED]")
-print("LIVE :", LIVE)
-print("DEMO :", DEMO)
-print("TESTNET :", TESTNET)
+
 print("CATEGORY :", CATEGORY)
-print("SYMBOL :", DEFAULT_SYMBOL)
+
+print("SYMBOL   :", DEFAULT_SYMBOL)
+
+print("ACCOUNT  :", ACCOUNT_TYPE)
+
+print("LEVERAGE :", LEVERAGE)
+
 print("==============================")
