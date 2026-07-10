@@ -3,16 +3,23 @@
 
 import sqlite3
 import threading
+import time
+
+
+from config import DATABASE_PATH
+
 
 
 
 class Database:
 
 
+
     def __init__(self):
 
 
-        self.path = "bot.db"
+        self.path = DATABASE_PATH
+
 
         self.lock = threading.Lock()
 
@@ -22,7 +29,7 @@ class Database:
 
 
     # =====================================
-    # INIT
+    # INIT DATABASE
     # =====================================
 
     def init_db(self):
@@ -32,7 +39,9 @@ class Database:
 
 
             conn = sqlite3.connect(
+
                 self.path
+
             )
 
 
@@ -40,114 +49,502 @@ class Database:
 
 
 
-            cursor.execute("""
+            # Trades
 
-            CREATE TABLE IF NOT EXISTS trades (
+            cursor.execute(
+                """
 
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CREATE TABLE IF NOT EXISTS trades (
 
-                symbol TEXT,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                side TEXT,
+                    symbol TEXT,
 
-                qty REAL,
+                    side TEXT,
 
-                entry REAL,
+                    entry REAL,
 
-                exit REAL,
+                    exit REAL,
 
-                pnl REAL,
+                    qty REAL,
 
-                result TEXT,
+                    pnl REAL,
 
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    timestamp INTEGER
 
+                )
+
+                """
             )
 
-            """)
 
 
 
-            cursor.execute("""
+            # Orders
 
-            CREATE TABLE IF NOT EXISTS orders (
+            cursor.execute(
+                """
 
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CREATE TABLE IF NOT EXISTS orders (
 
-                order_id TEXT,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                side TEXT,
+                    order_id TEXT,
 
-                qty REAL,
+                    symbol TEXT,
 
-                price REAL,
+                    side TEXT,
 
-                status TEXT,
+                    qty REAL,
 
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    price REAL,
 
+                    status TEXT,
+
+                    timestamp INTEGER
+
+                )
+
+                """
             )
 
-            """)
 
 
 
-            cursor.execute("""
 
-            CREATE TABLE IF NOT EXISTS errors (
+            # Signals
 
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cursor.execute(
+                """
 
-                message TEXT,
+                CREATE TABLE IF NOT EXISTS signals (
 
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
 
+                    signal_type TEXT,
+
+                    side TEXT,
+
+                    price REAL,
+
+                    timestamp INTEGER
+
+                )
+
+                """
             )
 
-            """)
+
+
+
+
+
+            # Equity
+
+            cursor.execute(
+                """
+
+                CREATE TABLE IF NOT EXISTS equity (
+
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                    value REAL,
+
+                    timestamp INTEGER
+
+                )
+
+                """
+            )
+
+
+
+
+
+
+            # Errors
+
+            cursor.execute(
+                """
+
+                CREATE TABLE IF NOT EXISTS errors (
+
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                    message TEXT,
+
+                    timestamp INTEGER
+
+                )
+
+                """
+            )
 
 
 
             conn.commit()
 
+
             conn.close()
 
 
 
+        print(
+
+            "[DATABASE READY]"
+
+        )
+
+
+
+
+
     # =====================================
-    # INSERT
+    # INSERT SIGNAL
+    # =====================================
+
+    def save_signal(
+        self,
+        signal
+    ):
+
+
+        self.execute(
+
+            """
+
+            INSERT INTO signals
+
+            (
+
+            signal_type,
+
+            side,
+
+            price,
+
+            timestamp
+
+            )
+
+            VALUES (?,?,?,?)
+
+            """,
+
+            (
+
+                signal["type"],
+
+                signal.get("side"),
+
+                signal.get("price"),
+
+                int(time.time())
+
+            )
+
+        )
+
+
+
+
+
+
+    # =====================================
+    # SAVE ORDER
+    # =====================================
+
+    def save_order(
+        self,
+        order
+    ):
+
+
+        self.execute(
+
+            """
+
+            INSERT INTO orders
+
+            (
+
+            order_id,
+
+            symbol,
+
+            side,
+
+            qty,
+
+            price,
+
+            status,
+
+            timestamp
+
+            )
+
+            VALUES (?,?,?,?,?,?,?)
+
+            """,
+
+            (
+
+                order.get("orderId"),
+
+                order.get("symbol"),
+
+                order.get("side"),
+
+                float(
+
+                    order.get(
+
+                        "qty",
+
+                        0
+
+                    )
+
+                ),
+
+                float(
+
+                    order.get(
+
+                        "price",
+
+                        0
+
+                    )
+
+                ),
+
+                order.get(
+
+                    "orderStatus"
+
+                ),
+
+                int(time.time())
+
+            )
+
+        )
+
+
+
+
+
+
+    # =====================================
+    # SAVE TRADE
+    # =====================================
+
+    def save_trade(
+        self,
+        data
+    ):
+
+
+        self.execute(
+
+            """
+
+            INSERT INTO trades
+
+            (
+
+            symbol,
+
+            side,
+
+            entry,
+
+            exit,
+
+            qty,
+
+            pnl,
+
+            timestamp
+
+            )
+
+            VALUES (?,?,?,?,?,?,?)
+
+            """,
+
+            (
+
+                data["symbol"],
+
+                data["side"],
+
+                data["entry"],
+
+                data["exit"],
+
+                data["qty"],
+
+                data["pnl"],
+
+                int(time.time())
+
+            )
+
+        )
+
+
+
+
+
+
+    # =====================================
+    # EQUITY
+    # =====================================
+
+    def save_equity(
+        self,
+        equity
+    ):
+
+
+        self.execute(
+
+            """
+
+            INSERT INTO equity
+
+            (
+
+            value,
+
+            timestamp
+
+            )
+
+            VALUES (?,?)
+
+            """,
+
+            (
+
+                equity,
+
+                int(time.time())
+
+            )
+
+        )
+
+
+
+
+
+
+
+    # =====================================
+    # ERROR
+    # =====================================
+
+    def save_error(
+        self,
+        error
+    ):
+
+
+        self.execute(
+
+            """
+
+            INSERT INTO errors
+
+            (
+
+            message,
+
+            timestamp
+
+            )
+
+            VALUES (?,?)
+
+            """,
+
+            (
+
+                str(error),
+
+                int(time.time())
+
+            )
+
+        )
+
+
+
+
+
+
+    # =====================================
+    # EXECUTE
     # =====================================
 
     def execute(
         self,
         query,
-        params=()
+        params
     ):
 
 
-        with self.lock:
+        try:
 
 
-            conn = sqlite3.connect(
-                self.path
+            with self.lock:
+
+
+                conn = sqlite3.connect(
+
+                    self.path
+
+                )
+
+
+                cursor = conn.cursor()
+
+
+                cursor.execute(
+
+                    query,
+
+                    params
+
+                )
+
+
+                conn.commit()
+
+
+                conn.close()
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[DB ERROR]",
+
+                e
+
             )
 
 
-            cursor = conn.cursor()
-
-
-            cursor.execute(
-                query,
-                params
-            )
-
-
-            conn.commit()
-
-
-            conn.close()
 
 
 
 
-db = Database()
+
+database = Database()
