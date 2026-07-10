@@ -1,51 +1,147 @@
-# config.py
-
+# ==================================================
+# CONFIGURATION
+# ==================================================
 
 import os
+
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+
+
+# ==================================================
+# HELPER
+# ==================================================
+
+def get_bool(
+    key,
+    default=False
+):
+
+    value = os.getenv(
+        key,
+        str(default)
+    )
+
+    return value.lower() in (
+        "true",
+        "1",
+        "yes"
+    )
+
+
+
+def get_int(
+    key,
+    default=0
+):
+
+    try:
+
+        return int(
+            os.getenv(
+                key,
+                default
+            )
+        )
+
+    except:
+
+        return default
+
+
+
+def get_float(
+    key,
+    default=0.0
+):
+
+    try:
+
+        return float(
+            os.getenv(
+                key,
+                default
+            )
+        )
+
+    except:
+
+        return default
+
+
+
+def get_str(
+    key,
+    default=""
+):
+
+    return os.getenv(
+        key,
+        default
+    )
+
 
 
 # ==================================================
 # BYBIT API
 # ==================================================
 
-BYBIT_API_KEY = os.getenv(
-    "BYBIT_API_KEY",
-    ""
+BYBIT_API_KEY = get_str(
+    "BYBIT_API_KEY"
 )
 
 
-BYBIT_API_SECRET = os.getenv(
-    "BYBIT_API_SECRET",
-    ""
+BYBIT_API_SECRET = get_str(
+    "BYBIT_API_SECRET"
 )
 
 
 
-# True  = Testnet
-# False = Real Trading
+# ==================================================
+# MODE
+# ==================================================
 
-BYBIT_TESTNET = True
-
-
-
-# Demo Trading Account
-
-BYBIT_DEMO = False
+BYBIT_TESTNET = get_bool(
+    "BYBIT_TESTNET"
+)
 
 
+BYBIT_DEMO = get_bool(
+    "BYBIT_DEMO"
+)
 
-# API URL 표시용
 
-BYBIT_BASE_URL = (
+LIVE_TRADING = get_bool(
+    "LIVE_TRADING"
+)
 
-    "https://api-testnet.bybit.com"
 
-    if BYBIT_TESTNET
 
-    else
+# ==================================================
+# SERVER
+# ==================================================
 
-    "https://api.bybit.com"
+BYBIT_BASE_URL = get_str(
+    "BYBIT_BASE_URL",
+    "https://api-demo.bybit.com"
+)
 
+
+
+# ==================================================
+# WEBSOCKET
+# ==================================================
+
+BYBIT_PUBLIC_WS = get_str(
+    "BYBIT_PUBLIC_WS"
+)
+
+
+BYBIT_PRIVATE_WS = get_str(
+    "BYBIT_PRIVATE_WS"
 )
 
 
@@ -54,15 +150,27 @@ BYBIT_BASE_URL = (
 # ACCOUNT
 # ==================================================
 
-ACCOUNT_TYPE = "UNIFIED"
+ACCOUNT_TYPE = get_str(
+    "ACCOUNT_TYPE",
+    "UNIFIED"
+)
+
+
+CATEGORY = get_str(
+    "CATEGORY",
+    "linear"
+)
 
 
 
-CATEGORY = "linear"
+# ==================================================
+# SYMBOL
+# ==================================================
 
-
-
-DEFAULT_SYMBOL = "BTCUSDT"
+DEFAULT_SYMBOL = get_str(
+    "DEFAULT_SYMBOL",
+    "BTCUSDT"
+)
 
 
 
@@ -70,103 +178,80 @@ DEFAULT_SYMBOL = "BTCUSDT"
 # ORDER
 # ==================================================
 
-ORDER_TYPE = "Market"
+DEFAULT_QTY = get_float(
+    "DEFAULT_QTY",
+    0.001
+)
 
 
-
-TIME_IN_FORCE = "IOC"
-
-
-
-DEFAULT_QTY = 0.001
+ORDER_TYPE = get_str(
+    "ORDER_TYPE",
+    "Market"
+)
 
 
-
-LEVERAGE = 5
-
-
-
-
-# ==================================================
-# POSITION
-# ==================================================
-
-MAX_POSITION_SIZE = 0.01
+TIME_IN_FORCE = get_str(
+    "TIME_IN_FORCE",
+    "GTC"
+)
 
 
-
-# One Way Mode
-
-POSITION_MODE = "ONE_WAY"
-
-
+ORDER_COOLDOWN = get_int(
+    "ORDER_COOLDOWN",
+    60
+)
 
 
-# ==================================================
-# RISK MANAGEMENT
-# ==================================================
-
-# 하루 최대 손실 %
-
-MAX_DAILY_LOSS_PERCENT = 5
-
-
-
-# 최대 전체 Drawdown %
-
-MAX_DRAWDOWN_PERCENT = 15
-
-
-
-# 한번 거래 위험 %
-
-RISK_PER_TRADE_PERCENT = 1
-
-
-
-# 최대 동시 포지션
-
-MAX_OPEN_POSITION = 1
-
-
-
-# 연속 손실 제한
-
-MAX_LOSS_STREAK = 5
-
-
-
-# 주문 쿨다운 초
-
-ORDER_COOLDOWN = 60
-
+ORDER_RETRY = get_int(
+    "ORDER_RETRY",
+    3
+)
 
 
 
 # ==================================================
-# STRATEGY
+# LEVERAGE
 # ==================================================
 
-
-# SuperTrend
-
-ST_LENGTH = 14
-
-
-ST_MULTIPLIER = 3.0
+LEVERAGE = get_int(
+    "LEVERAGE",
+    3
+)
 
 
 
-# ATR
+# ==================================================
+# RISK
+# ==================================================
 
-ATR_PERIOD = 14
+MAX_POSITION_SIZE = get_float(
+    "MAX_POSITION_SIZE",
+    0.001
+)
 
 
+MAX_DAILY_LOSS_PERCENT = get_float(
+    "MAX_DAILY_LOSS_PERCENT",
+    5
+)
 
-# VWAP
 
-VWAP_ENABLED = True
+MAX_DRAWDOWN_PERCENT = get_float(
+    "MAX_DRAWDOWN_PERCENT",
+    15
+)
 
+
+MAX_LOSS_STREAK = get_int(
+    "MAX_LOSS_STREAK",
+    5
+)
+
+
+RISK_PER_TRADE_PERCENT = get_float(
+    "RISK_PER_TRADE_PERCENT",
+    1
+)
 
 
 
@@ -174,74 +259,45 @@ VWAP_ENABLED = True
 # TP / SL
 # ==================================================
 
-
-# 기본값
-
-TAKE_PROFIT_PERCENT = 2.0
-
-
-STOP_LOSS_PERCENT = 1.0
+TAKE_PROFIT_PERCENT = get_float(
+    "TAKE_PROFIT_PERCENT",
+    1
+)
 
 
-
-# ATR 기반 사용
-
-USE_ATR_STOP = True
-
-
-ATR_STOP_MULTIPLIER = 2.0
-
-
-ATR_TP_MULTIPLIER = 3.0
-
-
-
-
-# Trailing Stop
-
-USE_TRAILING_STOP = True
-
-
-TRAILING_PERCENT = 0.5
-
+STOP_LOSS_PERCENT = get_float(
+    "STOP_LOSS_PERCENT",
+    0.5
+)
 
 
 
 # ==================================================
-# MARKET FILTER
+# INDICATORS
 # ==================================================
 
-
-# 거래량 필터
-
-USE_VOLUME_FILTER = True
-
-
-
-MIN_VOLUME_MULTIPLIER = 1.2
+VWAP_LENGTH = get_int(
+    "VWAP_LENGTH",
+    20
+)
 
 
-
-# 변동성 필터
-
-USE_VOLATILITY_FILTER = True
-
-
-
-MAX_ATR_MULTIPLIER = 3
+SUPERTREND_PERIOD = get_int(
+    "SUPERTREND_PERIOD",
+    10
+)
 
 
+SUPERTREND_MULTIPLIER = get_float(
+    "SUPERTREND_MULTIPLIER",
+    3
+)
 
 
-# ==================================================
-# WEBSOCKET
-# ==================================================
-
-WS_RECONNECT_DELAY = 5
-
-
-WS_HEARTBEAT = 30
-
+ATR_PERIOD = get_int(
+    "ATR_PERIOD",
+    14
+)
 
 
 
@@ -249,12 +305,16 @@ WS_HEARTBEAT = 30
 # WATCHDOG
 # ==================================================
 
-WATCHDOG_INTERVAL = 30
+WATCHDOG_INTERVAL = get_int(
+    "WATCHDOG_INTERVAL",
+    30
+)
 
 
-
-MAX_API_ERROR = 5
-
+MAX_API_ERROR = get_int(
+    "MAX_API_ERROR",
+    5
+)
 
 
 
@@ -262,8 +322,10 @@ MAX_API_ERROR = 5
 # DATABASE
 # ==================================================
 
-DATABASE_PATH = "bot.db"
-
+DATABASE_PATH = get_str(
+    "DATABASE_PATH",
+    "data/bot.db"
+)
 
 
 
@@ -271,45 +333,90 @@ DATABASE_PATH = "bot.db"
 # TELEGRAM
 # ==================================================
 
-TELEGRAM_TOKEN = os.getenv(
+TELEGRAM_ENABLED = get_bool(
+    "TELEGRAM_ENABLED"
+)
 
-    "TELEGRAM_TOKEN",
 
-    ""
+TELEGRAM_TOKEN = get_str(
+    "TELEGRAM_TOKEN"
+)
 
+
+TELEGRAM_CHAT_ID = get_str(
+    "TELEGRAM_CHAT_ID"
 )
 
 
 
-TELEGRAM_CHAT_ID = os.getenv(
+# ==================================================
+# LOG
+# ==================================================
 
-    "TELEGRAM_CHAT_ID",
-
-    ""
-
+LOG_LEVEL = get_str(
+    "LOG_LEVEL",
+    "INFO"
 )
 
 
 
-
 # ==================================================
-# LOGGING
-# ==================================================
-
-LOG_LEVEL = "INFO"
-
-
-LOG_FILE = "bot.log"
-
-
-
-
-# ==================================================
-# SYSTEM
+# VALIDATION
 # ==================================================
 
-DEBUG = True
+def validate_config():
+
+
+    errors = []
 
 
 
-TIMEZONE = "UTC"
+    if not BYBIT_API_KEY:
+
+        errors.append(
+            "Missing BYBIT_API_KEY"
+        )
+
+
+    if not BYBIT_API_SECRET:
+
+        errors.append(
+            "Missing BYBIT_API_SECRET"
+        )
+
+
+
+    if CATEGORY not in (
+        "linear",
+        "spot",
+        "inverse"
+    ):
+
+        errors.append(
+            "Invalid CATEGORY"
+        )
+
+
+
+    if errors:
+
+        raise Exception(
+            "\n".join(errors)
+        )
+
+
+
+# 실행 시 설정 검사
+
+validate_config()
+
+
+
+print("==============================")
+print("[CONFIG LOADED]")
+print("MODE :", 
+      "LIVE" if LIVE_TRADING else "TEST")
+print("DEMO :", BYBIT_DEMO)
+print("CATEGORY :", CATEGORY)
+print("SYMBOL :", DEFAULT_SYMBOL)
+print("==============================")
