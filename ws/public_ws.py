@@ -1,17 +1,21 @@
-import time
 import threading
+import time
+
 
 from pybit.unified_trading import WebSocket
 
+
 from config import (
-    BYBIT_TESTNET,
+    BYBIT_PUBLIC_WS,
     CATEGORY,
     DEFAULT_SYMBOL,
+    BYBIT_TESTNET,
 )
 
 
+
 # ==========================================
-# BYBIT PUBLIC WEBSOCKET V5
+# PUBLIC KLINE WEBSOCKET
 # ==========================================
 
 class PublicWS:
@@ -19,13 +23,22 @@ class PublicWS:
 
     def __init__(self):
 
+
         self.ws = None
 
         self.running = False
 
-        self.ticker = None
 
-        self.kline = []
+        self.price = None
+
+
+        self.opens = []
+        self.highs = []
+        self.lows = []
+        self.closes = []
+        self.volumes = []
+
+
 
         print("==============================")
         print("[PUBLIC WS INIT]")
@@ -35,58 +48,113 @@ class PublicWS:
 
 
 
-    # ======================================
-    # TICKER CALLBACK
-    # ======================================
-
-    def handle_ticker(self, message):
-
-        try:
-
-            self.ticker = message
-
-
-        except Exception as e:
-
-            print(
-                "[TICKER CALLBACK ERROR]",
-                e
-            )
-
-
 
     # ======================================
     # KLINE CALLBACK
     # ======================================
 
-    def handle_kline(self, message):
+    def handle_kline(
+        self,
+        message
+    ):
+
 
         try:
 
+
             data = message.get(
-                "data",
-                []
+                "data"
             )
 
 
-            for candle in data:
+            if not data:
 
-                self.kline.append(candle)
+                return
 
 
 
-            if len(self.kline) > 500:
+            candle = data[0]
 
-                self.kline = self.kline[-500:]
+
+
+            open_price = float(
+                candle["open"]
+            )
+
+            high_price = float(
+                candle["high"]
+            )
+
+            low_price = float(
+                candle["low"]
+            )
+
+            close_price = float(
+                candle["close"]
+            )
+
+            volume = float(
+                candle["volume"]
+            )
+
+
+
+            self.price = close_price
+
+
+
+            self.opens.append(
+                open_price
+            )
+
+            self.highs.append(
+                high_price
+            )
+
+            self.lows.append(
+                low_price
+            )
+
+            self.closes.append(
+                close_price
+            )
+
+            self.volumes.append(
+                volume
+            )
+
+
+
+            if len(self.closes) > 300:
+
+
+                self.opens = self.opens[-300:]
+
+                self.highs = self.highs[-300:]
+
+                self.lows = self.lows[-300:]
+
+                self.closes = self.closes[-300:]
+
+                self.volumes = self.volumes[-300:]
+
+
+
+            print(
+                "[KLINE]",
+                close_price
+            )
 
 
 
         except Exception as e:
 
+
             print(
-                "[KLINE CALLBACK ERROR]",
+                "[KLINE ERROR]",
                 e
             )
+
 
 
 
@@ -96,16 +164,13 @@ class PublicWS:
 
     def start(self):
 
+
         try:
 
 
             self.running = True
 
 
-
-            # IMPORTANT
-            # Demo Trading Public WS 사용 금지
-            # Public Market Data = 일반 V5 endpoint
 
             self.ws = WebSocket(
 
@@ -117,21 +182,11 @@ class PublicWS:
 
 
 
-            self.ws.ticker_stream(
-
-                symbol=DEFAULT_SYMBOL,
-
-                callback=self.handle_ticker
-
-            )
-
-
-
             self.ws.kline_stream(
 
-                symbol=DEFAULT_SYMBOL,
-
                 interval=1,
+
+                symbol=DEFAULT_SYMBOL,
 
                 callback=self.handle_kline
 
@@ -161,8 +216,9 @@ class PublicWS:
 
 
 
+
     # ======================================
-    # THREAD START
+    # THREAD
     # ======================================
 
     def run_thread(self):
@@ -181,6 +237,7 @@ class PublicWS:
 
 
 
+
     # ======================================
     # STOP
     # ======================================
@@ -191,77 +248,39 @@ class PublicWS:
         self.running = False
 
 
-        try:
-
-            if self.ws:
-
-                self.ws.exit()
-
-        except:
-
-            pass
-
-
-
         print(
             "[PUBLIC WS STOPPED]"
         )
 
 
 
+
     # ======================================
-    # PRICE GETTER
+    # GETTERS
     # ======================================
 
     def get_price(self):
 
-        try:
-
-            if not self.ticker:
-
-                return None
+        return self.price
 
 
 
-            data = self.ticker.get(
-                "data",
-                {}
-            )
+    def get_ohlcv(self):
 
 
+        return (
 
-            price = data.get(
-                "lastPrice"
-            )
+            self.opens,
 
+            self.highs,
 
+            self.lows,
 
-            if price:
+            self.closes,
 
-                return float(price)
+            self.volumes
 
-
-
-        except Exception as e:
-
-            print(
-                "[PRICE ERROR]",
-                e
-            )
-
-
-
-        return None
-
-
-
-    # ======================================
-    # KLINE GETTER
-    # ======================================
-
-    def get_kline(self):
-
-        return self.kline
+        )
 
 
 
