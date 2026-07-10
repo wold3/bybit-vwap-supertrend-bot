@@ -6,47 +6,31 @@ from pybit.unified_trading import WebSocket
 
 
 from config import (
-
     BYBIT_TESTNET,
-
     CATEGORY,
-
     DEFAULT_SYMBOL,
-
 )
 
 
 
 
 
-# ==========================================
-# PUBLIC MARKET WS
-# ==========================================
-
 class PublicWS:
 
 
     def __init__(self):
 
-
         self.ws = None
-
         self.thread = None
 
         self.running = False
 
 
-
         self.opens = []
-
         self.highs = []
-
         self.lows = []
-
         self.closes = []
-
         self.volumes = []
-
 
 
         print("==============================")
@@ -65,9 +49,7 @@ class PublicWS:
 
     def handle_kline(self, message):
 
-
         try:
-
 
             data = message.get(
                 "data",
@@ -76,13 +58,11 @@ class PublicWS:
 
 
             if not data:
-
                 return
 
 
 
             candle = data[0]
-
 
 
             close = float(
@@ -107,27 +87,21 @@ class PublicWS:
 
 
 
-
-
             self.opens.append(
                 open_price
             )
-
 
             self.highs.append(
                 high
             )
 
-
             self.lows.append(
                 low
             )
 
-
             self.closes.append(
                 close
             )
-
 
             self.volumes.append(
                 volume
@@ -135,28 +109,16 @@ class PublicWS:
 
 
 
-
-
-            # 최근 200개 유지
-
             max_length = 200
-
 
 
             if len(self.closes) > max_length:
 
-
                 self.opens.pop(0)
-
                 self.highs.pop(0)
-
                 self.lows.pop(0)
-
                 self.closes.pop(0)
-
                 self.volumes.pop(0)
-
-
 
 
 
@@ -167,10 +129,7 @@ class PublicWS:
 
 
 
-
-
         except Exception as e:
-
 
             print(
                 "[KLINE ERROR]",
@@ -194,37 +153,23 @@ class PublicWS:
 
 
 
-        # 중요:
-        # Demo Public WS 사용 금지
-        # Market Data는 일반 V5 Public 사용
-
-
         self.ws = WebSocket(
-
 
             testnet=BYBIT_TESTNET,
 
-
             channel_type="linear"
-
 
         )
 
 
 
-
-
         self.ws.kline_stream(
-
 
             interval=1,
 
-
             symbol=DEFAULT_SYMBOL,
 
-
             callback=self.handle_kline
-
 
         )
 
@@ -236,10 +181,7 @@ class PublicWS:
 
 
 
-
-
         while self.running:
-
 
             time.sleep(1)
 
@@ -248,7 +190,7 @@ class PublicWS:
 
 
     # ======================================
-    # RUN
+    # START
     # ======================================
 
     def start(self):
@@ -262,7 +204,6 @@ class PublicWS:
 
 
             try:
-
 
                 self.connect()
 
@@ -290,19 +231,16 @@ class PublicWS:
 
     # ======================================
     # THREAD
-    ======================================
+    # ======================================
 
     def run_thread(self):
 
 
         self.thread = threading.Thread(
 
-
             target=self.start,
 
-
             daemon=True
-
 
         )
 
@@ -315,7 +253,7 @@ class PublicWS:
 
     # ======================================
     # STOP
-    ======================================
+    # ======================================
 
     def stop(self):
 
@@ -323,23 +261,16 @@ class PublicWS:
         self.running = False
 
 
-
         try:
 
-
             if self.ws:
-
 
                 self.ws.exit()
 
 
-
         except Exception:
 
-
             pass
-
-
 
 
 
@@ -352,8 +283,8 @@ class PublicWS:
 
 
     # ======================================
-    # OHLCV DATA
-    ======================================
+    # GET OHLCV
+    # ======================================
 
     def get_ohlcv(self):
 
