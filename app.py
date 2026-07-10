@@ -3,7 +3,6 @@
 # Trading Application Core
 # =====================================================
 
-
 import time
 import threading
 
@@ -54,18 +53,12 @@ from database.database import (
 )
 
 
-from config import (
-    KLINE_INTERVAL
-)
-
-
 
 
 
 
 
 class TradingApp:
-
 
 
 
@@ -107,7 +100,6 @@ class TradingApp:
         try:
 
 
-
             if not bybit_api.ping():
 
 
@@ -116,8 +108,6 @@ class TradingApp:
                     "BYBIT CONNECTION FAILED"
 
                 )
-
-
 
 
 
@@ -141,15 +131,9 @@ class TradingApp:
 
 
 
+            equity = self.parse_equity(
 
-
-            equity = (
-
-                self.parse_equity(
-
-                    wallet
-
-                )
+                wallet
 
             )
 
@@ -165,11 +149,7 @@ class TradingApp:
 
 
 
-
-
             position_manager.sync()
-
-
 
 
 
@@ -181,11 +161,7 @@ class TradingApp:
 
 
 
-
-
             bybit_api.set_leverage()
-
-
 
 
 
@@ -197,11 +173,7 @@ class TradingApp:
 
 
 
-
-
             telegram_bot.bot_start()
-
-
 
 
 
@@ -209,9 +181,8 @@ class TradingApp:
 
 
 
-
-
             private_ws.start()
+
 
 
             watchdog.start()
@@ -219,8 +190,6 @@ class TradingApp:
 
 
             self.start_market_stream()
-
-
 
 
 
@@ -232,10 +201,7 @@ class TradingApp:
 
 
 
-
-
         except Exception as e:
-
 
 
             print(
@@ -247,21 +213,11 @@ class TradingApp:
             )
 
 
-
             database.save_error(
 
                 str(e)
 
             )
-
-
-
-            telegram_bot.error(
-
-                str(e)
-
-            )
-
 
 
             self.stop()
@@ -277,7 +233,7 @@ class TradingApp:
 
 
     # =====================================================
-    # MARKET LOOP
+    # MARKET THREAD
     # =====================================================
 
     def start_market_stream(self):
@@ -291,42 +247,30 @@ class TradingApp:
 
 
 
-
-
-        def run():
-
+        def loop():
 
 
             while self.running:
 
 
-
                 try:
-
 
 
                     candles = (
 
                         bybit_api
-                        .get_kline(
-
-                            interval=KLINE_INTERVAL
-
-                        )
+                        .get_kline()
 
                     )
-
-
 
 
 
                     if candles:
 
 
-
                         print(
 
-                            "[KLINE]",
+                            "[CANDLE RECEIVED]",
 
                             len(candles)
 
@@ -342,16 +286,11 @@ class TradingApp:
 
 
 
-
-
                     watchdog.heartbeat()
 
 
 
-
-
                 except Exception as e:
-
 
 
                     print(
@@ -363,14 +302,11 @@ class TradingApp:
                     )
 
 
-
                     database.save_error(
 
                         str(e)
 
                     )
-
-
 
 
 
@@ -384,12 +320,11 @@ class TradingApp:
 
         self.market_thread = threading.Thread(
 
-            target=run,
+            target=loop,
 
             daemon=True
 
         )
-
 
 
         self.market_thread.start()
@@ -405,13 +340,9 @@ class TradingApp:
     # =====================================================
 
     def on_candle(
-
         self,
-
         candles
-
     ):
-
 
 
         if not self.running:
@@ -421,22 +352,7 @@ class TradingApp:
 
 
 
-
-
-        print(
-
-            "[CANDLE RECEIVED]",
-
-            len(candles)
-
-        )
-
-
-
-
-
         try:
-
 
 
             signal = (
@@ -455,7 +371,6 @@ class TradingApp:
         except Exception as e:
 
 
-
             print(
 
                 "[STRATEGY ERROR]",
@@ -465,13 +380,11 @@ class TradingApp:
             )
 
 
-
             database.save_error(
 
                 str(e)
 
             )
-
 
 
             return
@@ -485,13 +398,11 @@ class TradingApp:
         if signal is None:
 
 
-
             print(
 
                 "[NO SIGNAL]"
 
             )
-
 
 
             return
@@ -512,8 +423,6 @@ class TradingApp:
 
 
 
-
-
         database.save_signal(
 
             signal
@@ -524,9 +433,6 @@ class TradingApp:
 
 
 
-
-
-        # EXIT
 
 
         if signal.get(
@@ -540,7 +446,6 @@ class TradingApp:
             order_manager.close_position()
 
 
-
             return
 
 
@@ -549,11 +454,7 @@ class TradingApp:
 
 
 
-        # RISK CHECK
-
-
         if not risk_manager.can_trade():
-
 
 
             print(
@@ -563,25 +464,12 @@ class TradingApp:
             )
 
 
-
             return
 
 
 
 
 
-
-
-        # POSITION SYNC
-
-
-        position_manager.sync()
-
-
-
-
-
-        # ORDER
 
 
         order_manager.execute(
@@ -598,23 +486,17 @@ class TradingApp:
 
 
 
-
-
     # =====================================================
     # EQUITY PARSE
     # =====================================================
 
     def parse_equity(
-
         self,
-
         wallet
-
     ):
 
 
         try:
-
 
 
             return float(
@@ -631,10 +513,7 @@ class TradingApp:
 
 
 
-
-
         except Exception as e:
-
 
 
             print(
@@ -644,7 +523,6 @@ class TradingApp:
                 e
 
             )
-
 
 
             return 0
@@ -674,10 +552,7 @@ class TradingApp:
 
 
 
-
-
         try:
-
 
 
             database.event(
@@ -685,7 +560,6 @@ class TradingApp:
                 "BOT STOP"
 
             )
-
 
 
             telegram_bot.bot_stop()
@@ -700,10 +574,7 @@ class TradingApp:
 
 
 
-
-
         except Exception as e:
-
 
 
             print(
@@ -715,16 +586,11 @@ class TradingApp:
             )
 
 
-
             database.save_error(
 
                 str(e)
 
             )
-
-
-
-
 
 
 
