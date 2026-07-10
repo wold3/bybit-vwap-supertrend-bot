@@ -320,6 +320,14 @@ MIN_VOLUME = float(
 )
 
 
+MIN_VOLUME_MULTIPLIER = float(
+    os.getenv(
+        "MIN_VOLUME_MULTIPLIER",
+        "1.0"
+    )
+)
+
+
 
 # ==================================
 # LOG
