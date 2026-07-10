@@ -1,4 +1,6 @@
+import pandas as pd
 import numpy as np
+
 
 from config import (
     VWAP_LENGTH,
@@ -15,11 +17,16 @@ from config import (
 class VWAPSupertrend:
 
 
+
     def __init__(self):
+
 
         print("==============================")
         print("[SIGNAL INIT]")
-        print("VWAP :", VWAP_LENGTH)
+        print(
+            "VWAP :",
+            VWAP_LENGTH
+        )
         print(
             "SUPERTREND :",
             SUPERTREND_PERIOD,
@@ -29,43 +36,44 @@ class VWAPSupertrend:
 
 
 
+
+
     # ======================================
     # VWAP
     # ======================================
 
     def calculate_vwap(
+
         self,
-        closes,
-        volumes
+
+        close,
+
+        volume
+
     ):
 
 
-        if len(closes) < VWAP_LENGTH:
+        price_volume = (
 
-            return None
+            np.array(close)
 
+            *
 
+            np.array(volume)
 
-        closes = np.array(
-            closes[-VWAP_LENGTH:]
         )
-
-
-        volumes = np.array(
-            volumes[-VWAP_LENGTH:]
-        )
-
 
 
         return (
 
-            np.sum(
-                closes * volumes
-            )
+            price_volume.sum()
+
             /
-            np.sum(volumes)
+
+            np.array(volume).sum()
 
         )
+
 
 
 
@@ -75,54 +83,87 @@ class VWAPSupertrend:
     # ======================================
 
     def calculate_atr(
+
         self,
-        highs,
-        lows,
-        closes
+
+        high,
+
+        low,
+
+        close
+
     ):
 
 
-        if len(closes) < SUPERTREND_PERIOD + 1:
+        df = pd.DataFrame({
 
-            return None
+            "high":high,
 
+            "low":low,
 
+            "close":close
 
-        tr = []
-
-
-
-        for i in range(1, len(closes)):
-
-
-            high = highs[i]
-
-            low = lows[i]
-
-            prev_close = closes[i-1]
+        })
 
 
 
-            value = max(
+        df["tr"] = np.maximum(
 
-                high - low,
+            df["high"]
 
-                abs(high - prev_close),
+            -
 
-                abs(low - prev_close)
+            df["low"],
+
+
+            np.maximum(
+
+                abs(
+
+                    df["high"]
+
+                    -
+
+                    df["close"].shift()
+
+                ),
+
+
+                abs(
+
+                    df["low"]
+
+                    -
+
+                    df["close"].shift()
+
+                )
 
             )
 
-
-            tr.append(value)
-
+        )
 
 
-        return np.mean(
 
-            tr[-SUPERTREND_PERIOD:]
+        atr = (
+
+            df["tr"]
+
+            .rolling(
+
+                SUPERTREND_PERIOD
+
+            )
+
+            .mean()
+
+            .iloc[-1]
 
         )
+
+
+        return atr
+
 
 
 
@@ -132,51 +173,61 @@ class VWAPSupertrend:
     # ======================================
 
     def calculate_supertrend(
+
         self,
-        highs,
-        lows,
-        closes
+
+        high,
+
+        low,
+
+        close
+
     ):
 
 
         atr = self.calculate_atr(
 
-            highs,
+            high,
 
-            lows,
+            low,
 
-            closes
+            close
 
         )
 
 
-        if atr is None:
+
+        if np.isnan(atr):
 
             return None
 
 
 
-        last_close = closes[-1]
 
-        middle = (
+        hl2 = (
 
-            highs[-1]
+            high[-1]
 
             +
 
-            lows[-1]
+            low[-1]
 
         ) / 2
 
 
 
+
         upper = (
 
-            middle
+            hl2
 
             +
 
-            SUPERTREND_MULTIPLIER * atr
+            SUPERTREND_MULTIPLIER
+
+            *
+
+            atr
 
         )
 
@@ -184,23 +235,33 @@ class VWAPSupertrend:
 
         lower = (
 
-            middle
+            hl2
 
             -
 
-            SUPERTREND_MULTIPLIER * atr
+            SUPERTREND_MULTIPLIER
+
+            *
+
+            atr
 
         )
 
 
 
-        if last_close > upper:
+        price = close[-1]
+
+
+
+        if price > upper:
+
 
             return "UP"
 
 
 
-        if last_close < lower:
+        elif price < lower:
+
 
             return "DOWN"
 
@@ -211,126 +272,139 @@ class VWAPSupertrend:
 
 
 
+
     # ======================================
-    # SIGNAL CHECK
+    # SIGNAL
     # ======================================
 
     def check_signal(
+
         self,
-        prices,
-        volumes,
-        highs=None,
-        lows=None,
-        closes=None
+
+        close,
+
+        volume,
+
+        high,
+
+        low,
+
+        price=None
+
     ):
 
 
+        try:
 
-        if len(prices) < VWAP_LENGTH:
+
+
+            if len(close) < VWAP_LENGTH:
+
+
+                return None
+
+
+
+
+            if price is None:
+
+
+                price = close[-1]
+
+
+
+
+
+            vwap = self.calculate_vwap(
+
+                close[-VWAP_LENGTH:],
+
+                volume[-VWAP_LENGTH:]
+
+            )
+
+
+
+            trend = self.calculate_supertrend(
+
+                high,
+
+                low,
+
+                close
+
+            )
+
+
+
+
+            print(
+                "[SIGNAL CHECK]",
+                "PRICE:",
+                price,
+                "VWAP:",
+                round(vwap,2),
+                "TREND:",
+                trend
+            )
+
+
+
+
+
+            # LONG
+
+            if (
+
+                price > vwap
+
+                and
+
+                trend == "UP"
+
+            ):
+
+
+                return "Buy"
+
+
+
+
+
+            # SHORT
+
+            if (
+
+                price < vwap
+
+                and
+
+                trend == "DOWN"
+
+            ):
+
+
+                return "Sell"
+
+
+
+
 
             return None
 
 
 
-        if highs is None:
 
-            highs = prices
-
-        if lows is None:
-
-            lows = prices
-
-        if closes is None:
-
-            closes = prices
+        except Exception as e:
 
 
+            print(
+                "[SIGNAL ERROR]",
+                e
+            )
 
-
-        vwap = self.calculate_vwap(
-
-            closes,
-
-            volumes
-
-        )
-
-
-
-        trend = self.calculate_supertrend(
-
-            highs,
-
-            lows,
-
-            closes
-
-        )
-
-
-
-        if vwap is None:
 
             return None
-
-
-
-        current = closes[-1]
-
-
-
-        print(
-
-            "[SIGNAL CHECK]",
-
-            "PRICE:",
-            round(current,2),
-
-            "VWAP:",
-            round(vwap,2),
-
-            "TREND:",
-            trend
-
-        )
-
-
-
-
-        # BUY
-
-        if (
-
-            current > vwap
-
-            and
-
-            trend == "UP"
-
-        ):
-
-            return "Buy"
-
-
-
-
-        # SELL
-
-        if (
-
-            current < vwap
-
-            and
-
-            trend == "DOWN"
-
-        ):
-
-            return "Sell"
-
-
-
-        return None
 
 
 
