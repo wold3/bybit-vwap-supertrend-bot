@@ -33,12 +33,17 @@ class PrivateWS:
 
         self.ws = None
 
+
         self.running = False
 
 
-        self.position_data = None
+        self.thread = None
+
+
 
         self.order_data = None
+
+        self.position_data = None
 
         self.wallet_data = None
 
@@ -71,7 +76,7 @@ class PrivateWS:
 
 
             # --------------------------
-            # ORDER UPDATE
+            # ORDER
             # --------------------------
 
             if topic == "order":
@@ -85,7 +90,8 @@ class PrivateWS:
                     "[ORDER UPDATE]"
                 )
 
-                print(
+
+                self.sync_order(
                     message
                 )
 
@@ -94,7 +100,7 @@ class PrivateWS:
 
 
             # --------------------------
-            # POSITION UPDATE
+            # POSITION
             # --------------------------
 
             elif topic == "position":
@@ -109,7 +115,6 @@ class PrivateWS:
                 )
 
 
-
                 self.sync_position(
                     message
                 )
@@ -119,7 +124,7 @@ class PrivateWS:
 
 
             # --------------------------
-            # WALLET UPDATE
+            # WALLET
             # --------------------------
 
             elif topic == "wallet":
@@ -132,6 +137,7 @@ class PrivateWS:
                 print(
                     "[WALLET UPDATE]"
                 )
+
 
 
 
@@ -164,6 +170,7 @@ class PrivateWS:
             )
 
 
+
             if not data:
 
 
@@ -193,7 +200,6 @@ class PrivateWS:
             )
 
 
-
             entry = float(
 
                 pos.get(
@@ -206,10 +212,6 @@ class PrivateWS:
 
 
 
-
-            # --------------------------
-            # POSITION EXISTS
-            # --------------------------
 
             if size > 0 and side:
 
@@ -241,11 +243,27 @@ class PrivateWS:
 
 
 
+
+
             else:
 
 
-
                 position_manager.clear()
+
+
+
+                order_manager.update_position(
+
+                    {
+
+                        "side": None,
+
+                        "size": 0
+
+                    }
+
+                )
+
 
 
 
@@ -263,84 +281,52 @@ class PrivateWS:
 
 
     # ======================================
-    # START
+    # ORDER SYNC
     # ======================================
 
-    def start(self):
+    def sync_order(self, message):
 
 
         try:
 
 
-
-            self.running = True
-
-
-
-
-            self.ws = WebSocket(
+            data = message.get(
+                "data",
+                []
+            )
 
 
-                testnet=BYBIT_TESTNET,
+            if not data:
+
+                return
 
 
-                demo=BYBIT_DEMO,
+
+            order = data[0]
 
 
-                channel_type="private",
 
-
-                api_key=BYBIT_API_KEY,
-
-
-                api_secret=BYBIT_API_SECRET
-
+            status = order.get(
+                "orderStatus"
             )
 
 
 
-
-
-            self.ws.order_stream(
-
-                callback=self.handle_message
-
+            side = order.get(
+                "side"
             )
-
-
-
-            self.ws.position_stream(
-
-                callback=self.handle_message
-
-            )
-
-
-
-            self.ws.wallet_stream(
-
-                callback=self.handle_message
-
-            )
-
-
 
 
 
             print(
-                "[PRIVATE WS STARTED]"
+
+                "[ORDER STATUS]",
+
+                status,
+
+                side
+
             )
-
-
-
-
-
-            while self.running:
-
-
-                time.sleep(1)
-
-
 
 
 
@@ -349,7 +335,7 @@ class PrivateWS:
 
 
             print(
-                "[PRIVATE WS START ERROR]",
+                "[ORDER SYNC ERROR]",
                 e
             )
 
@@ -358,13 +344,122 @@ class PrivateWS:
 
 
     # ======================================
-    # THREAD START
+    # CONNECT
+    # ======================================
+
+    def connect(self):
+
+
+        self.ws = WebSocket(
+
+
+            testnet=BYBIT_TESTNET,
+
+
+            demo=BYBIT_DEMO,
+
+
+            channel_type="private",
+
+
+            api_key=BYBIT_API_KEY,
+
+
+            api_secret=BYBIT_API_SECRET
+
+        )
+
+
+
+
+        self.ws.order_stream(
+
+            callback=self.handle_message
+
+        )
+
+
+        self.ws.position_stream(
+
+            callback=self.handle_message
+
+        )
+
+
+        self.ws.wallet_stream(
+
+            callback=self.handle_message
+
+        )
+
+
+
+        print(
+            "[PRIVATE WS STARTED]"
+        )
+
+
+
+        while self.running:
+
+
+            time.sleep(1)
+
+
+
+
+
+    # ======================================
+    # START LOOP
+    # ======================================
+
+    def start(self):
+
+
+        self.running = True
+
+
+
+        while self.running:
+
+
+
+            try:
+
+
+                self.connect()
+
+
+
+            except Exception as e:
+
+
+                print(
+                    "[PRIVATE WS ERROR]",
+                    e
+                )
+
+
+                print(
+                    "[PRIVATE WS RECONNECT] 5 sec"
+                )
+
+
+
+                time.sleep(5)
+
+
+
+
+
+    # ======================================
+    # THREAD
     # ======================================
 
     def run_thread(self):
 
 
-        thread = threading.Thread(
+        self.thread = threading.Thread(
 
 
             target=self.start,
@@ -375,7 +470,7 @@ class PrivateWS:
         )
 
 
-        thread.start()
+        self.thread.start()
 
 
 
@@ -401,7 +496,7 @@ class PrivateWS:
 
 
     # ======================================
-    # GET DATA
+    # GETTERS
     # ======================================
 
     def get_position(self):
@@ -411,10 +506,12 @@ class PrivateWS:
 
 
 
+
     def get_order(self):
 
 
         return self.order_data
+
 
 
 
