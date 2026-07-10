@@ -1,172 +1,106 @@
+```python
 import os
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
-
-
-# ==========================================
+# ==================================================
 # MODE
-# ==========================================
+# ==================================================
 
-# Bybit Demo Trading
 BYBIT_DEMO = True
-
-# Testnet 여부
 BYBIT_TESTNET = False
-
-# Live Trading
 LIVE = False
 
-
-# 기존 코드 호환용
+# 기존 코드 호환
 DEMO = BYBIT_DEMO
 
-
-
-
-
-# ==========================================
+# ==================================================
 # API KEY
-# ==========================================
+# ==================================================
 
-BYBIT_API_KEY = os.getenv(
-    "BYBIT_API_KEY",
-    ""
-)
+BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
+BYBIT_API_SECRET = os.getenv("BYBIT_API_SECRET", "")
 
-
-BYBIT_API_SECRET = os.getenv(
-    "BYBIT_API_SECRET",
-    ""
-)
-
-
-
-
-
-# ==========================================
+# ==================================================
 # ACCOUNT
-# ==========================================
+# ==================================================
 
 ACCOUNT = "UNIFIED"
-
+ACCOUNT_TYPE = ACCOUNT
 
 CATEGORY = "linear"
 
+SYMBOL = "BTCUSDT"
+DEFAULT_SYMBOL = SYMBOL
 
-DEFAULT_SYMBOL = "BTCUSDT"
-
-SYMBOL = DEFAULT_SYMBOL
-
-
-
-
-
-# ==========================================
-# REST API
-# ==========================================
+# ==================================================
+# REST
+# ==================================================
 
 if BYBIT_DEMO:
-
     REST_URL = "https://api-demo.bybit.com"
-
 elif BYBIT_TESTNET:
-
     REST_URL = "https://api-testnet.bybit.com"
-
 else:
-
     REST_URL = "https://api.bybit.com"
 
+# 기존 코드 호환
+BYBIT_BASE_URL = REST_URL
 
-
-
-
-# ==========================================
+# ==================================================
 # WEBSOCKET
-# ==========================================
+# ==================================================
 
-# Market Data
-# Demo 계정도 일반 Public WS 사용
+# Public Market Data
+PUBLIC_WS = "wss://stream.bybit.com/v5/public"
 
-PUBLIC_WS = (
-    "wss://stream.bybit.com/v5/public"
-)
+# Private Account
+if BYBIT_DEMO:
+    PRIVATE_WS = "wss://stream-demo.bybit.com/v5/private"
+elif BYBIT_TESTNET:
+    PRIVATE_WS = "wss://stream-testnet.bybit.com/v5/private"
+else:
+    PRIVATE_WS = "wss://stream.bybit.com/v5/private"
 
-
-
-# Account Private WS
-PRIVATE_WS = (
-    "wss://stream-demo.bybit.com/v5/private"
-    if BYBIT_DEMO
-    else "wss://stream.bybit.com/v5/private"
-)
-
-
-
-
-
-# ==========================================
-# TRADE SETTINGS
-# ==========================================
+# ==================================================
+# ORDER
+# ==================================================
 
 QTY = 0.001
-
+DEFAULT_QTY = QTY
 
 LEVERAGE = 3
 
+ORDER_TYPE = "Market"
+TIME_IN_FORCE = "GTC"
 
 ORDER_COOLDOWN = 60
 
-
-
-
-
-# ==========================================
-# INDICATOR SETTINGS
-# ==========================================
+# ==================================================
+# INDICATOR
+# ==================================================
 
 VWAP_LENGTH = 20
-
-
-SUPERTREND_PERIOD = 5
-
-
-SUPERTREND_MULTIPLIER = 2.0
-
-
-
-
-
-# 기존 출력 호환
-
 VWAP = VWAP_LENGTH
 
+SUPERTREND_PERIOD = 5
+SUPERTREND_MULTIPLIER = 2.0
 
 SUPERTREND = (
     SUPERTREND_PERIOD,
-    SUPERTREND_MULTIPLIER
+    SUPERTREND_MULTIPLIER,
 )
 
-
-
-
-
-# ==========================================
-# RISK MANAGEMENT
-# ==========================================
+# ==================================================
+# RISK
+# ==================================================
 
 MAX_DAILY_LOSS_PERCENT = 5.0
 
-
-
-
-
-# ==========================================
+# ==================================================
 # DEBUG
-# ==========================================
+# ==================================================
 
 print("==============================")
 print("[CONFIG LOADED]")
@@ -174,19 +108,16 @@ print("DEMO :", DEMO)
 print("BYBIT_DEMO :", BYBIT_DEMO)
 print("TESTNET :", BYBIT_TESTNET)
 print("LIVE :", LIVE)
-print("ACCOUNT :", ACCOUNT)
+print("ACCOUNT :", ACCOUNT_TYPE)
 print("CATEGORY :", CATEGORY)
-print("SYMBOL :", SYMBOL)
-print("QTY :", QTY)
+print("SYMBOL :", DEFAULT_SYMBOL)
+print("QTY :", DEFAULT_QTY)
 print("LEVERAGE :", LEVERAGE)
 print("ORDER COOLDOWN :", ORDER_COOLDOWN)
 print("VWAP :", VWAP_LENGTH)
-print(
-    "SUPERTREND :",
-    SUPERTREND_PERIOD,
-    SUPERTREND_MULTIPLIER
-)
-print("REST :", REST_URL)
+print("SUPERTREND :", SUPERTREND_PERIOD, SUPERTREND_MULTIPLIER)
+print("REST :", BYBIT_BASE_URL)
 print("PUBLIC WS :", PUBLIC_WS)
 print("PRIVATE WS :", PRIVATE_WS)
 print("==============================")
+```
