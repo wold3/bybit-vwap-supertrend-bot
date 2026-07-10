@@ -1,21 +1,24 @@
 import time
-import signal as system_signal
+import signal
+import threading
 
 
 from api.bybit_api import bybit_api
 
-from risk.risk_manager import risk_manager
-
-from execution.order_manager import order_manager
-
-from execution.position_manager import position_manager
+from ws.public_ws import public_ws
+from ws.private_ws import private_ws
 
 from signals.vwap_supertrend import signal_engine
 
-from ws.public_ws import public_ws
+from execution.order_manager import order_manager
+from execution.position_manager import position_manager
 
-from ws.private_ws import private_ws
+from risk.risk_manager import risk_manager
 
+
+from config import (
+    DEFAULT_QTY,
+)
 
 
 
@@ -23,16 +26,14 @@ from ws.private_ws import private_ws
 # BOT APPLICATION
 # ==========================================
 
-class TradingBot:
+class BotApp:
 
 
     def __init__(self):
 
+
         self.running = False
 
-        self.entry_price = None
-
-        self.side = None
 
 
         print("==============================")
@@ -42,11 +43,12 @@ class TradingBot:
 
 
 
+
     # ======================================
-    # INITIALIZE
+    # START
     # ======================================
 
-    def initialize(self):
+    def start(self):
 
 
         print()
@@ -56,48 +58,74 @@ class TradingBot:
 
 
 
+        # ------------------------------
+        # WALLET
+        # ------------------------------
+
         wallet = bybit_api.get_wallet_balance()
 
 
 
-        equity = 0
+        if wallet:
 
 
+            try:
+
+
+                equity = float(
+
+                    wallet["result"]
+                    ["list"][0]
+                    ["totalEquity"]
+
+                )
+
+
+                risk_manager.initialize(
+
+                    equity
+
+                )
+
+
+            except Exception as e:
+
+
+                print(
+                    "[RISK INIT ERROR]",
+                    e
+                )
+
+
+
+
+
+        # ------------------------------
+        # LEVERAGE
+        # ------------------------------
 
         try:
 
 
-            equity = float(
+            bybit_api.set_leverage()
 
-                wallet["result"]
-                ["list"][0]
-                ["totalEquity"]
-
-            )
 
 
         except Exception as e:
 
 
             print(
-                "[EQUITY ERROR]",
+                "[LEVERAGE ERROR]",
                 e
             )
 
 
 
 
-        risk_manager.initialize(
 
-            equity
-
-        )
-
-
-
-        bybit_api.set_leverage()
-
-
+        # ------------------------------
+        # WS START
+        # ------------------------------
 
         public_ws.run_thread()
 
@@ -110,210 +138,6 @@ class TradingBot:
         )
 
 
-        time.sleep(3)
-
-
-
-    # ======================================
-    # ENTRY CHECK
-    # ======================================
-
-    def check_entry(self):
-
-
-        try:
-
-
-            if order_manager.has_position():
-
-                return
-
-
-
-
-            opens, highs, lows, closes, volumes = (
-
-                public_ws.get_ohlcv()
-
-            )
-
-
-
-            if len(closes) < 30:
-
-                return
-
-
-
-
-            signal = signal_engine.check_signal(
-
-                closes,
-
-                volumes,
-
-                highs,
-
-                lows,
-
-                closes
-
-            )
-
-
-
-
-            if signal == "Buy":
-
-
-                print(
-                    "[SIGNAL] BUY"
-                )
-
-
-
-                result = order_manager.buy()
-
-
-
-                if result:
-
-
-                    self.side = "Buy"
-
-                    self.entry_price = closes[-1]
-
-
-
-
-
-            elif signal == "Sell":
-
-
-                print(
-                    "[SIGNAL] SELL"
-                )
-
-
-
-                result = order_manager.sell()
-
-
-
-                if result:
-
-
-                    self.side = "Sell"
-
-                    self.entry_price = closes[-1]
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[ENTRY ERROR]",
-                e
-            )
-
-
-
-
-    # ======================================
-    # EXIT CHECK
-    # ======================================
-
-    def check_exit(self):
-
-
-        try:
-
-
-            if self.entry_price is None:
-
-                return
-
-
-
-            if self.side is None:
-
-                return
-
-
-
-
-            _, _, _, closes, _ = (
-
-                public_ws.get_ohlcv()
-
-            )
-
-
-
-            if len(closes) == 0:
-
-                return
-
-
-
-
-            result = position_manager.evaluate_exit(
-
-                self.entry_price,
-
-                self.side,
-
-                closes
-
-            )
-
-
-
-
-            if result:
-
-
-
-                print(
-                    "[EXIT SIGNAL]",
-                    result
-                )
-
-
-
-                order_manager.close_position()
-
-
-
-                self.entry_price = None
-
-                self.side = None
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[EXIT ERROR]",
-                e
-            )
-
-
-
-
-
-    # ======================================
-    # MAIN LOOP
-    # ======================================
-
-    def run(self):
-
 
         self.running = True
 
@@ -325,21 +149,14 @@ class TradingBot:
 
 
 
+
         while self.running:
 
 
             try:
 
 
-                self.check_exit()
-
-
-                self.check_entry()
-
-
-
-                time.sleep(1)
-
+                self.loop()
 
 
 
@@ -352,7 +169,168 @@ class TradingBot:
                 )
 
 
-                time.sleep(2)
+
+            time.sleep(1)
+
+
+
+
+
+    # ======================================
+    # MAIN LOOP
+    # ======================================
+
+    def loop(self):
+
+
+        opens, highs, lows, closes, volumes = (
+
+            public_ws.get_ohlcv()
+
+        )
+
+
+
+        if len(closes) < 20:
+
+
+            return
+
+
+
+
+        print(
+            "[DATA]",
+            len(closes)
+        )
+
+
+
+
+
+        # ------------------------------
+        # EXIT CHECK
+        # ------------------------------
+
+        if position_manager.has_position():
+
+
+
+            result = position_manager.evaluate_exit(
+
+                position_manager.entry_price,
+
+                position_manager.side,
+
+                closes
+
+            )
+
+
+
+            if result:
+
+
+
+                print(
+                    "[EXIT]",
+                    result
+                )
+
+
+                order_manager.close_position()
+
+                position_manager.clear()
+
+
+
+                return
+
+
+
+
+
+
+        # ------------------------------
+        # ENTRY CHECK
+        # ------------------------------
+
+        if not risk_manager.can_trade():
+
+
+            return
+
+
+
+
+        if order_manager.has_position():
+
+
+            return
+
+
+
+
+
+        signal_result = signal_engine.check_signal(
+
+            close=closes,
+
+            volume=volumes,
+
+            high=highs,
+
+            low=lows
+
+        )
+
+
+
+        if signal_result:
+
+
+            print(
+                "[SIGNAL]",
+                signal_result
+            )
+
+
+
+            if signal_result == "Buy":
+
+
+                if order_manager.buy():
+
+
+                    position_manager.update_position(
+
+                        "Buy",
+
+                        DEFAULT_QTY,
+
+                        closes[-1]
+
+                    )
+
+
+
+
+            elif signal_result == "Sell":
+
+
+                if order_manager.sell():
+
+
+                    position_manager.update_position(
+
+                        "Sell",
+
+                        DEFAULT_QTY,
+
+                        closes[-1]
+
+                    )
+
 
 
 
@@ -362,6 +340,14 @@ class TradingBot:
     # ======================================
 
     def stop(self):
+
+
+        print()
+
+        print(
+            "[SHUTDOWN]"
+        )
+
 
 
         self.running = False
@@ -382,52 +368,49 @@ class TradingBot:
 
 
 
-# ==========================================
-# INSTANCE
-# ==========================================
-
-bot = TradingBot()
-
-
-
 
 # ==========================================
 # SIGNAL HANDLER
 # ==========================================
 
-def shutdown(
+app = BotApp()
 
-    sig,
+
+
+def shutdown_handler(
+
+    signum,
 
     frame
 
 ):
 
 
-    print(
-        "[SHUTDOWN]"
-    )
-
-
-    bot.stop()
+    app.stop()
 
 
 
+    raise SystemExit
 
-system_signal.signal(
 
-    system_signal.SIGINT,
 
-    shutdown
+
+
+signal.signal(
+
+    signal.SIGINT,
+
+    shutdown_handler
 
 )
 
 
-system_signal.signal(
 
-    system_signal.SIGTERM,
+signal.signal(
 
-    shutdown
+    signal.SIGTERM,
+
+    shutdown_handler
 
 )
 
@@ -435,36 +418,10 @@ system_signal.signal(
 
 
 # ==========================================
-# START
+# RUN
 # ==========================================
 
 if __name__ == "__main__":
 
 
-    try:
-
-
-        bot.initialize()
-
-
-        bot.run()
-
-
-
-    except KeyboardInterrupt:
-
-
-        bot.stop()
-
-
-
-    except Exception as e:
-
-
-        print(
-            "[FATAL ERROR]",
-            e
-        )
-
-
-        bot.stop()
+    app.start()
