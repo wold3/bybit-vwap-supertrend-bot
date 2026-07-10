@@ -10,16 +10,11 @@ from config import (
 
 
 
-# ==========================================
-# VWAP + SUPERTREND SIGNAL ENGINE
-# ==========================================
-
 class VWAPSupertrend:
 
 
 
     def __init__(self):
-
 
         print("==============================")
         print("[SIGNAL INIT]")
@@ -37,12 +32,11 @@ class VWAPSupertrend:
 
 
 
-
     # ======================================
     # VWAP
     # ======================================
 
-    def calculate_vwap(
+    def vwap(
 
         self,
 
@@ -53,24 +47,19 @@ class VWAPSupertrend:
     ):
 
 
-        price_volume = (
+        close = np.array(close)
 
-            np.array(close)
+        volume = np.array(volume)
 
-            *
-
-            np.array(volume)
-
-        )
 
 
         return (
 
-            price_volume.sum()
+            (close * volume).sum()
 
             /
 
-            np.array(volume).sum()
+            volume.sum()
 
         )
 
@@ -82,7 +71,7 @@ class VWAPSupertrend:
     # ATR
     # ======================================
 
-    def calculate_atr(
+    def atr(
 
         self,
 
@@ -106,37 +95,22 @@ class VWAPSupertrend:
         })
 
 
-
         df["tr"] = np.maximum(
 
-            df["high"]
-
-            -
-
-            df["low"],
+            df.high - df.low,
 
 
             np.maximum(
 
                 abs(
-
-                    df["high"]
-
-                    -
-
-                    df["close"].shift()
-
+                    df.high -
+                    df.close.shift(1)
                 ),
 
 
                 abs(
-
-                    df["low"]
-
-                    -
-
-                    df["close"].shift()
-
+                    df.low -
+                    df.close.shift(1)
                 )
 
             )
@@ -144,8 +118,7 @@ class VWAPSupertrend:
         )
 
 
-
-        atr = (
+        return (
 
             df["tr"]
 
@@ -157,12 +130,11 @@ class VWAPSupertrend:
 
             .mean()
 
-            .iloc[-1]
+            .fillna(0)
+
+            .values
 
         )
-
-
-        return atr
 
 
 
@@ -172,7 +144,7 @@ class VWAPSupertrend:
     # SUPERTREND
     # ======================================
 
-    def calculate_supertrend(
+    def supertrend(
 
         self,
 
@@ -185,7 +157,7 @@ class VWAPSupertrend:
     ):
 
 
-        atr = self.calculate_atr(
+        atr = self.atr(
 
             high,
 
@@ -197,77 +169,106 @@ class VWAPSupertrend:
 
 
 
-        if np.isnan(atr):
+        upper = []
 
-            return None
-
-
+        lower = []
 
 
-        hl2 = (
 
-            high[-1]
-
-            +
-
-            low[-1]
-
-        ) / 2
+        trend = []
 
 
 
 
-        upper = (
-
-            hl2
-
-            +
-
-            SUPERTREND_MULTIPLIER
-
-            *
-
-            atr
-
-        )
+        for i in range(len(close)):
 
 
+            mid = (
 
-        lower = (
+                high[i]
 
-            hl2
+                +
 
-            -
+                low[i]
 
-            SUPERTREND_MULTIPLIER
-
-            *
-
-            atr
-
-        )
+            ) / 2
 
 
 
-        price = close[-1]
+            up = (
+
+                mid
+
+                +
+
+                SUPERTREND_MULTIPLIER
+
+                *
+
+                atr[i]
+
+            )
+
+
+            dn = (
+
+                mid
+
+                -
+
+                SUPERTREND_MULTIPLIER
+
+                *
+
+                atr[i]
+
+            )
 
 
 
-        if price > upper:
+            upper.append(up)
 
-
-            return "UP"
-
-
-
-        elif price < lower:
-
-
-            return "DOWN"
+            lower.append(dn)
 
 
 
-        return "NEUTRAL"
+            if close[i] > up:
+
+
+                trend.append(1)
+
+
+
+            elif close[i] < dn:
+
+
+                trend.append(-1)
+
+
+
+            else:
+
+
+                if i > 0:
+
+
+                    trend.append(
+
+                        trend[i-1]
+
+                    )
+
+
+                else:
+
+
+                    trend.append(0)
+
+
+
+
+
+        return trend[-1]
 
 
 
@@ -297,11 +298,11 @@ class VWAPSupertrend:
         try:
 
 
-
             if len(close) < VWAP_LENGTH:
 
 
                 return None
+
 
 
 
@@ -315,7 +316,7 @@ class VWAPSupertrend:
 
 
 
-            vwap = self.calculate_vwap(
+            current_vwap = self.vwap(
 
                 close[-VWAP_LENGTH:],
 
@@ -325,7 +326,7 @@ class VWAPSupertrend:
 
 
 
-            trend = self.calculate_supertrend(
+            st = self.supertrend(
 
                 high,
 
@@ -341,11 +342,11 @@ class VWAPSupertrend:
             print(
                 "[SIGNAL CHECK]",
                 "PRICE:",
-                price,
+                round(price,2),
                 "VWAP:",
-                round(vwap,2),
-                "TREND:",
-                trend
+                round(current_vwap,2),
+                "ST:",
+                st
             )
 
 
@@ -356,11 +357,11 @@ class VWAPSupertrend:
 
             if (
 
-                price > vwap
+                price > current_vwap
 
                 and
 
-                trend == "UP"
+                st == 1
 
             ):
 
@@ -371,15 +372,16 @@ class VWAPSupertrend:
 
 
 
+
             # SHORT
 
             if (
 
-                price < vwap
+                price < current_vwap
 
                 and
 
-                trend == "DOWN"
+                st == -1
 
             ):
 
@@ -390,7 +392,9 @@ class VWAPSupertrend:
 
 
 
+
             return None
+
 
 
 
@@ -409,9 +413,5 @@ class VWAPSupertrend:
 
 
 
-
-# ==========================================
-# SINGLETON
-# ==========================================
 
 signal_engine = VWAPSupertrend()
