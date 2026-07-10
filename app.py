@@ -1,37 +1,29 @@
-import threading
 import time
+import threading
 
 
-from websocket_stream import stream
+from api.bybit_api import bybit_api
 
+from risk.risk_manager import risk_manager
 
-from indicators.indicator_engine import (
-    indicator_engine,
+from strategy.vwap_supertrend_strategy import (
+    vwap_supertrend_strategy
 )
-
-
-from strategy.strategy_engine import (
-    strategy_engine,
-)
-
 
 from execution.order_manager import (
-    order_manager,
+    order_manager
 )
 
-
-from risk.risk_manager import (
-    risk_manager,
+from portfolio.position_manager import (
+    position_manager
 )
 
-
-from watchdog.watchdog import (
-    watchdog,
+from services.private_ws import (
+    private_ws
 )
 
-
-from portfolio.bybit_wallet import (
-    wallet,
+from services.watchdog import (
+    watchdog
 )
 
 
@@ -42,24 +34,10 @@ class TradingApp:
     def __init__(self):
 
 
-        print("==============================")
-        print("[APP INIT]")
-        print("==============================")
-
-
         self.running = False
 
-        self.thread = None
 
-
-
-        # websocket callback 연결
-
-        stream.set_callback(
-            self.on_candle
-        )
-
-
+        self.market_thread = None
 
 
 
@@ -70,9 +48,94 @@ class TradingApp:
     def start(self):
 
 
-        if self.running:
+        print("====================")
+        print("[BOT START]")
+        print("====================")
 
-            return
+
+
+        # 1. API TEST
+
+        if not bybit_api.ping():
+
+            raise Exception(
+                "BYBIT CONNECTION FAILED"
+            )
+
+
+
+        # 2. WALLET
+
+
+        wallet = (
+
+            bybit_api
+            .get_wallet_balance()
+
+        )
+
+
+        if wallet is None:
+
+            raise Exception(
+                "WALLET ERROR"
+            )
+
+
+
+        equity = (
+
+            self.parse_equity(
+                wallet
+            )
+
+        )
+
+
+
+        # 3. POSITION SYNC
+
+
+        position_manager.sync()
+
+
+
+        # 4. RISK INIT
+
+
+        risk_manager.initialize(
+
+            equity
+
+        )
+
+
+
+        # 5. LEVERAGE
+
+
+        bybit_api.set_leverage()
+
+
+
+        # 6. PRIVATE WS
+
+
+        private_ws.start()
+
+
+
+        # 7. WATCHDOG
+
+
+        watchdog.start()
+
+
+
+        # 8. MARKET DATA
+
+
+        self.start_market_stream()
 
 
 
@@ -80,216 +143,164 @@ class TradingApp:
 
 
 
-        print("====================================")
-        print("VWAP SUPERTREND BOT START")
-        print("====================================")
+        print(
 
-
-
-        # Risk 초기화
-
-        try:
-
-            risk_manager.initialize()
-
-        except Exception as e:
-
-            print(
-                "[RISK INIT ERROR]",
-                e
-            )
-
-
-
-
-
-        # Watchdog 시작
-
-        try:
-
-            watchdog.start()
-
-        except Exception as e:
-
-            print(
-                "[WATCHDOG ERROR]",
-                e
-            )
-
-
-
-
-
-        # Public Websocket 시작
-
-        stream.run_thread()
-
-
-
-
-
-        # 메인 루프
-
-        self.thread = threading.Thread(
-
-            target=self.loop,
-
-            daemon=True
+            "[BOT READY]"
 
         )
 
 
-        self.thread.start()
-
-
-
-        print("[BOT RUNNING]")
-
-
-
-
-
 
     # =====================================
-    # CANDLE EVENT
+    # MARKET EVENT
     # =====================================
 
     def on_candle(
         self,
-        candle
+        candles
+    ):
+
+
+
+        if not self.running:
+
+            return
+
+
+
+        signal = (
+
+            vwap_supertrend_strategy
+            .analyze(
+                candles
+            )
+
+        )
+
+
+
+        if signal is None:
+
+            return
+
+
+
+        print(
+
+            "[SIGNAL]",
+
+            signal
+
+        )
+
+
+
+        # EXIT
+
+        if signal["type"] == "EXIT":
+
+
+            order_manager.close_position()
+
+
+
+            return
+
+
+
+        # ENTRY
+
+
+        if not risk_manager.can_trade():
+
+            print(
+                "[BLOCKED BY RISK]"
+            )
+
+            return
+
+
+
+        order_manager.execute(
+
+            signal
+
+        )
+
+
+
+    # =====================================
+    # MARKET STREAM
+    # =====================================
+
+    def start_market_stream(self):
+
+
+        def run():
+
+
+            while True:
+
+
+                candles = (
+                    bybit_api
+                    .get_kline()
+                )
+
+
+                if candles:
+
+
+                    self.on_candle(
+                        candles
+                    )
+
+
+                time.sleep(60)
+
+
+
+        self.market_thread = threading.Thread(
+
+            target=run
+
+        )
+
+
+        self.market_thread.daemon = True
+
+
+        self.market_thread.start()
+
+
+
+    # =====================================
+    # EQUITY PARSER
+    # =====================================
+
+    def parse_equity(
+        self,
+        wallet
     ):
 
 
         try:
 
 
-            print(
-                "[PROCESS CANDLE]",
-                candle["close"]
-            )
+            return float(
 
-
-
-            indicators = indicator_engine.update(
-
-                candle
+                wallet
+                ["result"]
+                ["list"][0]
+                ["totalEquity"]
 
             )
 
 
+        except:
 
-            if not indicators:
 
-                return
-
-
-
-
-
-            signal = strategy_engine.analyze(
-
-                candle,
-
-                indicators
-
-            )
-
-
-
-
-
-            if signal == "BUY":
-
-
-                print(
-                    "[SIGNAL BUY]"
-                )
-
-
-                order_manager.buy()
-
-
-
-
-
-            elif signal == "SELL":
-
-
-                print(
-                    "[SIGNAL SELL]"
-                )
-
-
-                order_manager.sell()
-
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[CANDLE ERROR]",
-                e
-            )
-
-
-
-
-
-
-
-    # =====================================
-    # LOOP
-    # =====================================
-
-    def loop(self):
-
-
-        print(
-            "[APP LOOP START]"
-        )
-
-
-
-        while self.running:
-
-
-            try:
-
-
-                watchdog.heartbeat()
-
-
-
-                risk_manager.check_daily_loss()
-
-
-
-                time.sleep(5)
-
-
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "[LOOP ERROR]",
-
-                    e
-
-                )
-
-
-                time.sleep(5)
-
-
-
-
+            return 0
 
 
 
@@ -301,9 +312,8 @@ class TradingApp:
 
 
         print(
-            "[BOT STOPPING]"
+            "[BOT STOP]"
         )
-
 
 
         self.running = False
@@ -312,21 +322,10 @@ class TradingApp:
 
         try:
 
+            private_ws.stop()
+
             watchdog.stop()
 
         except:
 
             pass
-
-
-
-        print(
-            "[BOT STOPPED]"
-        )
-
-
-
-
-
-
-app = TradingApp()
