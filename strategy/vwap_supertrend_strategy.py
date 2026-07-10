@@ -1,34 +1,35 @@
 from strategy.indicators import indicators
 
+from config import (
+    ST_LENGTH,
+    ST_MULTIPLIER,
+    USE_VOLUME_FILTER,
+    MIN_VOLUME_MULTIPLIER,
+)
+
+
 
 class VWAPSuperTrendStrategy:
 
 
-    def __init__(
-        self,
-        st_length=10,
-        st_multiplier=3.0,
-        volume_multiplier=1.2
-    ):
+    def __init__(self):
 
-        self.st_length = st_length
 
-        self.st_multiplier = st_multiplier
+        self.position = None
 
-        self.volume_multiplier = volume_multiplier
 
-        self.previous_direction = None
+        self.last_trend = 0
 
 
 
-    # =====================================================
+
+    # ======================================
     # ANALYZE
-    # =====================================================
+    # ======================================
 
     def analyze(
         self,
-        candles,
-        current_position=None
+        candles
     ):
 
 
@@ -38,10 +39,19 @@ class VWAPSuperTrendStrategy:
 
 
 
-        if len(candles) < self.st_length + 5:
+        if len(candles) < ST_LENGTH + 20:
 
             return None
 
+
+
+        closes = [
+
+            float(c["close"])
+
+            for c in candles
+
+        ]
 
 
         highs = [
@@ -62,15 +72,6 @@ class VWAPSuperTrendStrategy:
         ]
 
 
-        closes = [
-
-            float(c["close"])
-
-            for c in candles
-
-        ]
-
-
         volumes = [
 
             float(c["volume"])
@@ -81,123 +82,113 @@ class VWAPSuperTrendStrategy:
 
 
 
-        # =================================================
+        # ==========================
         # INDICATORS
-        # =================================================
+        # ==========================
 
 
         vwap = indicators.vwap(
 
-            highs,
-            lows,
             closes,
+
             volumes
 
         )
 
 
 
-        st = indicators.supertrend(
+        supertrend = indicators.supertrend(
 
             highs,
+
             lows,
+
             closes,
 
-            self.st_length,
+            ST_LENGTH,
 
-            self.st_multiplier
+            ST_MULTIPLIER
 
         )
 
 
 
-        if st is None:
+        if supertrend is None:
 
             return None
+
+
+
+        trend = supertrend["direction"]
 
 
 
         price = closes[-1]
 
 
-        direction = st["direction"]
 
-
-
-        # =================================================
-        # SUPERTREND FLIP CHECK
-        # =================================================
-
-
-        changed = False
-
-
-        if self.previous_direction is not None:
-
-
-            if direction != self.previous_direction:
-
-                changed = True
-
-
-
-        self.previous_direction = direction
-
-
-
-        if not changed:
-
-            return None
-
-
-
-        # =================================================
-        # VOLUME FILTER
-        # =================================================
+        current_volume = volumes[-1]
 
 
         avg_volume = sum(
 
             volumes[-20:]
 
-        ) / min(
+        ) / 20
 
-            20,
-            len(volumes)
+
+
+        # ==========================
+        # VOLUME FILTER
+        # ==========================
+
+
+        if USE_VOLUME_FILTER:
+
+
+            if current_volume < (
+
+                avg_volume *
+
+                MIN_VOLUME_MULTIPLIER
+
+            ):
+
+                return None
+
+
+
+
+        # ==========================
+        # ENTRY
+        # ==========================
+
+
+        # SuperTrend 변경 확인
+
+
+        trend_changed = (
+
+            trend != self.last_trend
 
         )
 
 
-        volume_ok = (
-
-            volumes[-1]
-
-            >=
-
-            avg_volume
-
-            *
-
-            self.volume_multiplier
-
-        )
+        self.last_trend = trend
 
 
 
-        if not volume_ok:
 
-            return None
-
-
-
-        # =================================================
-        # LONG ENTRY
-        # =================================================
+        # LONG
 
 
         if (
 
-            direction == 1
+            trend == 1
+
+            and
+
+            trend_changed
 
             and
 
@@ -205,9 +196,14 @@ class VWAPSuperTrendStrategy:
 
             and
 
-            current_position != "Buy"
+            self.position != "Buy"
 
         ):
+
+
+
+            self.position = "Buy"
+
 
 
             return {
@@ -215,50 +211,44 @@ class VWAPSuperTrendStrategy:
 
                 "type":
 
-                    "ENTRY",
+                "ENTRY",
 
 
                 "side":
 
-                    "Buy",
+                "Buy",
 
 
                 "price":
 
-                    price,
+                price,
 
 
                 "vwap":
 
-                    vwap,
+                vwap,
 
 
-                "atr":
+                "trend":
 
-                    st["atr"],
+                trend
 
-
-                "supertrend":
-
-                    direction,
-
-
-                "reason":
-
-                    "SUPERTREND_FLIP_UP"
 
             }
 
 
 
-        # =================================================
-        # SHORT ENTRY
-        # =================================================
+
+        # SHORT
 
 
         if (
 
-            direction == -1
+            trend == -1
+
+            and
+
+            trend_changed
 
             and
 
@@ -266,9 +256,14 @@ class VWAPSuperTrendStrategy:
 
             and
 
-            current_position != "Sell"
+            self.position != "Sell"
 
         ):
+
+
+
+            self.position = "Sell"
+
 
 
             return {
@@ -276,59 +271,51 @@ class VWAPSuperTrendStrategy:
 
                 "type":
 
-                    "ENTRY",
+                "ENTRY",
 
 
                 "side":
 
-                    "Sell",
+                "Sell",
 
 
                 "price":
 
-                    price,
+                price,
 
 
                 "vwap":
 
-                    vwap,
+                vwap,
 
 
-                "atr":
+                "trend":
 
-                    st["atr"],
+                trend
 
-
-                "supertrend":
-
-                    direction,
-
-
-                "reason":
-
-                    "SUPERTREND_FLIP_DOWN"
 
             }
 
 
 
-        # =================================================
+
+        # ==========================
         # EXIT
-        # =================================================
+        # ==========================
 
 
-        if current_position:
+        if self.position == "Buy":
 
 
-            if (
+            if trend == -1:
 
-                current_position == "Buy"
 
-                and
 
-                direction == -1
+                old = self.position
 
-            ):
+
+                self.position = None
+
 
 
                 return {
@@ -336,31 +323,31 @@ class VWAPSuperTrendStrategy:
 
                     "type":
 
-                        "EXIT",
+                    "EXIT",
 
 
                     "side":
 
-                        "Buy",
+                    old
 
-
-                    "reason":
-
-                        "SUPERTREND_REVERSAL"
 
                 }
 
 
 
-            if (
 
-                current_position == "Sell"
+        if self.position == "Sell":
 
-                and
 
-                direction == 1
+            if trend == 1:
 
-            ):
+
+
+                old = self.position
+
+
+                self.position = None
+
 
 
                 return {
@@ -368,19 +355,16 @@ class VWAPSuperTrendStrategy:
 
                     "type":
 
-                        "EXIT",
+                    "EXIT",
 
 
                     "side":
 
-                        "Sell",
+                    old
 
-
-                    "reason":
-
-                        "SUPERTREND_REVERSAL"
 
                 }
+
 
 
 
@@ -388,6 +372,6 @@ class VWAPSuperTrendStrategy:
 
 
 
-# singleton
+
 
 vwap_supertrend_strategy = VWAPSuperTrendStrategy()
