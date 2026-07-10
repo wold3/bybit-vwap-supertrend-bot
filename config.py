@@ -1,3 +1,4 @@
+```python
 # ==================================================
 # CONFIGURATION
 # ==================================================
@@ -12,75 +13,44 @@ load_dotenv()
 
 
 # ==================================================
-# HELPER
+# TYPE CONVERTER
 # ==================================================
 
-def get_bool(
-    key,
-    default=False
-):
+def env_str(key, default=""):
+    return os.getenv(key, default)
 
-    value = os.getenv(
-        key,
-        str(default)
-    )
 
-    return value.lower() in (
+
+def env_int(key, default=0):
+    try:
+        return int(os.getenv(key, default))
+    except:
+        return default
+
+
+
+def env_float(key, default=0.0):
+    try:
+        return float(os.getenv(key, default))
+    except:
+        return default
+
+
+
+def env_bool(key, default=False):
+
+    value = str(
+        os.getenv(
+            key,
+            default
+        )
+    ).lower()
+
+    return value in (
         "true",
         "1",
-        "yes"
-    )
-
-
-
-def get_int(
-    key,
-    default=0
-):
-
-    try:
-
-        return int(
-            os.getenv(
-                key,
-                default
-            )
-        )
-
-    except:
-
-        return default
-
-
-
-def get_float(
-    key,
-    default=0.0
-):
-
-    try:
-
-        return float(
-            os.getenv(
-                key,
-                default
-            )
-        )
-
-    except:
-
-        return default
-
-
-
-def get_str(
-    key,
-    default=""
-):
-
-    return os.getenv(
-        key,
-        default
+        "yes",
+        "on"
     )
 
 
@@ -89,13 +59,32 @@ def get_str(
 # BYBIT API
 # ==================================================
 
-BYBIT_API_KEY = get_str(
+BYBIT_API_KEY = env_str(
     "BYBIT_API_KEY"
 )
 
 
-BYBIT_API_SECRET = get_str(
+BYBIT_API_SECRET = env_str(
     "BYBIT_API_SECRET"
+)
+
+
+BYBIT_BASE_URL = env_str(
+    "BYBIT_BASE_URL",
+    "https://api-demo.bybit.com"
+)
+
+
+
+BYBIT_TESTNET = env_bool(
+    "BYBIT_TESTNET",
+    False
+)
+
+
+BYBIT_DEMO = env_bool(
+    "BYBIT_DEMO",
+    True
 )
 
 
@@ -104,29 +93,9 @@ BYBIT_API_SECRET = get_str(
 # MODE
 # ==================================================
 
-BYBIT_TESTNET = get_bool(
-    "BYBIT_TESTNET"
-)
-
-
-BYBIT_DEMO = get_bool(
-    "BYBIT_DEMO"
-)
-
-
-LIVE_TRADING = get_bool(
-    "LIVE_TRADING"
-)
-
-
-
-# ==================================================
-# SERVER
-# ==================================================
-
-BYBIT_BASE_URL = get_str(
-    "BYBIT_BASE_URL",
-    "https://api-demo.bybit.com"
+LIVE_TRADING = env_bool(
+    "LIVE_TRADING",
+    False
 )
 
 
@@ -135,13 +104,15 @@ BYBIT_BASE_URL = get_str(
 # WEBSOCKET
 # ==================================================
 
-BYBIT_PUBLIC_WS = get_str(
-    "BYBIT_PUBLIC_WS"
+BYBIT_PUBLIC_WS = env_str(
+    "BYBIT_PUBLIC_WS",
+    "wss://stream.bybit.com/v5/public"
 )
 
 
-BYBIT_PRIVATE_WS = get_str(
-    "BYBIT_PRIVATE_WS"
+BYBIT_PRIVATE_WS = env_str(
+    "BYBIT_PRIVATE_WS",
+    "wss://stream-demo.bybit.com/v5/private"
 )
 
 
@@ -150,13 +121,13 @@ BYBIT_PRIVATE_WS = get_str(
 # ACCOUNT
 # ==================================================
 
-ACCOUNT_TYPE = get_str(
+ACCOUNT_TYPE = env_str(
     "ACCOUNT_TYPE",
     "UNIFIED"
 )
 
 
-CATEGORY = get_str(
+CATEGORY = env_str(
     "CATEGORY",
     "linear"
 )
@@ -167,7 +138,7 @@ CATEGORY = get_str(
 # SYMBOL
 # ==================================================
 
-DEFAULT_SYMBOL = get_str(
+DEFAULT_SYMBOL = env_str(
     "DEFAULT_SYMBOL",
     "BTCUSDT"
 )
@@ -178,31 +149,31 @@ DEFAULT_SYMBOL = get_str(
 # ORDER
 # ==================================================
 
-DEFAULT_QTY = get_float(
+DEFAULT_QTY = env_float(
     "DEFAULT_QTY",
     0.001
 )
 
 
-ORDER_TYPE = get_str(
+ORDER_TYPE = env_str(
     "ORDER_TYPE",
     "Market"
 )
 
 
-TIME_IN_FORCE = get_str(
+TIME_IN_FORCE = env_str(
     "TIME_IN_FORCE",
     "GTC"
 )
 
 
-ORDER_COOLDOWN = get_int(
+ORDER_COOLDOWN = env_int(
     "ORDER_COOLDOWN",
     60
 )
 
 
-ORDER_RETRY = get_int(
+ORDER_RETRY = env_int(
     "ORDER_RETRY",
     3
 )
@@ -213,7 +184,7 @@ ORDER_RETRY = get_int(
 # LEVERAGE
 # ==================================================
 
-LEVERAGE = get_int(
+LEVERAGE = env_int(
     "LEVERAGE",
     3
 )
@@ -221,36 +192,36 @@ LEVERAGE = get_int(
 
 
 # ==================================================
-# RISK
+# RISK MANAGEMENT
 # ==================================================
 
-MAX_POSITION_SIZE = get_float(
+MAX_POSITION_SIZE = env_float(
     "MAX_POSITION_SIZE",
     0.001
 )
 
 
-MAX_DAILY_LOSS_PERCENT = get_float(
+MAX_DAILY_LOSS_PERCENT = env_float(
     "MAX_DAILY_LOSS_PERCENT",
     5
 )
 
 
-MAX_DRAWDOWN_PERCENT = get_float(
+MAX_DRAWDOWN_PERCENT = env_float(
     "MAX_DRAWDOWN_PERCENT",
     15
 )
 
 
-MAX_LOSS_STREAK = get_int(
-    "MAX_LOSS_STREAK",
-    5
+RISK_PER_TRADE_PERCENT = env_float(
+    "RISK_PER_TRADE_PERCENT",
+    1
 )
 
 
-RISK_PER_TRADE_PERCENT = get_float(
-    "RISK_PER_TRADE_PERCENT",
-    1
+MAX_LOSS_STREAK = env_int(
+    "MAX_LOSS_STREAK",
+    5
 )
 
 
@@ -259,13 +230,13 @@ RISK_PER_TRADE_PERCENT = get_float(
 # TP / SL
 # ==================================================
 
-TAKE_PROFIT_PERCENT = get_float(
+TAKE_PROFIT_PERCENT = env_float(
     "TAKE_PROFIT_PERCENT",
     1
 )
 
 
-STOP_LOSS_PERCENT = get_float(
+STOP_LOSS_PERCENT = env_float(
     "STOP_LOSS_PERCENT",
     0.5
 )
@@ -276,25 +247,25 @@ STOP_LOSS_PERCENT = get_float(
 # INDICATORS
 # ==================================================
 
-VWAP_LENGTH = get_int(
+VWAP_LENGTH = env_int(
     "VWAP_LENGTH",
     20
 )
 
 
-SUPERTREND_PERIOD = get_int(
+SUPERTREND_PERIOD = env_int(
     "SUPERTREND_PERIOD",
     10
 )
 
 
-SUPERTREND_MULTIPLIER = get_float(
+SUPERTREND_MULTIPLIER = env_float(
     "SUPERTREND_MULTIPLIER",
     3
 )
 
 
-ATR_PERIOD = get_int(
+ATR_PERIOD = env_int(
     "ATR_PERIOD",
     14
 )
@@ -305,13 +276,13 @@ ATR_PERIOD = get_int(
 # WATCHDOG
 # ==================================================
 
-WATCHDOG_INTERVAL = get_int(
+WATCHDOG_INTERVAL = env_int(
     "WATCHDOG_INTERVAL",
     30
 )
 
 
-MAX_API_ERROR = get_int(
+MAX_API_ERROR = env_int(
     "MAX_API_ERROR",
     5
 )
@@ -322,7 +293,7 @@ MAX_API_ERROR = get_int(
 # DATABASE
 # ==================================================
 
-DATABASE_PATH = get_str(
+DATABASE_PATH = env_str(
     "DATABASE_PATH",
     "data/bot.db"
 )
@@ -333,17 +304,18 @@ DATABASE_PATH = get_str(
 # TELEGRAM
 # ==================================================
 
-TELEGRAM_ENABLED = get_bool(
-    "TELEGRAM_ENABLED"
+TELEGRAM_ENABLED = env_bool(
+    "TELEGRAM_ENABLED",
+    False
 )
 
 
-TELEGRAM_TOKEN = get_str(
+TELEGRAM_TOKEN = env_str(
     "TELEGRAM_TOKEN"
 )
 
 
-TELEGRAM_CHAT_ID = get_str(
+TELEGRAM_CHAT_ID = env_str(
     "TELEGRAM_CHAT_ID"
 )
 
@@ -353,7 +325,7 @@ TELEGRAM_CHAT_ID = get_str(
 # LOG
 # ==================================================
 
-LOG_LEVEL = get_str(
+LOG_LEVEL = env_str(
     "LOG_LEVEL",
     "INFO"
 )
@@ -366,36 +338,39 @@ LOG_LEVEL = get_str(
 
 def validate_config():
 
-
     errors = []
-
 
 
     if not BYBIT_API_KEY:
 
         errors.append(
-            "Missing BYBIT_API_KEY"
+            "BYBIT_API_KEY missing"
         )
 
 
     if not BYBIT_API_SECRET:
 
         errors.append(
-            "Missing BYBIT_API_SECRET"
+            "BYBIT_API_SECRET missing"
         )
-
 
 
     if CATEGORY not in (
         "linear",
-        "spot",
-        "inverse"
+        "inverse",
+        "spot"
     ):
 
         errors.append(
             "Invalid CATEGORY"
         )
 
+
+    if DEFAULT_QTY <= 0:
+
+        errors.append(
+            "DEFAULT_QTY invalid"
+        )
 
 
     if errors:
@@ -406,17 +381,15 @@ def validate_config():
 
 
 
-# 실행 시 설정 검사
-
 validate_config()
 
 
 
 print("==============================")
 print("[CONFIG LOADED]")
-print("MODE :", 
-      "LIVE" if LIVE_TRADING else "TEST")
+print("LIVE :", LIVE_TRADING)
 print("DEMO :", BYBIT_DEMO)
 print("CATEGORY :", CATEGORY)
 print("SYMBOL :", DEFAULT_SYMBOL)
 print("==============================")
+```
