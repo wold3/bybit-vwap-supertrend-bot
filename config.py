@@ -11,6 +11,7 @@ load_dotenv(
 )
 
 
+
 # ==================================
 # BYBIT API
 # ==================================
@@ -24,6 +25,7 @@ BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
     ""
 )
+
 
 
 # ==================================
@@ -46,6 +48,7 @@ BYBIT_PRIVATE_WS = os.getenv(
     "BYBIT_PRIVATE_WS",
     "wss://stream-demo.bybit.com/v5/private"
 )
+
 
 
 # ==================================
@@ -144,9 +147,18 @@ LEVERAGE = int(
 )
 
 
+# 주문 연속 실행 방지 시간
+ORDER_COOLDOWN = int(
+    os.getenv(
+        "ORDER_COOLDOWN",
+        "60"
+    )
+)
+
+
 
 # ==================================
-# INDICATOR
+# INDICATORS
 # ==================================
 
 VWAP_LENGTH = int(
@@ -186,7 +198,7 @@ MAX_POSITION_SIZE = float(
 )
 
 
-# 호환
+# 호환용
 MAX_POSITION = MAX_POSITION_SIZE
 
 
@@ -270,6 +282,7 @@ print("CATEGORY :", CATEGORY)
 print("SYMBOL :", DEFAULT_SYMBOL)
 print("QTY :", DEFAULT_QTY)
 print("LEVERAGE :", LEVERAGE)
+print("ORDER COOLDOWN :", ORDER_COOLDOWN)
 print("VWAP :", VWAP_LENGTH)
 print("SUPERTREND :", SUPERTREND_PERIOD, SUPERTREND_MULTIPLIER)
 print("REST :", BYBIT_BASE_URL)
