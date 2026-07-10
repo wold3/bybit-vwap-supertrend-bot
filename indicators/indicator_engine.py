@@ -1,12 +1,5 @@
-import math
-from collections import deque
-
-
-from config import (
-    VWAP_LENGTH,
-    SUPERTREND_PERIOD,
-    SUPERTREND_MULTIPLIER,
-)
+import pandas as pd
+import numpy as np
 
 
 
@@ -15,41 +8,31 @@ class IndicatorEngine:
 
     def __init__(self):
 
-        self.prices = deque(
-            maxlen=500
+
+        self.length = 100
+
+
+        self.period = 10
+
+        self.multiplier = 3
+
+
+
+        self.df = pd.DataFrame()
+
+
+
+        print(
+            "[INDICATOR ENGINE READY]"
         )
 
-        self.highs = deque(
-            maxlen=500
-        )
-
-        self.lows = deque(
-            maxlen=500
-        )
-
-        self.volumes = deque(
-            maxlen=500
-        )
 
 
-        self.vwap = None
-
-        self.supertrend = None
-
-        self.atr = None
-
-        self.previous_close = None
-
-        self.last_signal = None
-
-
-
-        print("[INDICATOR ENGINE READY]")
 
 
 
     # =====================================================
-    # UPDATE
+    # UPDATE CANDLE
     # =====================================================
 
     def update(
@@ -61,45 +44,87 @@ class IndicatorEngine:
         try:
 
 
-            close = float(
-                candle["close"]
+            row = {
+
+
+                "timestamp":
+
+                    candle["timestamp"],
+
+
+                "open":
+
+                    candle["open"],
+
+
+                "high":
+
+                    candle["high"],
+
+
+                "low":
+
+                    candle["low"],
+
+
+                "close":
+
+                    candle["close"],
+
+
+                "volume":
+
+                    candle["volume"],
+
+
+            }
+
+
+
+
+
+            self.df = pd.concat(
+
+                [
+
+                    self.df,
+
+                    pd.DataFrame(
+                        [row]
+                    )
+
+                ],
+
+                ignore_index=True
+
             )
 
-            high = float(
-                candle["high"]
-            )
-
-            low = float(
-                candle["low"]
-            )
-
-            volume = float(
-                candle["volume"]
-            )
 
 
 
-            self.prices.append(
-                close
-            )
 
-            self.highs.append(
-                high
-            )
-
-            self.lows.append(
-                low
-            )
-
-            self.volumes.append(
-                volume
-            )
+            if len(self.df) > self.length:
 
 
+                self.df = (
 
-            self.calculate_vwap()
+                    self.df
 
-            self.calculate_supertrend()
+                    .iloc[
+                        -self.length:
+                    ]
+
+                    .reset_index(
+                        drop=True
+                    )
+
+                )
+
+
+
+
+
+            self.calculate()
 
 
 
@@ -114,280 +139,261 @@ class IndicatorEngine:
 
 
 
+
+
+
+
+
     # =====================================================
-    # VWAP
+    # CALCULATE
     # =====================================================
 
-    def calculate_vwap(self):
+    def calculate(self):
 
 
-        if len(self.prices) == 0:
-
-            return None
+        if len(self.df) < 20:
 
 
+            return
 
-        length = min(
 
-            VWAP_LENGTH,
 
-            len(self.prices)
+
+
+
+        df = self.df
+
+
+
+
+
+
+        # -------------------------
+        # VWAP
+        # -------------------------
+
+
+        price = (
+
+            df["close"]
 
         )
 
 
-        prices = list(
-            self.prices
-        )[-length:]
 
+        volume = (
 
-        volumes = list(
-            self.volumes
-        )[-length:]
+            df["volume"]
 
-
-
-        total_volume = sum(
-            volumes
         )
 
 
 
-        if total_volume == 0:
+        df["vwap"] = (
 
-            return None
+            (
 
+                price * volume
 
-
-        value = sum(
-
-            p * v
-
-            for p, v in zip(
-                prices,
-                volumes
             )
 
+            .cumsum()
+
+            /
+
+            volume.cumsum()
+
         )
 
 
 
-        self.vwap = (
-            value /
-            total_volume
+
+
+
+        # -------------------------
+        # ATR
+        # -------------------------
+
+
+        high = df["high"]
+
+        low = df["low"]
+
+        close = df["close"]
+
+
+
+        tr1 = high - low
+
+
+        tr2 = abs(
+
+            high - close.shift()
+
         )
 
 
-        return self.vwap
+        tr3 = abs(
 
+            low - close.shift()
 
-
-
-
-    # =====================================================
-    # ATR
-    # =====================================================
-
-    def calculate_atr(self):
-
-
-        if len(self.highs) < SUPERTREND_PERIOD + 1:
-
-            return None
-
-
-
-        highs = list(
-            self.highs
-        )
-
-        lows = list(
-            self.lows
-        )
-
-        closes = list(
-            self.prices
         )
 
 
 
-        trs = []
+        tr = pd.concat(
+
+            [
+
+                tr1,
+
+                tr2,
+
+                tr3
+
+            ],
+
+            axis=1
+
+        ).max(
+            axis=1
+        )
+
+
+
+        atr = (
+
+            tr.rolling(
+
+                self.period
+
+            )
+
+            .mean()
+
+        )
+
+
+
+        df["atr"] = atr
+
+
+
+
+
+
+        # -------------------------
+        # SuperTrend
+        # -------------------------
+
+
+        hl2 = (
+
+            high + low
+
+        ) / 2
+
+
+
+
+
+        upper = (
+
+            hl2
+
+            +
+
+            self.multiplier
+
+            *
+
+            atr
+
+        )
+
+
+
+
+
+        lower = (
+
+            hl2
+
+            -
+
+            self.multiplier
+
+            *
+
+            atr
+
+        )
+
+
+
+        trend = []
+
+
+
+        current = "UP"
+
 
 
 
         for i in range(
-            1,
-            len(highs)
+            len(df)
         ):
 
 
-            tr = max(
+            if i == 0:
 
-                highs[i] - lows[i],
 
-                abs(
-                    highs[i]
-                    -
-                    closes[i-1]
-                ),
-
-                abs(
-                    lows[i]
-                    -
-                    closes[i-1]
+                trend.append(
+                    current
                 )
 
+                continue
+
+
+
+
+            if close.iloc[i] > upper.iloc[i-1]:
+
+
+                current = "UP"
+
+
+
+            elif close.iloc[i] < lower.iloc[i-1]:
+
+
+                current = "DOWN"
+
+
+
+
+            trend.append(
+                current
             )
 
 
-            trs.append(
-                tr
-            )
+
+
+        df["supertrend"] = trend
 
 
 
-        period = SUPERTREND_PERIOD
+
+        self.df = df
 
 
-
-        if len(trs) < period:
-
-            return None
-
-
-
-        self.atr = (
-
-            sum(
-                trs[-period:]
-            )
-
-            /
-
-            period
-
-        )
-
-
-        return self.atr
 
 
 
 
 
     # =====================================================
-    # SUPERTREND
-    # =====================================================
-
-    def calculate_supertrend(self):
-
-
-        atr = self.calculate_atr()
-
-
-        if atr is None:
-
-            return None
-
-
-
-        close = self.prices[-1]
-
-
-
-        basic_upper = (
-
-            close
-
-            +
-
-            SUPERTREND_MULTIPLIER
-            *
-            atr
-
-        )
-
-
-
-        basic_lower = (
-
-            close
-
-            -
-
-            SUPERTREND_MULTIPLIER
-            *
-            atr
-
-        )
-
-
-
-        if self.supertrend is None:
-
-
-            self.supertrend = {
-
-                "upper": basic_upper,
-
-                "lower": basic_lower,
-
-                "trend": "UP"
-
-            }
-
-
-            return self.supertrend
-
-
-
-
-        previous = self.supertrend
-
-
-
-        trend = previous["trend"]
-
-
-
-        if close > previous["upper"]:
-
-            trend = "UP"
-
-
-
-        elif close < previous["lower"]:
-
-            trend = "DOWN"
-
-
-
-        self.supertrend = {
-
-
-            "upper":
-                basic_upper,
-
-
-            "lower":
-                basic_lower,
-
-
-            "trend":
-                trend
-
-        }
-
-
-
-        return self.supertrend
-
-
-
-
-
-    # =====================================================
-    # MARKET DATA
+    # GET DATA
     # =====================================================
 
     def get_market_data(
@@ -396,45 +402,80 @@ class IndicatorEngine:
     ):
 
 
-        if self.vwap is None:
+        try:
+
+
+            if len(self.df) == 0:
+
+
+                return None
+
+
+
+
+
+
+            last = self.df.iloc[-1]
+
+
+
+
+
+            vwap = last.get(
+                "vwap"
+            )
+
+
+            trend = last.get(
+                "supertrend"
+            )
+
+
+
+
+
+            if pd.isna(vwap):
+
+
+                return None
+
+
+
+
+
+
+            return {
+
+
+                "vwap":
+
+                    float(vwap),
+
+
+                "supertrend":
+
+                    trend,
+
+
+            }
+
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[MARKET DATA ERROR]",
+                e
+            )
+
 
             return None
 
 
-        if self.supertrend is None:
-
-            return None
-
-
-
-        return {
-
-
-            "close":
-
-                float(
-                    candle["close"]
-                )
-                if candle
-                else None,
-
-
-            "vwap":
-
-                self.vwap,
-
-
-            "supertrend":
-
-                self.supertrend["trend"],
-
-
-            "atr":
-
-                self.atr,
-
-
-        }
 
 
 
