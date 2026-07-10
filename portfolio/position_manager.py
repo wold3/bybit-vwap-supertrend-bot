@@ -3,85 +3,258 @@ import time
 
 class PositionManager:
 
-    def __init__(self):
 
-        # symbol 기준 포지션 저장
-        self.positions = {}
+    def __init__(
 
-    # =================================================
-    # 포지션 오픈
-    # =================================================
-    def open_position(self, symbol, side, qty, entry_price):
+        self,
 
-        self.positions[symbol] = {
-            "symbol": symbol,
-            "side": side,
-            "qty": qty,
-            "entry_price": entry_price,
-            "open_time": time.time(),
-            "unrealized_pnl": 0.0
+        bybit_api
+
+    ):
+
+
+        self.api = bybit_api
+
+
+        self.position = {
+
+            "side": None,
+
+            "size": 0,
+
+            "entry_price": 0,
+
+            "unrealized_pnl": 0,
+
+            "updated": 0
+
         }
 
-    # =================================================
-    # 포지션 업데이트 (PnL 계산)
-    # =================================================
-    def update_price(self, symbol, current_price):
-
-        if symbol not in self.positions:
-            return None
-
-        pos = self.positions[symbol]
-
-        entry = pos["entry_price"]
-        qty = pos["qty"]
-
-        if pos["side"] == "BUY":
-            pnl = (current_price - entry) * qty
-        else:
-            pnl = (entry - current_price) * qty
-
-        pos["unrealized_pnl"] = pnl
-
-        return pnl
-
-    # =================================================
-    # 손절 / 익절 체크
-    # =================================================
-    def check_exit(self, symbol, sl_pct=-0.5, tp_pct=1.0):
-
-        if symbol not in self.positions:
-            return None
-
-        pos = self.positions[symbol]
-
-        entry = pos["entry_price"]
-        pnl_pct = (pos["unrealized_pnl"] / entry) * 100
-
-        # 손절
-        if pnl_pct <= sl_pct:
-            return "STOP_LOSS"
-
-        # 익절
-        if pnl_pct >= tp_pct:
-            return "TAKE_PROFIT"
-
-        return None
-
-    # =================================================
-    # 포지션 종료
-    # =================================================
-    def close_position(self, symbol):
-
-        if symbol in self.positions:
-            del self.positions[symbol]
-
-    # =================================================
-    # 현재 포지션 조회
-    # =================================================
-    def get_position(self, symbol):
-
-        return self.positions.get(symbol, None)
 
 
-# 싱글톤
-position_manager = PositionManager()
+    # =====================================================
+    # SYNC FROM EXCHANGE
+    # =====================================================
+
+    def sync(self):
+
+
+        try:
+
+
+            response = self.api.get_position()
+
+
+
+            if not response:
+
+                return False
+
+
+
+            data = (
+
+                response
+                .get("result", {})
+                .get("list", [])
+
+            )
+
+
+            if not data:
+
+                self.clear()
+
+                return True
+
+
+
+            pos = data[0]
+
+
+
+            size = float(
+
+                pos.get(
+                    "size",
+                    0
+                )
+
+            )
+
+
+
+            if size <= 0:
+
+
+                self.clear()
+
+                return True
+
+
+
+            self.position = {
+
+
+                "side":
+
+                    pos.get(
+                        "side"
+                    ),
+
+
+                "size":
+
+                    size,
+
+
+                "entry_price":
+
+                    float(
+
+                        pos.get(
+                            "avgPrice",
+                            0
+                        )
+
+                    ),
+
+
+                "unrealized_pnl":
+
+                    float(
+
+                        pos.get(
+                            "unrealisedPnl",
+                            0
+                        )
+
+                    ),
+
+
+                "updated":
+
+                    time.time()
+
+            }
+
+
+
+            return True
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[POSITION SYNC ERROR]",
+
+                e
+
+            )
+
+
+            return False
+
+
+
+    # =====================================================
+    # CURRENT POSITION
+    # =====================================================
+
+    def get_position(self):
+
+        return self.position
+
+
+
+    # =====================================================
+    # HAS POSITION
+    # =====================================================
+
+    def has_position(self):
+
+
+        return (
+
+            self.position["size"]
+
+            >
+
+            0
+
+        )
+
+
+
+    # =====================================================
+    # SIDE
+    # =====================================================
+
+    def side(self):
+
+
+        return self.position["side"]
+
+
+
+    # =====================================================
+    # SIZE
+    # =====================================================
+
+    def size(self):
+
+
+        return self.position["size"]
+
+
+
+    # =====================================================
+    # ENTRY PRICE
+    # =====================================================
+
+    def entry_price(self):
+
+
+        return self.position["entry_price"]
+
+
+
+    # =====================================================
+    # CLEAR
+    # =====================================================
+
+    def clear(self):
+
+
+        self.position = {
+
+
+            "side": None,
+
+            "size": 0,
+
+            "entry_price": 0,
+
+            "unrealized_pnl": 0,
+
+            "updated": time.time()
+
+        }
+
+
+
+    # =====================================================
+    # STATUS
+    # =====================================================
+
+    def status(self):
+
+
+        return self.position
+
+
+
+position_manager = None
