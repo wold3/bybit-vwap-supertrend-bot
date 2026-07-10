@@ -1,81 +1,72 @@
 # =====================================================
 # web/server.py
-# Browser Dashboard Server
+# FastAPI Dashboard Server
 # =====================================================
 
-
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-
 import threading
-import uvicorn
-import os
 import time
 
 
 
-from web.chart_data import (
-    get_candles
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+import uvicorn
+
+
+
+from config import (
+    WEB_HOST,
+    WEB_PORT
 )
 
 
 
 
 
-app = FastAPI(
-    title="VWAP SuperTrend BOT Dashboard"
-)
+app = FastAPI()
 
 
 
 
 
 # =====================================================
-# GLOBAL STATUS
+# MEMORY STORE
 # =====================================================
 
 
-STATUS = {
+status = {
 
 
     "bot":
-
         "STOPPED",
 
 
     "symbol":
-
-        "BTCUSDT",
+        "",
 
 
     "price":
-
         0,
 
 
     "vwap":
-
         0,
 
 
     "trend":
+        "NONE",
 
+
+    "volume":
+        False,
+
+
+    "signal":
         "NONE",
 
 
     "position":
-
-        "NONE",
-
-
-    "signal":
-
-        "NONE",
-
-
-    "time":
-
-        0
+        "NONE"
 
 
 }
@@ -84,11 +75,15 @@ STATUS = {
 
 
 
-LOGS = []
+
+
+candles = []
 
 
 
-LOCK = threading.Lock()
+logs = []
+
+
 
 
 
@@ -97,25 +92,112 @@ LOCK = threading.Lock()
 
 
 # =====================================================
-# HOME
+# STATUS UPDATE
+# =====================================================
+
+
+def update_status(data):
+
+
+    status.update(
+
+        data
+
+    )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# LOG
+# =====================================================
+
+
+def add_log(message):
+
+
+    logs.append(
+
+        {
+
+        "time":
+
+            time.strftime(
+
+                "%H:%M:%S"
+
+            ),
+
+
+        "message":
+
+            str(message)
+
+        }
+
+    )
+
+
+    if len(logs) > 200:
+
+
+        logs.pop(0)
+
+
+
+
+
+
+
+
+
+# =====================================================
+# CANDLE
+# =====================================================
+
+
+def add_candle(candle):
+
+
+    candles.append(
+
+        candle
+
+    )
+
+
+    if len(candles) > 300:
+
+
+        candles.pop(0)
+
+
+
+
+
+
+
+
+
+# =====================================================
+# DASHBOARD PAGE
 # =====================================================
 
 
 @app.get(
+
     "/",
+
     response_class=HTMLResponse
+
 )
-def home():
 
-
-    path = os.path.join(
-
-        "web",
-
-        "dashboard.html"
-
-    )
-
+def index():
 
 
     try:
@@ -123,7 +205,7 @@ def home():
 
         with open(
 
-            path,
+            "web/dashboard.html",
 
             "r",
 
@@ -139,17 +221,7 @@ def home():
     except Exception as e:
 
 
-        return f"""
-
-        <h1>
-        Dashboard Error
-        </h1>
-
-        <p>
-        {e}
-        </p>
-
-        """
+        return str(e)
 
 
 
@@ -160,61 +232,16 @@ def home():
 
 
 # =====================================================
-# STATUS API
+# API STATUS
 # =====================================================
 
 
-@app.get(
-    "/api/status"
-)
-def status():
+@app.get("/api/status")
+
+def api_status():
 
 
-    with LOCK:
-
-
-        return STATUS
-
-
-
-
-
-
-
-# =====================================================
-# CHART API
-# =====================================================
-
-
-@app.get(
-    "/api/chart"
-)
-def chart():
-
-
-    return get_candles()
-
-
-
-
-
-
-
-# =====================================================
-# LOG API
-# =====================================================
-
-
-@app.get(
-    "/api/logs"
-)
-def logs():
-
-
-    with LOCK:
-
-
-        return LOGS[-100:]
+    return status
 
 
 
@@ -225,77 +252,16 @@ def logs():
 
 
 # =====================================================
-# UPDATE STATUS
+# API CHART
 # =====================================================
 
 
-def update_status(
-    data
-):
+@app.get("/api/chart")
+
+def api_chart():
 
 
-    with LOCK:
-
-
-        STATUS.update(
-
-            data
-
-        )
-
-
-        STATUS["time"] = int(
-
-            time.time()
-
-        )
-
-
-
-
-
-
-
-# =====================================================
-# ADD LOG
-# =====================================================
-
-
-def add_log(
-    message
-):
-
-
-    with LOCK:
-
-
-        LOGS.append(
-
-            {
-
-            "time":
-
-                time.strftime(
-
-                    "%H:%M:%S"
-
-                ),
-
-
-            "message":
-
-                str(message)
-
-            }
-
-        )
-
-
-
-        if len(LOGS) > 200:
-
-
-            LOGS.pop(0)
+    return candles
 
 
 
@@ -306,42 +272,85 @@ def add_log(
 
 
 # =====================================================
-# DASHBOARD START
+# API LOG
 # =====================================================
+
+
+@app.get("/api/logs")
+
+def api_logs():
+
+
+    return logs
+
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SERVER START
+# =====================================================
+
+
+server_thread = None
+
 
 
 def start_dashboard():
 
 
-    thread = threading.Thread(
+    global server_thread
 
-        target=lambda:
 
-            uvicorn.run(
 
-                app,
+    if server_thread:
 
-                host="0.0.0.0",
 
-                port=8000,
+        return
 
-                log_level="warning"
 
-            ),
 
+
+    def run():
+
+
+        print(
+
+            "[WEB SERVER START]",
+
+            WEB_PORT
+
+        )
+
+
+        uvicorn.run(
+
+            app,
+
+            host=WEB_HOST,
+
+            port=WEB_PORT,
+
+            log_level="warning"
+
+        )
+
+
+
+
+
+    server_thread = threading.Thread(
+
+        target=run,
 
         daemon=True
 
     )
 
 
-
-    thread.start()
-
-
-
-    print(
-
-        "[WEB DASHBOARD READY]"
-
-    )
+    server_thread.start()
