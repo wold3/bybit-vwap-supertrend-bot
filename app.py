@@ -1,3 +1,5 @@
+# app.py
+
 import time
 import threading
 
@@ -33,9 +35,7 @@ class TradingApp:
 
     def __init__(self):
 
-
         self.running = False
-
 
         self.market_thread = None
 
@@ -47,112 +47,144 @@ class TradingApp:
 
     def start(self):
 
-
         print("====================")
         print("[BOT START]")
         print("====================")
 
 
+        try:
 
-        # 1. API TEST
 
-        if not bybit_api.ping():
+            # -----------------------------
+            # API CHECK
+            # -----------------------------
 
-            raise Exception(
-                "BYBIT CONNECTION FAILED"
+            if not bybit_api.ping():
+
+                raise Exception(
+                    "BYBIT CONNECTION FAILED"
+                )
+
+
+
+            # -----------------------------
+            # WALLET
+            # -----------------------------
+
+            wallet = (
+
+                bybit_api
+                .get_wallet_balance()
+
             )
 
 
+            if wallet is None:
 
-        # 2. WALLET
-
-
-        wallet = (
-
-            bybit_api
-            .get_wallet_balance()
-
-        )
-
-
-        if wallet is None:
-
-            raise Exception(
-                "WALLET ERROR"
-            )
+                raise Exception(
+                    "WALLET ERROR"
+                )
 
 
 
-        equity = (
-
-            self.parse_equity(
+            equity = self.parse_equity(
                 wallet
             )
 
-        )
+
+
+            if equity <= 0:
+
+                raise Exception(
+                    "INVALID EQUITY"
+                )
 
 
 
-        # 3. POSITION SYNC
+            # -----------------------------
+            # POSITION RESTORE
+            # -----------------------------
 
-
-        position_manager.sync()
-
-
-
-        # 4. RISK INIT
-
-
-        risk_manager.initialize(
-
-            equity
-
-        )
+            position_manager.sync()
 
 
 
-        # 5. LEVERAGE
+            # -----------------------------
+            # RISK INIT
+            # -----------------------------
 
+            risk_manager.initialize(
 
-        bybit_api.set_leverage()
+                equity
 
-
-
-        # 6. PRIVATE WS
-
-
-        private_ws.start()
-
-
-
-        # 7. WATCHDOG
-
-
-        watchdog.start()
+            )
 
 
 
-        # 8. MARKET DATA
+            # -----------------------------
+            # LEVERAGE
+            # -----------------------------
 
-
-        self.start_market_stream()
-
-
-
-        self.running = True
+            bybit_api.set_leverage()
 
 
 
-        print(
+            # -----------------------------
+            # PRIVATE WS
+            # -----------------------------
 
-            "[BOT READY]"
+            private_ws.start()
 
-        )
+
+
+            # -----------------------------
+            # WATCHDOG
+            # -----------------------------
+
+            watchdog.start()
+
+
+
+            # -----------------------------
+            # START FLAG
+            # -----------------------------
+
+            self.running = True
+
+
+
+            # -----------------------------
+            # MARKET DATA
+            # -----------------------------
+
+            self.start_market_stream()
+
+
+
+            print(
+                "[BOT READY]"
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[START ERROR]",
+                e
+            )
+
+
+            self.stop()
+
+
+            raise
 
 
 
     # =====================================
-    # MARKET EVENT
+    # CANDLE EVENT
     # =====================================
 
     def on_candle(
@@ -161,71 +193,84 @@ class TradingApp:
     ):
 
 
-
         if not self.running:
 
             return
 
 
 
-        signal = (
+        try:
 
-            vwap_supertrend_strategy
-            .analyze(
-                candles
+
+            signal = (
+
+                vwap_supertrend_strategy
+                .analyze(
+                    candles
+                )
+
             )
 
-        )
 
 
+            if signal is None:
 
-        if signal is None:
-
-            return
-
+                return
 
 
-        print(
-
-            "[SIGNAL]",
-
-            signal
-
-        )
-
-
-
-        # EXIT
-
-        if signal["type"] == "EXIT":
-
-
-            order_manager.close_position()
-
-
-
-            return
-
-
-
-        # ENTRY
-
-
-        if not risk_manager.can_trade():
 
             print(
-                "[BLOCKED BY RISK]"
+                "[SIGNAL]",
+                signal
             )
 
-            return
+
+
+            # -------------------------
+            # EXIT
+            # -------------------------
+
+            if signal["type"] == "EXIT":
+
+
+                order_manager.close_position()
+
+
+                return
 
 
 
-        order_manager.execute(
+            # -------------------------
+            # ENTRY
+            # -------------------------
 
-            signal
+            if not risk_manager.can_trade():
 
-        )
+
+                print(
+                    "[RISK BLOCK]"
+                )
+
+
+                return
+
+
+
+            order_manager.execute(
+
+                signal
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[CANDLE ERROR]",
+                e
+            )
 
 
 
@@ -239,35 +284,63 @@ class TradingApp:
         def run():
 
 
-            while True:
+            print(
+                "[MARKET THREAD START]"
+            )
 
 
-                candles = (
-                    bybit_api
-                    .get_kline()
-                )
+            while self.running:
 
 
-                if candles:
+                try:
 
 
-                    self.on_candle(
-                        candles
+                    candles = (
+
+                        bybit_api
+                        .get_kline()
+
                     )
+
+
+                    if candles:
+
+
+                        self.on_candle(
+
+                            candles
+
+                        )
+
+
+
+                except Exception as e:
+
+
+                    print(
+                        "[MARKET LOOP ERROR]",
+                        e
+                    )
+
 
 
                 time.sleep(60)
 
 
 
+            print(
+                "[MARKET THREAD STOP]"
+            )
+
+
+
         self.market_thread = threading.Thread(
 
-            target=run
+            target=run,
+
+            daemon=True
 
         )
-
-
-        self.market_thread.daemon = True
 
 
         self.market_thread.start()
@@ -287,6 +360,21 @@ class TradingApp:
         try:
 
 
+            # New BybitAPI format
+
+            if "equity" in wallet:
+
+
+                return float(
+
+                    wallet["equity"]
+
+                )
+
+
+
+            # fallback old format
+
             return float(
 
                 wallet
@@ -297,10 +385,45 @@ class TradingApp:
             )
 
 
-        except:
+
+        except Exception as e:
+
+
+            print(
+                "[EQUITY PARSE ERROR]",
+                e
+            )
 
 
             return 0
+
+
+
+    # =====================================
+    # HEALTH CHECK
+    # =====================================
+
+    def health_check(self):
+
+
+        try:
+
+
+            if not bybit_api.ping():
+
+                print(
+                    "[HEALTH ERROR] API"
+                )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[HEALTH ERROR]",
+                e
+            )
 
 
 
@@ -322,10 +445,69 @@ class TradingApp:
 
         try:
 
+
+            # 미체결 주문 제거
+
+            bybit_api.cancel_all_orders()
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[CANCEL ERROR]",
+                e
+            )
+
+
+
+        try:
+
+
             private_ws.stop()
+
+
+        except Exception:
+
+
+            pass
+
+
+
+        try:
+
 
             watchdog.stop()
 
-        except:
+
+        except Exception:
+
 
             pass
+
+
+
+        try:
+
+
+            if self.market_thread:
+
+
+                self.market_thread.join(
+
+                    timeout=5
+
+                )
+
+
+        except Exception:
+
+
+            pass
+
+
+
+        print(
+            "[BOT STOPPED]"
+        )
