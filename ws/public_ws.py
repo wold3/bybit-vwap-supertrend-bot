@@ -6,12 +6,16 @@ from pybit.unified_trading import WebSocket
 
 
 from config import (
+
     BYBIT_TESTNET,
+
+    BYBIT_DEMO,
+
     CATEGORY,
+
     DEFAULT_SYMBOL,
+
 )
-
-
 
 
 
@@ -32,10 +36,6 @@ class PublicWS:
 
 
         self.thread = None
-
-
-
-        self.price = 0
 
 
 
@@ -79,7 +79,10 @@ class PublicWS:
 
             if not data:
 
+
                 return
+
+
 
 
 
@@ -94,14 +97,31 @@ class PublicWS:
             )
 
 
-            self.price = close
+            high = float(
+
+                candle["high"]
+
+            )
 
 
+            low = float(
+
+                candle["low"]
+
+            )
 
 
-            print(
-                "[KLINE]",
-                close
+            open_price = float(
+
+                candle["open"]
+
+            )
+
+
+            volume = float(
+
+                candle["volume"]
+
             )
 
 
@@ -110,27 +130,21 @@ class PublicWS:
 
             self.opens.append(
 
-                float(
-                    candle["open"]
-                )
+                open_price
 
             )
 
 
             self.highs.append(
 
-                float(
-                    candle["high"]
-                )
+                high
 
             )
 
 
             self.lows.append(
 
-                float(
-                    candle["low"]
-                )
+                low
 
             )
 
@@ -144,22 +158,21 @@ class PublicWS:
 
             self.volumes.append(
 
-                float(
-                    candle["volume"]
-                )
+                volume
 
             )
 
 
 
 
-            # memory limit
 
-            max_len = 200
+            # 최대 보관
+
+            limit = 200
 
 
 
-            if len(self.closes) > max_len:
+            if len(self.closes) > limit:
 
 
                 self.opens.pop(0)
@@ -171,6 +184,18 @@ class PublicWS:
                 self.closes.pop(0)
 
                 self.volumes.pop(0)
+
+
+
+
+
+            print(
+
+                "[KLINE]",
+
+                close
+
+            )
 
 
 
@@ -201,22 +226,28 @@ class PublicWS:
             testnet=BYBIT_TESTNET,
 
 
-            channel_type=CATEGORY
+            demo=BYBIT_DEMO,
+
+
+            channel_type="linear"
 
         )
+
+
 
 
 
         self.ws.kline_stream(
 
 
-            interval="1",
+            interval=1,
 
 
             symbol=DEFAULT_SYMBOL,
 
 
             callback=self.handle_kline
+
 
         )
 
@@ -253,7 +284,6 @@ class PublicWS:
         while self.running:
 
 
-
             try:
 
 
@@ -270,9 +300,8 @@ class PublicWS:
                 )
 
 
-
                 print(
-                    "[PUBLIC WS RECONNECT] 5 sec"
+                    "[PUBLIC WS RECONNECT] 5 SEC"
                 )
 
 
@@ -326,17 +355,8 @@ class PublicWS:
 
 
     # ======================================
-    # DATA ACCESS
+    # OHLCV
     # ======================================
-
-    def get_price(self):
-
-
-        return self.price
-
-
-
-
 
     def get_ohlcv(self):
 
