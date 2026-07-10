@@ -46,14 +46,12 @@ class PrivateWS:
 
 
 
+
     # ======================================
-    # CALLBACK
+    # MESSAGE HANDLER
     # ======================================
 
-    def handle_message(
-        self,
-        message
-    ):
+    def handle_message(self, message):
 
 
         try:
@@ -71,10 +69,10 @@ class PrivateWS:
                 self.position = message
 
 
+
                 print(
                     "[POSITION UPDATE]"
                 )
-
 
                 print(
                     message
@@ -89,8 +87,13 @@ class PrivateWS:
                 self.orders = message
 
 
+
                 print(
                     "[ORDER UPDATE]"
+                )
+
+                print(
+                    message
                 )
 
 
@@ -102,8 +105,13 @@ class PrivateWS:
                 self.wallet = message
 
 
+
                 print(
                     "[WALLET UPDATE]"
+                )
+
+                print(
+                    message
                 )
 
 
@@ -131,6 +139,7 @@ class PrivateWS:
         try:
 
 
+
             self.running = True
 
 
@@ -138,13 +147,15 @@ class PrivateWS:
 
             self.ws = WebSocket(
 
+
                 testnet=BYBIT_TESTNET,
 
-                demo=BYBIT_DEMO,
 
                 channel_type="private",
 
+
                 api_key=BYBIT_API_KEY,
+
 
                 api_secret=BYBIT_API_SECRET
 
@@ -178,9 +189,11 @@ class PrivateWS:
 
 
 
+
             print(
                 "[PRIVATE WS STARTED]"
             )
+
 
 
 
@@ -189,6 +202,7 @@ class PrivateWS:
 
 
                 time.sleep(1)
+
 
 
 
@@ -215,7 +229,9 @@ class PrivateWS:
 
         thread = threading.Thread(
 
+
             target=self.start,
+
 
             daemon=True
 
@@ -238,6 +254,7 @@ class PrivateWS:
         self.running = False
 
 
+
         print(
             "[PRIVATE WS STOPPED]"
         )
@@ -252,19 +269,20 @@ class PrivateWS:
 
     def get_position(self):
 
-        return self.position
 
+        return self.position
 
 
 
     def get_orders(self):
 
+
         return self.orders
 
 
 
-
     def get_wallet(self):
+
 
         return self.wallet
 
