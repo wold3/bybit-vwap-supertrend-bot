@@ -1,15 +1,20 @@
 import time
 import threading
 
+
 from pybit.unified_trading import WebSocket
+
 
 from config import (
     TESTNET,
     DEFAULT_SYMBOL,
 )
 
+
 from indicators.indicator_engine import indicator_engine
 from strategy.strategy_engine import strategy_engine
+
+
 
 
 
@@ -24,6 +29,8 @@ class WebSocketStream:
 
         self.last_timestamp = None
 
+        self.running = False
+
 
         print("==============================")
         print("[WEBSOCKET STREAM INIT]")
@@ -32,40 +39,73 @@ class WebSocketStream:
         print("==============================")
 
 
+
+
+
     # ==================================
     # START
     # ==================================
 
     def start(self):
 
-        self.ws = WebSocket(
 
-            testnet=TESTNET,
+        if self.running:
 
-            channel_type="linear"
-
-        )
+            return
 
 
-        self.ws.kline(
-
-            interval=5,
-
-            symbol=self.symbol,
-
-            callback=self.callback
-
-        )
+        self.running = True
 
 
-        print(
-            "[STREAM STARTED]"
-        )
+
+        try:
 
 
-        while True:
+            self.ws = WebSocket(
 
-            time.sleep(1)
+                testnet=TESTNET,
+
+                channel_type="linear"
+
+            )
+
+
+
+            self.ws.kline_stream(
+
+                interval=5,
+
+                symbol=self.symbol,
+
+                callback=self.callback
+
+            )
+
+
+
+            print(
+                "[STREAM STARTED]"
+            )
+
+
+
+            while self.running:
+
+
+                time.sleep(1)
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[WEBSOCKET START ERROR]",
+                e
+            )
+
+
+
 
 
 
@@ -78,14 +118,18 @@ class WebSocketStream:
         message
     ):
 
+
         try:
+
 
             if "data" not in message:
 
                 return
 
 
+
             data = message["data"]
+
 
 
             if not data:
@@ -93,10 +137,10 @@ class WebSocketStream:
                 return
 
 
+
             candle_data = data[0]
 
 
-            # 완성 캔들 확인
 
             if not candle_data.get(
                 "confirm",
@@ -107,11 +151,13 @@ class WebSocketStream:
 
 
 
+
             candle = {
 
 
                 "symbol":
                     self.symbol,
+
 
 
                 "timestamp":
@@ -120,10 +166,12 @@ class WebSocketStream:
                     ),
 
 
+
                 "open":
                     float(
                         candle_data["open"]
                     ),
+
 
 
                 "high":
@@ -132,10 +180,12 @@ class WebSocketStream:
                     ),
 
 
+
                 "low":
                     float(
                         candle_data["low"]
                     ),
+
 
 
                 "close":
@@ -144,10 +194,12 @@ class WebSocketStream:
                     ),
 
 
+
                 "volume":
                     float(
                         candle_data["volume"]
                     ),
+
 
 
                 "confirm":
@@ -157,11 +209,13 @@ class WebSocketStream:
 
 
 
-            # 중복 방지
+
+            # 중복 캔들 방지
 
             if candle["timestamp"] == self.last_timestamp:
 
                 return
+
 
 
             self.last_timestamp = candle["timestamp"]
@@ -174,26 +228,46 @@ class WebSocketStream:
             )
 
 
-            # Indicator 업데이트
 
-            indicator_engine.update(
+
+
+            # Indicator
+
+            indicators = indicator_engine.update(
+
                 candle
+
             )
 
 
-            # Strategy 실행
+
+            if not indicators:
+
+                return
+
+
+
+
+
+            # Strategy
 
             signal = strategy_engine.on_candle(
+
                 candle
+
             )
+
 
 
             if signal:
+
 
                 print(
                     "[SIGNAL]",
                     signal
                 )
+
+
 
 
 
@@ -207,11 +281,49 @@ class WebSocketStream:
 
 
 
+
+
+
+
+    # ==================================
+    # STOP
+    # ==================================
+
+    def stop(self):
+
+
+        self.running = False
+
+
+
+        try:
+
+            if self.ws:
+
+                self.ws.exit()
+
+        except Exception:
+
+
+            pass
+
+
+
+        print(
+            "[STREAM STOPPED]"
+        )
+
+
+
+
+
+
     # ==================================
     # THREAD
     # ==================================
 
     def run_thread(self):
+
 
         thread = threading.Thread(
 
@@ -223,6 +335,9 @@ class WebSocketStream:
 
 
         thread.start()
+
+
+
 
 
 
