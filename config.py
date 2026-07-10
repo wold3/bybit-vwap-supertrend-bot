@@ -27,7 +27,7 @@ BYBIT_API_SECRET = os.getenv(
 
 
 # ==================================
-# SERVER
+# BYBIT SERVER
 # ==================================
 
 BYBIT_BASE_URL = os.getenv(
@@ -75,6 +75,7 @@ DEMO = not LIVE_TRADING
 TESTNET = BYBIT_TESTNET
 
 
+
 # ==================================
 # ACCOUNT
 # ==================================
@@ -83,6 +84,7 @@ ACCOUNT_TYPE = os.getenv(
     "ACCOUNT_TYPE",
     "UNIFIED"
 )
+
 
 
 # ==================================
@@ -99,6 +101,7 @@ DEFAULT_SYMBOL = os.getenv(
     "DEFAULT_SYMBOL",
     "BTCUSDT"
 )
+
 
 
 # ==================================
@@ -141,8 +144,9 @@ LEVERAGE = int(
 )
 
 
+
 # ==================================
-# INDICATORS
+# INDICATOR
 # ==================================
 
 VWAP_LENGTH = int(
@@ -169,6 +173,7 @@ SUPERTREND_MULTIPLIER = float(
 )
 
 
+
 # ==================================
 # RISK
 # ==================================
@@ -181,8 +186,9 @@ MAX_POSITION_SIZE = float(
 )
 
 
-# 호환용
+# 호환
 MAX_POSITION = MAX_POSITION_SIZE
+
 
 
 MAX_DAILY_LOSS = float(
@@ -191,6 +197,11 @@ MAX_DAILY_LOSS = float(
         "0.03"
     )
 )
+
+
+# risk_manager.py 사용
+DAILY_LOSS_LIMIT = MAX_DAILY_LOSS
+
 
 
 MAX_LOSS_AMOUNT = float(
@@ -233,6 +244,7 @@ MAX_OPEN_POSITIONS = int(
 )
 
 
+
 # ==================================
 # LOG
 # ==================================
@@ -241,6 +253,7 @@ LOG_LEVEL = os.getenv(
     "LOG_LEVEL",
     "INFO"
 )
+
 
 
 # ==================================
