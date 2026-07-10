@@ -1,5 +1,5 @@
 import time
-
+from datetime import datetime
 
 from config import (
     MAX_DAILY_LOSS_PERCENT,
@@ -7,91 +7,72 @@ from config import (
 )
 
 
-
-
-
-# ==========================================
-# RISK MANAGER
-# ==========================================
-
 class RiskManager:
 
 
     def __init__(self):
 
+        self.start_equity = 0.0
 
-        self.start_equity = 0
+        self.current_equity = 0.0
 
-
-        self.current_equity = 0
-
+        self.highest_equity = 0.0
 
         self.initialized = False
 
 
         self.daily_loss_limit = (
-
             MAX_DAILY_LOSS_PERCENT
-
         )
 
 
-
-        print("==============================")
-        print("[RISK MANAGER INIT]")
-        print(
-            "MAX DAILY LOSS :",
-            self.daily_loss_limit,
-            "%"
-        )
-        print("==============================")
+        self.max_drawdown_percent = 15.0
 
 
+        self.risk_per_trade = 0.01
+
+
+        self.consecutive_losses = 0
+
+
+        self.max_consecutive_losses = 5
+
+
+        self.kill_switch = False
+
+
+        self.daily_reset_time = datetime.now().date()
 
 
 
-    # ======================================
+    # =====================================================
     # INITIALIZE
-    # ======================================
+    # =====================================================
 
     def initialize(self, equity):
 
-
         try:
 
+            equity = float(equity)
 
-            self.start_equity = float(
+            self.start_equity = equity
 
-                equity
+            self.current_equity = equity
 
-            )
-
-
-            self.current_equity = float(
-
-                equity
-
-            )
-
+            self.highest_equity = equity
 
             self.initialized = True
 
+            self.kill_switch = False
 
 
-            print("==============================")
-            print("[RISK INITIALIZED]")
             print(
-                "START EQUITY :",
-                self.start_equity
+                "[RISK INITIALIZED]",
+                equity
             )
-            print("==============================")
-
-
-
 
 
         except Exception as e:
-
 
             print(
                 "[RISK INIT ERROR]",
@@ -100,122 +81,198 @@ class RiskManager:
 
 
 
-
-
-    # ======================================
+    # =====================================================
     # UPDATE EQUITY
-    # ======================================
+    # =====================================================
 
     def update_equity(self, equity):
 
-
         try:
 
+            self.current_equity = float(equity)
 
-            self.current_equity = float(
 
-                equity
+            if (
+                self.current_equity
+                >
+                self.highest_equity
+            ):
 
-            )
-
+                self.highest_equity = (
+                    self.current_equity
+                )
 
 
         except:
-
 
             pass
 
 
 
+    # =====================================================
+    # DAILY RESET
+    # =====================================================
+
+    def reset_daily(self):
+
+        today = datetime.now().date()
 
 
-    # ======================================
-    # LOSS PERCENT
-    # ======================================
+        if today != self.daily_reset_time:
+
+
+            self.start_equity = (
+                self.current_equity
+            )
+
+
+            self.daily_reset_time = today
+
+
+            self.consecutive_losses = 0
+
+
+            self.kill_switch = False
+
+
+            print(
+                "[RISK DAILY RESET]"
+            )
+
+
+
+    # =====================================================
+    # LOSS %
+    # =====================================================
 
     def loss_percent(self):
 
 
         if self.start_equity <= 0:
 
-
             return 0
-
-
-
-
-        loss = (
-
-            self.start_equity
-
-            -
-
-            self.current_equity
-
-        )
-
 
 
         return (
 
-            loss
-
+            (
+                self.start_equity
+                -
+                self.current_equity
+            )
             /
-
             self.start_equity
 
         ) * 100
 
 
 
+    # =====================================================
+    # DRAWDOWN
+    # =====================================================
+
+    def drawdown_percent(self):
 
 
-    # ======================================
-    # TRADE CHECK
-    # ======================================
+        if self.highest_equity <= 0:
+
+            return 0
+
+
+        return (
+
+            (
+                self.highest_equity
+                -
+                self.current_equity
+            )
+            /
+            self.highest_equity
+
+        ) * 100
+
+
+
+    # =====================================================
+    # TRADE PERMISSION
+    # =====================================================
 
     def can_trade(self):
 
 
+        self.reset_daily()
+
+
+
         if not self.initialized:
 
+            return False
+
+
+
+        if self.kill_switch:
 
             print(
-                "[RISK BLOCK] NOT INITIALIZED"
+                "[RISK BLOCK] KILL SWITCH"
             )
-
 
             return False
 
 
 
+        if (
+
+            self.loss_percent()
+            >=
+            self.daily_loss_limit
+
+        ):
 
 
-        loss = self.loss_percent()
+            self.activate_kill_switch(
 
+                "DAILY LOSS LIMIT"
 
-
-
-
-        if loss >= self.daily_loss_limit:
-
-
-
-            print(
-                "[RISK BLOCK]"
             )
-
-
-            print(
-                "LOSS :",
-                round(loss,2),
-                "%"
-            )
-
 
             return False
 
 
+
+        if (
+
+            self.drawdown_percent()
+            >=
+            self.max_drawdown_percent
+
+        ):
+
+
+            self.activate_kill_switch(
+
+                "MAX DRAWDOWN"
+
+            )
+
+            return False
+
+
+
+        if (
+
+            self.consecutive_losses
+            >=
+            self.max_consecutive_losses
+
+        ):
+
+
+            print(
+                "[RISK BLOCK] LOSS STREAK"
+            )
+
+
+            return False
 
 
 
@@ -223,65 +280,119 @@ class RiskManager:
 
 
 
+    # =====================================================
+    # POSITION SIZE
+    # =====================================================
 
-
-    # ======================================
-    # POSITION SIZE CHECK
-    # ======================================
-
-    def check_position_size(
+    def calculate_position_size(
 
         self,
 
-        qty
+        entry_price,
+
+        stop_price
 
     ):
 
 
-        try:
+        if self.current_equity <= 0:
 
-
-            qty = float(qty)
-
-
-
-            if qty > MAX_POSITION_SIZE:
-
-
-                print(
-                    "[RISK BLOCK] POSITION SIZE"
-                )
-
-
-                return False
+            return 0
 
 
 
+        risk_amount = (
 
-            return True
+            self.current_equity
 
+            *
 
+            self.risk_per_trade
 
-
-
-        except Exception as e:
-
-
-            print(
-                "[POSITION SIZE ERROR]",
-                e
-            )
-
-
-            return False
+        )
 
 
 
+        distance = abs(
+
+            entry_price
+            -
+            stop_price
+
+        )
 
 
-    # ======================================
+
+        if distance <= 0:
+
+            return 0
+
+
+
+        qty = (
+
+            risk_amount
+            /
+            distance
+
+        )
+
+
+
+        if qty > MAX_POSITION_SIZE:
+
+            qty = MAX_POSITION_SIZE
+
+
+
+        return round(
+
+            qty,
+
+            6
+
+        )
+
+
+
+    # =====================================================
+    # RECORD RESULT
+    # =====================================================
+
+    def record_trade(self, pnl):
+
+
+        if pnl < 0:
+
+            self.consecutive_losses += 1
+
+
+        else:
+
+            self.consecutive_losses = 0
+
+
+
+    # =====================================================
+    # KILL SWITCH
+    # =====================================================
+
+    def activate_kill_switch(self, reason):
+
+
+        self.kill_switch = True
+
+
+        print(
+            "[KILL SWITCH]",
+            reason
+        )
+
+
+
+    # =====================================================
     # STATUS
-    # ======================================
+    # =====================================================
 
     def status(self):
 
@@ -289,19 +400,29 @@ class RiskManager:
         return {
 
 
-            "start_equity":
-
-                self.start_equity,
-
-
-            "current_equity":
+            "equity":
 
                 self.current_equity,
 
 
-            "loss_percent":
+            "daily_loss":
 
                 self.loss_percent(),
+
+
+            "drawdown":
+
+                self.drawdown_percent(),
+
+
+            "loss_streak":
+
+                self.consecutive_losses,
+
+
+            "kill":
+
+                self.kill_switch,
 
 
             "can_trade":
@@ -311,11 +432,5 @@ class RiskManager:
         }
 
 
-
-
-
-# ==========================================
-# SINGLETON
-# ==========================================
 
 risk_manager = RiskManager()
