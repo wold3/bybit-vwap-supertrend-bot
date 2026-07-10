@@ -1,10 +1,8 @@
-import numpy as np
-
 from config import (
-    CATEGORY,
-    DEFAULT_SYMBOL,
     TAKE_PROFIT_PERCENT,
     STOP_LOSS_PERCENT,
+    CATEGORY,
+    DEFAULT_SYMBOL,
 )
 
 
@@ -18,6 +16,7 @@ class PositionManager:
 
     def __init__(self):
 
+
         print("==============================")
         print("[POSITION MANAGER INIT]")
         print("CATEGORY :", CATEGORY)
@@ -25,226 +24,13 @@ class PositionManager:
         print("==============================")
 
 
-    # ======================================
-    # TP / SL PRICE
-    # ======================================
-
-    def calculate_exit_price(
-        self,
-        entry_price,
-        side
-    ):
-
-
-        try:
-
-
-            entry_price = float(
-                entry_price
-            )
-
-
-
-            if side == "Buy":
-
-
-                tp = entry_price * (
-
-                    1
-                    +
-                    TAKE_PROFIT_PERCENT / 100
-
-                )
-
-
-                sl = entry_price * (
-
-                    1
-                    -
-                    STOP_LOSS_PERCENT / 100
-
-                )
-
-
-
-            elif side == "Sell":
-
-
-                tp = entry_price * (
-
-                    1
-                    -
-                    TAKE_PROFIT_PERCENT / 100
-
-                )
-
-
-                sl = entry_price * (
-
-                    1
-                    +
-                    STOP_LOSS_PERCENT / 100
-
-                )
-
-
-            else:
-
-                return None, None
-
-
-
-            return tp, sl
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[EXIT PRICE ERROR]",
-                e
-            )
-
-
-            return None, None
+        self.position = None
 
 
 
 
     # ======================================
-    # ATR LEVEL
-    # ======================================
-
-    def calc_atr_levels(
-        self,
-        prices,
-        period=20,
-        multiplier=2
-    ):
-
-
-        if len(prices) < period:
-
-            return None, None
-
-
-
-        high = max(
-            prices[-period:]
-        )
-
-
-        low = min(
-            prices[-period:]
-        )
-
-
-        atr = (
-
-            high - low
-
-        ) / period
-
-
-
-        return (
-
-            atr * multiplier,
-
-            atr * multiplier
-
-        )
-
-
-
-
-    # ======================================
-    # STOP LOSS CHECK
-    # ======================================
-
-    def should_stop_loss(
-        self,
-        entry_price,
-        current_price,
-        side,
-        sl
-    ):
-
-
-        if side == "Buy":
-
-            return (
-
-                current_price
-                <=
-                entry_price - sl
-
-            )
-
-
-
-        if side == "Sell":
-
-            return (
-
-                current_price
-                >=
-                entry_price + sl
-
-            )
-
-
-
-        return False
-
-
-
-
-    # ======================================
-    # TAKE PROFIT CHECK
-    # ======================================
-
-    def should_take_profit(
-        self,
-        entry_price,
-        current_price,
-        side,
-        tp
-    ):
-
-
-        if side == "Buy":
-
-            return (
-
-                current_price
-                >=
-                entry_price + tp
-
-            )
-
-
-
-        if side == "Sell":
-
-            return (
-
-                current_price
-                <=
-                entry_price - tp
-
-            )
-
-
-
-        return False
-
-
-
-
-    # ======================================
-    # EXIT SIGNAL
+    # EXIT CHECK
     # ======================================
 
     def evaluate_exit(
@@ -258,56 +44,155 @@ class PositionManager:
         try:
 
 
-            current_price = prices[-1]
-
-
-
-            tp, sl = self.calc_atr_levels(
-
-                prices
-
-            )
-
-
-
-            if tp is None:
+            if not prices:
 
                 return None
 
 
 
-            if self.should_stop_loss(
+            current_price = float(
 
-                entry_price,
+                prices[-1]
 
-                current_price,
-
-                side,
-
-                sl
-
-            ):
-
-
-                return "STOP_LOSS"
+            )
 
 
 
+            entry_price = float(
 
-            if self.should_take_profit(
+                entry_price
 
-                entry_price,
-
-                current_price,
-
-                side,
-
-                tp
-
-            ):
+            )
 
 
-                return "TAKE_PROFIT"
+
+
+            # ==============================
+            # LONG POSITION
+            # ==============================
+
+            if side == "Buy":
+
+
+                profit_price = (
+
+                    entry_price
+
+                    *
+
+                    (
+
+                        1
+
+                        +
+
+                        TAKE_PROFIT_PERCENT / 100
+
+                    )
+
+                )
+
+
+
+                stop_price = (
+
+                    entry_price
+
+                    *
+
+                    (
+
+                        1
+
+                        -
+
+                        STOP_LOSS_PERCENT / 100
+
+                    )
+
+                )
+
+
+
+
+                if current_price >= profit_price:
+
+
+                    return "TAKE_PROFIT"
+
+
+
+
+                if current_price <= stop_price:
+
+
+                    return "STOP_LOSS"
+
+
+
+
+
+            # ==============================
+            # SHORT POSITION
+            # ==============================
+
+            elif side == "Sell":
+
+
+
+                profit_price = (
+
+                    entry_price
+
+                    *
+
+                    (
+
+                        1
+
+                        -
+
+                        TAKE_PROFIT_PERCENT / 100
+
+                    )
+
+                )
+
+
+
+                stop_price = (
+
+                    entry_price
+
+                    *
+
+                    (
+
+                        1
+
+                        +
+
+                        STOP_LOSS_PERCENT / 100
+
+                    )
+
+                )
+
+
+
+
+                if current_price <= profit_price:
+
+
+                    return "TAKE_PROFIT"
+
+
+
+
+                if current_price >= stop_price:
+
+
+                    return "STOP_LOSS"
 
 
 
@@ -321,12 +206,41 @@ class PositionManager:
 
 
             print(
-                "[EXIT ERROR]",
+                "[POSITION MANAGER ERROR]",
                 e
             )
 
 
             return None
+
+
+
+
+
+    # ======================================
+    # UPDATE POSITION
+    # ======================================
+
+    def update(
+        self,
+        position
+    ):
+
+
+        self.position = position
+
+
+
+
+
+    # ======================================
+    # GET POSITION
+    # ======================================
+
+    def get_position(self):
+
+        return self.position
+
 
 
 
