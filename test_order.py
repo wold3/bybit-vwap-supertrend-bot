@@ -6,26 +6,34 @@ print("DEMO ORDER TEST")
 print("==============================")
 
 
-# 현재 레버리지 확인
-bybit_api.set_leverage()
+price = bybit_api.get_price()
+
+print(
+    "CURRENT PRICE :",
+    price
+)
+
+
+tp = price * 1.01
+
+sl = price * 0.995
 
 
 
-# BUY 테스트
 result = bybit_api.create_order(
 
-    "Buy",
+    side="Buy",
 
-    "0.001"
+    qty=0.001,
+
+    take_profit=tp,
+
+    stop_loss=sl
 
 )
 
 
 
 print("==============================")
-
-print("RESULT")
-
 print(result)
-
 print("==============================")
