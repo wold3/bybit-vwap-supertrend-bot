@@ -1,6 +1,10 @@
 import time
-import signal
-import sys
+import signal as os_signal
+
+
+from config import (
+    DEFAULT_SYMBOL,
+)
 
 
 from api.bybit_api import bybit_api
@@ -11,22 +15,18 @@ from execution.order_manager import order_manager
 
 from execution.position_manager import position_manager
 
-from signal.vwap_supertrend import vwap_supertrend
+
+from signals.vwap_supertrend import signal_engine
+
 
 from websocket.public_ws import public_ws
 
 from websocket.private_ws import private_ws
 
 
-from config import (
-    DEFAULT_SYMBOL,
-    ORDER_COOLDOWN,
-)
-
-
 
 # ==========================================
-# BOT MAIN
+# BOT APPLICATION
 # ==========================================
 
 class TradingBot:
@@ -35,13 +35,12 @@ class TradingBot:
     def __init__(self):
 
 
-        self.running = False
-
-
         print("==============================")
         print("[APP INIT]")
         print("==============================")
 
+
+        self.running = True
 
 
 
@@ -52,12 +51,13 @@ class TradingBot:
     def start(self):
 
 
-        print("==============================")
+        print("====================================")
         print("VWAP SUPERTREND BOT START")
-        print("==============================")
+        print("====================================")
 
 
-        # Risk 초기화
+
+        # risk initialize
 
         try:
 
@@ -73,35 +73,27 @@ class TradingBot:
 
 
 
-        # Websocket 시작
+        # websocket start
 
 
-        public_ws.run_thread()
+        try:
+
+            public_ws.run_thread()
+
+            private_ws.run_thread()
 
 
-        private_ws.run_thread()
+        except Exception as e:
 
-
-
-        self.running = True
+            print(
+                "[WS ERROR]",
+                e
+            )
 
 
 
         print("[BOT RUNNING]")
 
-
-
-        self.loop()
-
-
-
-
-
-    # ======================================
-    # MAIN LOOP
-    # ======================================
-
-    def loop(self):
 
 
         while self.running:
@@ -110,63 +102,7 @@ class TradingBot:
             try:
 
 
-
-                candles = public_ws.get_candles()
-
-
-
-                if len(candles) < 30:
-
-
-                    time.sleep(1)
-
-                    continue
-
-
-
-
-                signal = vwap_supertrend.generate_signal(
-
-                    candles
-
-                )
-
-
-
-                print(
-
-                    "[SIGNAL]",
-
-                    signal
-
-                )
-
-
-
-
-                # BUY
-
-                if signal == "BUY":
-
-
-                    order_manager.buy()
-
-
-
-                # SELL
-
-                elif signal == "SELL":
-
-
-                    order_manager.sell()
-
-
-
-
-
-                time.sleep(
-                    ORDER_COOLDOWN
-                )
+                self.loop()
 
 
 
@@ -174,17 +110,71 @@ class TradingBot:
 
 
                 print(
-
-                    "[BOT LOOP ERROR]",
-
+                    "[MAIN LOOP ERROR]",
                     e
-
                 )
 
 
-                time.sleep(5)
+
+            time.sleep(1)
 
 
+
+    # ======================================
+    # MAIN LOOP
+    # ======================================
+
+
+    def loop(self):
+
+
+        candles = public_ws.get_candles()
+
+
+
+        if candles is None:
+
+
+            return
+
+
+
+        result = signal_engine.check_signal(
+
+            candles
+
+        )
+
+
+
+        if result is None:
+
+
+            return
+
+
+
+        print("==============================")
+
+        print("[SIGNAL]")
+
+        print(result)
+
+        print("==============================")
+
+
+
+        if result == "BUY":
+
+
+            order_manager.buy()
+
+
+
+        elif result == "SELL":
+
+
+            order_manager.sell()
 
 
 
@@ -194,22 +184,27 @@ class TradingBot:
     # STOP
     # ======================================
 
+
     def stop(self):
 
 
-        print()
-
         print("[BOT STOPPING]")
-
 
 
         self.running = False
 
 
 
-        public_ws.stop()
+        try:
 
-        private_ws.stop()
+            public_ws.stop()
+
+            private_ws.stop()
+
+
+        except:
+
+            pass
 
 
 
@@ -219,53 +214,56 @@ class TradingBot:
 
 
 
-
-
 # ==========================================
-# CTRL+C
+# GLOBAL BOT
 # ==========================================
+
 
 bot = TradingBot()
 
 
 
-def shutdown(
-    sig,
-    frame
+# ==========================================
+# SYSTEM SIGNAL
+# ==========================================
+
+
+def shutdown_handler(
+
+        signum,
+
+        frame
+
 ):
 
 
     bot.stop()
 
-    sys.exit(0)
 
 
+os_signal.signal(
 
-signal.signal(
+    os_signal.SIGINT,
 
-    signal.SIGINT,
-
-    shutdown
+    shutdown_handler
 
 )
 
 
+os_signal.signal(
 
-signal.signal(
+    os_signal.SIGTERM,
 
-    signal.SIGTERM,
-
-    shutdown
+    shutdown_handler
 
 )
-
-
 
 
 
 # ==========================================
 # RUN
 # ==========================================
+
 
 if __name__ == "__main__":
 
