@@ -1,119 +1,315 @@
+# config.py
+
+
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
 
 # ==================================================
-# MODE
+# BYBIT API
 # ==================================================
 
-BYBIT_DEMO = True
-BYBIT_TESTNET = False
-LIVE = False
+BYBIT_API_KEY = os.getenv(
+    "BYBIT_API_KEY",
+    ""
+)
 
-DEMO = BYBIT_DEMO
 
-# ==================================================
-# API
-# ==================================================
+BYBIT_API_SECRET = os.getenv(
+    "BYBIT_API_SECRET",
+    ""
+)
 
-BYBIT_API_KEY = os.getenv("BYBIT_API_KEY", "")
-BYBIT_API_SECRET = os.getenv("BYBIT_API_SECRET", "")
+
+
+# True  = Testnet
+# False = Real Trading
+
+BYBIT_TESTNET = True
+
+
+
+# Demo Trading Account
+
+BYBIT_DEMO = False
+
+
+
+# API URL 표시용
+
+BYBIT_BASE_URL = (
+
+    "https://api-testnet.bybit.com"
+
+    if BYBIT_TESTNET
+
+    else
+
+    "https://api.bybit.com"
+
+)
+
+
 
 # ==================================================
 # ACCOUNT
 # ==================================================
 
-ACCOUNT = "UNIFIED"
-ACCOUNT_TYPE = ACCOUNT
+ACCOUNT_TYPE = "UNIFIED"
+
+
 
 CATEGORY = "linear"
 
-SYMBOL = "BTCUSDT"
-DEFAULT_SYMBOL = SYMBOL
 
-# ==================================================
-# REST URL
-# ==================================================
 
-if BYBIT_DEMO:
-    REST_URL = "https://api-demo.bybit.com"
-elif BYBIT_TESTNET:
-    REST_URL = "https://api-testnet.bybit.com"
-else:
-    REST_URL = "https://api.bybit.com"
+DEFAULT_SYMBOL = "BTCUSDT"
 
-BYBIT_BASE_URL = REST_URL
 
-# ==================================================
-# WEBSOCKET
-# ==================================================
-
-PUBLIC_WS = "wss://stream.bybit.com/v5/public"
-
-if BYBIT_DEMO:
-    PRIVATE_WS = "wss://stream-demo.bybit.com/v5/private"
-elif BYBIT_TESTNET:
-    PRIVATE_WS = "wss://stream-testnet.bybit.com/v5/private"
-else:
-    PRIVATE_WS = "wss://stream.bybit.com/v5/private"
 
 # ==================================================
 # ORDER
 # ==================================================
 
-QTY = 0.001
-DEFAULT_QTY = QTY
-
-LEVERAGE = 3
-
 ORDER_TYPE = "Market"
-TIME_IN_FORCE = "GTC"
+
+
+
+TIME_IN_FORCE = "IOC"
+
+
+
+DEFAULT_QTY = 0.001
+
+
+
+LEVERAGE = 5
+
+
+
+
+# ==================================================
+# POSITION
+# ==================================================
+
+MAX_POSITION_SIZE = 0.01
+
+
+
+# One Way Mode
+
+POSITION_MODE = "ONE_WAY"
+
+
+
+
+# ==================================================
+# RISK MANAGEMENT
+# ==================================================
+
+# 하루 최대 손실 %
+
+MAX_DAILY_LOSS_PERCENT = 5
+
+
+
+# 최대 전체 Drawdown %
+
+MAX_DRAWDOWN_PERCENT = 15
+
+
+
+# 한번 거래 위험 %
+
+RISK_PER_TRADE_PERCENT = 1
+
+
+
+# 최대 동시 포지션
+
+MAX_OPEN_POSITION = 1
+
+
+
+# 연속 손실 제한
+
+MAX_LOSS_STREAK = 5
+
+
+
+# 주문 쿨다운 초
 
 ORDER_COOLDOWN = 60
+
+
+
 
 # ==================================================
 # STRATEGY
 # ==================================================
 
-VWAP_LENGTH = 20
 
-SUPERTREND_PERIOD = 5
-SUPERTREND_MULTIPLIER = 2.0
+# SuperTrend
+
+ST_LENGTH = 14
+
+
+ST_MULTIPLIER = 3.0
+
+
+
+# ATR
+
+ATR_PERIOD = 14
+
+
+
+# VWAP
+
+VWAP_ENABLED = True
+
+
+
 
 # ==================================================
-# POSITION / EXIT
+# TP / SL
 # ==================================================
 
-TAKE_PROFIT_PERCENT = 1.0
-STOP_LOSS_PERCENT = 0.5
+
+# 기본값
+
+TAKE_PROFIT_PERCENT = 2.0
+
+
+STOP_LOSS_PERCENT = 1.0
+
+
+
+# ATR 기반 사용
+
+USE_ATR_STOP = True
+
+
+ATR_STOP_MULTIPLIER = 2.0
+
+
+ATR_TP_MULTIPLIER = 3.0
+
+
+
+
+# Trailing Stop
+
+USE_TRAILING_STOP = True
+
+
+TRAILING_PERCENT = 0.5
+
+
+
 
 # ==================================================
-# RISK
+# MARKET FILTER
 # ==================================================
 
-MAX_POSITION_SIZE = 0.01
-MAX_DAILY_LOSS_PERCENT = 5.0
+
+# 거래량 필터
+
+USE_VOLUME_FILTER = True
+
+
+
+MIN_VOLUME_MULTIPLIER = 1.2
+
+
+
+# 변동성 필터
+
+USE_VOLATILITY_FILTER = True
+
+
+
+MAX_ATR_MULTIPLIER = 3
+
+
+
 
 # ==================================================
-# LOG
+# WEBSOCKET
 # ==================================================
 
-print("==============================")
-print("[CONFIG LOADED]")
-print("DEMO :", DEMO)
-print("BYBIT_DEMO :", BYBIT_DEMO)
-print("TESTNET :", BYBIT_TESTNET)
-print("LIVE :", LIVE)
-print("ACCOUNT :", ACCOUNT_TYPE)
-print("CATEGORY :", CATEGORY)
-print("SYMBOL :", DEFAULT_SYMBOL)
-print("QTY :", DEFAULT_QTY)
-print("LEVERAGE :", LEVERAGE)
-print("ORDER COOLDOWN :", ORDER_COOLDOWN)
-print("VWAP :", VWAP_LENGTH)
-print("SUPERTREND :", SUPERTREND_PERIOD, SUPERTREND_MULTIPLIER)
-print("REST :", BYBIT_BASE_URL)
-print("PUBLIC WS :", PUBLIC_WS)
-print("PRIVATE WS :", PRIVATE_WS)
-print("==============================")
+WS_RECONNECT_DELAY = 5
+
+
+WS_HEARTBEAT = 30
+
+
+
+
+# ==================================================
+# WATCHDOG
+# ==================================================
+
+WATCHDOG_INTERVAL = 30
+
+
+
+MAX_API_ERROR = 5
+
+
+
+
+# ==================================================
+# DATABASE
+# ==================================================
+
+DATABASE_PATH = "bot.db"
+
+
+
+
+# ==================================================
+# TELEGRAM
+# ==================================================
+
+TELEGRAM_TOKEN = os.getenv(
+
+    "TELEGRAM_TOKEN",
+
+    ""
+
+)
+
+
+
+TELEGRAM_CHAT_ID = os.getenv(
+
+    "TELEGRAM_CHAT_ID",
+
+    ""
+
+)
+
+
+
+
+# ==================================================
+# LOGGING
+# ==================================================
+
+LOG_LEVEL = "INFO"
+
+
+LOG_FILE = "bot.log"
+
+
+
+
+# ==================================================
+# SYSTEM
+# ==================================================
+
+DEBUG = True
+
+
+
+TIMEZONE = "UTC"
