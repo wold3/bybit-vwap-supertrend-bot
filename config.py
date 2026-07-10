@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 
 
@@ -7,15 +6,9 @@ from dotenv import load_dotenv
 # LOAD ENV
 # ==================================
 
-BASE_DIR = Path(__file__).resolve().parent
-
-ENV_PATH = BASE_DIR / ".env"
-
 load_dotenv(
-    ENV_PATH,
     override=True
 )
-
 
 
 # ==================================
@@ -32,7 +25,6 @@ BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
     ""
 )
-
 
 
 # ==================================
@@ -57,7 +49,6 @@ BYBIT_PRIVATE_WS = os.getenv(
 )
 
 
-
 # ==================================
 # MODE
 # ==================================
@@ -80,13 +71,9 @@ BYBIT_TESTNET = (
 )
 
 
-# Demo Trading
-
 DEMO = not LIVE_TRADING
 
-
 TESTNET = BYBIT_TESTNET
-
 
 
 # ==================================
@@ -99,6 +86,15 @@ ACCOUNT_TYPE = os.getenv(
 )
 
 
+# ==================================
+# TRADING CATEGORY
+# ==================================
+
+CATEGORY = os.getenv(
+    "CATEGORY",
+    "linear"
+)
+
 
 # ==================================
 # SYMBOL
@@ -108,18 +104,6 @@ DEFAULT_SYMBOL = os.getenv(
     "DEFAULT_SYMBOL",
     "BTCUSDT"
 )
-
-
-
-# ==================================
-# BYBIT CATEGORY
-# ==================================
-
-CATEGORY = os.getenv(
-    "CATEGORY",
-    "linear"
-)
-
 
 
 # ==================================
@@ -133,6 +117,33 @@ ORDER_RETRY = int(
     )
 )
 
+
+DEFAULT_QTY = float(
+    os.getenv(
+        "DEFAULT_QTY",
+        "0.001"
+    )
+)
+
+
+ORDER_TYPE = os.getenv(
+    "ORDER_TYPE",
+    "Market"
+)
+
+
+TIME_IN_FORCE = os.getenv(
+    "TIME_IN_FORCE",
+    "GTC"
+)
+
+
+LEVERAGE = int(
+    os.getenv(
+        "LEVERAGE",
+        "3"
+    )
+)
 
 
 # ==================================
@@ -158,10 +169,29 @@ SUPERTREND_PERIOD = int(
 SUPERTREND_MULTIPLIER = float(
     os.getenv(
         "SUPERTREND_MULTIPLIER",
-        "3"
+        "3.0"
     )
 )
 
+
+# ==================================
+# RISK
+# ==================================
+
+MAX_POSITION = float(
+    os.getenv(
+        "MAX_POSITION",
+        "0.001"
+    )
+)
+
+
+MAX_DAILY_LOSS = float(
+    os.getenv(
+        "MAX_DAILY_LOSS",
+        "0.03"
+    )
+)
 
 
 # ==================================
@@ -176,7 +206,7 @@ LOG_LEVEL = os.getenv(
 
 
 # ==================================
-# STATUS
+# PRINT STATUS
 # ==================================
 
 print("==============================")
@@ -187,6 +217,8 @@ print("LIVE :", LIVE_TRADING)
 print("ACCOUNT :", ACCOUNT_TYPE)
 print("CATEGORY :", CATEGORY)
 print("SYMBOL :", DEFAULT_SYMBOL)
+print("QTY :", DEFAULT_QTY)
+print("LEVERAGE :", LEVERAGE)
 print("REST :", BYBIT_BASE_URL)
 print("PUBLIC WS :", BYBIT_PUBLIC_WS)
 print("PRIVATE WS :", BYBIT_PRIVATE_WS)
