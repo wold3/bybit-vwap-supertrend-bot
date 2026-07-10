@@ -1,6 +1,6 @@
 # =====================================================
 # indicators/indicator_engine.py
-# VWAP + SuperTrend Indicator Engine
+# VWAP + SuperTrend Engine
 # =====================================================
 
 import math
@@ -45,7 +45,7 @@ class IndicatorEngine:
 
 
     # =====================================================
-    # UPDATE
+    # UPDATE CANDLE
     # =====================================================
 
     def update(
@@ -54,29 +54,121 @@ class IndicatorEngine:
     ):
 
 
-        self.candles.append(
-
-            candle
-
-        )
+        try:
 
 
-        if len(self.candles) > 500:
+            self.candles.append(
 
+                candle
 
-            self.candles.pop(0)
+            )
 
 
 
-        self.last_market = (
+            if len(self.candles) > 300:
 
-            self.calculate()
 
-        )
+                self.candles.pop(0)
 
+
+
+
+
+            self.last_market = (
+
+                self.calculate()
+
+            )
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[INDICATOR UPDATE ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+    # =====================================================
+    # MARKET DATA
+    # =====================================================
+
+    def get_market_data(self):
 
 
         return self.last_market
+
+
+
+
+
+
+
+    # =====================================================
+    # CALCULATE
+    # =====================================================
+
+    def calculate(self):
+
+
+        if len(self.candles) < ATR_PERIOD + 5:
+
+
+            return None
+
+
+
+
+
+        vwap = self.calculate_vwap()
+
+
+
+        atr = self.calculate_atr()
+
+
+
+        trend = self.calculate_supertrend(
+
+            atr
+
+        )
+
+
+
+        return {
+
+
+            "vwap":
+
+            vwap,
+
+
+            "atr":
+
+            atr,
+
+
+            "supertrend":
+
+            trend
+
+
+        }
+
 
 
 
@@ -91,10 +183,11 @@ class IndicatorEngine:
     def calculate_vwap(self):
 
 
+        total_price_volume = 0
+
+
         total_volume = 0
 
-
-        total_price_volume = 0
 
 
 
@@ -104,33 +197,45 @@ class IndicatorEngine:
 
             price = (
 
-                c["high"]
+                (
 
-                +
+                    c["high"]
 
-                c["low"]
+                    +
 
-                +
+                    c["low"]
 
-                c["close"]
+                    +
 
-            ) / 3
+                    c["close"]
+
+                )
+
+                /
+
+                3
+
+            )
 
 
 
-            volume = c["volume"]
+            volume = float(
+
+                c["volume"]
+
+            )
+
 
 
 
             total_price_volume += (
 
-                price
-
-                *
+                price *
 
                 volume
 
             )
+
 
 
             total_volume += volume
@@ -142,7 +247,9 @@ class IndicatorEngine:
         if total_volume == 0:
 
 
-            return None
+            return 0
+
+
 
 
 
@@ -162,75 +269,6 @@ class IndicatorEngine:
 
 
 
-    # =====================================================
-    # TRUE RANGE
-    # =====================================================
-
-    def true_range(
-        self,
-        index
-    ):
-
-
-        c = self.candles[index]
-
-
-
-        if index == 0:
-
-
-            return (
-
-                c["high"]
-
-                -
-
-                c["low"]
-
-            )
-
-
-
-        prev = self.candles[index-1]
-
-
-
-        return max(
-
-            c["high"]
-
-            -
-
-            c["low"],
-
-
-            abs(
-
-                c["high"]
-
-                -
-
-                prev["close"]
-
-            ),
-
-
-            abs(
-
-                c["low"]
-
-                -
-
-                prev["close"]
-
-            )
-
-        )
-
-
-
-
-
 
 
     # =====================================================
@@ -240,55 +278,78 @@ class IndicatorEngine:
     def calculate_atr(self):
 
 
-        if len(self.candles) < ATR_PERIOD + 1:
+        trs = []
+
+
+
+        candles = self.candles
+
+
+
+        for i in range(
+
+            1,
+
+            len(candles)
+
+        ):
+
+
+
+            high = candles[i]["high"]
+
+
+            low = candles[i]["low"]
+
+
+            prev_close = candles[i-1]["close"]
+
+
+
+
+
+            tr = max(
+
+
+                high-low,
+
+
+                abs(high-prev_close),
+
+
+                abs(low-prev_close)
+
+
+            )
+
+
+
+            trs.append(
+
+                tr
+
+            )
+
+
+
+
+
+        if len(trs) < ATR_PERIOD:
 
 
             return None
 
 
 
-        trs = []
+
+
+        recent = trs[-ATR_PERIOD:]
 
 
 
-        start = (
-
-            len(self.candles)
-
-            -
-
-            ATR_PERIOD
-
-        )
+        return sum(recent) / ATR_PERIOD
 
 
-
-        for i in range(
-
-            start,
-
-            len(self.candles)
-
-        ):
-
-
-            trs.append(
-
-                self.true_range(i)
-
-            )
-
-
-
-        return (
-
-            sum(trs)
-
-            /
-
-            len(trs)
-
-        )
 
 
 
@@ -300,158 +361,138 @@ class IndicatorEngine:
     # SUPERTREND
     # =====================================================
 
-    def calculate_supertrend(self):
+    def calculate_supertrend(
+        self,
+        atr
+    ):
 
 
-        atr = self.calculate_atr()
-
-
-
-        if atr is None:
-
-
-            return None
+        try:
 
 
 
-        candle = self.candles[-1]
+            candle = self.candles[-1]
 
 
 
-        hl2 = (
-
-            candle["high"]
-
-            +
-
-            candle["low"]
-
-        ) / 2
+            close = candle["close"]
 
 
 
-        upper = (
+            basic_upper = (
 
-            hl2
+                (
 
-            +
+                    candle["high"]
 
-            SUPERTREND_MULTIPLIER
+                    +
 
-            *
-
-            atr
-
-        )
-
-
-
-        lower = (
-
-            hl2
-
-            -
-
-            SUPERTREND_MULTIPLIER
-
-            *
-
-            atr
-
-        )
-
-
-
-        close = candle["close"]
-
-
-
-        if close > upper:
-
-
-            return "UP"
-
-
-
-        elif close < lower:
-
-
-            return "DOWN"
-
-
-
-        else:
-
-
-            # 이전 방향 유지
-
-            if self.last_market:
-
-
-                return self.last_market.get(
-
-                    "supertrend"
+                    candle["low"]
 
                 )
 
+                /
 
-            return "DOWN"
+                2
 
+                +
 
+                SUPERTREND_MULTIPLIER
 
+                *
 
+                atr
 
-
-
-    # =====================================================
-    # CALCULATE ALL
-    # =====================================================
-
-    def calculate(self):
-
-
-        vwap = self.calculate_vwap()
+            )
 
 
 
-        trend = self.calculate_supertrend()
 
+            basic_lower = (
 
+                (
 
-        return {
+                    candle["high"]
 
+                    +
 
-            "vwap":
+                    candle["low"]
 
-                vwap,
+                )
 
+                /
 
-            "supertrend":
+                2
 
-                trend,
+                -
 
+                SUPERTREND_MULTIPLIER
 
-            "close":
+                *
 
-                self.candles[-1]["close"]
+                atr
 
-
-        }
-
+            )
 
 
 
 
 
-
-    # =====================================================
-    # MARKET DATA
-    # =====================================================
-
-    def get_market_data(self):
+            if close > basic_upper:
 
 
-        return self.last_market
+                return "UP"
+
+
+
+
+            elif close < basic_lower:
+
+
+                return "DOWN"
+
+
+
+
+
+            else:
+
+
+                # 이전 방향 유지
+
+                if self.last_market:
+
+
+                    return self.last_market.get(
+
+                        "supertrend",
+
+                        "UP"
+
+                    )
+
+
+
+                return "UP"
+
+
+
+
+
+        except Exception as e:
+
+
+
+            print(
+
+                "[SUPERTREND ERROR]",
+
+                e
+
+            )
+
+
+            return None
 
 
 
