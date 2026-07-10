@@ -1,17 +1,16 @@
 # =====================================================
 # database/database.py
-# SQLite Database Manager
+# Trading Bot SQLite Database
 # =====================================================
 
 import sqlite3
 import threading
-import os
 import time
 
 
 
 from config import (
-    DATABASE_PATH
+    DATABASE_FILE
 )
 
 
@@ -31,24 +30,13 @@ class Database:
 
 
 
-        folder = os.path.dirname(
+        self.conn = sqlite3.connect(
 
-            DATABASE_PATH
+            DATABASE_FILE,
+
+            check_same_thread=False
 
         )
-
-
-
-        if folder:
-
-
-            os.makedirs(
-
-                folder,
-
-                exist_ok=True
-
-            )
 
 
 
@@ -68,119 +56,102 @@ class Database:
 
 
 
-    # =====================================================
-    # CONNECTION
-    # =====================================================
-
-    def connect(self):
-
-
-        return sqlite3.connect(
-
-            DATABASE_PATH,
-
-            check_same_thread=False
-
-        )
-
-
-
-
-
 
 
     # =====================================================
-    # TABLE CREATE
+    # TABLE INIT
     # =====================================================
 
     def create_tables(self):
 
 
-        with self.lock:
-
-
-            conn = self.connect()
-
-
-            cur = conn.cursor()
+        cursor = self.conn.cursor()
 
 
 
-            cur.execute(
+        cursor.execute(
+            """
 
-                """
+            CREATE TABLE IF NOT EXISTS events (
 
-                CREATE TABLE IF NOT EXISTS events
-                (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    event TEXT,
-                    created REAL
-                )
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                """
+                time REAL,
+
+                event TEXT
 
             )
 
-
-
-            cur.execute(
-
-                """
-
-                CREATE TABLE IF NOT EXISTS signals
-                (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    signal TEXT,
-                    price REAL,
-                    created REAL
-                )
-
-                """
-
-            )
+            """
+        )
 
 
 
-            cur.execute(
+        cursor.execute(
+            """
 
-                """
+            CREATE TABLE IF NOT EXISTS signals (
 
-                CREATE TABLE IF NOT EXISTS orders
-                (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    side TEXT,
-                    qty REAL,
-                    result TEXT,
-                    created REAL
-                )
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                """
+                time REAL,
+
+                signal TEXT,
+
+                price REAL,
+
+                trend TEXT
 
             )
 
+            """
+        )
 
 
-            cur.execute(
 
-                """
+        cursor.execute(
+            """
 
-                CREATE TABLE IF NOT EXISTS errors
-                (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    error TEXT,
-                    created REAL
-                )
+            CREATE TABLE IF NOT EXISTS trades (
 
-                """
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                time REAL,
+
+                side TEXT,
+
+                qty REAL,
+
+                pnl REAL
 
             )
 
+            """
+        )
 
 
-            conn.commit()
+
+        cursor.execute(
+            """
+
+            CREATE TABLE IF NOT EXISTS errors (
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                time REAL,
+
+                message TEXT
+
+            )
+
+            """
+        )
 
 
-            conn.close()
+
+        self.conn.commit()
+
+
 
 
 
@@ -194,7 +165,7 @@ class Database:
 
     def event(
         self,
-        text
+        message
     ):
 
 
@@ -204,44 +175,30 @@ class Database:
             with self.lock:
 
 
-                conn = self.connect()
-
-
-                cur = conn.cursor()
-
-
-
-                cur.execute(
+                self.conn.execute(
 
                     """
 
                     INSERT INTO events
-                    (
-                        event,
-                        created
-                    )
 
-                    VALUES
-                    (?,?)
+                    (time,event)
+
+                    VALUES (?,?)
 
                     """,
 
                     (
 
-                        text,
+                        time.time(),
 
-                        time.time()
+                        message
 
                     )
 
                 )
 
 
-
-                conn.commit()
-
-
-                conn.close()
+                self.conn.commit()
 
 
 
@@ -255,6 +212,8 @@ class Database:
                 e
 
             )
+
+
 
 
 
@@ -278,37 +237,37 @@ class Database:
             with self.lock:
 
 
-                conn = self.connect()
-
-
-                cur = conn.cursor()
-
-
-
-                cur.execute(
+                self.conn.execute(
 
                     """
 
                     INSERT INTO signals
+
                     (
-                        signal,
-                        price,
-                        created
+
+                    time,
+
+                    signal,
+
+                    price,
+
+                    trend
+
                     )
 
-                    VALUES
-                    (?,?,?)
+                    VALUES (?,?,?,?)
 
                     """,
 
                     (
+
+                        time.time(),
 
                         signal.get(
 
                             "signal"
 
                         ),
-
 
                         signal.get(
 
@@ -318,19 +277,18 @@ class Database:
 
                         ),
 
+                        signal.get(
 
-                        time.time()
+                            "trend"
+
+                        )
 
                     )
 
                 )
 
 
-
-                conn.commit()
-
-
-                conn.close()
+                self.conn.commit()
 
 
 
@@ -351,15 +309,17 @@ class Database:
 
 
 
+
+
     # =====================================================
-    # ORDER
+    # TRADE
     # =====================================================
 
-    def save_order(
+    def save_trade(
         self,
         side,
         qty,
-        result
+        pnl=0
     ):
 
 
@@ -369,39 +329,37 @@ class Database:
             with self.lock:
 
 
-                conn = self.connect()
-
-
-                cur = conn.cursor()
-
-
-
-                cur.execute(
+                self.conn.execute(
 
                     """
 
-                    INSERT INTO orders
+                    INSERT INTO trades
+
                     (
-                        side,
-                        qty,
-                        result,
-                        created
+
+                    time,
+
+                    side,
+
+                    qty,
+
+                    pnl
+
                     )
 
-                    VALUES
-                    (?,?,?,?)
+                    VALUES (?,?,?,?)
 
                     """,
 
                     (
 
+                        time.time(),
+
                         side,
 
                         qty,
 
-                        str(result),
-
-                        time.time()
+                        pnl
 
                     )
 
@@ -409,10 +367,7 @@ class Database:
 
 
 
-                conn.commit()
-
-
-                conn.close()
+                self.conn.commit()
 
 
 
@@ -421,11 +376,15 @@ class Database:
 
             print(
 
-                "[DB ORDER ERROR]",
+                "[DB TRADE ERROR]",
 
                 e
 
             )
+
+
+
+
 
 
 
@@ -439,7 +398,7 @@ class Database:
 
     def save_error(
         self,
-        error
+        message
     ):
 
 
@@ -449,44 +408,36 @@ class Database:
             with self.lock:
 
 
-                conn = self.connect()
-
-
-                cur = conn.cursor()
-
-
-
-                cur.execute(
+                self.conn.execute(
 
                     """
 
                     INSERT INTO errors
+
                     (
-                        error,
-                        created
+
+                    time,
+
+                    message
+
                     )
 
-                    VALUES
-                    (?,?)
+                    VALUES (?,?)
 
                     """,
 
                     (
 
-                        str(error),
+                        time.time(),
 
-                        time.time()
+                        str(message)
 
                     )
 
                 )
 
 
-
-                conn.commit()
-
-
-                conn.close()
+                self.conn.commit()
 
 
 
@@ -507,27 +458,26 @@ class Database:
 
 
 
+
+
     # =====================================================
-    # STATUS
+    # CLOSE
     # =====================================================
 
-    def status(self):
+    def close(self):
 
 
-        return {
+        try:
 
 
-            "database":
-
-                DATABASE_PATH,
+            self.conn.close()
 
 
-            "ready":
 
-                True
+        except:
 
 
-        }
+            pass
 
 
 
