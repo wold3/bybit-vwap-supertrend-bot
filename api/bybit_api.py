@@ -5,6 +5,8 @@ from pybit.unified_trading import HTTP
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
+    BYBIT_TESTNET,
+    BYBIT_DEMO,
     CATEGORY,
     DEFAULT_SYMBOL,
     ACCOUNT_TYPE,
@@ -24,11 +26,11 @@ class BybitAPI:
 
     def __init__(self):
 
+
         print("==============================")
         print("[BYBIT API INIT]")
-        print("BASE : https://api-demo.bybit.com")
-        print("TESTNET : False")
-        print("DEMO : True")
+        print("TESTNET :", BYBIT_TESTNET)
+        print("DEMO :", BYBIT_DEMO)
         print("ACCOUNT :", ACCOUNT_TYPE)
         print("CATEGORY :", CATEGORY)
         print("SYMBOL :", DEFAULT_SYMBOL)
@@ -37,9 +39,9 @@ class BybitAPI:
 
         self.session = HTTP(
 
-            testnet=False,
+            testnet=BYBIT_TESTNET,
 
-            demo=True,
+            demo=BYBIT_DEMO,
 
             api_key=BYBIT_API_KEY,
 
@@ -50,14 +52,14 @@ class BybitAPI:
 
 
     # ==================================================
-    # WALLET BALANCE
+    # WALLET
     # ==================================================
 
     def get_wallet_balance(self):
 
         try:
 
-            response = self.session.get_wallet_balance(
+            result = self.session.get_wallet_balance(
 
                 accountType=ACCOUNT_TYPE
 
@@ -66,7 +68,7 @@ class BybitAPI:
 
             print("[WALLET RESPONSE]")
 
-            return response
+            return result
 
 
 
@@ -82,6 +84,50 @@ class BybitAPI:
 
 
     # ==================================================
+    # EQUITY
+    # ==================================================
+
+    def get_equity(self):
+
+        try:
+
+            data = self.get_wallet_balance()
+
+
+            if not data:
+
+                return 0
+
+
+
+            account = data["result"]["list"][0]
+
+
+            equity = float(
+
+                account["totalEquity"]
+
+            )
+
+
+            return equity
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[EQUITY ERROR]",
+                e
+            )
+
+
+            return 0
+
+
+
+    # ==================================================
     # POSITION
     # ==================================================
 
@@ -89,17 +135,14 @@ class BybitAPI:
 
         try:
 
-            response = self.session.get_positions(
+
+            return self.session.get_positions(
 
                 category=CATEGORY,
 
                 symbol=DEFAULT_SYMBOL
 
             )
-
-
-            return response
-
 
 
         except Exception as e:
@@ -109,6 +152,7 @@ class BybitAPI:
                 "[POSITION ERROR]",
                 e
             )
+
 
             return None
 
@@ -132,7 +176,7 @@ class BybitAPI:
         try:
 
 
-            response = self.session.get_kline(
+            return self.session.get_kline(
 
                 category=CATEGORY,
 
@@ -143,9 +187,6 @@ class BybitAPI:
                 limit=limit
 
             )
-
-
-            return response
 
 
 
@@ -163,7 +204,7 @@ class BybitAPI:
 
 
     # ==================================================
-    # CREATE ORDER
+    # PLACE ORDER
     # ==================================================
 
     def create_order(
@@ -172,7 +213,9 @@ class BybitAPI:
 
         side,
 
-        qty=None
+        qty=None,
+
+        reduce_only=False
 
     ):
 
@@ -198,16 +241,18 @@ class BybitAPI:
 
                 qty=str(qty),
 
-                timeInForce=TIME_IN_FORCE
+                timeInForce=TIME_IN_FORCE,
+
+                reduceOnly=reduce_only
 
             )
 
 
 
+            print("==============================")
             print("[ORDER RESPONSE]")
-
             print(response)
-
+            print("==============================")
 
 
             return response
@@ -228,7 +273,7 @@ class BybitAPI:
 
 
     # ==================================================
-    # CANCEL ALL ORDERS
+    # CANCEL
     # ==================================================
 
     def cancel_all_orders(self):
@@ -274,12 +319,12 @@ class BybitAPI:
 
     def server_time(self):
 
-
         return int(
 
-            time.time() * 1000
+            time.time()*1000
 
         )
+
 
 
 
