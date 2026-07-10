@@ -2,24 +2,15 @@ import time
 
 from pybit.unified_trading import HTTP
 
-
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
-    BYBIT_TESTNET,
-    BYBIT_BASE_URL,
-
     CATEGORY,
     DEFAULT_SYMBOL,
-
     ACCOUNT_TYPE,
-
     DEFAULT_QTY,
-
     ORDER_TYPE,
     TIME_IN_FORCE,
-
-    LEVERAGE,
 )
 
 
@@ -33,11 +24,11 @@ class BybitAPI:
 
     def __init__(self):
 
-
         print("==============================")
         print("[BYBIT API INIT]")
-        print("BASE :", BYBIT_BASE_URL)
-        print("TESTNET :", BYBIT_TESTNET)
+        print("BASE : https://api-demo.bybit.com")
+        print("TESTNET : False")
+        print("DEMO : True")
         print("ACCOUNT :", ACCOUNT_TYPE)
         print("CATEGORY :", CATEGORY)
         print("SYMBOL :", DEFAULT_SYMBOL)
@@ -46,7 +37,9 @@ class BybitAPI:
 
         self.session = HTTP(
 
-            testnet=BYBIT_TESTNET,
+            testnet=False,
+
+            demo=True,
 
             api_key=BYBIT_API_KEY,
 
@@ -57,14 +50,14 @@ class BybitAPI:
 
 
     # ==================================================
-    # WALLET
+    # WALLET BALANCE
     # ==================================================
 
     def get_wallet_balance(self):
 
         try:
 
-            result = self.session.get_wallet_balance(
+            response = self.session.get_wallet_balance(
 
                 accountType=ACCOUNT_TYPE
 
@@ -73,21 +66,18 @@ class BybitAPI:
 
             print("[WALLET RESPONSE]")
 
-            return result
+            return response
 
 
 
         except Exception as e:
-
 
             print(
                 "[WALLET ERROR]",
                 e
             )
 
-
             return None
-
 
 
 
@@ -99,8 +89,7 @@ class BybitAPI:
 
         try:
 
-
-            result = self.session.get_positions(
+            response = self.session.get_positions(
 
                 category=CATEGORY,
 
@@ -109,7 +98,7 @@ class BybitAPI:
             )
 
 
-            return result
+            return response
 
 
 
@@ -121,9 +110,7 @@ class BybitAPI:
                 e
             )
 
-
             return None
-
 
 
 
@@ -145,7 +132,7 @@ class BybitAPI:
         try:
 
 
-            result = self.session.get_kline(
+            response = self.session.get_kline(
 
                 category=CATEGORY,
 
@@ -158,7 +145,7 @@ class BybitAPI:
             )
 
 
-            return result
+            return response
 
 
 
@@ -175,10 +162,8 @@ class BybitAPI:
 
 
 
-
-
     # ==================================================
-    # MARKET ORDER
+    # CREATE ORDER
     # ==================================================
 
     def create_order(
@@ -201,7 +186,7 @@ class BybitAPI:
 
 
 
-            result = self.session.place_order(
+            response = self.session.place_order(
 
                 category=CATEGORY,
 
@@ -218,13 +203,14 @@ class BybitAPI:
             )
 
 
+
             print("[ORDER RESPONSE]")
 
-            print(result)
+            print(response)
 
 
 
-            return result
+            return response
 
 
 
@@ -241,10 +227,8 @@ class BybitAPI:
 
 
 
-
-
     # ==================================================
-    # CANCEL ALL ORDER
+    # CANCEL ALL ORDERS
     # ==================================================
 
     def cancel_all_orders(self):
@@ -253,7 +237,7 @@ class BybitAPI:
         try:
 
 
-            result = self.session.cancel_all_orders(
+            response = self.session.cancel_all_orders(
 
                 category=CATEGORY,
 
@@ -262,12 +246,12 @@ class BybitAPI:
             )
 
 
-            print(
-                "[CANCEL ALL]"
-            )
+            print("[CANCEL RESPONSE]")
+
+            print(response)
 
 
-            return result
+            return response
 
 
 
@@ -284,228 +268,18 @@ class BybitAPI:
 
 
 
-
-
-    # ==================================================
-    # SET LEVERAGE
-    # ==================================================
-
-    def set_leverage(
-
-        self,
-
-        leverage=LEVERAGE
-
-    ):
-
-
-        try:
-
-
-            result = self.session.set_leverage(
-
-                category=CATEGORY,
-
-                symbol=DEFAULT_SYMBOL,
-
-                buyLeverage=str(leverage),
-
-                sellLeverage=str(leverage)
-
-            )
-
-
-            print("[LEVERAGE RESPONSE]")
-
-            print(result)
-
-
-            return result
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[LEVERAGE ERROR]",
-                e
-            )
-
-
-            return None
-
-
-
-
-
-    # ==================================================
-    # SET TP / SL
-    # ==================================================
-
-    def set_trading_stop(
-
-        self,
-
-        take_profit,
-
-        stop_loss
-
-    ):
-
-
-        try:
-
-
-            result = self.session.set_trading_stop(
-
-                category=CATEGORY,
-
-                symbol=DEFAULT_SYMBOL,
-
-                tpslMode="Full",
-
-                positionIdx=0,
-
-                takeProfit=str(take_profit),
-
-                stopLoss=str(stop_loss)
-
-            )
-
-
-            print("[TP SL RESPONSE]")
-
-            print(result)
-
-
-            return result
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[TP SL ERROR]",
-                e
-            )
-
-
-            return None
-
-
-
-
-
-    # ==================================================
-    # CLOSE POSITION
-    # ==================================================
-
-    def close_position(self):
-
-
-        try:
-
-
-            position = self.get_position()
-
-
-
-            if position is None:
-
-                return None
-
-
-
-            data = position["result"]["list"]
-
-
-
-            for p in data:
-
-
-                size = float(
-
-                    p.get(
-                        "size",
-                        0
-
-                    )
-
-                )
-
-
-                if size <= 0:
-
-                    continue
-
-
-
-                side = p["side"]
-
-
-
-                close_side = (
-
-                    "Sell"
-
-                    if side == "Buy"
-
-                    else
-
-                    "Buy"
-
-                )
-
-
-
-                result = self.create_order(
-
-                    side=close_side,
-
-                    qty=size
-
-                )
-
-
-                return result
-
-
-
-
-            return None
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[CLOSE ERROR]",
-                e
-            )
-
-
-            return None
-
-
-
-
-
     # ==================================================
     # SERVER TIME
     # ==================================================
 
     def server_time(self):
 
+
         return int(
 
-            time.time()*1000
+            time.time() * 1000
 
         )
-
 
 
 
