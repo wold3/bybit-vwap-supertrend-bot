@@ -1,9 +1,8 @@
-import time
+import datetime
+
 
 from config import (
     MAX_DAILY_LOSS_PERCENT,
-    ORDER_COOLDOWN,
-    MAX_POSITION_SIZE,
 )
 
 
@@ -22,10 +21,12 @@ class RiskManager:
 
         self.current_equity = 0
 
-        self.daily_loss = 0
+
+        self.start_time = None
 
 
-        self.last_order_time = 0
+        self.block_trading = False
+
 
 
         print("==============================")
@@ -35,11 +36,8 @@ class RiskManager:
             MAX_DAILY_LOSS_PERCENT,
             "%"
         )
-        print(
-            "ORDER COOLDOWN :",
-            ORDER_COOLDOWN
-        )
         print("==============================")
+
 
 
 
@@ -48,10 +46,7 @@ class RiskManager:
     # INITIALIZE
     # ======================================
 
-    def initialize(
-        self,
-        equity=0
-    ):
+    def initialize(self, equity):
 
 
         try:
@@ -67,7 +62,7 @@ class RiskManager:
             )
 
 
-            self.daily_loss = 0
+            self.start_time = datetime.datetime.now()
 
 
 
@@ -97,110 +92,139 @@ class RiskManager:
     # UPDATE EQUITY
     # ======================================
 
-    def update_equity(
-        self,
-        equity
-    ):
+    def update_equity(self, equity):
 
 
-        self.current_equity = float(
-            equity
-        )
+        try:
 
 
-
-        self.daily_loss = (
-
-            (
-                self.start_equity
-                -
-                self.current_equity
+            self.current_equity = float(
+                equity
             )
-            /
-            self.start_equity
-
-        ) * 100
 
 
 
-
-
-    # ======================================
-    # DAILY LOSS CHECK
-    # ======================================
-
-    def allow_trade(self):
-
-
-        if self.start_equity <= 0:
-
-            return False
-
-
-
-        if self.daily_loss >= MAX_DAILY_LOSS_PERCENT:
+        except Exception as e:
 
 
             print(
-                "[RISK BLOCK]",
-                "DAILY LOSS LIMIT"
+                "[EQUITY UPDATE ERROR]",
+                e
             )
 
 
-            return False
-
-
-
-        return True
-
 
 
 
     # ======================================
-    # ORDER COOLDOWN
+    # LOSS CHECK
     # ======================================
 
-    def check_cooldown(self):
+    def check_daily_loss(self):
 
 
-        now = time.time()
+        try:
+
+
+            if self.start_equity <= 0:
+
+                return False
 
 
 
-        if (
 
-            now - self.last_order_time
-
-            <
-            
-            ORDER_COOLDOWN
-
-        ):
-
-
-            remain = int(
-
-                ORDER_COOLDOWN
-
-                -
+            loss_percent = (
 
                 (
-                    now
+
+                    self.start_equity
+
                     -
-                    self.last_order_time
+
+                    self.current_equity
+
                 )
 
+                /
+
+                self.start_equity
+
+                *
+
+                100
+
             )
 
 
+
+
+            if loss_percent >= MAX_DAILY_LOSS_PERCENT:
+
+
+
+                self.block_trading = True
+
+
+
+                print(
+                    "[RISK BLOCK]",
+                    "LOSS:",
+                    round(loss_percent,2),
+                    "%"
+                )
+
+
+
+                return True
+
+
+
+
+            return False
+
+
+
+
+        except Exception as e:
+
+
             print(
-                "[COOLDOWN]",
-                remain,
-                "sec"
+                "[LOSS CHECK ERROR]",
+                e
             )
 
 
             return False
+
+
+
+
+
+    # ======================================
+    # CAN TRADE
+    # ======================================
+
+    def can_trade(self):
+
+
+        if self.block_trading:
+
+
+            print(
+                "[TRADE BLOCKED BY RISK]"
+            )
+
+
+            return False
+
+
+
+
+        if self.check_daily_loss():
+
+
+            return False
+
 
 
 
@@ -209,42 +233,24 @@ class RiskManager:
 
 
 
-    # ======================================
-    # ORDER REGISTER
-    # ======================================
-
-    def register_order(self):
-
-
-        self.last_order_time = time.time()
-
-
-
 
     # ======================================
-    # POSITION SIZE CHECK
+    # RESET
     # ======================================
 
-    def check_position_size(
-        self,
-        qty
-    ):
+    def reset(self):
 
 
-        if float(qty) > MAX_POSITION_SIZE:
+        self.block_trading = False
 
 
-            print(
-                "[RISK BLOCK]",
-                "POSITION SIZE"
-            )
-
-
-            return False
+        self.start_equity = self.current_equity
 
 
 
-        return True
+        print(
+            "[RISK RESET]"
+        )
 
 
 
