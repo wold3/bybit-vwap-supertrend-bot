@@ -29,7 +29,7 @@ BYBIT_API_SECRET = os.getenv(
 
 
 # ==================================
-# BYBIT SERVER
+# SERVER
 # ==================================
 
 BYBIT_BASE_URL = os.getenv(
@@ -83,9 +83,12 @@ TESTNET = BYBIT_TESTNET
 # ACCOUNT
 # ==================================
 
+# Bybit V5 account type
+# 현재 API KEY 상태 기준
+
 ACCOUNT_TYPE = os.getenv(
     "ACCOUNT_TYPE",
-    "UNIFIED"
+    "CONTRACT"
 )
 
 
@@ -147,7 +150,6 @@ LEVERAGE = int(
 )
 
 
-# 주문 연속 실행 방지 시간
 ORDER_COOLDOWN = int(
     os.getenv(
         "ORDER_COOLDOWN",
@@ -198,36 +200,29 @@ MAX_POSITION_SIZE = float(
 )
 
 
-# 호환용
-MAX_POSITION = MAX_POSITION_SIZE
-
-
-
-MAX_DAILY_LOSS = float(
+DEFAULT_RISK = float(
     os.getenv(
-        "MAX_DAILY_LOSS",
+        "DEFAULT_RISK",
+        "1.0"
+    )
+)
+
+
+DAILY_LOSS_LIMIT = float(
+    os.getenv(
+        "DAILY_LOSS_LIMIT",
         "0.03"
     )
 )
 
 
-# risk_manager.py 사용
-DAILY_LOSS_LIMIT = MAX_DAILY_LOSS
-
+MAX_DAILY_LOSS = DAILY_LOSS_LIMIT
 
 
 MAX_LOSS_AMOUNT = float(
     os.getenv(
         "MAX_LOSS_AMOUNT",
         "0"
-    )
-)
-
-
-RISK_PERCENT = float(
-    os.getenv(
-        "RISK_PERCENT",
-        "1.0"
     )
 )
 
@@ -282,7 +277,6 @@ print("CATEGORY :", CATEGORY)
 print("SYMBOL :", DEFAULT_SYMBOL)
 print("QTY :", DEFAULT_QTY)
 print("LEVERAGE :", LEVERAGE)
-print("ORDER COOLDOWN :", ORDER_COOLDOWN)
 print("VWAP :", VWAP_LENGTH)
 print("SUPERTREND :", SUPERTREND_PERIOD, SUPERTREND_MULTIPLIER)
 print("REST :", BYBIT_BASE_URL)
