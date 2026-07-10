@@ -1,4 +1,7 @@
+# =====================================================
 # app.py
+# Trading Application Core
+# =====================================================
 
 
 import time
@@ -6,10 +9,14 @@ import threading
 
 
 
-from api.bybit_api import bybit_api
+from api.bybit_api import (
+    bybit_api
+)
 
 
-from risk.risk_manager import risk_manager
+from risk.risk_manager import (
+    risk_manager
+)
 
 
 from strategy.vwap_supertrend_strategy import (
@@ -17,7 +24,7 @@ from strategy.vwap_supertrend_strategy import (
 )
 
 
-from execution.order_manager import (
+from order.order_manager import (
     order_manager
 )
 
@@ -47,12 +54,18 @@ from database.database import (
 )
 
 
+from config import (
+    KLINE_INTERVAL
+)
+
+
 
 
 
 
 
 class TradingApp:
+
 
 
 
@@ -66,13 +79,21 @@ class TradingApp:
 
 
 
+        print(
+
+            "[TRADING APP READY]"
+
+        )
 
 
 
 
-    # =====================================
+
+
+
+    # =====================================================
     # START
-    # =====================================
+    # =====================================================
 
     def start(self):
 
@@ -86,11 +107,14 @@ class TradingApp:
         try:
 
 
+
             if not bybit_api.ping():
 
 
                 raise Exception(
+
                     "BYBIT CONNECTION FAILED"
+
                 )
 
 
@@ -110,7 +134,9 @@ class TradingApp:
 
 
                 raise Exception(
+
                     "WALLET ERROR"
+
                 )
 
 
@@ -130,8 +156,11 @@ class TradingApp:
 
 
             print(
+
                 "[EQUITY]",
+
                 equity
+
             )
 
 
@@ -176,11 +205,6 @@ class TradingApp:
 
 
 
-            #
-            # 중요:
-            # thread 시작 전에 running True
-            #
-
             self.running = True
 
 
@@ -194,8 +218,6 @@ class TradingApp:
 
 
 
-
-
             self.start_market_stream()
 
 
@@ -203,7 +225,9 @@ class TradingApp:
 
 
             print(
+
                 "[BOT READY]"
+
             )
 
 
@@ -213,10 +237,15 @@ class TradingApp:
         except Exception as e:
 
 
+
             print(
+
                 "[START ERROR]",
+
                 e
+
             )
+
 
 
             database.save_error(
@@ -234,7 +263,9 @@ class TradingApp:
             )
 
 
+
             self.stop()
+
 
 
             raise e
@@ -245,47 +276,62 @@ class TradingApp:
 
 
 
-    # =====================================
+    # =====================================================
     # MARKET LOOP
-    # =====================================
+    # =====================================================
 
     def start_market_stream(self):
 
 
         print(
+
             "[MARKET THREAD START]"
+
         )
+
+
 
 
 
         def run():
 
 
+
             while self.running:
+
 
 
                 try:
 
 
+
                     candles = (
 
                         bybit_api
-                        .get_kline()
+                        .get_kline(
+
+                            interval=KLINE_INTERVAL
+
+                        )
 
                     )
+
+
 
 
 
                     if candles:
 
 
+
                         print(
 
-                            "[CANDLE RECEIVED]",
+                            "[KLINE]",
 
                             len(candles)
 
                         )
+
 
 
                         self.on_candle(
@@ -296,11 +342,16 @@ class TradingApp:
 
 
 
+
+
                     watchdog.heartbeat()
 
 
 
+
+
                 except Exception as e:
+
 
 
                     print(
@@ -310,6 +361,7 @@ class TradingApp:
                         e
 
                     )
+
 
 
                     database.save_error(
@@ -348,9 +400,9 @@ class TradingApp:
 
 
 
-    # =====================================
+    # =====================================================
     # CANDLE PROCESS
-    # =====================================
+    # =====================================================
 
     def on_candle(
 
@@ -359,6 +411,7 @@ class TradingApp:
         candles
 
     ):
+
 
 
         if not self.running:
@@ -370,7 +423,20 @@ class TradingApp:
 
 
 
+        print(
+
+            "[CANDLE RECEIVED]",
+
+            len(candles)
+
+        )
+
+
+
+
+
         try:
+
 
 
             signal = (
@@ -389,6 +455,7 @@ class TradingApp:
         except Exception as e:
 
 
+
             print(
 
                 "[STRATEGY ERROR]",
@@ -398,11 +465,13 @@ class TradingApp:
             )
 
 
+
             database.save_error(
 
                 str(e)
 
             )
+
 
 
             return
@@ -411,7 +480,10 @@ class TradingApp:
 
 
 
+
+
         if signal is None:
+
 
 
             print(
@@ -421,7 +493,10 @@ class TradingApp:
             )
 
 
+
             return
+
+
 
 
 
@@ -453,6 +528,7 @@ class TradingApp:
 
         # EXIT
 
+
         if signal.get(
 
             "type"
@@ -473,7 +549,7 @@ class TradingApp:
 
 
 
-        # ENTRY RISK CHECK
+        # RISK CHECK
 
 
         if not risk_manager.can_trade():
@@ -487,12 +563,25 @@ class TradingApp:
             )
 
 
+
             return
 
 
 
 
 
+
+
+        # POSITION SYNC
+
+
+        position_manager.sync()
+
+
+
+
+
+        # ORDER
 
 
         order_manager.execute(
@@ -511,9 +600,9 @@ class TradingApp:
 
 
 
-    # =====================================
+    # =====================================================
     # EQUITY PARSE
-    # =====================================
+    # =====================================================
 
     def parse_equity(
 
@@ -524,8 +613,8 @@ class TradingApp:
     ):
 
 
-
         try:
+
 
 
             return float(
@@ -542,6 +631,8 @@ class TradingApp:
 
 
 
+
+
         except Exception as e:
 
 
@@ -555,6 +646,7 @@ class TradingApp:
             )
 
 
+
             return 0
 
 
@@ -563,9 +655,9 @@ class TradingApp:
 
 
 
-    # =====================================
+    # =====================================================
     # STOP
-    # =====================================
+    # =====================================================
 
     def stop(self):
 
@@ -608,6 +700,8 @@ class TradingApp:
 
 
 
+
+
         except Exception as e:
 
 
@@ -627,6 +721,8 @@ class TradingApp:
                 str(e)
 
             )
+
+
 
 
 
