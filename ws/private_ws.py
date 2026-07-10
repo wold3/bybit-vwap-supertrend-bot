@@ -14,9 +14,15 @@ from config import (
 )
 
 
+from execution.position_manager import position_manager
+from execution.order_manager import order_manager
+
+
+
+
 
 # ==========================================
-# PRIVATE WEBSOCKET V5
+# PRIVATE WS MANAGER
 # ==========================================
 
 class PrivateWS:
@@ -30,11 +36,11 @@ class PrivateWS:
         self.running = False
 
 
-        self.position = None
+        self.position_data = None
 
-        self.orders = None
+        self.order_data = None
 
-        self.wallet = None
+        self.wallet_data = None
 
 
 
@@ -58,33 +64,20 @@ class PrivateWS:
 
 
             topic = message.get(
-                "topic"
+                "topic",
+                ""
             )
 
 
 
-            if topic == "position":
+            # --------------------------
+            # ORDER UPDATE
+            # --------------------------
+
+            if topic == "order":
 
 
-                self.position = message
-
-
-
-                print(
-                    "[POSITION UPDATE]"
-                )
-
-                print(
-                    message
-                )
-
-
-
-
-            elif topic == "order":
-
-
-                self.orders = message
+                self.order_data = message
 
 
 
@@ -99,19 +92,45 @@ class PrivateWS:
 
 
 
+
+            # --------------------------
+            # POSITION UPDATE
+            # --------------------------
+
+            elif topic == "position":
+
+
+                self.position_data = message
+
+
+
+                print(
+                    "[POSITION UPDATE]"
+                )
+
+
+
+                self.sync_position(
+                    message
+                )
+
+
+
+
+
+            # --------------------------
+            # WALLET UPDATE
+            # --------------------------
+
             elif topic == "wallet":
 
 
-                self.wallet = message
+                self.wallet_data = message
 
 
 
                 print(
                     "[WALLET UPDATE]"
-                )
-
-                print(
-                    message
                 )
 
 
@@ -122,6 +141,120 @@ class PrivateWS:
 
             print(
                 "[PRIVATE MESSAGE ERROR]",
+                e
+            )
+
+
+
+
+
+    # ======================================
+    # POSITION SYNC
+    # ======================================
+
+    def sync_position(self, message):
+
+
+        try:
+
+
+            data = message.get(
+                "data",
+                []
+            )
+
+
+            if not data:
+
+
+                return
+
+
+
+
+
+            pos = data[0]
+
+
+
+            side = pos.get(
+                "side",
+                ""
+            )
+
+
+            size = float(
+
+                pos.get(
+                    "size",
+                    0
+                )
+
+            )
+
+
+
+            entry = float(
+
+                pos.get(
+                    "avgPrice",
+                    0
+                )
+
+            )
+
+
+
+
+
+            # --------------------------
+            # POSITION EXISTS
+            # --------------------------
+
+            if size > 0 and side:
+
+
+
+                position_manager.update_position(
+
+                    side,
+
+                    size,
+
+                    entry
+
+                )
+
+
+
+                order_manager.update_position(
+
+                    {
+
+                        "side": side,
+
+                        "size": size
+
+                    }
+
+                )
+
+
+
+            else:
+
+
+
+                position_manager.clear()
+
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[POSITION SYNC ERROR]",
                 e
             )
 
@@ -151,6 +284,9 @@ class PrivateWS:
                 testnet=BYBIT_TESTNET,
 
 
+                demo=BYBIT_DEMO,
+
+
                 channel_type="private",
 
 
@@ -164,7 +300,8 @@ class PrivateWS:
 
 
 
-            self.ws.position_stream(
+
+            self.ws.order_stream(
 
                 callback=self.handle_message
 
@@ -172,7 +309,7 @@ class PrivateWS:
 
 
 
-            self.ws.order_stream(
+            self.ws.position_stream(
 
                 callback=self.handle_message
 
@@ -221,7 +358,7 @@ class PrivateWS:
 
 
     # ======================================
-    # THREAD
+    # THREAD START
     # ======================================
 
     def run_thread(self):
@@ -264,27 +401,27 @@ class PrivateWS:
 
 
     # ======================================
-    # GETTERS
+    # GET DATA
     # ======================================
 
     def get_position(self):
 
 
-        return self.position
+        return self.position_data
 
 
 
-    def get_orders(self):
+    def get_order(self):
 
 
-        return self.orders
+        return self.order_data
 
 
 
     def get_wallet(self):
 
 
-        return self.wallet
+        return self.wallet_data
 
 
 
