@@ -1,66 +1,153 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-
-from config import DB_TYPE, SQLITE_PATH, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB
+# database/database.py
 
 
-# =====================================================
-# DB URL 생성
-# =====================================================
-
-def get_db_url():
-
-    if DB_TYPE == "sqlite":
-        return f"sqlite:///{SQLITE_PATH}"
-
-    elif DB_TYPE == "postgres":
-
-        return (
-            f"postgresql+psycopg2://"
-            f"{POSTGRES_USER}:{POSTGRES_PASSWORD}"
-            f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
-        )
-
-    else:
-        raise ValueError(f"Unsupported DB_TYPE: {DB_TYPE}")
+import sqlite3
+import threading
 
 
-# =====================================================
-# ENGINE
-# =====================================================
 
-engine = create_engine(
-    get_db_url(),
-    pool_pre_ping=True,
-    echo=False
-)
+class Database:
 
 
-# =====================================================
-# SESSION
-# =====================================================
-
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+    def __init__(self):
 
 
-# =====================================================
-# BASE MODEL
-# =====================================================
+        self.path = "bot.db"
 
-Base = declarative_base()
+        self.lock = threading.Lock()
 
 
-# =====================================================
-# DEPENDENCY
-# =====================================================
+        self.init_db()
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
+
+    # =====================================
+    # INIT
+    # =====================================
+
+    def init_db(self):
+
+
+        with self.lock:
+
+
+            conn = sqlite3.connect(
+                self.path
+            )
+
+
+            cursor = conn.cursor()
+
+
+
+            cursor.execute("""
+
+            CREATE TABLE IF NOT EXISTS trades (
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                symbol TEXT,
+
+                side TEXT,
+
+                qty REAL,
+
+                entry REAL,
+
+                exit REAL,
+
+                pnl REAL,
+
+                result TEXT,
+
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+
+            )
+
+            """)
+
+
+
+            cursor.execute("""
+
+            CREATE TABLE IF NOT EXISTS orders (
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                order_id TEXT,
+
+                side TEXT,
+
+                qty REAL,
+
+                price REAL,
+
+                status TEXT,
+
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+
+            )
+
+            """)
+
+
+
+            cursor.execute("""
+
+            CREATE TABLE IF NOT EXISTS errors (
+
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                message TEXT,
+
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+
+            )
+
+            """)
+
+
+
+            conn.commit()
+
+            conn.close()
+
+
+
+    # =====================================
+    # INSERT
+    # =====================================
+
+    def execute(
+        self,
+        query,
+        params=()
+    ):
+
+
+        with self.lock:
+
+
+            conn = sqlite3.connect(
+                self.path
+            )
+
+
+            cursor = conn.cursor()
+
+
+            cursor.execute(
+                query,
+                params
+            )
+
+
+            conn.commit()
+
+
+            conn.close()
+
+
+
+
+db = Database()
