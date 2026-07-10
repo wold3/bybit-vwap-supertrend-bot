@@ -1,121 +1,160 @@
 import time
 
-from config import (
-    DAILY_LOSS_LIMIT,
-    MAX_POSITION_SIZE,
-)
-
-from api.bybit_api import bybit_api
-
-
-# ==========================================
-# RISK MANAGER
-# ==========================================
 
 class RiskManager:
 
 
     def __init__(self):
 
-        self.start_equity = self.get_equity()
-
-        self.daily_start_equity = self.start_equity
-
-        self.last_order_time = 0
-
-
         print("==============================")
-        print("[RISK INIT EQUITY]", self.start_equity)
+        print("[RISK MANAGER INIT]")
         print("==============================")
 
 
-    # ======================================
-    # EQUITY
-    # ======================================
+        # 초기 자산
+        self.initial_equity = 0.0
 
-    def get_equity(self):
+        # 현재 자산
+        self.current_equity = 0.0
+
+
+        # 최고 자산
+        self.highest_equity = 0.0
+
+
+        # 손실률
+        self.daily_loss = 0.0
+
+
+        # 최대 일일 손실 %
+        self.max_daily_loss = 5.0
+
+
+        # 거래 가능 여부
+        self.trading_enabled = True
+
+
+        # 초기화 시간
+        self.start_time = None
+
+
+
+    # ==================================================
+    # INITIALIZE
+    # ==================================================
+
+    def initialize(self, equity):
+
 
         try:
 
-            wallet = bybit_api.get_wallet_balance()
+
+            self.initial_equity = float(equity)
+
+            self.current_equity = float(equity)
+
+            self.highest_equity = float(equity)
 
 
-            if not wallet:
-                return 0.0
+            self.daily_loss = 0.0
+
+            self.trading_enabled = True
 
 
-            if wallet.get("retCode") != 0:
-                return 0.0
+            self.start_time = time.time()
 
 
-            data = wallet["result"]["list"][0]
 
-
-            equity = float(
-                data.get(
-                    "totalEquity",
-                    0
-                )
+            print("==============================")
+            print("[RISK INITIALIZED]")
+            print(
+                "EQUITY :",
+                self.initial_equity
             )
+            print(
+                "MAX LOSS :",
+                self.max_daily_loss,
+                "%"
+            )
+            print("==============================")
 
 
-            return equity
+            return True
+
 
 
         except Exception as e:
 
+
             print(
-                "[EQUITY ERROR]",
+                "[RISK INIT ERROR]",
                 e
             )
 
-            return 0.0
+
+            return False
 
 
 
-    # ======================================
-    # DAILY LOSS CHECK
-    # ======================================
 
-    def check_daily_loss(self):
+    # ==================================================
+    # UPDATE EQUITY
+    # ==================================================
+
+    def update_equity(self, equity):
+
 
         try:
 
-            current = self.get_equity()
 
-
-            if self.daily_start_equity <= 0:
-
-                return False
+            self.current_equity = float(equity)
 
 
 
-            loss_percent = (
+            if self.current_equity > self.highest_equity:
 
-                self.daily_start_equity - current
+                self.highest_equity = self.current_equity
 
-            ) / self.daily_start_equity
+
+
+            if self.initial_equity > 0:
+
+
+                loss = (
+
+                    self.initial_equity
+                    -
+                    self.current_equity
+
+                )
+
+
+                self.daily_loss = (
+
+                    loss
+                    /
+                    self.initial_equity
+
+                ) * 100
 
 
 
             print(
                 "[DAILY LOSS]",
-                round(loss_percent * 100, 4),
+                round(
+                    self.daily_loss,
+                    4
+                ),
                 "%"
             )
 
 
-            if loss_percent >= DAILY_LOSS_LIMIT:
 
-                print(
-                    "[RISK STOP] DAILY LOSS LIMIT"
-                )
-
-                return True
+            self.check_daily_loss()
 
 
 
-            return False
+            return self.daily_loss
 
 
 
@@ -123,54 +162,65 @@ class RiskManager:
 
 
             print(
-                "[DAILY LOSS ERROR]",
+                "[RISK UPDATE ERROR]",
                 e
             )
 
+
+            return None
+
+
+
+
+    # ==================================================
+    # DAILY LOSS CHECK
+    # ==================================================
+
+    def check_daily_loss(self):
+
+
+        if self.daily_loss >= self.max_daily_loss:
+
+
+            self.trading_enabled = False
+
+
+            print("==============================")
+            print("[RISK STOP]")
+            print(
+                "DAILY LOSS LIMIT:",
+                self.daily_loss,
+                "%"
+            )
+            print("==============================")
+
+
             return False
 
-
-
-    # ======================================
-    # ORDER COOLDOWN
-    # ======================================
-
-    def order_allowed(self):
-
-        now = time.time()
-
-
-        if now - self.last_order_time < 60:
-
-            return False
 
 
         return True
 
 
 
-    def update_order_time(self):
 
-        self.last_order_time = time.time()
+    # ==================================================
+    # TRADE PERMISSION
+    # ==================================================
+
+    def allow_trade(self):
 
 
+        if not self.trading_enabled:
 
-    # ======================================
-    # POSITION SIZE
-    # ======================================
-
-    def check_position_size(
-        self,
-        qty
-    ):
-
-        if qty > MAX_POSITION_SIZE:
 
             print(
-                "[RISK BLOCK] POSITION SIZE"
+                "[TRADE BLOCKED] Risk limit"
             )
 
+
             return False
+
 
 
         return True
@@ -178,8 +228,134 @@ class RiskManager:
 
 
 
-# ==========================================
-# SINGLETON
-# ==========================================
+    # ==================================================
+    # POSITION SIZE CONTROL
+    # ==================================================
 
-risk_manager = RiskManager()
+    def calculate_position_size(
+
+        self,
+
+        balance,
+
+        risk_percent,
+
+        stop_loss_percent
+
+    ):
+
+
+        try:
+
+
+            risk_amount = (
+
+                float(balance)
+
+                *
+
+                float(risk_percent)
+
+                /
+
+                100
+
+            )
+
+
+
+            size = (
+
+                risk_amount
+
+                /
+
+                (
+
+                    float(stop_loss_percent)
+
+                    /
+
+                    100
+
+                )
+
+            )
+
+
+
+            return round(
+                size,
+                6
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[SIZE ERROR]",
+                e
+            )
+
+
+            return 0
+
+
+
+    # ==================================================
+    # RESET DAILY
+    # ==================================================
+
+    def reset_daily(self):
+
+
+        self.initial_equity = self.current_equity
+
+        self.daily_loss = 0.0
+
+        self.trading_enabled = True
+
+
+        print(
+            "[RISK RESET]"
+        )
+
+
+
+    # ==================================================
+    # STATUS
+    # ==================================================
+
+    def get_status(self):
+
+
+        return {
+
+
+            "initial_equity":
+                self.initial_equity,
+
+
+            "current_equity":
+                self.current_equity,
+
+
+            "highest_equity":
+                self.highest_equity,
+
+
+            "daily_loss":
+                self.daily_loss,
+
+
+            "max_daily_loss":
+                self.max_daily_loss,
+
+
+            "trading_enabled":
+                self.trading_enabled
+
+
+        }
