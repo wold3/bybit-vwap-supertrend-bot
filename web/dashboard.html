@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>
+VWAP SuperTrend Bot
+</title>
+
+
+<style>
+
+body{
+
+font-family:Arial;
+
+background:#111;
+
+color:white;
+
+padding:30px;
+
+}
+
+
+.card{
+
+background:#222;
+
+padding:20px;
+
+border-radius:10px;
+
+width:400px;
+
+}
+
+
+</style>
+
+
+</head>
+
+
+<body>
+
+
+<h1>
+VWAP SuperTrend BOT
+</h1>
+
+
+<div class="card">
+
+
+<p>
+BOT :
+<span id="bot"></span>
+</p>
+
+
+<p>
+SYMBOL :
+<span id="symbol"></span>
+</p>
+
+
+<p>
+PRICE :
+<span id="price"></span>
+</p>
+
+
+<p>
+VWAP :
+<span id="vwap"></span>
+</p>
+
+
+<p>
+TREND :
+<span id="trend"></span>
+</p>
+
+
+<p>
+POSITION :
+<span id="position"></span>
+</p>
+
+
+</div>
+
+
+
+
+<script>
+
+
+async function load(){
+
+
+let r =
+await fetch(
+"/api/status"
+);
+
+
+let d =
+await r.json();
+
+
+
+bot.innerHTML=d.bot;
+
+symbol.innerHTML=d.symbol;
+
+price.innerHTML=d.price;
+
+vwap.innerHTML=d.vwap;
+
+trend.innerHTML=d.trend;
+
+position.innerHTML=d.position;
+
+
+}
+
+
+
+setInterval(
+
+load,
+
+1000
+
+);
+
+
+load();
+
+
+</script>
+
+
+</body>
+
+</html>
