@@ -3,17 +3,20 @@ import time
 
 from config import (
     DEFAULT_SYMBOL,
+    CATEGORY,
 )
 
 
 from api.bybit_client import (
-    bybit_client,
+    bybit_client
 )
+
 
 
 
 
 class PositionManager:
+
 
 
     def __init__(self):
@@ -22,18 +25,27 @@ class PositionManager:
         self.symbol = DEFAULT_SYMBOL
 
 
+        self.category = CATEGORY
+
+
 
         self.current = {
 
-            "symbol": self.symbol,
 
             "side": None,
 
-            "size": 0,
 
-            "avg_price": 0,
+            "size": 0.0,
 
-            "unrealised_pnl": 0,
+
+            "avg_price": 0.0,
+
+
+            "unrealised_pnl": 0.0,
+
+
+            "position_idx": 0,
+
 
         }
 
@@ -42,7 +54,10 @@ class PositionManager:
         print("==============================")
         print("[POSITION MANAGER READY]")
         print("SYMBOL :", self.symbol)
+        print("CATEGORY :", self.category)
         print("==============================")
+
+
 
 
 
@@ -60,13 +75,19 @@ class PositionManager:
 
             params = {
 
+
                 "category":
-                    "linear",
+
+                    self.category,
+
+
 
                 "symbol":
-                    self.symbol
+
+                    self.symbol,
 
             }
+
 
 
 
@@ -111,13 +132,16 @@ class PositionManager:
 
 
 
+
             positions = (
 
                 response
+
                 .get(
                     "result",
                     {}
                 )
+
                 .get(
                     "list",
                     []
@@ -130,33 +154,11 @@ class PositionManager:
 
 
 
-            target = None
-
-
-
-
-
-            for pos in positions:
-
-
-                if pos.get(
-                    "symbol"
-                ) == self.symbol:
-
-
-                    target = pos
-
-                    break
-
-
-
-
-
-
-            if target is None:
+            if not positions:
 
 
                 self.clear()
+
 
                 return self.current
 
@@ -165,14 +167,17 @@ class PositionManager:
 
 
 
+            pos = positions[0]
+
+
+
+
+
             size = float(
 
-                target.get(
-
+                pos.get(
                     "size",
-
                     0
-
                 )
 
             )
@@ -181,11 +186,13 @@ class PositionManager:
 
 
 
+            # 빈 포지션
 
             if size <= 0:
 
 
                 self.clear()
+
 
                 return self.current
 
@@ -197,17 +204,12 @@ class PositionManager:
             self.current = {
 
 
-                "symbol":
-
-                    self.symbol,
-
-
-
                 "side":
 
-                    target.get(
+                    pos.get(
                         "side"
                     ),
+
 
 
 
@@ -217,11 +219,12 @@ class PositionManager:
 
 
 
+
                 "avg_price":
 
                     float(
 
-                        target.get(
+                        pos.get(
 
                             "avgPrice",
 
@@ -233,11 +236,12 @@ class PositionManager:
 
 
 
+
                 "unrealised_pnl":
 
                     float(
 
-                        target.get(
+                        pos.get(
 
                             "unrealisedPnl",
 
@@ -245,7 +249,25 @@ class PositionManager:
 
                         )
 
-                    )
+                    ),
+
+
+
+
+                "position_idx":
+
+                    int(
+
+                        pos.get(
+
+                            "positionIdx",
+
+                            0
+
+                        )
+
+                    ),
+
 
             }
 
@@ -264,15 +286,14 @@ class PositionManager:
 
 
 
-
             return self.current
 
 
 
 
 
-
         except Exception as e:
+
 
 
             print(
@@ -282,6 +303,7 @@ class PositionManager:
                 e
 
             )
+
 
 
             return self.current
@@ -302,29 +324,19 @@ class PositionManager:
         self.current = {
 
 
-            "symbol":
-
-                self.symbol,
+            "side": None,
 
 
-            "side":
-
-                None,
+            "size": 0.0,
 
 
-            "size":
-
-                0,
+            "avg_price": 0.0,
 
 
-            "avg_price":
-
-                0,
+            "unrealised_pnl": 0.0,
 
 
-            "unrealised_pnl":
-
-                0
+            "position_idx": 0,
 
         }
 
@@ -335,7 +347,7 @@ class PositionManager:
 
 
     # =====================================================
-    # STATUS
+    # CHECK
     # =====================================================
 
     def has_position(self):
@@ -350,6 +362,17 @@ class PositionManager:
             0
 
         )
+
+
+
+
+
+
+
+    def get_position(self):
+
+
+        return self.current
 
 
 
@@ -413,21 +436,12 @@ class PositionManager:
         while True:
 
 
-            try:
-
-                self.sync()
-
-
-            except Exception as e:
-
-                print(
-                    "[POSITION MONITOR ERROR]",
-                    e
-                )
-
+            self.sync()
 
 
             time.sleep(5)
+
+
 
 
 
