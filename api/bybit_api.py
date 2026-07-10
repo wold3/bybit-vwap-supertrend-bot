@@ -1,4 +1,3 @@
-```python
 import time
 
 from pybit.unified_trading import HTTP
@@ -7,6 +6,7 @@ from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
     BYBIT_TESTNET,
+    BYBIT_BASE_URL,
     CATEGORY,
     DEFAULT_SYMBOL,
     ACCOUNT_TYPE,
@@ -17,16 +17,16 @@ from config import (
 
 
 # ==================================================
-# BYBIT V5 API
+# BYBIT V5 API CLIENT
 # ==================================================
 
 class BybitAPI:
-
 
     def __init__(self):
 
         print("==============================")
         print("[BYBIT API INIT]")
+        print("BASE :", BYBIT_BASE_URL)
         print("TESTNET :", BYBIT_TESTNET)
         print("ACCOUNT :", ACCOUNT_TYPE)
         print("CATEGORY :", CATEGORY)
@@ -35,45 +35,33 @@ class BybitAPI:
 
 
         self.session = HTTP(
-
             testnet=BYBIT_TESTNET,
-
             api_key=BYBIT_API_KEY,
-
             api_secret=BYBIT_API_SECRET
-
         )
 
 
-
     # ==================================================
-    # WALLET BALANCE
+    # WALLET
     # ==================================================
 
     def get_wallet_balance(self):
 
         try:
 
-            response = self.session.get_wallet_balance(
-
+            result = self.session.get_wallet_balance(
                 accountType=ACCOUNT_TYPE
-
             )
 
+            print("[WALLET RESPONSE]")
+            print(result)
 
-            print("[WALLET]")
-            print(response)
-
-
-            return response
+            return result
 
 
         except Exception as e:
 
-            print(
-                "[WALLET ERROR]",
-                e
-            )
+            print("[WALLET ERROR]", e)
 
             return None
 
@@ -87,7 +75,7 @@ class BybitAPI:
 
         try:
 
-            response = self.session.get_positions(
+            result = self.session.get_positions(
 
                 category=CATEGORY,
 
@@ -95,16 +83,12 @@ class BybitAPI:
 
             )
 
-
-            return response
+            return result
 
 
         except Exception as e:
 
-            print(
-                "[POSITION ERROR]",
-                e
-            )
+            print("[POSITION ERROR]", e)
 
             return None
 
@@ -115,18 +99,14 @@ class BybitAPI:
     # ==================================================
 
     def get_kline(
-
         self,
-
         interval="1",
-
         limit=200
-
     ):
 
         try:
 
-            response = self.session.get_kline(
+            result = self.session.get_kline(
 
                 category=CATEGORY,
 
@@ -138,16 +118,39 @@ class BybitAPI:
 
             )
 
-
-            return response
+            return result
 
 
         except Exception as e:
 
-            print(
-                "[KLINE ERROR]",
-                e
+            print("[KLINE ERROR]", e)
+
+            return None
+
+
+
+    # ==================================================
+    # LAST PRICE
+    # ==================================================
+
+    def get_last_price(self):
+
+        try:
+
+            result = self.session.get_tickers(
+
+                category=CATEGORY,
+
+                symbol=DEFAULT_SYMBOL
+
             )
+
+            return result
+
+
+        except Exception as e:
+
+            print("[PRICE ERROR]", e)
 
             return None
 
@@ -158,26 +161,18 @@ class BybitAPI:
     # ==================================================
 
     def create_order(
-
         self,
-
         side,
-
         qty=None
-
     ):
-
 
         try:
 
-
             if qty is None:
-
                 qty = DEFAULT_QTY
 
 
-
-            response = self.session.place_order(
+            result = self.session.place_order(
 
                 category=CATEGORY,
 
@@ -195,35 +190,30 @@ class BybitAPI:
 
 
             print("[ORDER RESPONSE]")
-            print(response)
+            print(result)
 
 
-            return response
+            return result
 
 
 
         except Exception as e:
 
-
-            print(
-                "[ORDER ERROR]",
-                e
-            )
-
+            print("[ORDER ERROR]", e)
 
             return None
 
 
 
     # ==================================================
-    # CANCEL ALL
+    # CANCEL ALL ORDERS
     # ==================================================
 
     def cancel_all_orders(self):
 
         try:
 
-            response = self.session.cancel_all_orders(
+            result = self.session.cancel_all_orders(
 
                 category=CATEGORY,
 
@@ -231,20 +221,15 @@ class BybitAPI:
 
             )
 
-
             print("[CANCEL ALL]")
-            print(response)
+            print(result)
 
-
-            return response
+            return result
 
 
         except Exception as e:
 
-            print(
-                "[CANCEL ERROR]",
-                e
-            )
+            print("[CANCEL ERROR]", e)
 
             return None
 
@@ -257,9 +242,7 @@ class BybitAPI:
     def server_time(self):
 
         return int(
-
             time.time() * 1000
-
         )
 
 
@@ -269,4 +252,3 @@ class BybitAPI:
 # ==================================================
 
 bybit_api = BybitAPI()
-```
