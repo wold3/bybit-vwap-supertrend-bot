@@ -26,11 +26,6 @@ BYBIT_API_SECRET = os.getenv(
 )
 
 
-
-# ==================================
-# BYBIT SERVER
-# ==================================
-
 BYBIT_BASE_URL = os.getenv(
     "BYBIT_BASE_URL",
     "https://api-demo.bybit.com"
@@ -178,6 +173,14 @@ MAX_POSITION_SIZE = float(
 )
 
 
+RISK_PER_TRADE_PERCENT = float(
+    os.getenv(
+        "RISK_PER_TRADE_PERCENT",
+        "1.0"
+    )
+)
+
+
 MAX_DAILY_LOSS_PERCENT = float(
     os.getenv(
         "MAX_DAILY_LOSS_PERCENT",
@@ -189,7 +192,7 @@ MAX_DAILY_LOSS_PERCENT = float(
 MAX_DRAWDOWN_PERCENT = float(
     os.getenv(
         "MAX_DRAWDOWN_PERCENT",
-        str(MAX_DAILY_LOSS_PERCENT)
+        "5"
     )
 )
 
@@ -198,14 +201,6 @@ MAX_LOSS_STREAK = int(
     os.getenv(
         "MAX_LOSS_STREAK",
         "3"
-    )
-)
-
-
-RISK_PER_TRADE_PERCENT = float(
-    os.getenv(
-        "RISK_PER_TRADE_PERCENT",
-        "1.0"
     )
 )
 
@@ -233,7 +228,7 @@ STOP_LOSS_PERCENT = float(
 
 
 # ==================================
-# INDICATORS
+# INDICATOR
 # ==================================
 
 VWAP_LENGTH = int(
@@ -304,14 +299,6 @@ USE_TREND_FILTER = (
 )
 
 
-MIN_TREND_STRENGTH = float(
-    os.getenv(
-        "MIN_TREND_STRENGTH",
-        "0.001"
-    )
-)
-
-
 MIN_VOLUME = float(
     os.getenv(
         "MIN_VOLUME",
@@ -328,6 +315,69 @@ MIN_VOLUME_MULTIPLIER = float(
 )
 
 
+MIN_TREND_STRENGTH = float(
+    os.getenv(
+        "MIN_TREND_STRENGTH",
+        "0.001"
+    )
+)
+
+
+
+# ==================================
+# WATCHDOG
+# ==================================
+
+WATCHDOG_INTERVAL = int(
+    os.getenv(
+        "WATCHDOG_INTERVAL",
+        "30"
+    )
+)
+
+
+WATCHDOG_TIMEOUT = int(
+    os.getenv(
+        "WATCHDOG_TIMEOUT",
+        "120"
+    )
+)
+
+
+
+# ==================================
+# TELEGRAM
+# ==================================
+
+TELEGRAM_TOKEN = os.getenv(
+    "TELEGRAM_TOKEN",
+    ""
+)
+
+
+TELEGRAM_CHAT_ID = os.getenv(
+    "TELEGRAM_CHAT_ID",
+    ""
+)
+
+
+
+# ==================================
+# DATABASE
+# ==================================
+
+DATABASE_PATH = os.getenv(
+    "DATABASE_PATH",
+    "data/bot.db"
+)
+
+
+DB_NAME = os.getenv(
+    "DB_NAME",
+    "bot.db"
+)
+
+
 
 # ==================================
 # LOG
@@ -341,7 +391,7 @@ LOG_LEVEL = os.getenv(
 
 
 # ==================================
-# DEBUG
+# START MESSAGE
 # ==================================
 
 print("==============================")
