@@ -1,19 +1,13 @@
 # =====================================================
 # risk/risk_manager.py
-# Risk Manager
+# Risk Management
 # =====================================================
-
-import math
-
-
 
 from config import (
     RISK_PER_TRADE_PERCENT,
-    STOP_LOSS_PERCENT,
+    LEVERAGE,
     MAX_POSITION_SIZE
 )
-
-
 
 
 
@@ -25,9 +19,6 @@ class RiskManager:
 
 
         self.equity = 0
-
-
-        self.risk_amount = 0
 
 
         print(
@@ -42,10 +33,8 @@ class RiskManager:
 
 
 
-
-
     # =====================================================
-    # SET EQUITY
+    # UPDATE EQUITY
     # =====================================================
 
     def update_equity(
@@ -54,63 +43,20 @@ class RiskManager:
     ):
 
 
-        try:
+        self.equity = float(
+
+            equity
+
+        )
 
 
-            self.equity = float(
+        print(
 
-                equity
+            "[RISK READY]",
 
-            )
+            self.equity
 
-
-
-            self.risk_amount = (
-
-                self.equity
-
-                *
-
-                RISK_PER_TRADE_PERCENT
-
-                /
-
-                100
-
-            )
-
-
-
-            print(
-
-                "[RISK READY]",
-
-                self.equity
-
-            )
-
-
-
-            return True
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[RISK EQUITY ERROR]",
-
-                e
-
-            )
-
-
-            return False
-
+        )
 
 
 
@@ -133,6 +79,7 @@ class RiskManager:
         try:
 
 
+
             if self.equity <= 0:
 
 
@@ -143,13 +90,15 @@ class RiskManager:
 
 
 
-            stop_distance = (
+            # 위험 금액
 
-                price
+            risk_amount = (
+
+                self.equity
 
                 *
 
-                STOP_LOSS_PERCENT
+                RISK_PER_TRADE_PERCENT
 
                 /
 
@@ -159,10 +108,19 @@ class RiskManager:
 
 
 
-            if stop_distance <= 0:
 
 
-                return 0
+            # 레버리지 적용
+
+            position_value = (
+
+                risk_amount
+
+                *
+
+                LEVERAGE
+
+            )
 
 
 
@@ -171,11 +129,11 @@ class RiskManager:
 
             qty = (
 
-                self.risk_amount
+                position_value
 
                 /
 
-                stop_distance
+                float(price)
 
             )
 
@@ -183,6 +141,8 @@ class RiskManager:
 
 
 
+
+            # 최대 제한
 
 
             if qty > MAX_POSITION_SIZE:
@@ -195,12 +155,21 @@ class RiskManager:
 
 
 
-            return self.round_qty(
+            # Bybit 최소 단위 보정
 
-                qty
+            qty = round(
+
+                qty,
+
+                3
 
             )
 
+
+
+
+
+            return qty
 
 
 
@@ -209,9 +178,10 @@ class RiskManager:
         except Exception as e:
 
 
+
             print(
 
-                "[POSITION SIZE ERROR]",
+                "[RISK ERROR]",
 
                 e
 
@@ -226,115 +196,21 @@ class RiskManager:
 
 
 
-
-
-
     # =====================================================
-    # QTY ROUND
+    # RISK CHECK
     # =====================================================
 
-    def round_qty(
-        self,
-        qty
-    ):
+    def check_risk(self):
 
 
-        step = 0.001
-
-
-
-        qty = math.floor(
-
-            qty / step
-
-        ) * step
-
-
-
-        return round(
-
-            qty,
-
-            3
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # CHECK RISK
-    # =====================================================
-
-    def check_trade(
-        self,
-        price
-    ):
-
-
-        qty = self.calculate_position_size(
-
-            price
-
-        )
-
-
-
-        if qty <= 0:
-
-
-            print(
-
-                "[RISK BLOCK]"
-
-            )
+        if self.equity <= 0:
 
 
             return False
 
 
 
-
-
         return True
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # STATUS
-    # =====================================================
-
-    def status(self):
-
-
-        return {
-
-
-            "equity":
-
-                self.equity,
-
-
-            "risk_amount":
-
-                self.risk_amount
-
-
-        }
-
-
 
 
 
