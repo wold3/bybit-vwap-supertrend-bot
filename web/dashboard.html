@@ -1,40 +1,147 @@
+<!-- =====================================================
+     web/dashboard.html
+     VWAP SuperTrend Bot Dashboard
+===================================================== -->
+
+
 <!DOCTYPE html>
 
 <html>
 
+
 <head>
 
+
+<meta charset="UTF-8">
+
+
 <title>
-VWAP SuperTrend Bot
+VWAP SuperTrend BOT
 </title>
+
+
+
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
 
 
 <style>
 
-body{
 
-font-family:Arial;
+body {
 
-background:#111;
 
-color:white;
+    background:#111;
 
-padding:30px;
+    color:white;
+
+    font-family:Arial, sans-serif;
+
+    margin:20px;
+
+
+}
+
+
+
+h1 {
+
+
+    color:#00ff99;
 
 }
 
 
-.card{
 
-background:#222;
+.container {
 
-padding:20px;
 
-border-radius:10px;
+    display:flex;
 
-width:400px;
+    gap:20px;
+
+    flex-wrap:wrap;
+
 
 }
+
+
+
+.card {
+
+
+    background:#222;
+
+    padding:20px;
+
+    border-radius:10px;
+
+    min-width:250px;
+
+
+}
+
+
+
+.value {
+
+
+    font-size:22px;
+
+    color:#00ccff;
+
+
+}
+
+
+
+#chart {
+
+
+    width:100%;
+
+    height:500px;
+
+    margin-top:20px;
+
+}
+
+
+
+#logs {
+
+
+    background:#000;
+
+    padding:15px;
+
+    height:200px;
+
+    overflow:auto;
+
+    font-size:13px;
+
+
+}
+
+
+
+.buy {
+
+
+    color:#00ff00;
+
+}
+
+
+
+.sell {
+
+
+    color:#ff4444;
+
+}
+
 
 
 </style>
@@ -43,50 +150,46 @@ width:400px;
 </head>
 
 
+
+
+
 <body>
 
 
+
 <h1>
-VWAP SuperTrend BOT
+VWAP SuperTrend Trading Bot
 </h1>
+
+
+
+
+
+<div class="container">
+
 
 
 <div class="card">
 
 
+<h3>
+BOT STATUS
+</h3>
+
+
 <p>
-BOT :
-<span id="bot"></span>
+STATUS :
+<span class="value" id="bot">
+-
+</span>
 </p>
 
 
 <p>
 SYMBOL :
-<span id="symbol"></span>
-</p>
-
-
-<p>
-PRICE :
-<span id="price"></span>
-</p>
-
-
-<p>
-VWAP :
-<span id="vwap"></span>
-</p>
-
-
-<p>
-TREND :
-<span id="trend"></span>
-</p>
-
-
-<p>
-POSITION :
-<span id="position"></span>
+<span class="value" id="symbol">
+-
+</span>
 </p>
 
 
@@ -95,55 +198,482 @@ POSITION :
 
 
 
+
+
+<div class="card">
+
+
+<h3>
+MARKET
+</h3>
+
+
+<p>
+PRICE :
+<span class="value" id="price">
+-
+</span>
+</p>
+
+
+<p>
+VWAP :
+<span class="value" id="vwap">
+-
+</span>
+</p>
+
+
+<p>
+TREND :
+<span class="value" id="trend">
+-
+</span>
+</p>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<h3>
+SIGNAL
+</h3>
+
+
+<p>
+
+<span class="value" id="signal">
+NONE
+</span>
+
+</p>
+
+
+<p>
+
+POSITION :
+
+<span class="value" id="position">
+NONE
+</span>
+
+</p>
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+<div id="chart"></div>
+
+
+
+
+
+<h2>
+BOT LOG
+</h2>
+
+
+
+<div id="logs">
+
+</div>
+
+
+
+
+
+
+
+
 <script>
 
 
-async function load(){
+// ==============================
+// CHART
+// ==============================
 
 
-let r =
-await fetch(
-"/api/status"
+
+const chart =
+
+LightweightCharts.createChart(
+
+document.getElementById(
+
+"chart"
+
+),
+
+{
+
+
+layout:{
+
+
+background:{
+color:"#111"
+},
+
+
+textColor:"#ddd"
+
+
+},
+
+
+grid:{
+
+
+vertLines:{
+color:"#333"
+},
+
+
+horzLines:{
+color:"#333"
+}
+
+
+},
+
+
+height:500
+
+
+}
+
 );
 
 
-let d =
-await r.json();
 
 
 
-bot.innerHTML=d.bot;
+const candleSeries =
 
-symbol.innerHTML=d.symbol;
+chart.addCandlestickSeries();
 
-price.innerHTML=d.price;
 
-vwap.innerHTML=d.vwap;
 
-trend.innerHTML=d.trend;
 
-position.innerHTML=d.position;
+
+
+
+
+
+// ==============================
+// STATUS
+// ==============================
+
+
+async function loadStatus(){
+
+
+
+try{
+
+
+let r = await fetch(
+
+"/api/status"
+
+);
+
+
+
+let d = await r.json();
+
+
+
+bot.innerHTML =
+d.bot;
+
+
+symbol.innerHTML =
+d.symbol;
+
+
+price.innerHTML =
+Number(d.price).toFixed(2);
+
+
+
+vwap.innerHTML =
+Number(d.vwap).toFixed(2);
+
+
+
+trend.innerHTML =
+d.trend;
+
+
+
+signal.innerHTML =
+d.signal;
+
+
+
+position.innerHTML =
+d.position;
+
+
+
+if(d.signal=="BUY"){
+
+
+signal.className="buy";
+
+
+}
+
+
+else if(d.signal=="SELL"){
+
+
+signal.className="sell";
 
 
 }
 
 
 
-setInterval(
+}catch(e){
 
-load,
 
-1000
+console.log(e);
+
+
+}
+
+
+
+}
+
+
+
+
+
+
+
+
+// ==============================
+// CHART DATA
+// ==============================
+
+
+async function loadChart(){
+
+
+
+try{
+
+
+let r = await fetch(
+
+"/api/chart"
 
 );
 
 
-load();
+
+let data = await r.json();
+
+
+
+
+let candles = data.map(
+
+x =>
+
+({
+
+
+time:
+
+Math.floor(
+
+x.time / 1000
+
+),
+
+
+open:
+
+x.open,
+
+
+high:
+
+x.high,
+
+
+low:
+
+x.low,
+
+
+close:
+
+x.close
+
+
+})
+
+);
+
+
+
+candleSeries.setData(
+
+candles
+
+);
+
+
+
+}catch(e){
+
+
+console.log(e);
+
+
+}
+
+
+
+}
+
+
+
+
+
+
+
+
+
+// ==============================
+// LOG
+// ==============================
+
+
+async function loadLogs(){
+
+
+
+try{
+
+
+let r = await fetch(
+
+"/api/logs"
+
+);
+
+
+
+let data = await r.json();
+
+
+
+logs.innerHTML =
+
+data.map(
+
+x =>
+
+
+`[${x.time}] ${x.message}`
+
+
+)
+
+.join(
+
+"<br>"
+
+);
+
+
+
+logs.scrollTop =
+
+logs.scrollHeight;
+
+
+
+}catch(e){
+
+
+console.log(e);
+
+
+}
+
+
+
+}
+
+
+
+
+
+
+
+
+
+function refresh(){
+
+
+loadStatus();
+
+
+loadChart();
+
+
+loadLogs();
+
+
+}
+
+
+
+
+setInterval(
+
+refresh,
+
+3000
+
+);
+
+
+
+refresh();
+
 
 
 </script>
 
 
+
 </body>
+
 
 </html>
