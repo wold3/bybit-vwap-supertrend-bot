@@ -1,53 +1,42 @@
+import time
+
 from config import (
-    DEFAULT_SYMBOL,
     CATEGORY,
+    DEFAULT_SYMBOL,
     DEFAULT_QTY,
+    ORDER_TYPE,
+    TIME_IN_FORCE,
+    ORDER_COOLDOWN,
 )
 
-
-from api.bybit_client import (
-    bybit_client,
-)
+from api.bybit_api import bybit_api
+from risk.risk_manager import risk_manager
 
 
-from risk.risk_manager import (
-    risk_manager,
-)
-
-
-
-
+# ==========================================
+# ORDER MANAGER
+# ==========================================
 
 class OrderManager:
 
 
     def __init__(self):
 
-
-        self.symbol = DEFAULT_SYMBOL
-
-        self.category = CATEGORY
+        self.last_order_time = 0
 
 
         print("==============================")
         print("[EXECUTION ORDER MANAGER INIT]")
-        print("CATEGORY :", self.category)
-        print("SYMBOL :", self.symbol)
+        print("CATEGORY :", CATEGORY)
+        print("SYMBOL :", DEFAULT_SYMBOL)
         print("==============================")
 
 
-
-
-
-
-
-
-
-    # =====================================================
+    # ======================================
     # CREATE ORDER
-    # =====================================================
+    # ======================================
 
-    def create_order(
+    def execute_order(
         self,
         side,
         qty=None
@@ -57,155 +46,50 @@ class OrderManager:
         try:
 
 
-
             if qty is None:
 
                 qty = DEFAULT_QTY
 
 
 
+            # risk check
 
-
-            qty = float(qty)
-
-
-
-
-
-
-
-            if not risk_manager.allow_order(qty):
-
+            if not risk_manager.order_allowed():
 
                 print(
-                    "[ORDER BLOCKED]"
+                    "[ORDER BLOCK] COOLDOWN"
                 )
 
+                return None
+
+
+
+            if not risk_manager.check_position_size(qty):
 
                 return None
 
 
 
+            print("==============================")
+            print("[ORDER REQUEST]")
+            print("SIDE :", side)
+            print("QTY :", qty)
+            print("==============================")
 
 
+            result = bybit_api.create_order(
 
+                side=side,
 
-            params = {
-
-
-                "category":
-
-                    self.category,
-
-
-                "symbol":
-
-                    self.symbol,
-
-
-                "side":
-
-                    side,
-
-
-                "orderType":
-
-                    "Market",
-
-
-                "qty":
-
-                    str(qty),
-
-
-                "timeInForce":
-
-                    "IOC",
-
-
-
-            }
-
-
-
-
-
-
-            print(
-
-                "[ORDER REQUEST]",
-
-                params
+                qty=qty
 
             )
 
 
+            if result:
 
 
-
-
-
-
-            result = bybit_client.post(
-
-                "/v5/order/create",
-
-                params
-
-            )
-
-
-
-
-
-
-            if not result:
-
-
-                return None
-
-
-
-
-
-
-
-            if result.get(
-
-                "retCode"
-
-            ) != 0:
-
-
-
-                print(
-
-                    "[ORDER FAILED]",
-
-                    result
-
-                )
-
-
-                return None
-
-
-
-
-
-
-
-            risk_manager.record_order()
-
-
-
-            print(
-
-                "[ORDER SUCCESS]",
-
-                result
-
-            )
+                risk_manager.update_order_time()
 
 
 
@@ -213,19 +97,12 @@ class OrderManager:
 
 
 
-
-
-
-
         except Exception as e:
 
 
             print(
-
-                "[ORDER EXCEPTION]",
-
+                "[ORDER MANAGER ERROR]",
                 e
-
             )
 
 
@@ -234,195 +111,57 @@ class OrderManager:
 
 
 
-
-
-
-
-
-
-    # =====================================================
-    # BUY
-    # =====================================================
+    # ======================================
+    # LONG
+    # ======================================
 
     def buy(
         self,
         qty=None
     ):
 
+        return self.execute_order(
 
-        return self.create_order(
+            side="Buy",
 
-            "Buy",
-
-            qty
+            qty=qty
 
         )
 
 
 
-
-
-
-
-
-
-
-    # =====================================================
-    # SELL
-    # =====================================================
+    # ======================================
+    # SHORT
+    # ======================================
 
     def sell(
         self,
         qty=None
     ):
 
+        return self.execute_order(
 
-        return self.create_order(
+            side="Sell",
 
-            "Sell",
-
-            qty
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # CLOSE
-    # =====================================================
-
-    def close(
-        self,
-        side,
-        qty
-    ):
-
-
-
-        close_side = (
-
-            "Sell"
-
-            if side == "Buy"
-
-            else
-
-            "Buy"
+            qty=qty
 
         )
 
 
 
+    # ======================================
+    # CANCEL
+    # ======================================
 
-        params = {
+    def cancel_all(self):
 
+        return bybit_api.cancel_all_orders()
 
-            "category":
 
-                self.category,
 
 
-            "symbol":
-
-                self.symbol,
-
-
-            "side":
-
-                close_side,
-
-
-            "orderType":
-
-                "Market",
-
-
-            "qty":
-
-                str(qty),
-
-
-            "reduceOnly":
-
-                True,
-
-
-        }
-
-
-
-
-
-
-        print(
-
-            "[CLOSE REQUEST]",
-
-            params
-
-        )
-
-
-
-
-
-
-        return bybit_client.post(
-
-            "/v5/order/create",
-
-            params
-
-        )
-
-
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # STATUS
-    # =====================================================
-
-    def status(self):
-
-
-        return {
-
-
-            "symbol":
-
-                self.symbol,
-
-
-            "category":
-
-                self.category,
-
-
-        }
-
-
-
-
-
-
-
-
-
-
-
+# ==========================================
+# SINGLETON
+# ==========================================
 
 order_manager = OrderManager()
