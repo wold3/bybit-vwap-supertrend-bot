@@ -1,11 +1,11 @@
-import time
+import numpy as np
 
 from config import (
     CATEGORY,
     DEFAULT_SYMBOL,
+    TAKE_PROFIT_PERCENT,
+    STOP_LOSS_PERCENT,
 )
-
-from api.bybit_api import bybit_api
 
 
 
@@ -13,9 +13,7 @@ from api.bybit_api import bybit_api
 # POSITION MANAGER
 # ==========================================
 
-
 class PositionManager:
-
 
 
     def __init__(self):
@@ -27,111 +25,76 @@ class PositionManager:
         print("==============================")
 
 
-        self.position = None
-
-
-
-
     # ======================================
-    # GET CURRENT POSITION
+    # TP / SL PRICE
     # ======================================
 
-    def get_position(self):
+    def calculate_exit_price(
+        self,
+        entry_price,
+        side
+    ):
+
 
         try:
 
 
-            response = bybit_api.get_position()
-
-
-
-            if not response:
-
-                return None
-
-
-
-            data = response.get(
-                "result",
-                {}
+            entry_price = float(
+                entry_price
             )
 
 
 
-            rows = data.get(
-                "list",
-                []
-            )
+            if side == "Buy":
 
 
+                tp = entry_price * (
 
-            if len(rows) == 0:
+                    1
+                    +
+                    TAKE_PROFIT_PERCENT / 100
 
-                return None
-
-
-
-            pos = rows[0]
-
-
-
-            size = float(
-                pos.get(
-                    "size",
-                    0
                 )
-            )
+
+
+                sl = entry_price * (
+
+                    1
+                    -
+                    STOP_LOSS_PERCENT / 100
+
+                )
 
 
 
-            if size == 0:
-
-                return None
+            elif side == "Sell":
 
 
+                tp = entry_price * (
 
-            self.position = {
+                    1
+                    -
+                    TAKE_PROFIT_PERCENT / 100
 
-
-                "symbol":
-                    pos.get(
-                        "symbol"
-                    ),
-
-
-                "side":
-                    pos.get(
-                        "side"
-                    ),
+                )
 
 
-                "size":
-                    size,
+                sl = entry_price * (
+
+                    1
+                    +
+                    STOP_LOSS_PERCENT / 100
+
+                )
 
 
-                "entry_price":
-                    float(
-                        pos.get(
-                            "avgPrice",
-                            0
-                        )
-                    ),
+            else:
 
-
-                "unrealized_pnl":
-                    float(
-                        pos.get(
-                            "unrealisedPnl",
-                            0
-                        )
-                    )
-
-            }
+                return None, None
 
 
 
-            return self.position
-
+            return tp, sl
 
 
 
@@ -139,31 +102,98 @@ class PositionManager:
 
 
             print(
-                "[POSITION ERROR]",
+                "[EXIT PRICE ERROR]",
                 e
             )
 
 
-            return None
-
-
+            return None, None
 
 
 
 
     # ======================================
-    # POSITION CHECK
+    # ATR LEVEL
     # ======================================
 
-    def is_open(self):
+    def calc_atr_levels(
+        self,
+        prices,
+        period=20,
+        multiplier=2
+    ):
 
 
-        position = self.get_position()
+        if len(prices) < period:
+
+            return None, None
 
 
-        if position:
 
-            return True
+        high = max(
+            prices[-period:]
+        )
+
+
+        low = min(
+            prices[-period:]
+        )
+
+
+        atr = (
+
+            high - low
+
+        ) / period
+
+
+
+        return (
+
+            atr * multiplier,
+
+            atr * multiplier
+
+        )
+
+
+
+
+    # ======================================
+    # STOP LOSS CHECK
+    # ======================================
+
+    def should_stop_loss(
+        self,
+        entry_price,
+        current_price,
+        side,
+        sl
+    ):
+
+
+        if side == "Buy":
+
+            return (
+
+                current_price
+                <=
+                entry_price - sl
+
+            )
+
+
+
+        if side == "Sell":
+
+            return (
+
+                current_price
+                >=
+                entry_price + sl
+
+            )
+
 
 
         return False
@@ -171,256 +201,118 @@ class PositionManager:
 
 
 
-
-
     # ======================================
-    # CURRENT SIDE
+    # TAKE PROFIT CHECK
     # ======================================
 
-    def get_side(self):
-
-
-        position = self.get_position()
-
-
-
-        if position:
-
-            return position["side"]
-
-
-
-        return None
-
-
-
-
-
-
-    # ======================================
-    # ENTRY PRICE
-    # ======================================
-
-    def get_entry_price(self):
-
-
-        position = self.get_position()
-
-
-
-        if position:
-
-            return position["entry_price"]
-
-
-
-        return 0
-
-
-
-
-
-
-    # ======================================
-    # ATR TP / SL CALCULATION
-    # ======================================
-
-    def calculate_tp_sl(
-
+    def should_take_profit(
         self,
-
-        prices,
-
-        multiplier=2.0
-
-    ):
-
-
-        if len(prices) < 20:
-
-            return None, None
-
-
-
-        high = max(
-            prices[-20:]
-        )
-
-
-        low = min(
-            prices[-20:]
-        )
-
-
-
-        atr = (
-            high - low
-        ) / 20
-
-
-
-        tp = atr * multiplier
-
-
-        sl = atr * multiplier
-
-
-
-        return tp, sl
-
-
-
-
-
-
-
-    # ======================================
-    # EXIT CHECK
-    # ======================================
-
-    def check_exit(
-
-        self,
-
+        entry_price,
         current_price,
-
-        prices
-
+        side,
+        tp
     ):
 
-
-        position = self.get_position()
-
-
-
-        if not position:
-
-            return None
-
-
-
-        entry = position["entry_price"]
-
-
-        side = position["side"]
-
-
-
-        tp, sl = self.calculate_tp_sl(
-            prices
-        )
-
-
-
-        if tp is None:
-
-            return None
-
-
-
-
-
-        # LONG
 
         if side == "Buy":
 
+            return (
 
-            if current_price <= entry - sl:
+                current_price
+                >=
+                entry_price + tp
 
-                return "STOP_LOSS"
-
-
-
-            if current_price >= entry + tp:
-
-                return "TAKE_PROFIT"
+            )
 
 
-
-
-
-        # SHORT
 
         if side == "Sell":
 
+            return (
 
-            if current_price >= entry + sl:
+                current_price
+                <=
+                entry_price - tp
 
-                return "STOP_LOSS"
-
-
-
-            if current_price <= entry - tp:
-
-                return "TAKE_PROFIT"
+            )
 
 
 
-
-        return None
-
-
+        return False
 
 
 
 
     # ======================================
-    # CLOSE POSITION
+    # EXIT SIGNAL
     # ======================================
 
-    def close_position(self):
+    def evaluate_exit(
+        self,
+        entry_price,
+        side,
+        prices
+    ):
 
 
         try:
 
 
-            position = self.get_position()
+            current_price = prices[-1]
 
 
 
-            if not position:
+            tp, sl = self.calc_atr_levels(
+
+                prices
+
+            )
+
+
+
+            if tp is None:
 
                 return None
 
 
 
-            side = position["side"]
+            if self.should_stop_loss(
+
+                entry_price,
+
+                current_price,
+
+                side,
+
+                sl
+
+            ):
+
+
+                return "STOP_LOSS"
 
 
 
-            size = position["size"]
+
+            if self.should_take_profit(
+
+                entry_price,
+
+                current_price,
+
+                side,
+
+                tp
+
+            ):
+
+
+                return "TAKE_PROFIT"
 
 
 
-            close_side = (
-                "Sell"
-                if side == "Buy"
-                else
-                "Buy"
-            )
 
-
-
-            result = bybit_api.create_order(
-
-                side=close_side,
-
-                qty=size
-
-            )
-
-
-
-            print(
-                "[POSITION CLOSED]"
-            )
-
-
-            print(result)
-
-
-
-            return result
+            return None
 
 
 
@@ -429,14 +321,12 @@ class PositionManager:
 
 
             print(
-                "[CLOSE ERROR]",
+                "[EXIT ERROR]",
                 e
             )
 
 
             return None
-
-
 
 
 
