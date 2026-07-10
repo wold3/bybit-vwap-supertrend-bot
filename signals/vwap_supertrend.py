@@ -11,7 +11,6 @@ from config import (
 # VWAP + SUPERTREND SIGNAL ENGINE
 # ==========================================
 
-
 class VWAPSupertrend:
 
 
@@ -28,28 +27,42 @@ class VWAPSupertrend:
         print("==============================")
 
 
+
     # ======================================
-    # VWAP
+    # VWAP 계산
     # ======================================
 
-    def calculate_vwap(self, prices, volumes):
+    def calculate_vwap(
+        self,
+        prices,
+        volumes
+    ):
+
 
         if len(prices) == 0:
+
             return None
 
 
-        pv = np.array(prices) * np.array(volumes)
+        volume_sum = np.sum(volumes)
 
-        return (
-            pv.sum()
-            /
-            np.array(volumes).sum()
-        )
+
+        if volume_sum == 0:
+
+            return None
+
+
+
+        return np.sum(
+            np.array(prices)
+            *
+            np.array(volumes)
+        ) / volume_sum
 
 
 
     # ======================================
-    # ATR
+    # ATR 계산
     # ======================================
 
     def calculate_atr(
@@ -58,8 +71,11 @@ class VWAPSupertrend:
         period=None
     ):
 
+
         if period is None:
+
             period = SUPERTREND_PERIOD
+
 
 
         if len(prices) < period + 1:
@@ -67,10 +83,12 @@ class VWAPSupertrend:
             return None
 
 
+
         tr = []
 
 
         for i in range(1, len(prices)):
+
 
             tr.append(
                 abs(
@@ -81,6 +99,7 @@ class VWAPSupertrend:
             )
 
 
+
         return np.mean(
             tr[-period:]
         )
@@ -88,7 +107,7 @@ class VWAPSupertrend:
 
 
     # ======================================
-    # SUPERTREND
+    # Supertrend 계산
     # ======================================
 
     def calculate_supertrend(
@@ -108,36 +127,46 @@ class VWAPSupertrend:
 
 
 
-        middle = np.mean(
+        basis = np.mean(
             prices[-SUPERTREND_PERIOD:]
         )
 
 
-        upper = (
-            middle
+
+        upper_band = (
+
+            basis
             +
             atr * SUPERTREND_MULTIPLIER
+
         )
 
 
-        lower = (
-            middle
+
+        lower_band = (
+
+            basis
             -
             atr * SUPERTREND_MULTIPLIER
+
         )
+
 
 
         current = prices[-1]
 
 
-        if current > upper:
+
+        if current > upper_band:
 
             return "BUY"
 
 
-        elif current < lower:
+
+        elif current < lower_band:
 
             return "SELL"
+
 
 
         return "HOLD"
@@ -145,7 +174,7 @@ class VWAPSupertrend:
 
 
     # ======================================
-    # MAIN SIGNAL
+    # Signal 생성
     # ======================================
 
     def generate_signal(
@@ -157,44 +186,171 @@ class VWAPSupertrend:
 
         if len(prices) < VWAP_LENGTH:
 
-            return "HOLD"
+            return None
 
 
 
         vwap = self.calculate_vwap(
+
             prices[-VWAP_LENGTH:],
+
             volumes[-VWAP_LENGTH:]
+
         )
 
 
-        supertrend = self.calculate_supertrend(
+
+        if vwap is None:
+
+            return None
+
+
+
+        trend = self.calculate_supertrend(
+
             prices
+
         )
+
 
 
         current = prices[-1]
 
 
 
+        # LONG
+
         if (
+
             current > vwap
-            and supertrend == "BUY"
+
+            and
+
+            trend == "BUY"
+
         ):
 
-            return "Buy"
+            return "BUY"
 
 
+
+        # SHORT
 
         if (
+
             current < vwap
-            and supertrend == "SELL"
+
+            and
+
+            trend == "SELL"
+
         ):
 
-            return "Sell"
+            return "SELL"
 
 
 
-        return "HOLD"
+        return None
+
+
+
+
+    # ======================================
+    # MAIN LOOP 연결 함수
+    # ======================================
+
+    def check_signal(
+        self,
+        candles
+    ):
+
+
+        try:
+
+
+            prices = []
+
+            volumes = []
+
+
+
+            for candle in candles:
+
+
+                if isinstance(candle, dict):
+
+
+                    prices.append(
+
+                        float(
+                            candle["close"]
+                        )
+
+                    )
+
+
+                    volumes.append(
+
+                        float(
+                            candle["volume"]
+                        )
+
+                    )
+
+
+                else:
+
+
+                    # Bybit kline 배열 대응
+                    # [
+                    # timestamp,
+                    # open,
+                    # high,
+                    # low,
+                    # close,
+                    # volume
+                    # ]
+
+                    prices.append(
+
+                        float(
+                            candle[4]
+                        )
+
+                    )
+
+
+                    volumes.append(
+
+                        float(
+                            candle[5]
+                        )
+
+                    )
+
+
+
+            return self.generate_signal(
+
+                prices,
+
+                volumes
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[SIGNAL ERROR]",
+                e
+            )
+
+
+            return None
+
 
 
 
