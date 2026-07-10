@@ -35,14 +35,21 @@ class BybitAPI:
 
 
         self.session = HTTP(
+
             testnet=BYBIT_TESTNET,
+
+            demo=True,
+
             api_key=BYBIT_API_KEY,
+
             api_secret=BYBIT_API_SECRET
+
         )
 
 
+
     # ==================================================
-    # WALLET
+    # WALLET BALANCE
     # ==================================================
 
     def get_wallet_balance(self):
@@ -50,13 +57,18 @@ class BybitAPI:
         try:
 
             result = self.session.get_wallet_balance(
+
                 accountType=ACCOUNT_TYPE
+
             )
+
 
             print("[WALLET RESPONSE]")
             print(result)
 
+
             return result
+
 
 
         except Exception as e:
@@ -83,7 +95,9 @@ class BybitAPI:
 
             )
 
+
             return result
+
 
 
         except Exception as e:
@@ -99,9 +113,13 @@ class BybitAPI:
     # ==================================================
 
     def get_kline(
+
         self,
+
         interval="1",
+
         limit=200
+
     ):
 
         try:
@@ -118,7 +136,9 @@ class BybitAPI:
 
             )
 
+
             return result
+
 
 
         except Exception as e:
@@ -130,46 +150,25 @@ class BybitAPI:
 
 
     # ==================================================
-    # LAST PRICE
-    # ==================================================
-
-    def get_last_price(self):
-
-        try:
-
-            result = self.session.get_tickers(
-
-                category=CATEGORY,
-
-                symbol=DEFAULT_SYMBOL
-
-            )
-
-            return result
-
-
-        except Exception as e:
-
-            print("[PRICE ERROR]", e)
-
-            return None
-
-
-
-    # ==================================================
     # CREATE ORDER
     # ==================================================
 
     def create_order(
+
         self,
+
         side,
+
         qty=None
+
     ):
 
         try:
 
             if qty is None:
+
                 qty = DEFAULT_QTY
+
 
 
             result = self.session.place_order(
@@ -221,10 +220,13 @@ class BybitAPI:
 
             )
 
+
             print("[CANCEL ALL]")
             print(result)
 
+
             return result
+
 
 
         except Exception as e:
@@ -242,7 +244,9 @@ class BybitAPI:
     def server_time(self):
 
         return int(
+
             time.time() * 1000
+
         )
 
 
