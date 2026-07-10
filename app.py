@@ -1,106 +1,72 @@
-import time
 import threading
+import time
 
 
-from config import (
-    LIVE_TRADING,
-    DEFAULT_SYMBOL,
-    BYBIT_BASE_URL,
+from websocket.public_ws import (
+    ws_client,
 )
 
 
-from market.websocket_client import (
-    ws_client
+from websocket.private_ws import (
+    private_ws_client,
 )
 
 
-from services.private_ws_client import (
-    private_ws_client
-)
-
-
-from portfolio.bybit_wallet import (
-    wallet
-)
-
-
-from position.position_manager import (
-    position_manager
-)
-
-
-from execution.order_manager import (
-    order_manager
+from indicators.indicator_engine import (
+    indicator_engine,
 )
 
 
 from strategy.strategy_engine import (
-    strategy_engine
+    strategy_engine,
+)
+
+
+from execution.order_manager import (
+    order_manager,
 )
 
 
 from risk.risk_manager import (
-    risk_manager
+    risk_manager,
+)
+
+
+from guard.bot_guard import (
+    bot_guard,
 )
 
 
 from watchdog.watchdog import (
-    watchdog
+    watchdog,
 )
 
 
-from core.bot_guard import (
-    bot_guard
-)
-
-
-from utils.logger import (
-    bot_logger,
-    error_logger,
+from portfolio.bybit_wallet import (
+    wallet,
 )
 
 
 
 
 
-# ==========================================================
-# HEARTBEAT
-# ==========================================================
-
-def heartbeat_loop():
-
-
-    print(
-        "[HEARTBEAT LOOP START]"
-    )
-
-
-    while bot_guard.is_running():
-
-
-        try:
-
-
-            bot_guard.heartbeat()
+class TradingApp:
 
 
 
-        except Exception as e:
+    def __init__(self):
 
 
-            print(
-                "[HEARTBEAT ERROR]",
-                e
-            )
-
-
-            error_logger.exception(
-                str(e)
-            )
+        print("==============================")
+        print("[APP INIT]")
+        print("==============================")
 
 
 
-        time.sleep(60)
+        self.running = False
+
+
+        self.thread = None
 
 
 
@@ -108,27 +74,30 @@ def heartbeat_loop():
 
 
 
+        # Public WS callback 연결
 
+        ws_client.set_callback(
 
-# ==========================================================
-# CANDLE HANDLER
-# ==========================================================
+            self.on_candle
 
-def handle_candle(
-    candle
-):
-
-
-    try:
-
-
-        signal = strategy_engine.on_candle(
-            candle
         )
 
 
 
-        if signal is None:
+
+
+
+
+
+
+    # =====================================================
+    # START
+    # =====================================================
+
+    def start(self):
+
+
+        if self.running:
 
 
             return
@@ -136,57 +105,30 @@ def handle_candle(
 
 
 
-
-
-        qty = 0.001
-
+        self.running = True
 
 
 
-
-        if not risk_manager.allow_order(
-            qty
-        ):
-
-
-            return
+        print("==============================")
+        print("VWAP SUPERTREND BOT START")
+        print("==============================")
 
 
 
 
 
+        # Risk 초기화
 
-
-        if signal == "BUY":
-
-
-            result = order_manager.create_order(
-
-                side="Buy",
-
-                qty=qty
-
-            )
+        risk_manager.initialize()
 
 
 
-        elif signal == "SELL":
-
-
-            result = order_manager.create_order(
-
-                side="Sell",
-
-                qty=qty
-
-            )
 
 
 
-        else:
+        # Watchdog
 
-
-            return
+        watchdog.start()
 
 
 
@@ -194,51 +136,49 @@ def handle_candle(
 
 
 
+        # Private WS
 
-        if result and result.get(
-            "retCode"
-        ) == 0:
+        threading.Thread(
 
+            target=private_ws_client.start,
 
+            daemon=True
 
-            print(
-                "[TRADE EXECUTED]",
-                signal
-            )
-
-
-            bot_logger.info(
-
-                f"ORDER {signal}"
-
-            )
-
-
-            risk_manager.record_order()
+        ).start()
 
 
 
-        else:
-
-
-            print(
-                "[ORDER RESULT]",
-                result
-            )
 
 
 
-    except Exception as e:
+
+        # Public WS
+
+        ws_client.start()
+
+
+
+
+
+
+
+        self.thread = threading.Thread(
+
+            target=self.loop,
+
+            daemon=True
+
+        )
+
+
+        self.thread.start()
+
+
+
 
 
         print(
-            "[HANDLE CANDLE ERROR]",
-            e
-        )
-
-
-        error_logger.exception(
-            str(e)
+            "[BOT RUNNING]"
         )
 
 
@@ -249,37 +189,97 @@ def handle_candle(
 
 
 
-# ==========================================================
-# STRATEGY MONITOR LOOP
-# ==========================================================
+    # =====================================================
+    # CANDLE CALLBACK
+    # =====================================================
 
-def strategy_loop():
-
-
-    print(
-        "[STRATEGY LOOP START]"
-    )
+    def on_candle(
+        self,
+        candle
+    ):
 
 
 
-    while bot_guard.is_running():
+        if not bot_guard.is_running():
+
+            return
+
+
+
 
 
         try:
 
 
-            if not risk_manager.check_daily_loss():
+
+
+            indicators = indicator_engine.update(
+
+                candle
+
+            )
+
+
+
+
+
+
+            if not indicators:
+
+
+                return
+
+
+
+
+
+
+
+
+            signal = strategy_engine.analyze(
+
+                candle,
+
+                indicators
+
+            )
+
+
+
+
+
+
+            if signal == "BUY":
+
 
 
                 print(
-                    "[STOP] DAILY LOSS"
+                    "[SIGNAL BUY]"
                 )
 
 
-                bot_guard.stop()
+
+                order_manager.buy()
 
 
-                break
+
+
+
+
+            elif signal == "SELL":
+
+
+
+                print(
+                    "[SIGNAL SELL]"
+                )
+
+
+
+                order_manager.sell()
+
+
+
 
 
 
@@ -288,18 +288,15 @@ def strategy_loop():
 
 
             print(
-                "[STRATEGY LOOP ERROR]",
+
+                "[CANDLE PROCESS ERROR]",
+
                 e
-            )
 
-
-            error_logger.exception(
-                str(e)
             )
 
 
 
-        time.sleep(5)
 
 
 
@@ -308,214 +305,109 @@ def strategy_loop():
 
 
 
+    # =====================================================
+    # LOOP
+    # =====================================================
 
-# ==========================================================
-# START BOT
-# ==========================================================
+    def loop(self):
 
-def start_bot():
 
+        print(
+            "[APP LOOP START]"
+        )
 
-    print("====================================")
-    print("VWAP SUPERTREND BOT START")
-    print("LIVE :", LIVE_TRADING)
-    print("SYMBOL :", DEFAULT_SYMBOL)
-    print("BASE :", BYBIT_BASE_URL)
-    print("====================================")
 
 
+        while self.running:
 
-    bot_logger.info(
-        "BOT START"
-    )
 
 
+            try:
 
 
-    # WATCHDOG
 
-    watchdog.start()
+                watchdog.heartbeat()
 
 
 
+                risk_manager.check_daily_loss()
 
 
-    # WALLET
 
-    equity = wallet.get_equity()
+                time.sleep(5)
 
 
-    print(
-        "[ACCOUNT EQUITY]",
-        equity
-    )
 
 
 
-    risk_manager.initialize()
+            except Exception as e:
 
 
 
+                print(
 
+                    "[APP LOOP ERROR]",
 
+                    e
 
-    # PUBLIC WS CALLBACK
+                )
 
-    ws_client.set_callback(
-        handle_candle
-    )
 
+                time.sleep(5)
 
 
 
 
 
 
-    # PUBLIC WS
 
-    threading.Thread(
 
-        target=ws_client.start,
 
-        daemon=True
+    # =====================================================
+    # STOP
+    # =====================================================
 
-    ).start()
+    def stop(self):
 
 
+        print(
+            "[BOT STOPPING]"
+        )
 
 
 
+        self.running = False
 
 
-    # PRIVATE WS
 
-    threading.Thread(
+        bot_guard.stop()
 
-        target=private_ws_client.start,
 
-        daemon=True
-
-    ).start()
-
-
-
-
-
-
-
-    # STRATEGY LOOP
-
-    threading.Thread(
-
-        target=strategy_loop,
-
-        daemon=True
-
-    ).start()
-
-
-
-
-
-
-
-    # HEARTBEAT
-
-    threading.Thread(
-
-        target=heartbeat_loop,
-
-        daemon=True
-
-    ).start()
-
-
-
-
-
-    print(
-        "[BOT RUNNING]"
-    )
-
-
-    bot_logger.info(
-        "BOT RUNNING"
-    )
-
-
-
-
-
-
-
-
-
-# ==========================================================
-# STOP BOT
-# ==========================================================
-
-def stop_bot():
-
-
-    print(
-        "\n[BOT STOPPING]"
-    )
-
-
-
-    bot_logger.info(
-        "BOT STOPPING"
-    )
-
-
-
-    bot_guard.stop()
-
-
-
-
-
-    try:
 
         ws_client.stop()
 
-    except Exception:
 
-        pass
-
-
-
-
-
-    try:
 
         private_ws_client.stop()
 
-    except Exception:
 
-        pass
-
-
-
-
-
-    try:
 
         watchdog.stop()
 
-    except Exception:
-
-        pass
 
 
+        print(
+            "[BOT STOPPED]"
+        )
 
 
 
-    print(
-        "[BOT STOPPED]"
-    )
 
 
-    bot_logger.info(
-        "BOT STOPPED"
-    )
+
+
+
+
+
+
+app = TradingApp()
