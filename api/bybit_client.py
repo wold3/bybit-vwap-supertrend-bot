@@ -13,8 +13,6 @@ from config import (
 
 
 
-
-
 class BybitClient:
 
 
@@ -34,10 +32,6 @@ class BybitClient:
         print("BASE :", self.base_url)
         print("KEY :", self.api_key[:6])
         print("==============================")
-
-
-
-
 
 
 
@@ -108,8 +102,6 @@ class BybitClient:
 
 
 
-
-
     # =====================================================
     # HEADERS
     # =====================================================
@@ -121,7 +113,7 @@ class BybitClient:
 
 
         timestamp = str(
-            int(time.time()*1000)
+            int(time.time() * 1000)
         )
 
 
@@ -172,6 +164,62 @@ class BybitClient:
 
 
 
+    # =====================================================
+    # RESPONSE PARSER
+    # =====================================================
+
+    def _parse_response(
+        self,
+        response
+    ):
+
+
+        print(
+            "[BYBIT STATUS]",
+            response.status_code
+        )
+
+
+        print(
+            "[BYBIT TEXT]",
+            response.text[:500]
+        )
+
+
+
+        if not response.text:
+
+            return None
+
+
+
+        try:
+
+            data = response.json()
+
+
+        except Exception:
+
+
+            print(
+                "[JSON PARSE ERROR]"
+            )
+
+
+            return None
+
+
+
+        print(
+            "[BYBIT RESPONSE]",
+            data
+        )
+
+
+        return data
+
+
+
 
 
 
@@ -196,14 +244,9 @@ class BybitClient:
         try:
 
 
-            query = params
-
-
-
             headers = self._headers(
-                query
+                params
             )
-
 
 
             url = (
@@ -224,7 +267,7 @@ class BybitClient:
 
                 headers=headers,
 
-                params=query,
+                params=params,
 
                 timeout=10
 
@@ -232,18 +275,9 @@ class BybitClient:
 
 
 
-            data = response.json()
-
-
-
-            print(
-                "[BYBIT RESPONSE]",
-                data
+            return self._parse_response(
+                response
             )
-
-
-
-            return data
 
 
 
@@ -282,9 +316,7 @@ class BybitClient:
 
 
 
-
         try:
-
 
 
             body = json.dumps(
@@ -317,7 +349,6 @@ class BybitClient:
 
 
 
-
             response = requests.post(
 
                 url,
@@ -332,20 +363,9 @@ class BybitClient:
 
 
 
-
-            data = response.json()
-
-
-
-            print(
-                "[BYBIT RESPONSE]",
-                data
+            return self._parse_response(
+                response
             )
-
-
-
-            return data
-
 
 
 
@@ -360,12 +380,6 @@ class BybitClient:
 
 
             return None
-
-
-
-
-
-
 
 
 
