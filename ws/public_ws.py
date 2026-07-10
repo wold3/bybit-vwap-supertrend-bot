@@ -5,11 +5,14 @@ from pybit.unified_trading import WebSocket
 
 from config import (
     BYBIT_TESTNET,
-    BYBIT_DEMO,
     CATEGORY,
     DEFAULT_SYMBOL,
 )
 
+
+# ==========================================
+# BYBIT PUBLIC WEBSOCKET V5
+# ==========================================
 
 class PublicWS:
 
@@ -17,9 +20,11 @@ class PublicWS:
     def __init__(self):
 
         self.ws = None
+
         self.running = False
 
         self.ticker = None
+
         self.kline = []
 
         print("==============================")
@@ -29,9 +34,10 @@ class PublicWS:
         print("==============================")
 
 
-    # ==========================
-    # CALLBACK
-    # ==========================
+
+    # ======================================
+    # TICKER CALLBACK
+    # ======================================
 
     def handle_ticker(self, message):
 
@@ -43,11 +49,15 @@ class PublicWS:
         except Exception as e:
 
             print(
-                "[TICKER ERROR]",
+                "[TICKER CALLBACK ERROR]",
                 e
             )
 
 
+
+    # ======================================
+    # KLINE CALLBACK
+    # ======================================
 
     def handle_kline(self, message):
 
@@ -64,40 +74,47 @@ class PublicWS:
                 self.kline.append(candle)
 
 
-            if len(self.kline) > 300:
 
-                self.kline = self.kline[-300:]
+            if len(self.kline) > 500:
+
+                self.kline = self.kline[-500:]
+
 
 
         except Exception as e:
 
             print(
-                "[KLINE ERROR]",
+                "[KLINE CALLBACK ERROR]",
                 e
             )
 
 
 
-    # ==========================
+    # ======================================
     # START
-    # ==========================
+    # ======================================
 
     def start(self):
 
         try:
 
+
             self.running = True
 
+
+
+            # IMPORTANT
+            # Demo Trading Public WS 사용 금지
+            # Public Market Data = 일반 V5 endpoint
 
             self.ws = WebSocket(
 
                 testnet=BYBIT_TESTNET,
 
-                demo=BYBIT_DEMO,
-
                 channel_type="linear"
 
             )
+
 
 
             self.ws.ticker_stream(
@@ -109,20 +126,23 @@ class PublicWS:
             )
 
 
+
             self.ws.kline_stream(
 
-                interval=1,
-
                 symbol=DEFAULT_SYMBOL,
+
+                interval=1,
 
                 callback=self.handle_kline
 
             )
 
 
+
             print(
                 "[PUBLIC WS STARTED]"
             )
+
 
 
             while self.running:
@@ -133,6 +153,7 @@ class PublicWS:
 
         except Exception as e:
 
+
             print(
                 "[PUBLIC WS START ERROR]",
                 e
@@ -140,11 +161,12 @@ class PublicWS:
 
 
 
-    # ==========================
-    # THREAD
-    # ==========================
+    # ======================================
+    # THREAD START
+    # ======================================
 
     def run_thread(self):
+
 
         thread = threading.Thread(
 
@@ -154,17 +176,32 @@ class PublicWS:
 
         )
 
+
         thread.start()
 
 
 
-    # ==========================
+    # ======================================
     # STOP
-    # ==========================
+    # ======================================
 
     def stop(self):
 
+
         self.running = False
+
+
+        try:
+
+            if self.ws:
+
+                self.ws.exit()
+
+        except:
+
+            pass
+
+
 
         print(
             "[PUBLIC WS STOPPED]"
@@ -172,28 +209,66 @@ class PublicWS:
 
 
 
-    # ==========================
-    # GET
-    # ==========================
+    # ======================================
+    # PRICE GETTER
+    # ======================================
 
     def get_price(self):
 
         try:
 
-            if self.ticker:
+            if not self.ticker:
 
-                return float(
-                    self.ticker["data"]["lastPrice"]
-                )
+                return None
 
 
-        except:
 
-            pass
+            data = self.ticker.get(
+                "data",
+                {}
+            )
+
+
+
+            price = data.get(
+                "lastPrice"
+            )
+
+
+
+            if price:
+
+                return float(price)
+
+
+
+        except Exception as e:
+
+            print(
+                "[PRICE ERROR]",
+                e
+            )
+
 
 
         return None
 
 
+
+    # ======================================
+    # KLINE GETTER
+    # ======================================
+
+    def get_kline(self):
+
+        return self.kline
+
+
+
+
+
+# ==========================================
+# SINGLETON
+# ==========================================
 
 public_ws = PublicWS()
