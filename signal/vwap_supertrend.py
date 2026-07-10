@@ -7,14 +7,11 @@ from config import (
 )
 
 
-
 # ==========================================
 # VWAP + SUPERTREND SIGNAL
 # ==========================================
 
-
 class VWAPSupertrend:
-
 
 
     def __init__(self):
@@ -31,50 +28,71 @@ class VWAPSupertrend:
 
 
 
-
-
     # ======================================
     # VWAP
     # ======================================
 
     def calculate_vwap(
-
         self,
-
-        prices,
-
-        volumes
-
+        candles
     ):
 
 
-        if len(prices) < VWAP_LENGTH:
+        if len(candles) < VWAP_LENGTH:
 
             return None
 
 
 
-        prices = np.array(prices[-VWAP_LENGTH:])
-
-        volumes = np.array(volumes[-VWAP_LENGTH:])
+        data = candles[-VWAP_LENGTH:]
 
 
-        vwap = (
 
-            np.sum(
-                prices * volumes
-            )
+        total_volume = 0
 
+        total_price_volume = 0
+
+
+
+        for c in data:
+
+
+            price = (
+
+                c["high"]
+                +
+                c["low"]
+                +
+                c["close"]
+
+            ) / 3
+
+
+
+            volume = c["volume"]
+
+
+
+            total_price_volume += price * volume
+
+            total_volume += volume
+
+
+
+
+        if total_volume == 0:
+
+            return None
+
+
+
+        return (
+
+            total_price_volume
             /
-
-            np.sum(volumes)
+            total_volume
 
         )
-
-
-        return float(vwap)
-
-
 
 
 
@@ -85,61 +103,52 @@ class VWAPSupertrend:
     # ======================================
 
     def calculate_atr(
-
         self,
-
-        highs,
-
-        lows,
-
-        closes
-
+        candles
     ):
 
 
-        if len(closes) < SUPERTREND_PERIOD + 1:
+        if len(candles) < SUPERTREND_PERIOD + 1:
 
             return None
 
 
 
-        tr = []
+        trs = []
 
 
-        for i in range(1, len(closes)):
+
+        for i in range(1,len(candles)):
 
 
-            high = highs[i]
+            high = candles[i]["high"]
 
-            low = lows[i]
+            low = candles[i]["low"]
 
-            prev_close = closes[i-1]
+            prev_close = candles[i-1]["close"]
 
 
-            value = max(
 
-                high-low,
+            tr = max(
 
-                abs(high-prev_close),
+                high - low,
 
-                abs(low-prev_close)
+                abs(high - prev_close),
+
+                abs(low - prev_close)
 
             )
 
 
-            tr.append(value)
+            trs.append(tr)
 
 
 
+        return np.mean(
 
-        atr = np.mean(
-
-            tr[-SUPERTREND_PERIOD:]
+            trs[-SUPERTREND_PERIOD:]
 
         )
-
-
-        return atr
 
 
 
@@ -151,28 +160,14 @@ class VWAPSupertrend:
     # ======================================
 
     def calculate_supertrend(
-
         self,
-
-        highs,
-
-        lows,
-
-        closes
-
+        candles
     ):
 
 
         atr = self.calculate_atr(
-
-            highs,
-
-            lows,
-
-            closes
-
+            candles
         )
-
 
 
         if atr is None:
@@ -181,18 +176,21 @@ class VWAPSupertrend:
 
 
 
+        last = candles[-1]
+
+
+
+        price = last["close"]
+
 
 
         hl2 = (
 
-            highs[-1]
-
+            last["high"]
             +
-
-            lows[-1]
+            last["low"]
 
         ) / 2
-
 
 
 
@@ -200,14 +198,8 @@ class VWAPSupertrend:
         upper = (
 
             hl2
-
             +
-
-            SUPERTREND_MULTIPLIER
-
-            *
-
-            atr
+            atr * SUPERTREND_MULTIPLIER
 
         )
 
@@ -216,20 +208,12 @@ class VWAPSupertrend:
         lower = (
 
             hl2
-
             -
-
-            SUPERTREND_MULTIPLIER
-
-            *
-
-            atr
+            atr * SUPERTREND_MULTIPLIER
 
         )
 
 
-
-        price = closes[-1]
 
 
 
@@ -252,171 +236,83 @@ class VWAPSupertrend:
 
 
 
-
     # ======================================
-    # SIGNAL GENERATOR
+    # SIGNAL
     # ======================================
 
     def generate_signal(
-
         self,
-
         candles
-
     ):
 
 
-        try:
+        if len(candles) < VWAP_LENGTH:
 
+            return "HOLD"
 
-            closes = [
 
-                float(x)
 
-                for x in candles["close"]
+        vwap = self.calculate_vwap(
+            candles
+        )
 
-            ]
 
+        trend = self.calculate_supertrend(
+            candles
+        )
 
 
-            highs = [
 
-                float(x)
+        if vwap is None or trend is None:
 
-                for x in candles["high"]
+            return "HOLD"
 
-            ]
 
 
 
-            lows = [
+        price = candles[-1]["close"]
 
-                float(x)
 
-                for x in candles["low"]
 
-            ]
 
 
+        # LONG
 
-            volumes = [
+        if (
 
-                float(x)
+            price > vwap
 
-                for x in candles["volume"]
+            and
 
-            ]
+            trend == "UP"
 
+        ):
 
+            return "BUY"
 
 
 
 
-            current_price = closes[-1]
 
+        # SHORT
 
+        if (
 
-            vwap = self.calculate_vwap(
+            price < vwap
 
-                closes,
+            and
 
-                volumes
+            trend == "DOWN"
 
-            )
+        ):
 
+            return "SELL"
 
 
-            trend = self.calculate_supertrend(
 
-                highs,
 
-                lows,
 
-                closes
-
-            )
-
-
-
-
-
-            if vwap is None or trend is None:
-
-                return None
-
-
-
-
-
-            print(
-                "[SIGNAL]",
-                "PRICE:",
-                current_price,
-                "VWAP:",
-                round(vwap,2),
-                "TREND:",
-                trend
-            )
-
-
-
-
-
-
-            # BUY 조건
-
-            if (
-
-                current_price > vwap
-
-                and
-
-                trend == "UP"
-
-            ):
-
-                return "BUY"
-
-
-
-
-
-
-            # SELL 조건
-
-            if (
-
-                current_price < vwap
-
-                and
-
-                trend == "DOWN"
-
-            ):
-
-                return "SELL"
-
-
-
-
-
-
-            return None
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[SIGNAL ERROR]",
-                e
-            )
-
-
-            return None
+        return "HOLD"
 
 
 
