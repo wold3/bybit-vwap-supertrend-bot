@@ -1,38 +1,22 @@
 import time
+from pprint import pprint
 
 from pybit.unified_trading import HTTP
 
-
 from config import (
-
     BYBIT_API_KEY,
-
     BYBIT_API_SECRET,
-
     BYBIT_TESTNET,
-
     BYBIT_DEMO,
-
     BYBIT_BASE_URL,
-
     CATEGORY,
-
     DEFAULT_SYMBOL,
-
     ACCOUNT_TYPE,
-
     DEFAULT_QTY,
-
     ORDER_TYPE,
-
     TIME_IN_FORCE,
-
     LEVERAGE,
-
 )
-
-
-
 
 
 # ==================================================
@@ -41,9 +25,7 @@ from config import (
 
 class BybitAPI:
 
-
     def __init__(self):
-
 
         print("==============================")
         print("[BYBIT API INIT]")
@@ -55,23 +37,13 @@ class BybitAPI:
         print("SYMBOL :", DEFAULT_SYMBOL)
         print("==============================")
 
-
-
         self.session = HTTP(
-
             testnet=BYBIT_TESTNET,
-
             demo=BYBIT_DEMO,
-
             api_key=BYBIT_API_KEY,
-
-            api_secret=BYBIT_API_SECRET
-
+            api_secret=BYBIT_API_SECRET,
+            recv_window=10000,
         )
-
-
-
-
 
     # ==================================================
     # WALLET BALANCE
@@ -79,42 +51,21 @@ class BybitAPI:
 
     def get_wallet_balance(self):
 
-
         try:
 
-
             response = self.session.get_wallet_balance(
-
-
                 accountType=ACCOUNT_TYPE
-
-
             )
 
-
-            print(
-                "[WALLET RESPONSE]"
-            )
-
+            print("[WALLET RESPONSE]")
 
             return response
 
-
-
         except Exception as e:
 
-
-            print(
-                "[WALLET ERROR]",
-                e
-            )
-
+            print("[WALLET ERROR]", e)
 
             return None
-
-
-
-
 
     # ==================================================
     # POSITION
@@ -122,89 +73,47 @@ class BybitAPI:
 
     def get_position(self):
 
-
         try:
 
-
-            return self.session.get_positions(
-
-
+            response = self.session.get_positions(
                 category=CATEGORY,
-
-
-                symbol=DEFAULT_SYMBOL
-
-
+                symbol=DEFAULT_SYMBOL,
             )
 
-
+            return response
 
         except Exception as e:
 
-
-            print(
-                "[POSITION ERROR]",
-                e
-            )
-
+            print("[POSITION ERROR]", e)
 
             return None
-
-
-
-
 
     # ==================================================
     # KLINE
     # ==================================================
 
     def get_kline(
-
         self,
-
         interval="1",
-
-        limit=200
-
+        limit=200,
     ):
-
 
         try:
 
-
-            return self.session.get_kline(
-
-
+            response = self.session.get_kline(
                 category=CATEGORY,
-
-
                 symbol=DEFAULT_SYMBOL,
-
-
                 interval=interval,
-
-
-                limit=limit
-
-
+                limit=limit,
             )
 
-
+            return response
 
         except Exception as e:
 
-
-            print(
-                "[KLINE ERROR]",
-                e
-            )
-
+            print("[KLINE ERROR]", e)
 
             return None
-
-
-
-
 
     # ==================================================
     # CURRENT PRICE
@@ -212,56 +121,24 @@ class BybitAPI:
 
     def get_price(self):
 
-
         try:
 
-
             result = self.session.get_tickers(
-
-
                 category=CATEGORY,
-
-
-                symbol=DEFAULT_SYMBOL
-
-
+                symbol=DEFAULT_SYMBOL,
             )
 
+            ticker = result["result"]["list"][0]
 
-            price = (
+            price = float(ticker["lastPrice"])
 
-                result
-
-                ["result"]
-
-                ["list"]
-
-                [0]
-
-                ["lastPrice"]
-
-            )
-
-
-
-            return float(price)
-
-
+            return price
 
         except Exception as e:
 
-
-            print(
-                "[PRICE ERROR]",
-                e
-            )
-
+            print("[PRICE ERROR]", e)
 
             return None
-
-
-
-
 
     # ==================================================
     # LEVERAGE
@@ -269,309 +146,139 @@ class BybitAPI:
 
     def set_leverage(self):
 
-
         try:
 
-
             result = self.session.set_leverage(
-
-
                 category=CATEGORY,
-
-
                 symbol=DEFAULT_SYMBOL,
-
-
                 buyLeverage=str(LEVERAGE),
-
-
-                sellLeverage=str(LEVERAGE)
-
-
+                sellLeverage=str(LEVERAGE),
             )
 
-
-
-            print(
-                "[LEVERAGE SET]",
-                result
-            )
-
-
+            print("[LEVERAGE SET]")
+            pprint(result)
 
             return True
 
-
-
         except Exception as e:
-
 
             error = str(e)
 
-
-
             # 이미 설정된 경우
-
             if "110043" in error:
-
-
-                print(
-                    "[LEVERAGE ALREADY SET]"
-                )
-
-
+                print("[LEVERAGE ALREADY SET]")
                 return True
 
-
-
-            print(
-                "[LEVERAGE ERROR]",
-                e
-            )
-
-
+            print("[LEVERAGE ERROR]", e)
             return False
-
-
-
-
 
     # ==================================================
     # CREATE ORDER
     # ==================================================
 
     def create_order(
-
         self,
-
         side,
-
         qty=None,
-
         take_profit=None,
-
-        stop_loss=None
-
+        stop_loss=None,
     ):
-
 
         try:
 
-
             if qty is None:
-
-
                 qty = DEFAULT_QTY
 
-
-
-
-
             params = {
-
-
                 "category": CATEGORY,
-
-
                 "symbol": DEFAULT_SYMBOL,
-
-
                 "side": side,
-
-
                 "orderType": ORDER_TYPE,
-
-
                 "qty": str(qty),
-
-
-                "timeInForce": TIME_IN_FORCE
-
-
+                "timeInForce": TIME_IN_FORCE,
             }
 
+            if take_profit is not None:
+                params["takeProfit"] = str(round(float(take_profit), 2))
+                params["tpslMode"] = "Full"
+                params["tpTriggerBy"] = "LastPrice"
 
+            if stop_loss is not None:
+                params["stopLoss"] = str(round(float(stop_loss), 2))
+                params["slTriggerBy"] = "LastPrice"
 
+            print("==============================")
+            print("[ORDER REQUEST]")
+            pprint(params)
 
+            response = self.session.place_order(**params)
 
-            # 서버 TP
-
-            if take_profit:
-
-
-                params["takeProfit"] = str(
-
-                    take_profit
-
-                )
-
-
-
-
-
-            # 서버 SL
-
-            if stop_loss:
-
-
-                params["stopLoss"] = str(
-
-                    stop_loss
-
-                )
-
-
-
-
-
-            print(
-                "[ORDER REQUEST]"
-            )
-
-
-            print(params)
-
-
-
-
-
-            response = self.session.place_order(
-
-
-                **params
-
-
-            )
-
-
-
-            print(
-                "[ORDER RESPONSE]"
-            )
-
-
-            print(response)
-
-
+            print("[ORDER RESPONSE]")
+            pprint(response)
+            print("==============================")
 
             return response
 
-
-
-
-
         except Exception as e:
 
-
-            print(
-                "[ORDER ERROR]",
-                e
-            )
-
+            print("[ORDER ERROR]", e)
 
             return None
-
-
-
-
 
     # ==================================================
     # CLOSE POSITION
     # ==================================================
 
     def close_position(
-
         self,
-
         side,
-
-        qty
-
+        qty,
     ):
-
 
         try:
 
+            close_side = "Sell" if side == "Buy" else "Buy"
 
-            close_side = (
-
-                "Sell"
-
-                if side == "Buy"
-
-                else
-
-                "Buy"
-
-            )
-
-
+            print("==============================")
+            print("[CLOSE POSITION]")
+            print("SIDE :", close_side)
+            print("QTY :", qty)
+            print("==============================")
 
             return self.create_order(
-
-
                 side=close_side,
-
-
-                qty=qty
-
-
+                qty=qty,
             )
-
-
 
         except Exception as e:
 
-
-            print(
-                "[CLOSE ERROR]",
-                e
-            )
-
+            print("[CLOSE ERROR]", e)
 
             return None
 
-
-
-
-
     # ==================================================
-    # CANCEL ORDERS
+    # CANCEL ALL ORDERS
     # ==================================================
 
     def cancel_all_orders(self):
 
-
         try:
 
-
-            return self.session.cancel_all_orders(
-
-
+            response = self.session.cancel_all_orders(
                 category=CATEGORY,
-
-
-                symbol=DEFAULT_SYMBOL
-
-
+                symbol=DEFAULT_SYMBOL,
             )
 
+            print("[CANCEL ALL ORDERS]")
+            pprint(response)
 
+            return response
 
         except Exception as e:
 
-
-            print(
-                "[CANCEL ERROR]",
-                e
-            )
-
+            print("[CANCEL ERROR]", e)
 
             return None
-
-
-
-
 
     # ==================================================
     # OPEN ORDERS
@@ -579,37 +286,20 @@ class BybitAPI:
 
     def get_open_orders(self):
 
-
         try:
 
-
-            return self.session.get_open_orders(
-
-
+            response = self.session.get_open_orders(
                 category=CATEGORY,
-
-
-                symbol=DEFAULT_SYMBOL
-
-
+                symbol=DEFAULT_SYMBOL,
             )
 
-
+            return response
 
         except Exception as e:
 
-
-            print(
-                "[OPEN ORDER ERROR]",
-                e
-            )
-
+            print("[OPEN ORDER ERROR]", e)
 
             return None
-
-
-
-
 
     # ==================================================
     # SERVER TIME
@@ -617,15 +307,41 @@ class BybitAPI:
 
     def server_time(self):
 
+        return int(time.time() * 1000)
 
-        return int(
+    # ==================================================
+    # GET SERVER TIME (API)
+    # ==================================================
 
-            time.time() * 1000
+    def get_server_time(self):
 
-        )
+        try:
 
+            response = self.session.get_server_time()
 
+            return response
 
+        except Exception as e:
+
+            print("[SERVER TIME ERROR]", e)
+
+            return None
+
+    # ==================================================
+    # PING
+    # ==================================================
+
+    def ping(self):
+
+        try:
+
+            result = self.get_price()
+
+            return result is not None
+
+        except Exception:
+
+            return False
 
 
 # ==================================================
