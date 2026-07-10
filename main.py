@@ -2,11 +2,6 @@ import time
 import signal as os_signal
 
 
-from config import (
-    DEFAULT_SYMBOL,
-)
-
-
 from api.bybit_api import bybit_api
 
 from risk.risk_manager import risk_manager
@@ -15,25 +10,22 @@ from execution.order_manager import order_manager
 
 from execution.position_manager import position_manager
 
-
 from signals.vwap_supertrend import signal_engine
 
+from ws.public_ws import public_ws
 
-from websocket.public_ws import public_ws
-
-from websocket.private_ws import private_ws
+from ws.private_ws import private_ws
 
 
 
 # ==========================================
-# BOT APPLICATION
+# TRADING BOT
 # ==========================================
 
 class TradingBot:
 
 
     def __init__(self):
-
 
         print("==============================")
         print("[APP INIT]")
@@ -57,11 +49,15 @@ class TradingBot:
 
 
 
-        # risk initialize
+        # --------------------------
+        # Risk Initialize
+        # --------------------------
 
         try:
 
-            risk_manager.initialize()
+            risk_manager.initialize(
+                bybit_api.get_wallet_balance()
+            )
 
 
         except Exception as e:
@@ -73,8 +69,9 @@ class TradingBot:
 
 
 
-        # websocket start
-
+        # --------------------------
+        # Websocket Start
+        # --------------------------
 
         try:
 
@@ -86,7 +83,7 @@ class TradingBot:
         except Exception as e:
 
             print(
-                "[WS ERROR]",
+                "[WS START ERROR]",
                 e
             )
 
@@ -101,19 +98,15 @@ class TradingBot:
 
             try:
 
-
                 self.loop()
 
 
-
             except Exception as e:
-
 
                 print(
                     "[MAIN LOOP ERROR]",
                     e
                 )
-
 
 
             time.sleep(1)
@@ -124,7 +117,6 @@ class TradingBot:
     # MAIN LOOP
     # ======================================
 
-
     def loop(self):
 
 
@@ -134,12 +126,11 @@ class TradingBot:
 
         if candles is None:
 
-
             return
 
 
 
-        result = signal_engine.check_signal(
+        signal = signal_engine.check_signal(
 
             candles
 
@@ -147,31 +138,27 @@ class TradingBot:
 
 
 
-        if result is None:
-
+        if signal is None:
 
             return
 
 
 
         print("==============================")
-
-        print("[SIGNAL]")
-
-        print(result)
-
+        print("[TRADING SIGNAL]")
+        print(signal)
         print("==============================")
 
 
 
-        if result == "BUY":
+        if signal == "BUY":
 
 
             order_manager.buy()
 
 
 
-        elif result == "SELL":
+        elif signal == "SELL":
 
 
             order_manager.sell()
@@ -179,11 +166,9 @@ class TradingBot:
 
 
 
-
     # ======================================
     # STOP
     # ======================================
-
 
     def stop(self):
 
@@ -202,9 +187,12 @@ class TradingBot:
             private_ws.stop()
 
 
-        except:
+        except Exception as e:
 
-            pass
+            print(
+                "[STOP ERROR]",
+                e
+            )
 
 
 
@@ -213,20 +201,17 @@ class TradingBot:
 
 
 
-
 # ==========================================
-# GLOBAL BOT
+# INSTANCE
 # ==========================================
-
 
 bot = TradingBot()
 
 
 
 # ==========================================
-# SYSTEM SIGNAL
+# SYSTEM SIGNAL HANDLER
 # ==========================================
-
 
 def shutdown_handler(
 
@@ -235,7 +220,6 @@ def shutdown_handler(
         frame
 
 ):
-
 
     bot.stop()
 
@@ -250,6 +234,7 @@ os_signal.signal(
 )
 
 
+
 os_signal.signal(
 
     os_signal.SIGTERM,
@@ -260,12 +245,11 @@ os_signal.signal(
 
 
 
+
 # ==========================================
 # RUN
 # ==========================================
 
-
 if __name__ == "__main__":
-
 
     bot.start()
