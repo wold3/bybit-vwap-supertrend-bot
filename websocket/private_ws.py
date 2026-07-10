@@ -1,5 +1,5 @@
-import time
 import threading
+import time
 
 from pybit.unified_trading import WebSocket
 
@@ -8,15 +8,12 @@ from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
     CATEGORY,
-    DEMO,
 )
 
 
-
 # ==========================================
-# BYBIT PRIVATE WEBSOCKET V5
+# PRIVATE WEBSOCKET V5
 # ==========================================
-
 
 class PrivateWS:
 
@@ -27,18 +24,16 @@ class PrivateWS:
 
         self.running = False
 
-        self.position = None
+        self.position = {}
 
-        self.orders = None
+        self.orders = {}
 
+        self.wallet = {}
 
         print("==============================")
         print("[PRIVATE WS INIT]")
         print("CATEGORY :", CATEGORY)
-        print("DEMO :", DEMO)
         print("==============================")
-
-
 
 
 
@@ -48,26 +43,52 @@ class PrivateWS:
 
     def handle_position(self, message):
 
-        self.position = message
+        try:
 
+            self.position = message
 
-        print("[POSITION UPDATE]")
-        print(message)
+            print("[POSITION UPDATE]")
 
+        except Exception as e:
 
+            print(
+                "[POSITION WS ERROR]",
+                e
+            )
 
 
 
     def handle_order(self, message):
 
-        self.orders = message
+        try:
+
+            self.orders = message
+
+            print("[ORDER UPDATE]")
+
+        except Exception as e:
+
+            print(
+                "[ORDER WS ERROR]",
+                e
+            )
 
 
-        print("[ORDER UPDATE]")
-        print(message)
 
+    def handle_wallet(self, message):
 
+        try:
 
+            self.wallet = message
+
+            print("[WALLET UPDATE]")
+
+        except Exception as e:
+
+            print(
+                "[WALLET WS ERROR]",
+                e
+            )
 
 
 
@@ -83,60 +104,66 @@ class PrivateWS:
             return
 
 
-
         self.running = True
 
 
+        try:
 
 
-        self.ws = WebSocket(
+            self.ws = WebSocket(
 
-            testnet=BYBIT_TESTNET,
+                testnet=BYBIT_TESTNET,
 
-            demo=DEMO,
+                channel_type="private",
 
-            channel_type="private",
+                api_key=BYBIT_API_KEY,
 
-            api_key=BYBIT_API_KEY,
+                api_secret=BYBIT_API_SECRET
 
-            api_secret=BYBIT_API_SECRET
-
-        )
-
-
+            )
 
 
 
-        self.ws.position_stream(
+            self.ws.position_stream(
 
-            callback=self.handle_position
+                callback=self.handle_position
 
-        )
-
-
-
-        self.ws.order_stream(
-
-            callback=self.handle_order
-
-        )
+            )
 
 
+            self.ws.order_stream(
+
+                callback=self.handle_order
+
+            )
 
 
-        print(
-            "[PRIVATE WS STARTED]"
-        )
+            self.ws.wallet_stream(
+
+                callback=self.handle_wallet
+
+            )
+
+
+            print("[PRIVATE WS STARTED]")
+
+
+            while self.running:
+
+                time.sleep(1)
 
 
 
-
-        while self.running:
-
-            time.sleep(1)
+        except Exception as e:
 
 
+            print(
+                "[PRIVATE WS START ERROR]",
+                e
+            )
 
+
+            self.running=False
 
 
 
@@ -161,11 +188,22 @@ class PrivateWS:
 
 
 
+    # ======================================
+    # STOP
+    # ======================================
+
+    def stop(self):
+
+
+        self.running=False
+
+
+        print("[PRIVATE WS STOPPED]")
 
 
 
     # ======================================
-    # GET POSITION
+    # DATA ACCESS
     # ======================================
 
     def get_position(self):
@@ -174,49 +212,15 @@ class PrivateWS:
 
 
 
-
-
-
-    # ======================================
-    # GET ORDER
-    # ======================================
-
     def get_orders(self):
 
         return self.orders
 
 
 
+    def get_wallet(self):
 
-
-
-    # ======================================
-    # STOP
-    # ======================================
-
-    def stop(self):
-
-
-        self.running = False
-
-
-        try:
-
-            if self.ws:
-
-                self.ws.exit()
-
-        except:
-
-            pass
-
-
-
-        print(
-            "[PRIVATE WS STOP]"
-        )
-
-
+        return self.wallet
 
 
 
