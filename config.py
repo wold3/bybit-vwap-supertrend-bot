@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 
@@ -6,7 +7,15 @@ from dotenv import load_dotenv
 # LOAD ENV
 # ==================================
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+
+ENV_PATH = BASE_DIR / ".env"
+
+load_dotenv(
+    ENV_PATH,
+    override=True
+)
+
 
 
 # ==================================
@@ -18,10 +27,12 @@ BYBIT_API_KEY = os.getenv(
     ""
 )
 
+
 BYBIT_API_SECRET = os.getenv(
     "BYBIT_API_SECRET",
     ""
 )
+
 
 
 # ==================================
@@ -46,6 +57,7 @@ BYBIT_PRIVATE_WS = os.getenv(
 )
 
 
+
 # ==================================
 # MODE
 # ==================================
@@ -68,12 +80,13 @@ BYBIT_TESTNET = (
 )
 
 
-# Demo Trading 여부
+# Demo Trading
 
 DEMO = not LIVE_TRADING
 
 
 TESTNET = BYBIT_TESTNET
+
 
 
 # ==================================
@@ -86,6 +99,7 @@ ACCOUNT_TYPE = os.getenv(
 )
 
 
+
 # ==================================
 # SYMBOL
 # ==================================
@@ -94,6 +108,18 @@ DEFAULT_SYMBOL = os.getenv(
     "DEFAULT_SYMBOL",
     "BTCUSDT"
 )
+
+
+
+# ==================================
+# BYBIT CATEGORY
+# ==================================
+
+CATEGORY = os.getenv(
+    "CATEGORY",
+    "linear"
+)
+
 
 
 # ==================================
@@ -108,6 +134,36 @@ ORDER_RETRY = int(
 )
 
 
+
+# ==================================
+# INDICATORS
+# ==================================
+
+VWAP_LENGTH = int(
+    os.getenv(
+        "VWAP_LENGTH",
+        "20"
+    )
+)
+
+
+SUPERTREND_PERIOD = int(
+    os.getenv(
+        "SUPERTREND_PERIOD",
+        "10"
+    )
+)
+
+
+SUPERTREND_MULTIPLIER = float(
+    os.getenv(
+        "SUPERTREND_MULTIPLIER",
+        "3"
+    )
+)
+
+
+
 # ==================================
 # LOG
 # ==================================
@@ -118,8 +174,9 @@ LOG_LEVEL = os.getenv(
 )
 
 
+
 # ==================================
-# PRINT STATUS
+# STATUS
 # ==================================
 
 print("==============================")
@@ -128,35 +185,9 @@ print("DEMO :", DEMO)
 print("TESTNET :", TESTNET)
 print("LIVE :", LIVE_TRADING)
 print("ACCOUNT :", ACCOUNT_TYPE)
+print("CATEGORY :", CATEGORY)
 print("SYMBOL :", DEFAULT_SYMBOL)
 print("REST :", BYBIT_BASE_URL)
 print("PUBLIC WS :", BYBIT_PUBLIC_WS)
 print("PRIVATE WS :", BYBIT_PRIVATE_WS)
 print("==============================")
-
-# ==================================
-# INDICATORS
-# ==================================
-
-VWAP_LENGTH = int(
-    os.getenv(
-        "VWAP_LENGTH",
-        20
-    )
-)
-
-
-SUPERTREND_PERIOD = int(
-    os.getenv(
-        "SUPERTREND_PERIOD",
-        10
-    )
-)
-
-
-SUPERTREND_MULTIPLIER = float(
-    os.getenv(
-        "SUPERTREND_MULTIPLIER",
-        3.0
-    )
-)
