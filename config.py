@@ -43,33 +43,32 @@ BYBIT_BASE_URL = os.getenv(
 # ==========================================
 
 BYBIT_TESTNET = (
-
     os.getenv(
         "BYBIT_TESTNET",
         "false"
     )
     .lower()
-    ==
-    "true"
-
+    == "true"
 )
 
 
 LIVE_TRADING = (
-
     os.getenv(
         "LIVE_TRADING",
         "false"
     )
     .lower()
-    ==
-    "true"
-
+    == "true"
 )
 
 
-# Demo Trading 여부
+
+# Demo Trading
 DEMO = not LIVE_TRADING
+
+
+# 기존 코드 호환용
+BYBIT_DEMO = DEMO
 
 
 
@@ -79,29 +78,17 @@ DEMO = not LIVE_TRADING
 # ==========================================
 
 # Public Market Data
-# Demo 계정도 일반 Public WS 사용
-
 BYBIT_PUBLIC_WS = os.getenv(
-
     "BYBIT_PUBLIC_WS",
-
     "wss://stream.bybit.com/v5/public"
-
 )
 
 
-
-# Private Account WS
-# Demo Trading 전용
-
+# Demo Private Account
 BYBIT_PRIVATE_WS = os.getenv(
-
     "BYBIT_PRIVATE_WS",
-
     "wss://stream-demo.bybit.com/v5/private"
-
 )
-
 
 
 
@@ -110,23 +97,15 @@ BYBIT_PRIVATE_WS = os.getenv(
 # ==========================================
 
 ACCOUNT_TYPE = os.getenv(
-
     "ACCOUNT_TYPE",
-
     "UNIFIED"
-
 )
-
 
 
 CATEGORY = os.getenv(
-
     "CATEGORY",
-
     "linear"
-
 )
-
 
 
 
@@ -135,12 +114,14 @@ CATEGORY = os.getenv(
 # ==========================================
 
 DEFAULT_SYMBOL = os.getenv(
-
     "DEFAULT_SYMBOL",
-
     "BTCUSDT"
-
 )
+
+
+
+# 호환용
+SYMBOL = DEFAULT_SYMBOL
 
 
 
@@ -150,65 +131,43 @@ DEFAULT_SYMBOL = os.getenv(
 # ==========================================
 
 DEFAULT_QTY = float(
-
     os.getenv(
-
         "DEFAULT_QTY",
-
         "0.001"
-
     )
-
 )
+
+
+QTY = DEFAULT_QTY
 
 
 
 ORDER_TYPE = os.getenv(
-
     "ORDER_TYPE",
-
     "Market"
-
 )
-
 
 
 TIME_IN_FORCE = os.getenv(
-
     "TIME_IN_FORCE",
-
     "GTC"
-
 )
-
 
 
 ORDER_COOLDOWN = int(
-
     os.getenv(
-
         "ORDER_COOLDOWN",
-
         "60"
-
     )
-
 )
-
 
 
 ORDER_RETRY = int(
-
     os.getenv(
-
         "ORDER_RETRY",
-
         "3"
-
     )
-
 )
-
 
 
 
@@ -217,83 +176,53 @@ ORDER_RETRY = int(
 # ==========================================
 
 LEVERAGE = int(
-
     os.getenv(
-
         "LEVERAGE",
-
         "3"
-
     )
-
 )
 
 
 
-
 # ==========================================
-# RISK MANAGEMENT
+# RISK
 # ==========================================
 
 MAX_POSITION_SIZE = float(
-
     os.getenv(
-
         "MAX_POSITION_SIZE",
-
         "0.001"
-
     )
-
 )
-
 
 
 MAX_DAILY_LOSS_PERCENT = float(
-
     os.getenv(
-
         "MAX_DAILY_LOSS_PERCENT",
-
         "5"
-
     )
-
 )
 
 
 
-
 # ==========================================
-# TAKE PROFIT / STOP LOSS
+# TP / SL
 # ==========================================
 
 TAKE_PROFIT_PERCENT = float(
-
     os.getenv(
-
         "TAKE_PROFIT_PERCENT",
-
         "1.0"
-
     )
-
 )
-
 
 
 STOP_LOSS_PERCENT = float(
-
     os.getenv(
-
         "STOP_LOSS_PERCENT",
-
         "0.5"
-
     )
-
 )
-
 
 
 
@@ -302,45 +231,27 @@ STOP_LOSS_PERCENT = float(
 # ==========================================
 
 VWAP_LENGTH = int(
-
     os.getenv(
-
         "VWAP_LENGTH",
-
         "20"
-
     )
-
 )
-
 
 
 SUPERTREND_PERIOD = int(
-
     os.getenv(
-
         "SUPERTREND_PERIOD",
-
         "10"
-
     )
-
 )
-
 
 
 SUPERTREND_MULTIPLIER = float(
-
     os.getenv(
-
         "SUPERTREND_MULTIPLIER",
-
         "3.0"
-
     )
-
 )
-
 
 
 
@@ -349,23 +260,20 @@ SUPERTREND_MULTIPLIER = float(
 # ==========================================
 
 LOG_LEVEL = os.getenv(
-
     "LOG_LEVEL",
-
     "INFO"
-
 )
 
 
 
-
 # ==========================================
-# CONFIG CHECK
+# START CHECK
 # ==========================================
 
 print("==============================")
 print("[CONFIG LOADED]")
 print("DEMO :", DEMO)
+print("BYBIT_DEMO :", BYBIT_DEMO)
 print("TESTNET :", BYBIT_TESTNET)
 print("LIVE :", LIVE_TRADING)
 print("ACCOUNT :", ACCOUNT_TYPE)
