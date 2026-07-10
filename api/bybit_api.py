@@ -1,11 +1,12 @@
+# =====================================================
 # api/bybit_api.py
-
+# Bybit V5 Unified API Wrapper
+# =====================================================
 
 from pybit.unified_trading import HTTP
 
 
 from config import (
-
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
 
@@ -15,9 +16,7 @@ from config import (
     CATEGORY,
     DEFAULT_SYMBOL,
 
-    LEVERAGE,
-
-    DEFAULT_QTY
+    LEVERAGE
 )
 
 
@@ -59,20 +58,17 @@ class BybitAPI:
 
 
 
-    # =====================================
-    # SERVER CHECK
-    # =====================================
+    # =====================================================
+    # PING
+    # =====================================================
 
     def ping(self):
 
         try:
 
-
             result = (
-
                 self.session
                 .get_server_time()
-
             )
 
 
@@ -80,7 +76,11 @@ class BybitAPI:
 
                 result.get(
                     "retCode"
-                ) == 0
+                )
+
+                ==
+
+                0
 
             )
 
@@ -102,11 +102,12 @@ class BybitAPI:
 
 
 
-    # =====================================
+    # =====================================================
     # WALLET
-    # =====================================
+    # =====================================================
 
     def get_wallet_balance(self):
+
 
         try:
 
@@ -159,16 +160,13 @@ class BybitAPI:
 
 
 
-    # =====================================
+    # =====================================================
     # KLINE
-    # =====================================
+    # =====================================================
 
     def get_kline(
-
         self,
-
         interval="1"
-
     ):
 
 
@@ -230,42 +228,50 @@ class BybitAPI:
 
                 candles.append(
 
+
                     {
 
 
                     "timestamp":
 
-                        int(row[0]),
-
+                        int(
+                            row[0]
+                        ),
 
 
                     "open":
 
-                        float(row[1]),
-
+                        float(
+                            row[1]
+                        ),
 
 
                     "high":
 
-                        float(row[2]),
-
+                        float(
+                            row[2]
+                        ),
 
 
                     "low":
 
-                        float(row[3]),
-
+                        float(
+                            row[3]
+                        ),
 
 
                     "close":
 
-                        float(row[4]),
-
+                        float(
+                            row[4]
+                        ),
 
 
                     "volume":
 
-                        float(row[5])
+                        float(
+                            row[5]
+                        )
 
 
                     }
@@ -274,20 +280,13 @@ class BybitAPI:
 
 
 
-
-
             print(
-
                 "[KLINE]",
-
                 len(candles)
-
             )
 
 
-
             return candles
-
 
 
 
@@ -296,7 +295,7 @@ class BybitAPI:
 
 
             print(
-                "[KLINE EXCEPTION]",
+                "[KLINE ERROR]",
                 e
             )
 
@@ -309,9 +308,9 @@ class BybitAPI:
 
 
 
-    # =====================================
+    # =====================================================
     # LEVERAGE
-    # =====================================
+    # =====================================================
 
     def set_leverage(self):
 
@@ -348,8 +347,7 @@ class BybitAPI:
 
 
                 print(
-                    "[LEVERAGE SET]",
-                    LEVERAGE
+                    "[LEVERAGE SET]"
                 )
 
 
@@ -357,10 +355,7 @@ class BybitAPI:
 
 
 
-
-
             return False
-
 
 
 
@@ -394,9 +389,9 @@ class BybitAPI:
 
 
 
-    # =====================================
-    # LAST PRICE
-    # =====================================
+    # =====================================================
+    # PRICE
+    # =====================================================
 
     def get_last_price(self):
 
@@ -429,7 +424,6 @@ class BybitAPI:
             )
 
 
-
         except Exception as e:
 
 
@@ -447,27 +441,83 @@ class BybitAPI:
 
 
 
-    # =====================================
+    # =====================================================
     # CREATE ORDER
-    # =====================================
+    # =====================================================
 
     def create_order(
-
         self,
-
         side,
-
-        qty=None
-
+        qty,
+        stop_loss=None,
+        take_profit=None,
+        reduce_only=False
     ):
 
 
         try:
 
 
-            if qty is None:
+            params = {
 
-                qty = DEFAULT_QTY
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL,
+
+
+                "side":
+
+                    side,
+
+
+                "orderType":
+
+                    "Market",
+
+
+                "qty":
+
+                    str(qty),
+
+
+                "positionIdx":
+
+                    0
+
+
+            }
+
+
+
+            if stop_loss:
+
+
+                params["stopLoss"] = str(
+                    stop_loss
+                )
+
+
+
+            if take_profit:
+
+
+                params["takeProfit"] = str(
+                    take_profit
+                )
+
+
+
+            if reduce_only:
+
+
+                params["reduceOnly"] = True
+
 
 
 
@@ -478,17 +528,7 @@ class BybitAPI:
                 self.session
                 .place_order(
 
-                    category=CATEGORY,
-
-                    symbol=DEFAULT_SYMBOL,
-
-                    side=side,
-
-                    orderType="Market",
-
-                    qty=str(qty),
-
-                    timeInForce="GTC"
+                    **params
 
                 )
 
@@ -497,14 +537,13 @@ class BybitAPI:
 
 
             print(
-                "[ORDER]",
+                "[ORDER RESULT]",
                 result
             )
 
 
 
             return result
-
 
 
 
@@ -526,9 +565,9 @@ class BybitAPI:
 
 
 
-    # =====================================
+    # =====================================================
     # CLOSE POSITION
-    # =====================================
+    # =====================================================
 
     def close_position(self):
 
@@ -536,75 +575,71 @@ class BybitAPI:
         try:
 
 
-            result = self.get_position()
-
-
-
-            if result is None:
-
-                return False
-
-
-
-
-
             position = (
 
-                result
-                ["result"]
-                ["list"][0]
+                self.get_position()
 
             )
 
 
 
-            size = float(
+            rows = (
 
                 position
-                ["size"]
+                ["result"]
+                ["list"]
 
             )
 
 
 
-            if size <= 0:
+            for p in rows:
 
 
-                return True
+                size = float(
 
-
-
-
-
-            if position["side"] == "Buy":
-
-
-                side = "Sell"
-
-
-
-            else:
-
-
-                side = "Buy"
-
-
-
-
-
-            return (
-
-                self.create_order(
-
-                    side,
-
-                    size
+                    p.get(
+                        "size",
+                        0
+                    )
 
                 )
 
-            )
 
 
+                if size <= 0:
+
+                    continue
+
+
+
+                if p["side"] == "Buy":
+
+                    side = "Sell"
+
+
+                else:
+
+                    side = "Buy"
+
+
+
+
+
+                return self.create_order(
+
+                    side,
+
+                    size,
+
+                    reduce_only=True
+
+                )
+
+
+
+
+            return True
 
 
 
@@ -625,9 +660,9 @@ class BybitAPI:
 
 
 
-    # =====================================
+    # =====================================================
     # POSITION
-    # =====================================
+    # =====================================================
 
     def get_position(self):
 
@@ -667,6 +702,8 @@ class BybitAPI:
 
 
 
-# Singleton
+# =====================================================
+# SINGLETON
+# =====================================================
 
 bybit_api = BybitAPI()
