@@ -9,19 +9,18 @@ from pybit.unified_trading import WebSocket
 
 
 from config import (
-
     BYBIT_TESTNET,
-
-    CATEGORY
-
+    CATEGORY,
+    BYBIT_API_KEY,
+    BYBIT_API_SECRET,
 )
+
 
 
 from portfolio.position_manager import (
-
     position_manager
-
 )
+
 
 
 
@@ -41,6 +40,10 @@ class PrivateWS:
         self.thread = None
 
 
+        self.last_message_time = 0
+
+
+
 
 
     # =====================================
@@ -52,16 +55,86 @@ class PrivateWS:
 
         if self.running:
 
+
             return
 
 
 
-        print(
-            "[PRIVATE WS START]"
+        self.running = True
+
+
+
+        self.thread = threading.Thread(
+
+            target=self.run,
+
+            daemon=True
+
         )
 
 
-        self.running = True
+
+        self.thread.start()
+
+
+
+        print(
+
+            "[PRIVATE WS START]"
+
+        )
+
+
+
+
+
+
+    # =====================================
+    # CONNECT LOOP
+    # =====================================
+
+    def run(self):
+
+
+        while self.running:
+
+
+
+            try:
+
+
+
+                self.connect()
+
+
+
+            except Exception as e:
+
+
+
+                print(
+
+                    "[PRIVATE WS ERROR]",
+
+                    e
+
+                )
+
+
+
+            time.sleep(5)
+
+
+
+
+
+
+
+    # =====================================
+    # CONNECT
+    # =====================================
+
+    def connect(self):
 
 
 
@@ -69,190 +142,48 @@ class PrivateWS:
 
             testnet=BYBIT_TESTNET,
 
-            channel_type="private"
+            channel_type="private",
+
+            api_key=BYBIT_API_KEY,
+
+            api_secret=BYBIT_API_SECRET
 
         )
 
 
 
-        self.subscribe()
+        self.ws.order_stream(
 
-
-
-        self.thread = threading.Thread(
-
-            target=self.keep_alive,
-
-            daemon=True
+            callback=self.on_order
 
         )
 
 
-        self.thread.start()
+        self.ws.position_stream(
 
+            callback=self.on_position
 
+        )
 
 
-    # =====================================
-    # SUBSCRIBE
-    # =====================================
 
-    def subscribe(self):
+        print(
 
+            "[PRIVATE WS CONNECTED]"
 
-        try:
+        )
 
 
-            self.ws.position_stream(
 
-                callback=self.on_position
+        while self.running:
 
-            )
 
+            self.last_message_time = time.time()
 
-            self.ws.order_stream(
 
-                callback=self.on_order
+            time.sleep(1)
 
-            )
 
-
-            self.ws.wallet_stream(
-
-                callback=self.on_wallet
-
-            )
-
-
-
-            print(
-
-                "[PRIVATE WS SUBSCRIBED]"
-
-            )
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[WS SUB ERROR]",
-
-                e
-
-            )
-
-
-
-
-    # =====================================
-    # POSITION EVENT
-    # =====================================
-
-    def on_position(
-        self,
-        message
-    ):
-
-
-        try:
-
-
-            data = (
-
-                message
-                .get("data")
-
-            )
-
-
-            if not data:
-
-                return
-
-
-
-            pos = data[0]
-
-
-
-            size = float(
-
-                pos.get(
-                    "size",
-                    0
-                )
-
-            )
-
-
-
-            if size <= 0:
-
-
-                position_manager.clear()
-
-
-
-            else:
-
-
-                position_manager.update({
-
-                    "symbol":
-
-                        pos["symbol"],
-
-
-                    "side":
-
-                        pos["side"],
-
-
-                    "size":
-
-                        size,
-
-
-                    "entry_price":
-
-                        float(
-                            pos["entryPrice"]
-                        ),
-
-
-                    "unrealized_pnl":
-
-                        float(
-                            pos["unrealisedPnl"]
-                        )
-
-                })
-
-
-
-            print(
-
-                "[POSITION UPDATE]",
-
-                position_manager.status()
-
-            )
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[POSITION EVENT ERROR]",
-
-                e
-
-            )
 
 
 
@@ -267,83 +198,147 @@ class PrivateWS:
     ):
 
 
+
         try:
+
 
 
             print(
 
-                "[ORDER EVENT]",
+                "[ORDER UPDATE]",
 
                 message
 
             )
 
 
-        except Exception:
+
+            data = message.get(
+
+                "data",
+
+                []
+
+            )
 
 
-            pass
+
+            for order in data:
+
+
+
+                status = order.get(
+
+                    "orderStatus"
+
+                )
+
+
+
+                if status == "Filled":
+
+
+
+                    print(
+
+                        "[ORDER FILLED]",
+
+                        order
+
+                    )
+
+
+
+                    position_manager.sync()
+
+
+
+
+
+
+        except Exception as e:
+
+
+
+            print(
+
+                "[ORDER WS ERROR]",
+
+                e
+
+            )
+
+
 
 
 
 
     # =====================================
-    # WALLET EVENT
+    # POSITION EVENT
     # =====================================
 
-    def on_wallet(
+    def on_position(
         self,
         message
     ):
 
 
+
         try:
+
 
 
             print(
 
-                "[WALLET EVENT]",
+                "[POSITION UPDATE]",
 
                 message
 
             )
 
 
-        except Exception:
+
+            position_manager.sync()
 
 
-            pass
+
+
+        except Exception as e:
+
+
+
+            print(
+
+                "[POSITION WS ERROR]",
+
+                e
+
+            )
+
+
 
 
 
 
     # =====================================
-    # KEEP ALIVE
+    # HEALTH
     # =====================================
 
-    def keep_alive(self):
+    def heartbeat(self):
 
 
-        while self.running:
+        return (
+
+            time.time()
+
+            -
+
+            self.last_message_time
+
+        )
 
 
-            try:
 
-
-                time.sleep(30)
-
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "[WS ERROR]",
-
-                    e
-
-                )
 
 
 
@@ -361,6 +356,7 @@ class PrivateWS:
         )
 
 
+
         self.running = False
 
 
@@ -375,16 +371,12 @@ class PrivateWS:
 
 
 
-        except Exception as e:
+        except Exception:
 
 
-            print(
+            pass
 
-                "[WS STOP ERROR]",
 
-                e
-
-            )
 
 
 
