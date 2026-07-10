@@ -1,54 +1,57 @@
-import json
 import time
-import hmac
-import hashlib
 import threading
-import websocket
 
-
-from config import (
-    BYBIT_PRIVATE_WS,
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
-)
+from pybit.unified_trading import WebSocket
 
 
 
-class PrivateWS:
+class PrivateWebSocket:
 
 
-    def __init__(self):
+    def __init__(
 
-        self.url = BYBIT_PRIVATE_WS
+        self,
 
-        self.api_key = BYBIT_API_KEY
+        api_key,
 
-        self.api_secret = BYBIT_API_SECRET
+        api_secret,
+
+        position_manager=None
+
+    ):
 
 
-        self.ws = None
+        self.position_manager = (
+            position_manager
+        )
+
 
         self.running = False
 
-        self.thread = None
+
+        self.ws = WebSocket(
+
+            testnet=True,
+
+            channel_type="private",
+
+            api_key=api_key,
+
+            api_secret=api_secret
+
+        )
 
 
-        self.authenticated = False
-
-
-        print("==============================")
-        print("[PRIVATE WS INIT]")
-        print("URL :", self.url)
-        print("KEY :", self.api_key[:6])
-        print("==============================")
+        self.last_message_time = 0
 
 
 
-    # =================================
+    # =====================================================
     # START
-    # =================================
+    # =====================================================
 
     def start(self):
+
 
         if self.running:
 
@@ -58,319 +61,193 @@ class PrivateWS:
         self.running = True
 
 
-        self.thread = threading.Thread(
 
-            target=self.run,
+        self.ws.order_stream(
 
-            daemon=True
+            callback=self.order_callback
 
         )
 
 
-        self.thread.start()
+        self.ws.position_stream(
+
+            callback=self.position_callback
+
+        )
+
+
+        self.ws.wallet_stream(
+
+            callback=self.wallet_callback
+
+        )
 
 
 
-    # =================================
-    # STOP
-    # =================================
+        thread = threading.Thread(
 
-    def stop(self):
+            target=self.monitor
 
-        self.running = False
+        )
 
 
-        try:
+        thread.daemon = True
 
-            if self.ws:
+        thread.start()
 
-                self.ws.close()
-
-
-        except Exception:
-
-            pass
 
 
         print(
-            "[PRIVATE WS STOPPED]"
-        )
 
-
-
-    # =================================
-    # RUN
-    # =================================
-
-    def run(self):
-
-
-        self.ws = websocket.WebSocketApp(
-
-            self.url,
-
-
-            on_open=self.on_open,
-
-
-            on_message=self.on_message,
-
-
-            on_error=self.on_error,
-
-
-            on_close=self.on_close
+            "[PRIVATE WS STARTED]"
 
         )
 
 
-        self.ws.run_forever()
+
+    # =====================================================
+    # ORDER EVENT
+    # =====================================================
+
+    def order_callback(self, message):
+
+
+        self.last_message_time = time.time()
 
 
 
-    # =================================
-    # AUTH SIGN
-    # =================================
+        data = message.get(
 
-    def _auth_signature(self):
+            "data",
 
+            []
 
-        expires = (
-            int(time.time()*1000)
-            +
-            10000
         )
 
 
-        payload = (
-            "GET/realtime"
-            +
-            str(expires)
-        )
+        for order in data:
 
 
-        sign = hmac.new(
+            status = order.get(
 
-            self.api_secret.encode(),
+                "orderStatus"
 
-            payload.encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-
-        return (
-            expires,
-            sign
-        )
-
-
-
-    # =================================
-    # OPEN
-    # =================================
-
-    def on_open(
-        self,
-        ws
-    ):
-
-
-        print(
-            "[PRIVATE CONNECTED]"
-        )
-
-
-        expires, sign = (
-            self._auth_signature()
-        )
-
-
-        auth = {
-
-
-            "op":
-                "auth",
-
-
-            "args":
-
-                [
-
-                    self.api_key,
-
-                    expires,
-
-                    sign
-
-                ]
-
-        }
-
-
-
-        ws.send(
-            json.dumps(auth)
-        )
-
-
-
-    # =================================
-    # MESSAGE
-    # =================================
-
-    def on_message(
-        self,
-        ws,
-        message
-    ):
-
-
-        try:
-
-
-            data = json.loads(
-                message
             )
 
 
-            if data.get("op") == "auth":
+            print(
+
+                "[ORDER EVENT]",
+
+                status
+
+            )
 
 
-                if data.get("success"):
-
-
-                    self.authenticated = True
-
-
-                    print(
-                        "[PRIVATE AUTH SUCCESS]"
-                    )
-
-
-                    self.subscribe(ws)
-
-
-
-                else:
-
-
-                    print(
-                        "[PRIVATE AUTH FAILED]",
-                        data
-                    )
-
-
-                return
-
-
-
-            if "topic" in data:
+            if status == "Filled":
 
 
                 print(
-                    "[PRIVATE DATA]",
-                    data["topic"]
+
+                    "[FILLED]",
+
+                    order.get("orderId")
+
                 )
 
 
 
-        except Exception as e:
+    # =====================================================
+    # POSITION EVENT
+    # =====================================================
+
+    def position_callback(self,message):
 
 
-            print(
-                "[PRIVATE MESSAGE ERROR]",
-                e
-            )
+        self.last_message_time = time.time()
 
-
-
-    # =================================
-    # SUBSCRIBE
-    # =================================
-
-    def subscribe(
-        self,
-        ws
-    ):
-
-
-        args = [
-
-            "position",
-
-            "execution",
-
-            "order",
-
-            "wallet"
-
-        ]
-
-
-        msg = {
-
-
-            "op":
-                "subscribe",
-
-
-            "args":
-                args
-
-        }
-
-
-        ws.send(
-            json.dumps(msg)
-        )
 
 
         print(
-            "[PRIVATE SUBSCRIBED]"
+
+            "[POSITION UPDATE]"
+
         )
 
 
+        if self.position_manager:
 
-    # =================================
-    # ERROR
-    # =================================
 
-    def on_error(
-        self,
-        ws,
-        error
-    ):
+            self.position_manager.sync()
+
+
+
+    # =====================================================
+    # WALLET EVENT
+    # =====================================================
+
+    def wallet_callback(self,message):
+
+
+        self.last_message_time = time.time()
+
 
 
         print(
-            "[PRIVATE WS ERROR]",
-            error
+
+            "[WALLET UPDATE]"
+
         )
 
 
 
-    # =================================
-    # CLOSE
-    # =================================
+    # =====================================================
+    # MONITOR
+    # =====================================================
 
-    def on_close(
-        self,
-        ws,
-        code,
-        msg
-    ):
+    def monitor(self):
 
 
-        self.authenticated = False
+        while self.running:
+
+
+            time.sleep(10)
+
+
+
+            if (
+
+                time.time()
+                -
+                self.last_message_time
+
+                >
+
+                60
+
+            ):
+
+
+                print(
+
+                    "[WS WARNING] NO MESSAGE"
+
+                )
+
+
+
+    # =====================================================
+    # STOP
+    # =====================================================
+
+    def stop(self):
+
+
+        self.running = False
 
 
         print(
-            "[PRIVATE WS CLOSED]"
+
+            "[PRIVATE WS STOP]"
+
         )
-
-
-
-private_ws = PrivateWS()
