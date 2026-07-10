@@ -1,224 +1,251 @@
 # portfolio/position_manager.py
 
 
+import time
+import threading
+
+
+
 from api.bybit_api import (
     bybit_api
 )
+
+
+from config import (
+    DEFAULT_SYMBOL
+)
+
+
 
 
 
 class PositionManager:
 
 
+
     def __init__(self):
 
 
-        self.position = None
+        self.lock = threading.Lock()
+
+
+        self.current = None
+
+
+        self.last_sync = 0
+
+
+
+        print(
+
+            "[POSITION MANAGER READY]"
+
+        )
+
+
 
 
 
 
     # =====================================
-    # SYNC FROM BYBIT
+    # SYNC POSITION
     # =====================================
 
     def sync(self):
 
 
-        try:
+        with self.lock:
 
 
-            response = (
-
-                bybit_api
-
-                .get_position()
-
-            )
+            try:
 
 
+                response = (
 
-            if not response:
-
-
-                self.position = None
-
-                return None
-
-
-
-
-
-            data = (
-
-                response
-
-                ["result"]
-
-                ["list"]
-
-            )
-
-
-
-            if not data:
-
-
-                self.position = None
-
-                return None
-
-
-
-
-
-            pos = data[0]
-
-
-
-            size = float(
-
-                pos.get(
-
-                    "size",
-
-                    0
+                    bybit_api.get_position()
 
                 )
 
-            )
+
+
+                if not response:
+
+
+                    self.current = None
+
+                    return None
 
 
 
-            # --------------------------------
-            # NO POSITION
-            # --------------------------------
-
-            if size == 0:
 
 
+                positions = (
 
-                self.position = None
+                    response
+
+                    .get(
+
+                        "result",
+
+                        {}
+
+                    )
+
+                    .get(
+
+                        "list",
+
+                        []
+
+                    )
+
+                )
+
+
+
+
+
+                for p in positions:
+
+
+
+                    size = float(
+
+                        p.get(
+
+                            "size",
+
+                            0
+
+                        )
+
+                    )
+
+
+
+                    if size > 0:
+
+
+
+                        self.current = {
+
+
+                            "symbol":
+
+                            p.get(
+
+                                "symbol"
+
+                            ),
+
+
+
+                            "side":
+
+                            p.get(
+
+                                "side"
+
+                            ),
+
+
+
+                            "size":
+
+                            size,
+
+
+
+                            "entry_price":
+
+                            float(
+
+                                p.get(
+
+                                    "avgPrice",
+
+                                    0
+
+                                )
+
+                            ),
+
+
+
+                            "unrealized_pnl":
+
+                            float(
+
+                                p.get(
+
+                                    "unrealisedPnl",
+
+                                    0
+
+                                )
+
+                            ),
+
+
+
+                            "updated":
+
+                            time.time()
+
+                        }
+
+
+
+
+                        self.last_sync = time.time()
+
+
+
+                        print(
+
+                            "[POSITION SYNC]",
+
+                            self.current
+
+                        )
+
+
+
+                        return self.current
+
+
+
+
+
+
+                self.current = None
+
+
+                self.last_sync = time.time()
+
+
+
+                return None
+
+
+
+
+
+
+            except Exception as e:
 
 
                 print(
 
-                    "[POSITION EMPTY]"
+                    "[POSITION SYNC ERROR]",
+
+                    e
 
                 )
 
 
                 return None
 
-
-
-
-
-            self.position = {
-
-
-                "symbol":
-
-                pos.get(
-
-                    "symbol"
-
-                ),
-
-
-                "side":
-
-                pos.get(
-
-                    "side"
-
-                ),
-
-
-                "size":
-
-                size,
-
-
-                "entry_price":
-
-                float(
-
-                    pos.get(
-
-                        "avgPrice",
-
-                        0
-
-                    )
-
-                ),
-
-
-                "mark_price":
-
-                float(
-
-                    pos.get(
-
-                        "markPrice",
-
-                        0
-
-                    )
-
-                ),
-
-
-                "unrealized_pnl":
-
-                float(
-
-                    pos.get(
-
-                        "unrealisedPnl",
-
-                        0
-
-                    )
-
-                )
-
-            }
-
-
-
-
-
-            print(
-
-                "[POSITION SYNC]",
-
-                self.position
-
-            )
-
-
-
-            return self.position
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[POSITION SYNC ERROR]",
-
-                e
-
-            )
-
-
-            return None
 
 
 
@@ -232,52 +259,25 @@ class PositionManager:
     def has_position(self):
 
 
-        return (
-
-            self.position is not None
-
-        )
+        if self.current:
 
 
+            if self.current.get(
+
+                "size",
+
+                0
+
+            ) > 0:
 
 
-
-    # =====================================
-    # GET
-    # =====================================
-
-    def get(self):
-
-
-        return self.position
+                return True
 
 
 
+        return False
 
 
-    # =====================================
-    # STATUS
-    # =====================================
-
-    def status(self):
-
-
-        if not self.position:
-
-
-            return {
-
-
-                "position":
-
-                "NONE"
-
-            }
-
-
-
-
-        return self.position
 
 
 
@@ -290,14 +290,20 @@ class PositionManager:
     def side(self):
 
 
-        if not self.position:
+        if not self.current:
 
 
             return None
 
 
 
-        return self.position["side"]
+        return self.current.get(
+
+            "side"
+
+        )
+
+
 
 
 
@@ -310,14 +316,23 @@ class PositionManager:
     def size(self):
 
 
-        if not self.position:
+        if not self.current:
 
 
             return 0
 
 
 
-        return self.position["size"]
+        return self.current.get(
+
+            "size",
+
+            0
+
+        )
+
+
+
 
 
 
@@ -330,14 +345,51 @@ class PositionManager:
     def entry_price(self):
 
 
-        if not self.position:
+        if not self.current:
 
 
             return 0
 
 
 
-        return self.position["entry_price"]
+        return self.current.get(
+
+            "entry_price",
+
+            0
+
+        )
+
+
+
+
+
+
+
+
+    # =====================================
+    # PNL
+    # =====================================
+
+    def pnl(self):
+
+
+        if not self.current:
+
+
+            return 0
+
+
+
+        return self.current.get(
+
+            "unrealized_pnl",
+
+            0
+
+        )
+
+
 
 
 
@@ -350,7 +402,53 @@ class PositionManager:
     def clear(self):
 
 
-        self.position = None
+        with self.lock:
+
+
+            self.current = None
+
+
+
+            print(
+
+                "[POSITION CLEARED]"
+
+            )
+
+
+
+
+
+
+
+    # =====================================
+    # STATUS
+    # =====================================
+
+    def status(self):
+
+
+        return {
+
+
+            "symbol":
+
+            DEFAULT_SYMBOL,
+
+
+            "position":
+
+            self.current,
+
+
+            "last_sync":
+
+            self.last_sync
+
+        }
+
+
+
 
 
 
