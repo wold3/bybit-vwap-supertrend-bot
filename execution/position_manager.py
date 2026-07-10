@@ -1,78 +1,137 @@
 import time
 
-
-from api.bybit_api import bybit_api
-
-
 from config import (
     CATEGORY,
     DEFAULT_SYMBOL,
 )
 
+from api.bybit_api import bybit_api
+
+
+
+# ==========================================
+# POSITION MANAGER
+# ==========================================
 
 
 class PositionManager:
 
 
-    def __init__(self):
 
-        self.position = None
+    def __init__(self):
 
         print("==============================")
         print("[POSITION MANAGER INIT]")
+        print("CATEGORY :", CATEGORY)
+        print("SYMBOL :", DEFAULT_SYMBOL)
         print("==============================")
 
 
+        self.position = None
 
-    # ==========================================
-    # POSITION 조회
-    # ==========================================
+
+
+
+    # ======================================
+    # GET CURRENT POSITION
+    # ======================================
 
     def get_position(self):
-
 
         try:
 
 
-            result = bybit_api.get_position()
+            response = bybit_api.get_position()
 
 
 
-            if result is None:
+            if not response:
 
                 return None
 
 
 
-            positions = result["result"]["list"]
+            data = response.get(
+                "result",
+                {}
+            )
 
 
 
-            for p in positions:
+            rows = data.get(
+                "list",
+                []
+            )
 
 
-                size = float(
 
-                    p.get(
-                        "size",
-                        0
+            if len(rows) == 0:
+
+                return None
+
+
+
+            pos = rows[0]
+
+
+
+            size = float(
+                pos.get(
+                    "size",
+                    0
+                )
+            )
+
+
+
+            if size == 0:
+
+                return None
+
+
+
+            self.position = {
+
+
+                "symbol":
+                    pos.get(
+                        "symbol"
+                    ),
+
+
+                "side":
+                    pos.get(
+                        "side"
+                    ),
+
+
+                "size":
+                    size,
+
+
+                "entry_price":
+                    float(
+                        pos.get(
+                            "avgPrice",
+                            0
+                        )
+                    ),
+
+
+                "unrealized_pnl":
+                    float(
+                        pos.get(
+                            "unrealisedPnl",
+                            0
+                        )
                     )
 
-                )
-
-
-                if size > 0:
-
-
-                    self.position = p
-
-                    return p
+            }
 
 
 
-            self.position = None
+            return self.position
 
-            return None
 
 
 
@@ -90,9 +149,33 @@ class PositionManager:
 
 
 
-    # ==========================================
-    # 현재 방향
-    # ==========================================
+
+
+    # ======================================
+    # POSITION CHECK
+    # ======================================
+
+    def is_open(self):
+
+
+        position = self.get_position()
+
+
+        if position:
+
+            return True
+
+
+        return False
+
+
+
+
+
+
+    # ======================================
+    # CURRENT SIDE
+    # ======================================
 
     def get_side(self):
 
@@ -103,10 +186,8 @@ class PositionManager:
 
         if position:
 
+            return position["side"]
 
-            return position.get(
-                "side"
-            )
 
 
         return None
@@ -114,11 +195,37 @@ class PositionManager:
 
 
 
-    # ==========================================
-    # ATR TP/SL 계산
-    # ==========================================
 
-    def calc_atr_levels(
+
+    # ======================================
+    # ENTRY PRICE
+    # ======================================
+
+    def get_entry_price(self):
+
+
+        position = self.get_position()
+
+
+
+        if position:
+
+            return position["entry_price"]
+
+
+
+        return 0
+
+
+
+
+
+
+    # ======================================
+    # ATR TP / SL CALCULATION
+    # ======================================
+
+    def calculate_tp_sl(
 
         self,
 
@@ -131,35 +238,29 @@ class PositionManager:
 
         if len(prices) < 20:
 
-
             return None, None
 
 
 
         high = max(
-
             prices[-20:]
-
         )
 
 
         low = min(
-
             prices[-20:]
-
         )
 
 
 
         atr = (
-
             high - low
-
         ) / 20
 
 
 
         tp = atr * multiplier
+
 
         sl = atr * multiplier
 
@@ -170,123 +271,18 @@ class PositionManager:
 
 
 
-    # ==========================================
-    # 손절 판단
-    # ==========================================
 
-    def should_stop_loss(
+
+
+    # ======================================
+    # EXIT CHECK
+    # ======================================
+
+    def check_exit(
 
         self,
-
-        entry_price,
 
         current_price,
-
-        side,
-
-        sl
-
-    ):
-
-
-
-        if side == "Buy":
-
-
-            return (
-
-                current_price
-
-                <=
-
-                entry_price - sl
-
-            )
-
-
-
-        if side == "Sell":
-
-
-            return (
-
-                current_price
-
-                >=
-
-                entry_price + sl
-
-            )
-
-
-
-        return False
-
-
-
-
-    # ==========================================
-    # 익절 판단
-    # ==========================================
-
-    def should_take_profit(
-
-        self,
-
-        entry_price,
-
-        current_price,
-
-        side,
-
-        tp
-
-    ):
-
-
-
-        if side == "Buy":
-
-
-            return (
-
-                current_price
-
-                >=
-
-                entry_price + tp
-
-            )
-
-
-
-        if side == "Sell":
-
-
-            return (
-
-                current_price
-
-                <=
-
-                entry_price - tp
-
-            )
-
-
-
-        return False
-
-
-
-
-    # ==========================================
-    # EXIT 판단
-    # ==========================================
-
-    def evaluate_exit(
-
-        self,
 
         prices
 
@@ -297,81 +293,67 @@ class PositionManager:
 
 
 
-        if position is None:
-
+        if not position:
 
             return None
 
 
 
-        entry_price = float(
-
-            position["avgPrice"]
-
-        )
-
+        entry = position["entry_price"]
 
 
         side = position["side"]
 
 
 
-        current_price = float(
-
-            prices[-1]
-
-        )
-
-
-
-        tp, sl = self.calc_atr_levels(
-
+        tp, sl = self.calculate_tp_sl(
             prices
-
         )
 
 
 
         if tp is None:
 
-
             return None
 
 
 
 
-        if self.should_stop_loss(
 
-            entry_price,
+        # LONG
 
-            current_price,
-
-            side,
-
-            sl
-
-        ):
+        if side == "Buy":
 
 
-            return "STOP_LOSS"
+            if current_price <= entry - sl:
+
+                return "STOP_LOSS"
 
 
 
+            if current_price >= entry + tp:
 
-        if self.should_take_profit(
-
-            entry_price,
-
-            current_price,
-
-            side,
-
-            tp
-
-        ):
+                return "TAKE_PROFIT"
 
 
-            return "TAKE_PROFIT"
+
+
+
+        # SHORT
+
+        if side == "Sell":
+
+
+            if current_price >= entry + sl:
+
+                return "STOP_LOSS"
+
+
+
+            if current_price <= entry - tp:
+
+                return "TAKE_PROFIT"
+
 
 
 
@@ -380,9 +362,11 @@ class PositionManager:
 
 
 
-    # ==========================================
+
+
+    # ======================================
     # CLOSE POSITION
-    # ==========================================
+    # ======================================
 
     def close_position(self):
 
@@ -394,8 +378,7 @@ class PositionManager:
 
 
 
-            if position is None:
-
+            if not position:
 
                 return None
 
@@ -405,20 +388,15 @@ class PositionManager:
 
 
 
-            qty = position["size"]
+            size = position["size"]
 
 
 
             close_side = (
-
                 "Sell"
-
                 if side == "Buy"
-
                 else
-
                 "Buy"
-
             )
 
 
@@ -427,19 +405,23 @@ class PositionManager:
 
                 side=close_side,
 
-                qty=qty
+                qty=size
 
             )
 
 
 
             print(
-                "[POSITION CLOSED]",
-                result
+                "[POSITION CLOSED]"
             )
 
 
+            print(result)
+
+
+
             return result
+
 
 
 
@@ -457,6 +439,10 @@ class PositionManager:
 
 
 
-# singleton
+
+
+# ==========================================
+# SINGLETON
+# ==========================================
 
 position_manager = PositionManager()
