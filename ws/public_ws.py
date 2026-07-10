@@ -14,8 +14,9 @@ from config import (
 
 
 
+
 # ==========================================
-# PUBLIC WEBSOCKET V5
+# PUBLIC WS MANAGER
 # ==========================================
 
 class PublicWS:
@@ -26,11 +27,16 @@ class PublicWS:
 
         self.ws = None
 
+
         self.running = False
 
 
+        self.thread = None
 
-        self.prices = []
+
+
+        self.price = 0
+
 
 
         self.opens = []
@@ -56,97 +62,18 @@ class PublicWS:
 
 
     # ======================================
-    # TICKER CALLBACK
-    # ======================================
-
-    def ticker_callback(
-
-        self,
-
-        message
-
-    ):
-
-
-        try:
-
-
-            data = message.get(
-
-                "data",
-
-                {}
-
-            )
-
-
-            if "lastPrice" in data:
-
-
-                price = float(
-
-                    data["lastPrice"]
-
-                )
-
-
-                self.prices.append(
-
-                    price
-
-                )
-
-
-                if len(self.prices) > 500:
-
-                    self.prices.pop(0)
-
-
-
-                print(
-
-                    "[PRICE]",
-
-                    price
-
-                )
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[TICKER ERROR]",
-                e
-            )
-
-
-
-
-
-    # ======================================
     # KLINE CALLBACK
     # ======================================
 
-    def kline_callback(
-
-        self,
-
-        message
-
-    ):
+    def handle_kline(self, message):
 
 
         try:
 
 
             data = message.get(
-
                 "data",
-
                 []
-
             )
 
 
@@ -156,17 +83,35 @@ class PublicWS:
 
 
 
-
             candle = data[0]
+
+
+
+            close = float(
+
+                candle["close"]
+
+            )
+
+
+            self.price = close
+
+
+
+
+            print(
+                "[KLINE]",
+                close
+            )
+
+
 
 
 
             self.opens.append(
 
                 float(
-
                     candle["open"]
-
                 )
 
             )
@@ -175,9 +120,7 @@ class PublicWS:
             self.highs.append(
 
                 float(
-
                     candle["high"]
-
                 )
 
             )
@@ -186,9 +129,7 @@ class PublicWS:
             self.lows.append(
 
                 float(
-
                     candle["low"]
-
                 )
 
             )
@@ -196,11 +137,7 @@ class PublicWS:
 
             self.closes.append(
 
-                float(
-
-                    candle["close"]
-
-                )
+                close
 
             )
 
@@ -208,16 +145,21 @@ class PublicWS:
             self.volumes.append(
 
                 float(
-
                     candle["volume"]
-
                 )
 
             )
 
 
 
-            if len(self.closes) > 500:
+
+            # memory limit
+
+            max_len = 200
+
+
+
+            if len(self.closes) > max_len:
 
 
                 self.opens.pop(0)
@@ -231,15 +173,6 @@ class PublicWS:
                 self.volumes.pop(0)
 
 
-
-
-            print(
-
-                "[KLINE]",
-
-                self.closes[-1]
-
-            )
 
 
 
@@ -256,74 +189,94 @@ class PublicWS:
 
 
     # ======================================
-    # START
+    # CONNECT
+    # ======================================
+
+    def connect(self):
+
+
+        self.ws = WebSocket(
+
+
+            testnet=BYBIT_TESTNET,
+
+
+            channel_type=CATEGORY
+
+        )
+
+
+
+        self.ws.kline_stream(
+
+
+            interval="1",
+
+
+            symbol=DEFAULT_SYMBOL,
+
+
+            callback=self.handle_kline
+
+        )
+
+
+
+        print(
+            "[PUBLIC WS STARTED]"
+        )
+
+
+
+
+
+        while self.running:
+
+
+            time.sleep(1)
+
+
+
+
+
+    # ======================================
+    # START LOOP
     # ======================================
 
     def start(self):
 
 
-        try:
-
-
-            self.running = True
+        self.running = True
 
 
 
-            self.ws = WebSocket(
-
-                testnet=BYBIT_TESTNET,
-
-                channel_type="linear"
-
-            )
+        while self.running:
 
 
 
-            self.ws.ticker_stream(
+            try:
 
-                symbol=DEFAULT_SYMBOL,
 
-                callback=self.ticker_callback
-
-            )
+                self.connect()
 
 
 
-            self.ws.kline_stream(
+            except Exception as e:
 
-                interval=1,
 
-                symbol=DEFAULT_SYMBOL,
-
-                callback=self.kline_callback
-
-            )
+                print(
+                    "[PUBLIC WS ERROR]",
+                    e
+                )
 
 
 
-
-            print(
-                "[PUBLIC WS STARTED]"
-            )
-
+                print(
+                    "[PUBLIC WS RECONNECT] 5 sec"
+                )
 
 
-            while self.running:
-
-
-                time.sleep(1)
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-                "[PUBLIC WS START ERROR]",
-                e
-            )
+                time.sleep(5)
 
 
 
@@ -336,16 +289,19 @@ class PublicWS:
     def run_thread(self):
 
 
-        thread = threading.Thread(
+        self.thread = threading.Thread(
+
 
             target=self.start,
+
 
             daemon=True
 
         )
 
 
-        thread.start()
+        self.thread.start()
+
 
 
 
@@ -360,6 +316,7 @@ class PublicWS:
         self.running = False
 
 
+
         print(
             "[PUBLIC WS STOPPED]"
         )
@@ -369,8 +326,17 @@ class PublicWS:
 
 
     # ======================================
-    # DATA GETTER
+    # DATA ACCESS
     # ======================================
+
+    def get_price(self):
+
+
+        return self.price
+
+
+
+
 
     def get_ohlcv(self):
 
