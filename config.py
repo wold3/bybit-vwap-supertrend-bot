@@ -1,13 +1,38 @@
 # =====================================================
 # config.py
-# GLOBAL BOT CONFIG
+# BYBIT VWAP SUPERTREND BOT CONFIG
 # =====================================================
 
 import os
-from dotenv import load_dotenv
 
 
-load_dotenv()
+
+print("==============================")
+print("[CONFIG LOADED]")
+print()
+
+
+
+# =====================================================
+# MODE
+# =====================================================
+
+LIVE = False
+
+
+# True  = 실제 주문
+# False = 테스트용
+
+
+CATEGORY = "linear"
+
+
+DEFAULT_SYMBOL = "BTCUSDT"
+
+
+ACCOUNT_TYPE = "UNIFIED"
+
+
 
 
 
@@ -16,48 +41,38 @@ load_dotenv()
 # =====================================================
 
 BYBIT_API_KEY = os.getenv(
+
     "BYBIT_API_KEY",
+
     ""
+
 )
 
 
 BYBIT_API_SECRET = os.getenv(
+
     "BYBIT_API_SECRET",
+
     ""
-)
 
-
-BYBIT_REST_URL = os.getenv(
-    "BYBIT_REST_URL",
-    "https://api-demo.bybit.com"
-)
-
-
-BYBIT_PRIVATE_WS = os.getenv(
-    "BYBIT_PRIVATE_WS",
-    "wss://stream-demo.bybit.com/v5/private"
 )
 
 
 
+BYBIT_REST_URL = (
 
+    "https://api.bybit.com"
 
-# =====================================================
-# ACCOUNT / MARKET
-# =====================================================
-
-CATEGORY = "linear"
-
-DEFAULT_SYMBOL = os.getenv(
-    "DEFAULT_SYMBOL",
-    "BTCUSDT"
 )
 
 
-ACCOUNT_TYPE = os.getenv(
-    "ACCOUNT_TYPE",
-    "UNIFIED"
+BYBIT_PRIVATE_WS = (
+
+    "wss://stream.bybit.com/v5/private"
+
 )
+
+
 
 
 
@@ -67,12 +82,8 @@ ACCOUNT_TYPE = os.getenv(
 # LEVERAGE
 # =====================================================
 
-LEVERAGE = int(
-    os.getenv(
-        "LEVERAGE",
-        "5"
-    )
-)
+LEVERAGE = 3
+
 
 
 
@@ -82,12 +93,16 @@ LEVERAGE = int(
 # ORDER
 # =====================================================
 
-DEFAULT_QTY = float(
-    os.getenv(
-        "DEFAULT_QTY",
-        "0.001"
-    )
-)
+DEFAULT_QTY = 0.001
+
+
+ORDER_COOLDOWN = 60
+
+
+
+MAX_POSITION_SIZE = 0.01
+
+
 
 
 
@@ -97,123 +112,72 @@ DEFAULT_QTY = float(
 # RISK MANAGEMENT
 # =====================================================
 
-RISK_PER_TRADE_PERCENT = float(
-    os.getenv(
-        "RISK_PER_TRADE_PERCENT",
-        "1"
-    )
-)
+RISK_PER_TRADE_PERCENT = 1.0
 
 
-MAX_POSITION_SIZE = float(
-    os.getenv(
-        "MAX_POSITION_SIZE",
-        "0.01"
-    )
-)
+
+MAX_DAILY_LOSS_PERCENT = 5
 
 
-MAX_DAILY_LOSS_PERCENT = float(
-    os.getenv(
-        "MAX_DAILY_LOSS_PERCENT",
-        "5"
-    )
-)
+
+MAX_DRAWDOWN_PERCENT = 10
 
 
-MAX_DRAWDOWN_PERCENT = float(
-    os.getenv(
-        "MAX_DRAWDOWN_PERCENT",
-        "10"
-    )
-)
+
+MAX_LOSS_STREAK = 3
 
 
-MAX_LOSS_STREAK = int(
-    os.getenv(
-        "MAX_LOSS_STREAK",
-        "3"
-    )
-)
-
-
-ORDER_COOLDOWN = int(
-    os.getenv(
-        "ORDER_COOLDOWN",
-        "300"
-    )
-)
 
 
 
 
 
 # =====================================================
-# TP / SL
+# STOP / TAKE PROFIT
 # =====================================================
 
-STOP_LOSS_PERCENT = float(
-    os.getenv(
-        "STOP_LOSS_PERCENT",
-        "1"
-    )
-)
+STOP_LOSS_PERCENT = 1.5
 
 
-TAKE_PROFIT_PERCENT = float(
-    os.getenv(
-        "TAKE_PROFIT_PERCENT",
-        "2"
-    )
-)
+TAKE_PROFIT_PERCENT = 3.0
+
+
 
 
 
 
 
 # =====================================================
-# INDICATORS
+# INDICATOR
 # =====================================================
 
-ATR_PERIOD = int(
-    os.getenv(
-        "ATR_PERIOD",
-        "14"
-    )
-)
+ATR_PERIOD = 14
 
 
-SUPERTREND_MULTIPLIER = float(
-    os.getenv(
-        "SUPERTREND_MULTIPLIER",
-        "3"
-    )
-)
+
+SUPERTREND_MULTIPLIER = 3
+
+
+
+VWAP_PERIOD = 20
+
+
 
 
 
 
 
 # =====================================================
-# VWAP / VOLUME FILTER
+# VOLUME FILTER
 # =====================================================
 
-USE_VOLUME_FILTER = (
-    os.getenv(
-        "USE_VOLUME_FILTER",
-        "True"
-    )
-    .lower()
-    == "true"
-)
+USE_VOLUME_FILTER = False
 
 
-MIN_VOLUME_MULTIPLIER = float(
-    os.getenv(
-        "MIN_VOLUME_MULTIPLIER",
-        "1.2"
-    )
-)
+
+MIN_VOLUME_MULTIPLIER = 0.8
+
+
 
 
 
@@ -223,20 +187,12 @@ MIN_VOLUME_MULTIPLIER = float(
 # WATCHDOG
 # =====================================================
 
-WATCHDOG_INTERVAL = int(
-    os.getenv(
-        "WATCHDOG_INTERVAL",
-        "30"
-    )
-)
+WATCHDOG_INTERVAL = 30
 
 
-MAX_API_ERROR = int(
-    os.getenv(
-        "MAX_API_ERROR",
-        "5"
-    )
-)
+MAX_API_ERROR = 5
+
+
 
 
 
@@ -246,26 +202,16 @@ MAX_API_ERROR = int(
 # TELEGRAM
 # =====================================================
 
-TELEGRAM_ENABLED = (
-    os.getenv(
-        "TELEGRAM_ENABLED",
-        "False"
-    )
-    .lower()
-    == "true"
-)
+TELEGRAM_ENABLED = False
 
 
-TELEGRAM_TOKEN = os.getenv(
-    "TELEGRAM_TOKEN",
-    ""
-)
+
+TELEGRAM_TOKEN = ""
 
 
-TELEGRAM_CHAT_ID = os.getenv(
-    "TELEGRAM_CHAT_ID",
-    ""
-)
+TELEGRAM_CHAT_ID = ""
+
+
 
 
 
@@ -275,36 +221,56 @@ TELEGRAM_CHAT_ID = os.getenv(
 # DATABASE
 # =====================================================
 
-DATABASE_PATH = os.getenv(
-    "DATABASE_PATH",
-    "data/trading.db"
+DATABASE_FILE = (
+
+    "trading.db"
+
 )
 
 
 
 
 
+
+
 # =====================================================
-# LOG
+# PRINT
 # =====================================================
 
-LIVE_TRADING = (
-    os.getenv(
-        "LIVE_TRADING",
-        "False"
-    )
-    .lower()
-    == "true"
+print(
+
+    "LIVE :",
+
+    LIVE
+
 )
 
 
+print(
+
+    "CATEGORY :",
+
+    CATEGORY
+
+)
 
 
+print(
 
-print("==============================")
-print("[CONFIG LOADED]")
-print("LIVE :", LIVE_TRADING)
-print("CATEGORY :", CATEGORY)
-print("SYMBOL :", DEFAULT_SYMBOL)
-print("LEVERAGE :", LEVERAGE)
+    "SYMBOL :",
+
+    DEFAULT_SYMBOL
+
+)
+
+
+print(
+
+    "LEVERAGE :",
+
+    LEVERAGE
+
+)
+
+
 print("==============================")
