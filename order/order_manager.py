@@ -11,6 +11,10 @@ from api.bybit_api import (
     bybit_api
 )
 
+from risk.risk_manager import (
+    risk_manager
+)
+
 
 
 class OrderManager:
@@ -40,6 +44,7 @@ class OrderManager:
                 return False
 
 
+
             action = signal.get(
                 "signal"
             )
@@ -49,6 +54,7 @@ class OrderManager:
                 "[ORDER EXECUTE]",
                 action
             )
+
 
 
             if action == "BUY":
@@ -107,17 +113,13 @@ class OrderManager:
                 return False
 
 
+
             rows = (
                 position
-                .get(
-                    "result",
-                    {}
-                )
-                .get(
-                    "list",
-                    []
-                )
+                .get("result", {})
+                .get("list", [])
             )
+
 
 
             for p in rows:
@@ -145,7 +147,6 @@ class OrderManager:
 
         except Exception:
 
-
             return False
 
 
@@ -157,22 +158,25 @@ class OrderManager:
     def create_order(
         self,
         side,
-        qty=None
+        qty
     ):
+
 
         try:
 
 
-            if qty is None:
-
-                qty = DEFAULT_QTY
-
+            print(
+                "[ORDER REQUEST]"
+            )
 
 
             print(
-                "[ORDER REQUEST]",
                 "SIDE:",
-                side,
+                side
+            )
+
+
+            print(
                 "QTY:",
                 qty
             )
@@ -199,7 +203,6 @@ class OrderManager:
                     "[ORDER FAILED]"
                 )
 
-
                 return False
 
 
@@ -217,12 +220,101 @@ class OrderManager:
 
 
             print(
-                "[CREATE ORDER ERROR]",
+                "[ORDER ERROR]",
+                e
+            )
+
+            return False
+
+
+
+    # =====================================================
+    # CALCULATE QTY
+    # =====================================================
+
+    def calculate_qty(
+        self,
+        side
+    ):
+
+
+        try:
+
+
+            price = (
+                bybit_api
+                .get_last_price()
+            )
+
+
+            if price is None:
+
+                return DEFAULT_QTY
+
+
+
+            if side == "Buy":
+
+                stop = price * 0.99
+
+
+            else:
+
+                stop = price * 1.01
+
+
+
+            qty = (
+                risk_manager
+                .calculate_position_size(
+
+                    price,
+
+                    stop
+
+                )
+            )
+
+
+
+            if qty <= 0:
+
+                qty = DEFAULT_QTY
+
+
+
+            if not risk_manager.check_position_size(qty):
+
+
+                print(
+                    "[POSITION SIZE BLOCK]"
+                )
+
+
+                return 0
+
+
+
+            return round(
+
+                qty,
+
+                3
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+                "[QTY ERROR]",
                 e
             )
 
 
-            return False
+            return DEFAULT_QTY
 
 
 
@@ -234,6 +326,7 @@ class OrderManager:
         self
     ):
 
+
         try:
 
 
@@ -241,6 +334,7 @@ class OrderManager:
                 bybit_api
                 .get_position()
             )
+
 
 
             if self.has_position(
@@ -262,11 +356,25 @@ class OrderManager:
 
 
 
+            qty = self.calculate_qty(
+
+                "Buy"
+
+            )
+
+
+
+            if qty <= 0:
+
+                return False
+
+
+
             return self.create_order(
 
                 "Buy",
 
-                DEFAULT_QTY
+                qty
 
             )
 
@@ -293,6 +401,7 @@ class OrderManager:
         self
     ):
 
+
         try:
 
 
@@ -300,6 +409,7 @@ class OrderManager:
                 bybit_api
                 .get_position()
             )
+
 
 
             if self.has_position(
@@ -321,11 +431,25 @@ class OrderManager:
 
 
 
+            qty = self.calculate_qty(
+
+                "Sell"
+
+            )
+
+
+
+            if qty <= 0:
+
+                return False
+
+
+
             return self.create_order(
 
                 "Sell",
 
-                DEFAULT_QTY
+                qty
 
             )
 
@@ -351,6 +475,7 @@ class OrderManager:
     def close_position(
         self
     ):
+
 
         try:
 
@@ -388,13 +513,17 @@ class OrderManager:
         self
     ):
 
+
         return {
+
 
             "symbol":
                 DEFAULT_SYMBOL,
 
+
             "ready":
                 True
+
 
         }
 
