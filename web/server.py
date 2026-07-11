@@ -1,7 +1,8 @@
 # =====================================================
 # web/server.py
-# VWAP SUPERTREND BOT DASHBOARD SERVER
+# VWAP SUPERTREND BOT WEB SERVER
 # =====================================================
+
 
 from flask import (
     Flask,
@@ -14,10 +15,15 @@ import threading
 import time
 
 
+
 from config import (
+
     WEB_HOST,
+
     WEB_PORT,
+
     SYMBOL
+
 )
 
 
@@ -28,6 +34,7 @@ from config import (
 # FLASK
 # =====================================================
 
+
 app = Flask(
 
     __name__,
@@ -35,6 +42,8 @@ app = Flask(
     template_folder="templates"
 
 )
+
+
 
 
 
@@ -51,11 +60,12 @@ bot_instance = None
 server_started = False
 
 
-_server_thread = None
+server_thread = None
 
 
 
 MAX_LOGS = 500
+
 
 
 
@@ -64,6 +74,7 @@ status_lock = threading.Lock()
 log_lock = threading.Lock()
 
 chart_lock = threading.Lock()
+
 
 
 
@@ -79,81 +90,65 @@ status = {
 
 
     "mode":
-
         "DEMO",
 
 
     "symbol":
-
         SYMBOL,
 
 
     "bot":
-
         "STOPPED",
 
 
     "position":
-
         "NONE",
 
 
     "position_size":
-
         0,
 
 
     "entry_price":
-
         0,
 
 
     "pnl":
-
         0,
 
 
     "price":
-
         0,
 
 
     "balance":
-
         0,
 
 
     "equity":
-
         0,
 
 
     "vwap":
-
         0,
 
 
     "trend":
-
         "NONE",
 
 
     "signal":
-
         "NONE",
 
 
     "watchdog":
-
         "OFF",
 
 
     "last_action":
-
-        "NONE"
+        "SYSTEM READY"
 
 }
-
 
 
 
@@ -183,17 +178,11 @@ def add_log(message):
 
         "["
 
-        +
+        + time.strftime("%H:%M:%S")
 
-        time.strftime("%H:%M:%S")
+        + "] "
 
-        +
-
-        "] "
-
-        +
-
-        str(message)
+        + str(message)
 
     )
 
@@ -210,7 +199,7 @@ def add_log(message):
 
 
 
-        if len(logs)>MAX_LOGS:
+        if len(logs) > MAX_LOGS:
 
 
             logs.pop(0)
@@ -221,8 +210,10 @@ def add_log(message):
 
 
 
+
+
 # =====================================================
-# STATUS
+# STATUS CONTROL
 # =====================================================
 
 
@@ -245,6 +236,8 @@ def update_status(data):
 
 
 
+
+
 def get_status():
 
 
@@ -259,9 +252,19 @@ def get_status():
 
 
 
-# =====================================================
-# SYMBOL
-# =====================================================
+def get_trading_mode():
+
+
+    with status_lock:
+
+
+        return status["mode"]
+
+
+
+
+
+
 
 
 def get_trading_symbol():
@@ -309,25 +312,6 @@ def set_bot_instance(bot):
 
 
 # =====================================================
-# MODE
-# =====================================================
-
-
-def get_trading_mode():
-
-
-    with status_lock:
-
-
-        return status["mode"]
-
-
-
-
-
-
-
-# =====================================================
 # HOME
 # =====================================================
 
@@ -343,6 +327,7 @@ def index():
         "index.html"
 
     )
+
 
 
 
@@ -377,14 +362,13 @@ def api_status():
             get_status(),
 
 
+
         "logs":
 
             log_copy
 
 
-
     })
-
 
 
 
@@ -411,7 +395,7 @@ def api_status():
 def api_symbol():
 
 
-    data=request.get_json(
+    data = request.get_json(
 
         silent=True
 
@@ -419,13 +403,51 @@ def api_symbol():
 
 
 
-    symbol=data.get(
+    symbol = data.get(
 
         "symbol",
 
         SYMBOL
 
     ).upper()
+
+
+
+
+
+    allow = [
+
+
+        "BTCUSDT",
+
+        "ETHUSDT",
+
+        "SOLUSDT",
+
+        "XRPUSDT"
+
+
+    ]
+
+
+
+    if symbol not in allow:
+
+
+        return jsonify({
+
+
+            "success":
+                False,
+
+
+            "error":
+                "INVALID SYMBOL"
+
+
+        })
+
+
 
 
 
@@ -444,10 +466,7 @@ def api_symbol():
             f"SYMBOL {symbol}"
 
 
-
     })
-
-
 
 
 
@@ -456,6 +475,7 @@ def api_symbol():
         f"SYMBOL CHANGE {symbol}"
 
     )
+
 
 
 
@@ -484,6 +504,7 @@ def api_symbol():
             f"SYMBOL ERROR {e}"
 
         )
+
 
 
 
@@ -547,6 +568,7 @@ def api_mode():
 
 
 
+
     if mode not in [
 
         "DEMO",
@@ -568,6 +590,7 @@ def api_mode():
 
 
 
+
     update_status({
 
         "mode":
@@ -583,13 +606,11 @@ def api_mode():
 
 
 
-
     add_log(
 
         f"MODE CHANGE {mode}"
 
     )
-
 
 
 
@@ -622,7 +643,6 @@ def api_mode():
 
 
     return jsonify({
-
 
         "success":
 
@@ -682,8 +702,6 @@ def api_start():
 
                 "START"
 
-
-
         })
 
 
@@ -716,6 +734,7 @@ def api_start():
         )
 
 
+
         return jsonify({
 
             "success":
@@ -723,7 +742,6 @@ def api_start():
                 False
 
         })
-
 
 
 
@@ -762,7 +780,6 @@ def api_stop():
 
         update_status({
 
-
             "bot":
 
                 "STOPPED",
@@ -771,7 +788,6 @@ def api_stop():
             "last_action":
 
                 "STOP"
-
 
         })
 
@@ -805,6 +821,7 @@ def api_stop():
         )
 
 
+
         return jsonify({
 
             "success":
@@ -822,7 +839,7 @@ def api_stop():
 
 
 # =====================================================
-# CLOSE
+# CLOSE POSITION
 # =====================================================
 
 
@@ -929,6 +946,7 @@ def api_chart():
 
 
 
+
 def update_chart(data):
 
 
@@ -958,18 +976,23 @@ def run_server():
 
     global server_started
 
+    global server_thread
 
-    global _server_thread
 
 
 
     if server_started:
 
+
         return
 
 
 
+
+
     server_started=True
+
+
 
 
 
@@ -1001,7 +1024,7 @@ def run_server():
 
 
 
-    _server_thread=threading.Thread(
+    server_thread = threading.Thread(
 
 
         target=run,
@@ -1010,12 +1033,11 @@ def run_server():
         daemon=True
 
 
-
     )
 
 
 
-    _server_thread.start()
+    server_thread.start()
 
 
 
@@ -1041,7 +1063,6 @@ def run_server():
 
 
 
-
 # =====================================================
 # EXPORT
 # =====================================================
@@ -1052,30 +1073,21 @@ __all__=[
 
     "app",
 
-
     "run_server",
-
 
     "set_bot_instance",
 
-
     "update_status",
-
 
     "get_status",
 
-
     "add_log",
-
 
     "get_trading_mode",
 
-
     "get_trading_symbol",
 
-
     "update_chart"
-
 
 
 ]
