@@ -1,29 +1,41 @@
 # =====================================================
 # order/order_manager.py
-# VWAP SUPERTREND BOT ORDER MANAGER
-# BYBIT V5
+# VWAP SUPERTREND BOT
+# BYBIT V5 ORDER MANAGER
 # =====================================================
 
 import time
 
 
+
 from api.bybit_api import bybit_api
 
+
 from risk.risk_manager import risk_manager
+
 
 from portfolio.position_manager import position_manager
 
 
+
 from config import (
+
+    MAX_POSITION_SIZE,
+
     TAKE_PROFIT_PERCENT,
-    STOP_LOSS_PERCENT,
-    MAX_POSITION_SIZE
+
+    STOP_LOSS_PERCENT
+
 )
 
 
+
 from web.server import (
+
     add_log,
+
     update_status
+
 )
 
 
@@ -33,16 +45,75 @@ from web.server import (
 class OrderManager:
 
 
+
     def __init__(self):
 
+
         self.last_order_time = 0
+
 
         self.cooldown = 3
 
 
+
         print(
+
             "[ORDER MANAGER READY]"
+
         )
+
+
+
+
+
+
+
+    # =====================================================
+    # SIDE NORMALIZE
+    # =====================================================
+
+
+    def normalize_side(self, side):
+
+
+        side = str(side).upper()
+
+
+
+        if side in [
+
+            "BUY",
+
+            "LONG",
+
+            "UP"
+
+        ]:
+
+
+            return "Buy"
+
+
+
+
+        if side in [
+
+            "SELL",
+
+            "SHORT",
+
+            "DOWN"
+
+        ]:
+
+
+            return "Sell"
+
+
+
+        return None
+
+
 
 
 
@@ -52,21 +123,31 @@ class OrderManager:
     # COOLDOWN
     # =====================================================
 
+
     def can_order(self):
 
-        now = time.time()
+
+        now=time.time()
 
 
-        if now - self.last_order_time < self.cooldown:
+
+        if now-self.last_order_time < self.cooldown:
+
 
             add_log(
+
                 "ORDER COOLDOWN"
+
             )
+
 
             return False
 
 
+
         return True
+
+
 
 
 
@@ -76,52 +157,83 @@ class OrderManager:
     # OPEN POSITION
     # =====================================================
 
+
     def open_position(
+
         self,
+
         side,
+
         qty=None
+
     ):
 
 
         try:
 
 
-            if not self.can_order():
+
+            side=self.normalize_side(side)
+
+
+
+            if not side:
+
+
+                add_log(
+
+                    "INVALID ORDER SIDE"
+
+                )
+
 
                 return None
+
+
+
+
+
+
+            if not self.can_order():
+
+
+                return None
+
+
+
 
 
 
 
             if qty is None:
 
-                qty = MAX_POSITION_SIZE
 
-
-
-            qty = float(qty)
-
-
-
-            print(
-                "[OPEN]",
-                side,
-                qty
-            )
+                qty=MAX_POSITION_SIZE
 
 
 
 
 
-            # -----------------------------
+            qty=float(qty)
+
+
+
+
+
+            # ------------------------------
             # RISK CHECK
-            # -----------------------------
+            # ------------------------------
+
 
             if not risk_manager.allow_order(qty):
 
+
                 add_log(
-                    "ORDER BLOCKED RISK"
+
+                    "RISK BLOCK ORDER"
+
                 )
+
 
                 return None
 
@@ -129,67 +241,77 @@ class OrderManager:
 
 
 
-            # -----------------------------
+
+
+            # ------------------------------
             # CURRENT POSITION
-            # -----------------------------
-
-            pos = position_manager.get_position()
+            # ------------------------------
 
 
-            current_side = pos.get(
+            position = position_manager.get_position()
+
+
+
+            current_side = position.get(
+
                 "side",
+
                 "NONE"
+
             )
 
 
-            current_size = float(
-                pos.get(
+
+            current_size=float(
+
+                position.get(
+
                     "size",
+
                     0
+
                 )
+
             )
 
 
 
 
 
-            # -----------------------------
-            # SAME POSITION
-            # -----------------------------
 
-            if current_size > 0 and current_side == side:
-
-
-                add_log(
-                    f"ALREADY POSITION {side}"
-                )
-
-
-                return None
+            if current_size > 0:
 
 
 
+                if current_side == side:
 
 
+                    add_log(
 
-            # -----------------------------
-            # CLOSE OPPOSITE
-            # -----------------------------
+                        "EXIST SAME POSITION"
 
-            if current_size > 0 and current_side != side:
+                    )
 
-
-                add_log(
-                    "CLOSE OPPOSITE FIRST"
-                )
-
-
-                result = self.close_position()
-
-
-                if not result:
 
                     return None
+
+
+
+
+
+                add_log(
+
+                    "CLOSE OPPOSITE POSITION"
+
+                )
+
+
+
+                if not self.close_position():
+
+
+                    return None
+
 
 
                 time.sleep(2)
@@ -200,30 +322,57 @@ class OrderManager:
 
 
 
-            # -----------------------------
-            # LEVERAGE
-            # -----------------------------
 
-            bybit_api.set_leverage()
-
+            # ------------------------------
+            # SET LEVERAGE
+            # ------------------------------
 
 
+            try:
+
+
+                bybit_api.set_leverage()
 
 
 
-            # -----------------------------
+            except Exception as e:
+
+
+                add_log(
+
+                    f"LEVERAGE ERROR {e}"
+
+                )
+
+
+
+
+
+
+
+
+
+
+            # ------------------------------
             # MARKET ORDER
-            # -----------------------------
+            # ------------------------------
+
 
             result = bybit_api.place_order(
 
+
                 side=side,
+
 
                 qty=qty,
 
+
                 reduce_only=False
 
+
             )
+
+
 
 
 
@@ -231,24 +380,32 @@ class OrderManager:
 
 
                 add_log(
-                    "ORDER EMPTY RESPONSE"
+
+                    "ORDER NO RESPONSE"
+
                 )
 
 
                 return None
+
 
 
 
 
 
             if result.get(
+
                 "retCode",
+
                 -1
+
             ) != 0:
 
 
                 add_log(
+
                     f"ORDER FAILED {result}"
+
                 )
 
 
@@ -259,7 +416,8 @@ class OrderManager:
 
 
 
-            self.last_order_time = time.time()
+
+            self.last_order_time=time.time()
 
 
 
@@ -276,11 +434,21 @@ class OrderManager:
 
             update_status({
 
+
                 "position":
+
                     side,
 
+
                 "position_size":
-                    qty
+
+                    qty,
+
+
+                "last_action":
+
+                    f"OPEN {side} {qty}"
+
 
             })
 
@@ -289,11 +457,8 @@ class OrderManager:
 
 
 
-            # -----------------------------
-            # WAIT POSITION SYNC
-            # -----------------------------
-
             time.sleep(1)
+
 
 
             position_manager.refresh()
@@ -315,7 +480,7 @@ class OrderManager:
 
             add_log(
 
-                f"OPEN ORDER ERROR {e}"
+                f"OPEN ERROR {e}"
 
             )
 
@@ -328,10 +493,10 @@ class OrderManager:
 
 
 
+    # =====================================================
+    # SET TP SL
+    # =====================================================
 
-    # =====================================================
-    # TP / SL
-    # =====================================================
 
     def set_tp_sl(self):
 
@@ -339,16 +504,21 @@ class OrderManager:
         try:
 
 
-            pos = position_manager.get_position()
+            pos=position_manager.get_position()
 
 
-            side = pos.get(
+
+            side=pos.get(
+
                 "side",
+
                 ""
+
             )
 
 
-            entry = float(
+
+            entry=float(
 
                 pos.get(
 
@@ -362,10 +532,11 @@ class OrderManager:
 
 
 
-            if entry <= 0:
+
+            if entry<=0:
 
 
-                entry = bybit_api.get_price()
+                entry=bybit_api.get_price()
 
 
 
@@ -380,48 +551,53 @@ class OrderManager:
 
 
 
-            if side == "Buy":
 
 
-                tp = entry * (
-
-                    1 +
-
-                    TAKE_PROFIT_PERCENT / 100
-
-                )
+            if side=="Buy":
 
 
-                sl = entry * (
+                tp=entry*(
 
-                    1 -
+                    1+
 
-                    STOP_LOSS_PERCENT / 100
+                    TAKE_PROFIT_PERCENT/100
 
                 )
 
 
+                sl=entry*(
 
+                    1-
 
-            elif side == "Sell":
-
-
-                tp = entry * (
-
-                    1 -
-
-                    TAKE_PROFIT_PERCENT / 100
+                    STOP_LOSS_PERCENT/100
 
                 )
 
 
-                sl = entry * (
 
-                    1 +
 
-                    STOP_LOSS_PERCENT / 100
+
+
+            elif side=="Sell":
+
+
+                tp=entry*(
+
+                    1-
+
+                    TAKE_PROFIT_PERCENT/100
 
                 )
+
+
+                sl=entry*(
+
+                    1+
+
+                    STOP_LOSS_PERCENT/100
+
+                )
+
 
 
             else:
@@ -434,13 +610,17 @@ class OrderManager:
 
 
 
-            result = bybit_api.set_trading_stop(
+            result=bybit_api.set_trading_stop(
+
 
                 round(tp,2),
 
+
                 round(sl,2)
 
+
             )
+
 
 
 
@@ -456,7 +636,6 @@ class OrderManager:
 
 
                 return True
-
 
 
 
@@ -487,24 +666,40 @@ class OrderManager:
     # CLOSE POSITION
     # =====================================================
 
+
     def close_position(self):
 
 
         try:
 
 
-            pos = position_manager.get_position()
+
+            position=position_manager.get_position()
 
 
 
-            if pos.get(
-                "size",
-                0
-            ) <= 0:
+            size=float(
+
+                position.get(
+
+                    "size",
+
+                    0
+
+                )
+
+            )
+
+
+
+
+            if size<=0:
 
 
                 add_log(
+
                     "NO POSITION"
+
                 )
 
 
@@ -515,7 +710,10 @@ class OrderManager:
 
 
 
-            result = bybit_api.close_position()
+            result=bybit_api.close_position()
+
+
+
 
 
 
@@ -523,12 +721,19 @@ class OrderManager:
 
 
                 add_log(
+
                     "CLOSE FAILED"
+
                 )
 
 
                 return False
 
+
+
+
+
+            self.last_order_time=time.time()
 
 
 
@@ -542,7 +747,27 @@ class OrderManager:
 
 
 
-            self.last_order_time = time.time()
+            update_status({
+
+
+                "position":
+
+                    "NONE",
+
+
+                "position_size":
+
+                    0,
+
+
+                "last_action":
+
+                    "POSITION CLOSED"
+
+
+            })
+
+
 
 
 
@@ -554,7 +779,8 @@ class OrderManager:
 
 
 
-            return result
+            return True
+
 
 
 
@@ -579,8 +805,9 @@ class OrderManager:
 
 
     # =====================================================
-    # EMERGENCY CLOSE
+    # EMERGENCY
     # =====================================================
+
 
     def emergency_close(self):
 
@@ -600,15 +827,16 @@ class OrderManager:
 
 
 
-
     # =====================================================
     # STATUS
     # =====================================================
+
 
     def status(self):
 
 
         return {
+
 
             "cooldown":
 
@@ -619,7 +847,11 @@ class OrderManager:
 
                 self.last_order_time
 
+
         }
+
+
+
 
 
 
@@ -628,5 +860,6 @@ class OrderManager:
 # =====================================================
 # INSTANCE
 # =====================================================
+
 
 order_manager = OrderManager()
