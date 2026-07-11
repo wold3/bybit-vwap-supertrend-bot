@@ -4,19 +4,20 @@
 # =====================================================
 
 
+# Bybit V5 API
+pybit
+
+
 # Web Dashboard
 Flask==3.0.3
-
 
 
 # HTTP API
 requests==2.32.3
 
 
-
 # WebSocket
 websocket-client==1.8.0
-
 
 
 # Data Processing
@@ -24,26 +25,21 @@ pandas==2.2.2
 numpy==2.0.1
 
 
-
 # Environment
 python-dotenv==1.0.1
-
 
 
 # Timezone
 pytz==2024.1
 
 
-
-# Technical Analysis Support
+# Technical Analysis
 ta==0.11.0
-
 
 
 # Database
 SQLAlchemy==2.0.32
 
 
-
-# Optional Performance
+# Performance
 orjson==3.10.7
