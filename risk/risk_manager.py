@@ -3,15 +3,11 @@
 # Risk Management System
 # =====================================================
 
-import math
-
-
 from config import (
     RISK_PER_TRADE_PERCENT,
     STOP_LOSS_PERCENT,
-    MAX_POSITION_SIZE,
-    LEVERAGE,
-    DEFAULT_SYMBOL
+    TAKE_PROFIT_PERCENT,
+    MAX_POSITION_SIZE
 )
 
 
@@ -29,7 +25,7 @@ class RiskManager:
 
         print(
 
-            "[RISK MANAGER INIT]"
+            "[RISK MANAGER READY]"
 
         )
 
@@ -52,64 +48,18 @@ class RiskManager:
     ):
 
 
-        try:
+        self.equity = float(
+
+            equity
+
+        )
 
 
-            self.equity = float(
+        print(
 
-                equity
-
-            )
-
-
-            print(
-
-                "[EQUITY UPDATED]",
-
-                self.equity
-
-            )
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[EQUITY ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # RISK AMOUNT
-    # =====================================================
-
-
-    def risk_amount(self):
-
-
-        return (
+            "[EQUITY UPDATED]",
 
             self.equity
-
-            *
-
-            RISK_PER_TRADE_PERCENT
-
-            /
-
-            100
 
         )
 
@@ -126,7 +76,7 @@ class RiskManager:
     # =====================================================
 
 
-    def calculate_qty(
+    def calculate_position_size(
         self,
         price
     ):
@@ -135,7 +85,7 @@ class RiskManager:
         try:
 
 
-            if price <= 0:
+            if self.equity <= 0:
 
 
                 return 0
@@ -146,7 +96,15 @@ class RiskManager:
 
             risk_money = (
 
-                self.risk_amount()
+                self.equity
+
+                *
+
+                RISK_PER_TRADE_PERCENT
+
+                /
+
+                100
 
             )
 
@@ -195,16 +153,6 @@ class RiskManager:
 
 
 
-            # leverage 적용
-
-            qty = qty * LEVERAGE
-
-
-
-
-
-            # 최대 제한
-
             if qty > MAX_POSITION_SIZE:
 
 
@@ -227,13 +175,12 @@ class RiskManager:
 
 
 
-
         except Exception as e:
 
 
             print(
 
-                "[QTY ERROR]",
+                "[SIZE ERROR]",
 
                 e
 
@@ -241,6 +188,8 @@ class RiskManager:
 
 
             return 0
+
+
 
 
 
@@ -259,13 +208,9 @@ class RiskManager:
     ):
 
 
-        qty = (
+        qty = self.calculate_position_size(
 
-            self.calculate_qty(
-
-                price
-
-            )
+            price
 
         )
 
@@ -290,11 +235,6 @@ class RiskManager:
         return {
 
 
-            "symbol":
-
-                DEFAULT_SYMBOL,
-
-
             "qty":
 
                 qty,
@@ -302,7 +242,8 @@ class RiskManager:
 
             "risk":
 
-                self.risk_amount()
+                RISK_PER_TRADE_PERCENT
+
 
         }
 
@@ -315,24 +256,15 @@ class RiskManager:
 
 
     # =====================================================
-    # TP / SL CALCULATION
+    # TP / SL
     # =====================================================
 
 
     def calculate_tp_sl(
         self,
         side,
-        entry
+        price
     ):
-
-
-        tp_percent = 2.0
-
-
-        sl_percent = STOP_LOSS_PERCENT
-
-
-
 
 
         if side == "Buy":
@@ -340,7 +272,7 @@ class RiskManager:
 
             tp = (
 
-                entry
+                price
 
                 *
 
@@ -350,7 +282,7 @@ class RiskManager:
 
                     +
 
-                    tp_percent
+                    TAKE_PROFIT_PERCENT
 
                     /
 
@@ -363,7 +295,7 @@ class RiskManager:
 
             sl = (
 
-                entry
+                price
 
                 *
 
@@ -373,7 +305,7 @@ class RiskManager:
 
                     -
 
-                    sl_percent
+                    STOP_LOSS_PERCENT
 
                     /
 
@@ -392,7 +324,7 @@ class RiskManager:
 
             tp = (
 
-                entry
+                price
 
                 *
 
@@ -402,7 +334,7 @@ class RiskManager:
 
                     -
 
-                    tp_percent
+                    TAKE_PROFIT_PERCENT
 
                     /
 
@@ -415,7 +347,7 @@ class RiskManager:
 
             sl = (
 
-                entry
+                price
 
                 *
 
@@ -425,7 +357,7 @@ class RiskManager:
 
                     +
 
-                    sl_percent
+                    STOP_LOSS_PERCENT
 
                     /
 
@@ -466,6 +398,53 @@ class RiskManager:
         }
 
 
+
+
+
+
+
+
+
+    # =====================================================
+    # DAILY LOSS PROTECTION
+    # =====================================================
+
+
+    def daily_loss_check(
+        self,
+        loss
+    ):
+
+
+        max_loss = (
+
+            self.equity
+
+            *
+
+            0.05
+
+        )
+
+
+
+        if loss >= max_loss:
+
+
+            print(
+
+                "[DAILY LOSS LIMIT]"
+
+            )
+
+
+            return False
+
+
+
+
+
+        return True
 
 
 
