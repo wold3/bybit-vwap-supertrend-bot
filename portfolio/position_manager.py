@@ -1,37 +1,28 @@
 # =====================================================
 # portfolio/position_manager.py
-# Position Manager
+# POSITION MANAGER
 # =====================================================
 
 import threading
+import time
 
-
+from api.bybit_api import bybit_api
 
 from web.server import (
-
-    update_status,
-
-    add_log
-
+    add_log,
+    update_status
 )
-
-
-
-
-
 
 
 class PositionManager:
 
-
     def __init__(self):
-
 
         self.lock = threading.Lock()
 
-
-
         self.position = {
+
+            "symbol": "",
 
             "side": "NONE",
 
@@ -39,11 +30,15 @@ class PositionManager:
 
             "entry_price": 0.0,
 
-            "pnl": 0.0
+            "mark_price": 0.0,
+
+            "liq_price": 0.0,
+
+            "unrealised_pnl": 0.0,
+
+            "updated": 0
 
         }
-
-
 
         print(
 
@@ -51,260 +46,191 @@ class PositionManager:
 
         )
 
-
-
-
-
-
-
-
-
     # =====================================================
-    # SAFE FLOAT
+    # UPDATE FROM API
     # =====================================================
 
-    def safe_float(
-
-        self,
-
-        value,
-
-        default=0.0
-
-    ):
-
+    def refresh(self):
 
         try:
 
+            data = bybit_api.get_position()
 
-            if value in [
+            if not data:
 
-                "",
+                return False
 
-                None
+            rows = data["result"]["list"]
 
-            ]:
+            if not rows:
 
+                return False
 
-                return default
-
-
-
-            return float(value)
-
-
-
-        except:
-
-
-            return default
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # UPDATE FROM BYBIT WS
-    # =====================================================
-
-    def update(
-
-        self,
-
-        data
-
-    ):
-
-
-        try:
-
-
+            p = rows[0]
 
             with self.lock:
 
+                self.position["symbol"] = p["symbol"]
 
+                self.position["side"] = p["side"] if p["side"] else "NONE"
 
-                if not data:
+                self.position["size"] = float(p["size"])
 
+                self.position["entry_price"] = float(p["avgPrice"] or 0)
 
-                    return
+                self.position["mark_price"] = float(p["markPrice"] or 0)
 
+                self.position["liq_price"] = float(p["liqPrice"] or 0)
 
+                self.position["unrealised_pnl"] = float(
 
-
-
-
-                item = data[0]
-
-
-
-
-
-                size = self.safe_float(
-
-                    item.get(
-
-                        "size",
-
-                        0
-
-                    )
+                    p["unrealisedPnl"] or 0
 
                 )
 
+                self.position["updated"] = time.time()
 
+            update_status(self.position)
 
-
-
-                entry = self.safe_float(
-
-                    item.get(
-
-                        "avgPrice",
-
-                        0
-
-                    )
-
-                )
-
-
-
-
-
-                pnl = self.safe_float(
-
-                    item.get(
-
-                        "unrealisedPnl",
-
-                        0
-
-                    )
-
-                )
-
-
-
-
-
-                side = item.get(
-
-                    "side",
-
-                    ""
-
-                )
-
-
-
-                if size <= 0:
-
-
-
-                    side = "NONE"
-
-
-
-
-
-                self.position = {
-
-
-                    "side":
-
-                        side,
-
-
-                    "size":
-
-                        size,
-
-
-                    "entry_price":
-
-                        entry,
-
-
-                    "pnl":
-
-                        pnl
-
-
-                }
-
-
-
-
-
-
-            update_status({
-
-                "position":
-
-                    side,
-
-
-                "position_size":
-
-                    size,
-
-
-                "entry_price":
-
-                    entry,
-
-
-                "pnl":
-
-                    pnl
-
-
-            })
-
-
-
-
+            return True
 
         except Exception as e:
 
-
-
             add_log(
 
-                f"POSITION UPDATE ERROR {e}"
+                f"POSITION REFRESH ERROR {e}"
+
+            )
+
+            return False
+
+    # =====================================================
+    # GET POSITION
+    # =====================================================
+
+    def get_position(self):
+
+        with self.lock:
+
+            return self.position.copy()
+
+    # =====================================================
+    # HAS POSITION
+    # =====================================================
+
+    def has_position(self):
+
+        with self.lock:
+
+            return self.position["size"] > 0
+
+
+
+    # =====================================================
+    # IS LONG
+    # =====================================================
+
+    def is_long(self):
+
+        with self.lock:
+
+            return (
+
+                self.position["side"] == "Buy"
+
+                and
+
+                self.position["size"] > 0
 
             )
 
 
 
-
-
-
-
-
-
     # =====================================================
-    # GET
+    # IS SHORT
     # =====================================================
 
-    def get_position(self):
-
+    def is_short(self):
 
         with self.lock:
 
+            return (
 
-            return self.position.copy()
+                self.position["side"] == "Sell"
+
+                and
+
+                self.position["size"] > 0
+
+            )
 
 
 
+    # =====================================================
+    # UPDATE FROM REST API
+    # =====================================================
+
+    def refresh(self):
+
+        try:
+
+            from api.bybit_api import bybit_api
+
+            result = bybit_api.get_position()
+
+            if not result:
+
+                return False
+
+            rows = result["result"]["list"]
+
+            if not rows:
+
+                return False
+
+            self.update(rows)
+
+            return True
+
+        except Exception as e:
+
+            add_log(
+
+                f"POSITION REFRESH ERROR {e}"
+
+            )
+
+            return False
 
 
 
+    # =====================================================
+    # STATUS
+    # =====================================================
+
+    def status(self):
+
+        with self.lock:
+
+            return {
+
+                "side":
+
+                    self.position["side"],
+
+                "size":
+
+                    self.position["size"],
+
+                "entry_price":
+
+                    self.position["entry_price"],
+
+                "pnl":
+
+                    self.position["pnl"]
+
+            }
 
 
 
@@ -314,63 +240,31 @@ class PositionManager:
 
     def reset(self):
 
-
         with self.lock:
-
-
 
             self.position = {
 
+                "side": "NONE",
 
-                "side":
+                "size": 0.0,
 
-                    "NONE",
+                "entry_price": 0.0,
 
-
-                "size":
-
-                    0.0,
-
-
-                "entry_price":
-
-                    0.0,
-
-
-                "pnl":
-
-                    0.0
-
+                "pnl": 0.0
 
             }
 
-
-
-
         update_status({
 
-            "position":
+            "position": "NONE",
 
-                "NONE",
+            "position_size": 0,
 
+            "entry_price": 0,
 
-            "position_size":
-
-                0,
-
-
-            "entry_price":
-
-                0,
-
-
-            "pnl":
-
-                0
+            "pnl": 0
 
         })
-
-
 
         add_log(
 
@@ -380,25 +274,15 @@ class PositionManager:
 
 
 
-
-
-
-
-
-
     # =====================================================
     # CLOSE
     # =====================================================
 
     def close(self):
 
-
         try:
 
-
             self.reset()
-
-
 
             print(
 
@@ -406,11 +290,7 @@ class PositionManager:
 
             )
 
-
-
         except Exception as e:
-
-
 
             print(
 
@@ -419,13 +299,6 @@ class PositionManager:
                 e
 
             )
-
-
-
-
-
-
-
 
 
 # =====================================================
