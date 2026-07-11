@@ -7,56 +7,182 @@
 
 <title>VWAP SUPERTREND BOT</title>
 
+
 <style>
 
 body{
 
-    background:#111;
+    margin:0;
+
+    background:#0b0f14;
+
+    color:#e6edf3;
+
+    font-family:
+    "Segoe UI",
+    Arial,
+    sans-serif;
+
+}
+
+
+.header{
+
+    padding:20px;
+
+    background:#111827;
+
+    border-bottom:1px solid #333;
+
+}
+
+
+.header h1{
+
+    margin:0;
+
+}
+
+
+.container{
+
+    padding:20px;
+
+    display:grid;
+
+    grid-template-columns:
+    repeat(auto-fit,minmax(300px,1fr));
+
+    gap:20px;
+
+}
+
+
+
+.card{
+
+    background:#151b24;
+
+    border:1px solid #30363d;
+
+    border-radius:12px;
+
+    padding:20px;
+
+}
+
+
+
+.title{
+
+    color:#8b949e;
+
+    margin-bottom:10px;
+
+}
+
+
+
+.value{
+
+    font-size:28px;
+
+    font-weight:bold;
+
+}
+
+
+
+.green{
+
+    color:#3fb950;
+
+}
+
+
+.red{
+
+    color:#f85149;
+
+}
+
+
+
+button{
+
+    width:120px;
+
+    height:45px;
+
+    margin:5px;
+
+    border:0;
+
+    border-radius:8px;
+
+    font-size:18px;
+
+    cursor:pointer;
+
+}
+
+
+
+.buy{
+
+    background:#238636;
 
     color:white;
 
-    font-family:Arial;
+}
 
-    padding:20px;
+
+.sell{
+
+    background:#da3633;
+
+    color:white;
 
 }
 
 
-.box{
+.close{
 
-    border:1px solid #555;
+    background:#57606a;
 
-    padding:20px;
-
-    margin:15px 0;
+    color:white;
 
 }
+
 
 
 #logs{
-
-    background:black;
 
     height:300px;
 
     overflow:auto;
 
-    padding:10px;
-
-    font-family:monospace;
-
-}
-
-
-button{
+    background:#000;
 
     padding:15px;
 
-    margin:5px;
+    font-family:monospace;
 
-    font-size:18px;
+    border-radius:8px;
 
 }
+
+
+
+.bigprice{
+
+    font-size:40px;
+
+    font-weight:bold;
+
+}
+
+
 
 </style>
 
@@ -66,23 +192,115 @@ button{
 <body>
 
 
+
+<div class="header">
+
 <h1>
 VWAP SUPERTREND BOT
 </h1>
 
+</div>
 
 
-<div class="box">
 
-<h2>
+
+<div class="container">
+
+
+
+<div class="card">
+
+<div class="title">
 BOT STATUS
-</h2>
+</div>
+
+<div id="bot" class="value">
+-
+</div>
+
+</div>
 
 
-<div id="status">
 
-CONNECTING...
+<div class="card">
 
+<div class="title">
+SYMBOL
+</div>
+
+<div id="symbol" class="value">
+-
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+<div class="title">
+PRICE
+</div>
+
+<div id="price" class="bigprice">
+-
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
+<div class="title">
+POSITION
+</div>
+
+
+<div id="position" class="value">
+-
+</div>
+
+
+<br>
+
+
+SIZE :
+
+<span id="size">
+-
+</span>
+
+
+<br>
+
+
+ENTRY :
+
+<span id="entry">
+-
+</span>
+
+
+</div>
+
+
+
+
+
+
+<div class="card">
+
+<div class="title">
+PNL
+</div>
+
+
+<div id="pnl" class="bigprice">
+-
 </div>
 
 
@@ -92,26 +310,34 @@ CONNECTING...
 
 
 
-<div class="box">
+<div class="card">
+
+<div class="title">
+MANUAL ORDER
+</div>
 
 
-<h2>
-ORDER
-</h2>
+<button class="buy"
+onclick="order('Buy')">
 
-
-<button onclick="order('Buy')">
 BUY
+
 </button>
 
 
-<button onclick="order('Sell')">
+<button class="sell"
+onclick="order('Sell')">
+
 SELL
+
 </button>
 
 
-<button onclick="closePosition()">
+<button class="close"
+onclick="closePosition()">
+
 CLOSE
+
 </button>
 
 
@@ -120,18 +346,22 @@ CLOSE
 
 
 
+<div class="card"
+style="grid-column:1/-1">
 
-<div class="box">
 
-
-<h2>
-LOGS
-</h2>
+<div class="title">
+SYSTEM LOG
+</div>
 
 
 <div id="logs">
 
 </div>
+
+
+</div>
+
 
 
 </div>
@@ -148,81 +378,73 @@ LOGS
 function update(){
 
 
-    fetch("/api/status")
-
-    .then(function(response){
-
-        return response.json();
-
-    })
+fetch("/api/status")
 
 
-    .then(function(data){
+.then(r=>r.json())
 
 
-        let s=data.status;
+.then(data=>{
+
+
+let s=data.status;
 
 
 
-        document.getElementById("status").innerHTML =
-
-        `
-
-        API : ${s.api}<br>
-
-        BOT : ${s.bot}<br>
-
-        MODE : ${s.mode}<br>
-
-        SYMBOL : ${s.symbol}<br>
-
-        POSITION : ${s.position}<br>
-
-        SIZE : ${s.position_size}<br>
-
-        ENTRY : ${s.entry_price}<br>
-
-        PRICE : ${s.price}<br>
-
-        PNL : ${s.pnl}
-
-        `;
+document.getElementById("bot").innerHTML=
+s.bot;
 
 
 
-        let log="";
-
-
-        data.logs.forEach(function(x){
-
-            log += x+"<br>";
-
-        });
+document.getElementById("symbol").innerHTML=
+s.symbol;
 
 
 
-        document.getElementById("logs").innerHTML=log;
+document.getElementById("price").innerHTML=
+s.price;
 
 
 
-    })
+document.getElementById("position").innerHTML=
+s.position;
 
 
 
-    .catch(function(error){
+document.getElementById("size").innerHTML=
+s.position_size;
 
 
-        document.getElementById("status").innerHTML =
 
-        "API ERROR : "+error;
+document.getElementById("entry").innerHTML=
+s.entry_price;
 
 
-    });
 
+document.getElementById("pnl").innerHTML=
+s.pnl;
+
+
+
+let log="";
+
+
+data.logs.forEach(x=>{
+
+log += x+"<br>";
+
+});
+
+
+document.getElementById("logs").innerHTML=
+log;
+
+
+
+});
 
 
 }
-
 
 
 
@@ -235,12 +457,11 @@ fetch("/api/order",{
 
 method:"POST",
 
-
 headers:{
 
 
-"Content-Type":"application/json"
-
+"Content-Type":
+"application/json"
 
 },
 
@@ -265,7 +486,6 @@ qty:0.001
 
 
 
-
 function closePosition(){
 
 
@@ -283,13 +503,14 @@ method:"POST"
 
 
 
-setInterval(update,1000);
 
+setInterval(update,1000);
 
 update();
 
 
 </script>
+
 
 
 </body>
