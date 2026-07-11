@@ -5,18 +5,20 @@
 
 from flask import (
     Flask,
-    jsonify,
-    render_template
+    render_template,
+    jsonify
 )
 
 
 import threading
-import time
 
 
 
-from web.chart_data import (
-    get_chart
+
+
+from config import (
+    WEB_HOST,
+    WEB_PORT
 )
 
 
@@ -25,9 +27,7 @@ from web.chart_data import (
 
 app = Flask(
 
-    __name__,
-
-    template_folder="templates"
+    __name__
 
 )
 
@@ -48,11 +48,6 @@ status = {
         "STARTING",
 
 
-    "symbol":
-
-        "",
-
-
     "price":
 
         0,
@@ -65,17 +60,12 @@ status = {
 
     "trend":
 
-        "NONE",
-
-
-    "volume":
-
-        False,
+        "-",
 
 
     "signal":
 
-        "NONE",
+        "-",
 
 
     "position":
@@ -98,19 +88,10 @@ status = {
         0,
 
 
-    "tp":
-
-        0,
-
-
-    "sl":
-
-        0,
-
-
     "watchdog":
 
-        "STARTING"
+        "OFF"
+
 
 }
 
@@ -135,7 +116,9 @@ lock = threading.Lock()
 # =====================================================
 
 
-def update_status(data):
+def update_status(
+    data
+):
 
 
     with lock:
@@ -154,12 +137,15 @@ def update_status(data):
 
 
 
+
 # =====================================================
-# ADD LOG
+# LOG
 # =====================================================
 
 
-def add_log(message):
+def add_log(
+    message
+):
 
 
     with lock:
@@ -167,7 +153,7 @@ def add_log(message):
 
         logs.append(
 
-            f"{time.strftime('%H:%M:%S')}  {message}"
+            message
 
         )
 
@@ -187,13 +173,13 @@ def add_log(message):
 
 
 # =====================================================
-# DASHBOARD PAGE
+# PAGE
 # =====================================================
 
 
 @app.route("/")
 
-def dashboard():
+def index():
 
 
     return render_template(
@@ -228,13 +214,12 @@ def api_status():
 
             "status":
 
-                status,
+                status.copy(),
 
 
             "logs":
 
-                logs[::-1]
-
+                logs.copy()
 
         })
 
@@ -256,39 +241,32 @@ def api_status():
 def api_chart():
 
 
-    return jsonify(
-
-        get_chart()
-
-    )
+    try:
 
 
+        from web.chart_data import (
+
+            get_chart
+
+        )
+
+
+        return jsonify(
+
+            get_chart()
+
+        )
 
 
 
+    except Exception:
 
 
+        return jsonify(
 
+            []
 
-# =====================================================
-# HEALTH CHECK
-# =====================================================
-
-
-@app.route("/health")
-
-def health():
-
-
-    return jsonify({
-
-
-        "status":
-
-            "OK"
-
-
-    })
+        )
 
 
 
@@ -303,37 +281,33 @@ def health():
 # =====================================================
 
 
-def start_dashboard():
-
-
-    thread = threading.Thread(
-
-        target=lambda:
-
-            app.run(
-
-                host="0.0.0.0",
-
-                port=8000,
-
-                debug=False,
-
-                use_reloader=False
-
-            ),
-
-
-        daemon=True
-
-    )
-
-
-    thread.start()
-
+def run_server():
 
 
     print(
 
-        "[WEB SERVER START] 8000"
+        "[WEB SERVER START]",
+
+        WEB_PORT
+
+    )
+
+
+    app.run(
+
+        host=
+
+        WEB_HOST,
+
+
+        port=
+
+        WEB_PORT,
+
+
+        debug=False,
+
+
+        use_reloader=False
 
     )
