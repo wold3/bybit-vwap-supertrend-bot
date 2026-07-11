@@ -23,7 +23,6 @@ from order.order_manager import order_manager
 from web.server import (
 
     update_status,
-
     add_log
 
 )
@@ -37,7 +36,6 @@ class TradingApp:
 
     def __init__(self):
 
-
         self.running = False
 
         self.market_thread = None
@@ -45,11 +43,8 @@ class TradingApp:
         self.stop_lock = threading.Lock()
 
 
-
         print(
-
             "[TRADING APP READY]"
-
         )
 
 
@@ -65,18 +60,13 @@ class TradingApp:
 
         if self.running:
 
-
             return
 
 
 
-
         print()
-
         print("====================")
-
         print("[BOT START]")
-
         print("====================")
 
 
@@ -85,201 +75,126 @@ class TradingApp:
 
 
 
-
-
-        # -------------------------------------------------
-        # BALANCE CHECK
-        # -------------------------------------------------
+        # BALANCE
 
         try:
-
 
             balance = bybit_api.get_balance()
 
 
-
             if balance:
 
-
                 print(
-
                     "[BALANCE OK]"
-
                 )
-
 
             else:
 
-
                 print(
-
-                    "[BALANCE CHECK FAILED - CONTINUE]"
-
+                    "[BALANCE CHECK FAILED]"
                 )
-
 
 
         except Exception as e:
 
-
-            print(
-
-                "[BALANCE ERROR PROTECTED]",
-
-                e
-
+            add_log(
+                f"BALANCE ERROR {e}"
             )
 
 
 
 
 
-        # -------------------------------------------------
         # PRIVATE WS
-        # -------------------------------------------------
 
         try:
-
 
             private_ws.start()
 
 
-
-            print(
-
-                "[PRIVATE WS STARTED]"
-
-            )
-
-
         except Exception as e:
 
-
-            print(
-
-                "[PRIVATE WS ERROR]",
-
-                e
-
+            add_log(
+                f"PRIVATE WS ERROR {e}"
             )
 
 
 
 
 
-        # -------------------------------------------------
         # POSITION SYNC
-        # -------------------------------------------------
 
         try:
-
 
             position_manager.refresh()
 
 
-
         except Exception as e:
 
-
-            print(
-
-                "[POSITION SYNC ERROR]",
-
-                e
-
+            add_log(
+                f"POSITION SYNC ERROR {e}"
             )
 
 
 
 
 
-        # -------------------------------------------------
         # WATCHDOG
-        # -------------------------------------------------
 
         try:
 
-
             from services.watchdog import watchdog
-
 
             watchdog.start()
 
 
+        except Exception as e:
 
-            print(
-
-                "[WATCHDOG START]"
-
+            add_log(
+                f"WATCHDOG ERROR {e}"
             )
 
 
 
-        except Exception:
 
 
-            pass
-
-
-
-
-
-        # -------------------------------------------------
         # MARKET LOOP
-        # -------------------------------------------------
-
-        if (
-
-            self.market_thread is None
-
-            or
-
-            not self.market_thread.is_alive()
-
-        ):
 
 
+        self.market_thread = threading.Thread(
 
-            self.market_thread = threading.Thread(
+            target=self.market_loop,
 
-                target=self.market_loop,
+            daemon=True,
 
-                daemon=True,
+            name="MarketLoop"
 
-                name="MarketLoop"
-
-            )
-
-
-            self.market_thread.start()
+        )
 
 
+        self.market_thread.start()
 
 
 
         update_status({
 
             "bot":
-
-                "RUNNING"
+            "RUNNING"
 
         })
 
 
-
         add_log(
-
             "BOT START"
-
         )
 
 
 
         print(
-
             "[BOT READY]"
-
         )
+
+
 
 
 
@@ -299,9 +214,7 @@ class TradingApp:
 
 
         print(
-
             "[MARKET LOOP START]"
-
         )
 
 
@@ -313,19 +226,17 @@ class TradingApp:
             try:
 
 
-
                 df = market_data.get_candles(
 
-                    interval="5",
+                    interval=config.CANDLE_INTERVAL,
 
-                    limit=200
+                    limit=config.MAX_HISTORY
 
                 )
 
 
 
                 if df is None:
-
 
 
                     time.sleep(30)
@@ -345,18 +256,32 @@ class TradingApp:
 
 
 
+                # STATUS UPDATE
+
+                try:
+
+                    price = market_data.price()
+
+
+                    update_status({
+
+                        "price":
+                        price
+
+                    })
+
+
+                except:
+
+                    pass
+
+
+
+
+
 
                 if signal:
 
-
-
-                    print(
-
-                        "[SIGNAL]",
-
-                        signal
-
-                    )
 
 
                     add_log(
@@ -367,13 +292,11 @@ class TradingApp:
 
 
 
-
-
                     position = position_manager.get_position()
 
 
 
-                    current = position.get(
+                    side = position.get(
 
                         "side",
 
@@ -382,98 +305,82 @@ class TradingApp:
                     )
 
 
+                    size = float(
 
-                    size = position.get(
+                        position.get(
 
-                        "size",
+                            "size",
 
-                        0
+                            0
 
-                    )
-
-
-
-
-
-                    # ---------------------------------
-                    # EXIST POSITION PROTECTION
-                    # ---------------------------------
-
-                    if size > 0:
-
-
-
-                        if current == signal:
-
-
-
-                            add_log(
-
-                                "SKIP EXIST POSITION"
-
-                            )
-
-                            time.sleep(30)
-
-                            continue
-
-
-
-
-                        else:
-
-
-
-                            add_log(
-
-                                "DIFFERENT POSITION EXISTS"
-
-                            )
-
-
-                            time.sleep(30)
-
-                            continue
-
-
-
-
-
-                    # ---------------------------------
-                    # ORDER
-                    # ---------------------------------
-
-                    qty = config.MAX_POSITION_SIZE
-
-
-
-                    result = order_manager.open_position(
-
-                        signal,
-
-                        qty
+                        )
 
                     )
 
 
 
-                    if result:
 
+
+                    # 현재 포지션 없음
+
+                    if size <= 0:
+
+
+
+                        result = order_manager.open_position(
+
+                            signal,
+
+                            config.MAX_POSITION_SIZE
+
+                        )
+
+
+                        if result:
+
+                            add_log(
+                                f"ORDER SUCCESS {signal}"
+                            )
+
+
+
+                    # 같은 방향
+
+                    elif side == signal:
 
 
                         add_log(
 
-                            f"ORDER SUCCESS {signal}"
+                            "EXIST POSITION SKIP"
 
                         )
 
+
+
+                    # 반대 방향
 
                     else:
 
 
                         add_log(
 
-                            "ORDER FAILED"
+                            "REVERSAL SIGNAL"
+
+                        )
+
+
+                        order_manager.close_position()
+
+
+                        time.sleep(2)
+
+
+
+                        order_manager.open_position(
+
+                            signal,
+
+                            config.MAX_POSITION_SIZE
 
                         )
 
@@ -481,7 +388,7 @@ class TradingApp:
 
 
 
-                # candle 보호
+
 
                 time.sleep(30)
 
@@ -496,7 +403,6 @@ class TradingApp:
                 traceback.print_exc()
 
 
-
                 add_log(
 
                     f"MARKET LOOP ERROR {e}"
@@ -504,8 +410,11 @@ class TradingApp:
                 )
 
 
-
                 time.sleep(10)
+
+
+
+
 
 
 
@@ -521,101 +430,52 @@ class TradingApp:
         with self.stop_lock:
 
 
-
             if not self.running:
 
-
                 return
-
 
 
 
             print()
 
             print("====================")
-
             print("[BOT STOP]")
-
             print("====================")
 
 
 
-
-
-            self.running = False
-
+            self.running=False
 
 
 
 
-            # -------------------------------------------------
-            # CLOSE POSITION
-            # -------------------------------------------------
+            # WS
 
             try:
-
-
-                order_manager.close_position()
-
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "[POSITION CLOSE ERROR]",
-
-                    e
-
-                )
-
-
-
-
-
-            # -------------------------------------------------
-            # PRIVATE WS
-            # -------------------------------------------------
-
-            try:
-
 
                 private_ws.stop()
 
 
-
             except Exception as e:
 
-
-                print(
-
-                    "[WS STOP ERROR]",
-
-                    e
-
+                add_log(
+                    f"WS STOP ERROR {e}"
                 )
 
 
 
 
 
-            # -------------------------------------------------
             # WATCHDOG
-            # -------------------------------------------------
 
             try:
 
-
                 from services.watchdog import watchdog
-
 
                 watchdog.stop()
 
 
-
-            except Exception:
-
+            except:
 
                 pass
 
@@ -623,30 +483,21 @@ class TradingApp:
 
 
 
-            # -------------------------------------------------
-            # THREAD JOIN
-            # -------------------------------------------------
+            # THREAD
 
-            if (
-
-                self.market_thread
-
-                and
-
-                self.market_thread.is_alive()
-
-            ):
+            if self.market_thread:
 
 
-                self.market_thread.join(
+                if self.market_thread.is_alive():
 
-                    timeout=5
+                    self.market_thread.join(
 
-                )
+                        timeout=5
+
+                    )
 
 
-
-            self.market_thread = None
+            self.market_thread=None
 
 
 
@@ -655,11 +506,9 @@ class TradingApp:
             update_status({
 
                 "bot":
-
-                    "STOPPED"
+                "STOPPED"
 
             })
-
 
 
             add_log(
@@ -669,18 +518,8 @@ class TradingApp:
             )
 
 
-
             print(
 
                 "[BOT STOP COMPLETE]"
 
             )
-
-
-
-
-
-# =======================================================
-# NO GLOBAL INSTANCE
-# main.py에서 생성
-# =======================================================
