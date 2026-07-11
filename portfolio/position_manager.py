@@ -10,40 +10,45 @@ from config import (
 )
 
 
-from api.bybit_api import (
-    bybit_api
-)
-
-
-from web.server import (
-    update_status,
-    add_log
-)
-
-
 
 
 
 class PositionManager:
 
 
+    def __init__(self, api):
 
-    def __init__(self):
-
-
-        self.position = None
+        self.api = api
 
 
-        self.size = 0
+        self.position = {
 
+            "side":
 
-        self.entry_price = 0
+                "NONE",
+
+            "size":
+
+                0,
+
+            "entry":
+
+                0,
+
+            "mark":
+
+                0,
+
+            "pnl":
+
+                0
+
+        }
+
 
 
         print(
-
             "[POSITION MANAGER READY]"
-
         )
 
 
@@ -52,25 +57,21 @@ class PositionManager:
 
 
 
-
-
     # =====================================================
-    # SYNC FROM BYBIT
+    # SYNC POSITION
     # =====================================================
+
 
     def sync(self):
 
 
-        try:
+        result = self.api.request(
 
+            "GET",
 
-            result = bybit_api.request(
+            "/v5/position/list",
 
-                "GET",
-
-                "/v5/position/list",
-
-                {
+            {
 
 
                 "category":
@@ -82,8 +83,19 @@ class PositionManager:
 
                     DEFAULT_SYMBOL
 
+            }
 
-                }
+        )
+
+
+
+
+        if not result:
+
+
+            raise Exception(
+
+                "POSITION API ERROR"
 
             )
 
@@ -91,48 +103,67 @@ class PositionManager:
 
 
 
-            if not result:
+
+        if result.get(
+
+            "retCode"
+
+        ) != 0:
 
 
-                return False
+            raise Exception(
+
+                result.get(
+
+                    "retMsg",
+
+                    "POSITION ERROR"
+
+                )
+
+            )
 
 
 
 
 
-            positions = (
+
+
+        try:
+
+
+            data = (
 
                 result
 
-                .get("result", {})
+                ["result"]
 
-                .get("list", [])
+                ["list"]
 
             )
 
 
 
-
-
-            if not positions:
+            if not data:
 
 
                 self.clear()
 
-                return True
+                return self.position
 
 
 
 
 
 
-            p = positions[0]
+
+            pos = data[0]
 
 
 
             size = float(
 
-                p.get(
+                pos.get(
 
                     "size",
 
@@ -156,182 +187,81 @@ class PositionManager:
 
 
 
-                print(
-
-                    "[NO POSITION]"
-
-                )
-
-
-
-                return True
-
-
-
-
-
-
-            side = p.get(
-
-                "side"
-
-            )
-
-
-
-            self.position = side
-
-
-
-            self.size = size
-
-
-
-            self.entry_price = float(
-
-                p.get(
-
-                    "avgPrice",
-
-                    0
-
-                )
-
-            )
-
-
-
-
-
-
-            update_status({
-
-                "position":
-
-                    side
-
-            })
-
-
-
-            add_log(
-
-                f"POSITION {side} {size}"
-
-            )
-
-
-
-            print(
-
-                "[POSITION]",
-
-                side,
-
-                size
-
-            )
-
-
-
-            return True
-
-
-
-
-
-
-
-        except Exception as e:
-
-
-
-            print(
-
-                "[POSITION SYNC ERROR]",
-
-                e
-
-            )
-
-
-            return False
-
-
-
-
-
-
-
-    # =====================================================
-    # UPDATE FROM WS
-    # =====================================================
-
-    def update(
-        self,
-        data
-    ):
-
-
-        try:
-
-
-
-            self.position = data.get(
-
-                "side"
-
-            )
-
-
-
-            self.size = float(
-
-                data.get(
-
-                    "size",
-
-                    0
-
-                )
-
-            )
-
-
-
-            self.entry_price = float(
-
-                data.get(
-
-                    "entryPrice",
-
-                    0
-
-                )
-
-            )
-
-
-
-
-
-            if self.size == 0:
-
-
-                self.clear()
-
-
-
             else:
 
 
-                update_status({
 
-                    "position":
+                self.position = {
 
-                        self.position
 
-                })
+                    "side":
+
+                        pos.get(
+
+                            "side",
+
+                            "NONE"
+
+                        ),
+
+
+                    "size":
+
+                        size,
+
+
+                    "entry":
+
+                        float(
+
+                            pos.get(
+
+                                "avgPrice",
+
+                                0
+
+                            )
+
+                        ),
+
+
+                    "mark":
+
+                        float(
+
+                            pos.get(
+
+                                "markPrice",
+
+                                0
+
+                            )
+
+                        ),
+
+
+                    "pnl":
+
+                        float(
+
+                            pos.get(
+
+                                "unrealisedPnl",
+
+                                0
+
+                            )
+
+                        )
+
+                }
+
+
+
+
+
+
+            return self.position
 
 
 
@@ -340,16 +270,20 @@ class PositionManager:
         except Exception as e:
 
 
-
             print(
 
-                "[POSITION UPDATE ERROR]",
+                "[POSITION PARSE ERROR]",
 
                 e
 
             )
 
 
+            self.clear()
+
+
+            return self.position
+
 
 
 
@@ -357,8 +291,52 @@ class PositionManager:
 
 
     # =====================================================
-    # GET POSITION
+    # CLEAR
     # =====================================================
+
+
+    def clear(self):
+
+
+        self.position = {
+
+
+            "side":
+
+                "NONE",
+
+
+            "size":
+
+                0,
+
+
+            "entry":
+
+                0,
+
+
+            "mark":
+
+                0,
+
+
+            "pnl":
+
+                0
+
+        }
+
+
+
+
+
+
+
+    # =====================================================
+    # GET
+    # =====================================================
+
 
     def get_position(self):
 
@@ -371,55 +349,24 @@ class PositionManager:
 
 
 
+
     # =====================================================
-    # CHECK POSITION
+    # HAS POSITION
     # =====================================================
+
 
     def has_position(self):
 
 
-        if self.position and self.size > 0:
+        return (
 
+            self.position["size"]
 
-            return True
+            >
 
+            0
 
-
-        return False
-
-
-
-
-
-
-
-    # =====================================================
-    # CLEAR
-    # =====================================================
-
-    def clear(self):
-
-
-        self.position = None
-
-
-        self.size = 0
-
-
-        self.entry_price = 0
-
-
-
-
-
-        update_status({
-
-            "position":
-
-                "NONE"
-
-        })
-
+        )
 
 
 
@@ -432,4 +379,12 @@ class PositionManager:
 # SINGLETON
 # =====================================================
 
-position_manager = PositionManager()
+
+from api.bybit_api import bybit_api
+
+
+position_manager = PositionManager(
+
+    bybit_api
+
+)
