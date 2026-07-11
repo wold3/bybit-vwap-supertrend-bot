@@ -1,11 +1,11 @@
 # =====================================================
 # database/database.py
-# Trading Database Manager
+# SQLite Trading Database
 # =====================================================
 
 import sqlite3
-import os
 import threading
+import os
 import time
 
 
@@ -35,7 +35,6 @@ class Database:
         self.create_tables()
 
 
-
         print(
 
             "[DATABASE READY]"
@@ -58,37 +57,59 @@ class Database:
     def connect(self):
 
 
-        folder = os.path.dirname(
-
-            DATABASE_FILE
-
-        )
+        try:
 
 
-        if folder:
+            folder = os.path.dirname(
+
+                DATABASE_FILE
+
+            )
 
 
-            os.makedirs(
+            if folder:
 
-                folder,
 
-                exist_ok=True
+                os.makedirs(
+
+                    folder,
+
+                    exist_ok=True
+
+                )
+
+
+
+
+
+            self.conn = sqlite3.connect(
+
+                DATABASE_FILE,
+
+                check_same_thread=False
 
             )
 
 
 
-        self.conn = sqlite3.connect(
-
-            DATABASE_FILE,
-
-            check_same_thread=False
-
-        )
+            self.conn.row_factory = sqlite3.Row
 
 
 
-        self.conn.row_factory = sqlite3.Row
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[DATABASE CONNECT ERROR]",
+
+                e
+
+            )
+
+
 
 
 
@@ -107,56 +128,70 @@ class Database:
         with self.lock:
 
 
-            cur = self.conn.cursor()
+            cursor = self.conn.cursor()
 
 
 
-            cur.execute(
-"""
-CREATE TABLE IF NOT EXISTS trades
-(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- time TEXT,
- symbol TEXT,
- side TEXT,
- qty REAL,
- entry REAL,
- tp REAL,
- sl REAL,
- result TEXT
-)
-"""
+            cursor.execute(
+
+                """
+
+                CREATE TABLE IF NOT EXISTS trades
+
+                (
+
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                    time TEXT,
+
+                    symbol TEXT,
+
+                    side TEXT,
+
+                    qty REAL,
+
+                    entry REAL,
+
+                    tp REAL,
+
+                    sl REAL,
+
+                    result TEXT
+
+                )
+
+                """
+
             )
 
 
 
 
 
-            cur.execute(
-"""
-CREATE TABLE IF NOT EXISTS logs
-(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- time TEXT,
- message TEXT
-)
-"""
+
+
+            cursor.execute(
+
+                """
+
+                CREATE TABLE IF NOT EXISTS errors
+
+                (
+
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+                    time TEXT,
+
+                    error TEXT
+
+                )
+
+                """
+
             )
 
 
 
-
-
-            cur.execute(
-"""
-CREATE TABLE IF NOT EXISTS errors
-(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- time TEXT,
- error TEXT
-)
-"""
-            )
 
 
 
@@ -175,7 +210,7 @@ CREATE TABLE IF NOT EXISTS errors
 
     def save_trade(
         self,
-        trade
+        data
     ):
 
 
@@ -185,50 +220,99 @@ CREATE TABLE IF NOT EXISTS errors
             with self.lock:
 
 
-                cur = self.conn.cursor()
+                cursor = self.conn.cursor()
 
 
 
-                cur.execute(
-"""
-INSERT INTO trades
-(
-time,
-symbol,
-side,
-qty,
-entry,
-tp,
-sl,
-result
-)
+                cursor.execute(
 
-VALUES
-(
-?,?,?,?,?,?,?,?
-)
-""",
+                    """
 
-(
-time.strftime(
-"%Y-%m-%d %H:%M:%S"
-),
+                    INSERT INTO trades
 
-trade.get("symbol"),
+                    (
 
-trade.get("side"),
+                    time,
 
-trade.get("qty"),
+                    symbol,
 
-trade.get("entry"),
+                    side,
 
-trade.get("tp"),
+                    qty,
 
-trade.get("sl"),
+                    entry,
 
-trade.get("result")
+                    tp,
 
-)
+                    sl,
+
+                    result
+
+                    )
+
+                    VALUES (?,?,?,?,?,?,?,?)
+
+                    """,
+
+
+                    (
+
+                    time.strftime(
+
+                        "%Y-%m-%d %H:%M:%S"
+
+                    ),
+
+
+                    data.get(
+
+                        "symbol"
+
+                    ),
+
+
+                    data.get(
+
+                        "side"
+
+                    ),
+
+
+                    data.get(
+
+                        "qty"
+
+                    ),
+
+
+                    data.get(
+
+                        "entry"
+
+                    ),
+
+
+                    data.get(
+
+                        "tp"
+
+                    ),
+
+
+                    data.get(
+
+                        "sl"
+
+                    ),
+
+
+                    data.get(
+
+                        "result"
+
+                    )
+
+                    )
 
                 )
 
@@ -240,73 +324,13 @@ trade.get("result")
 
 
 
-        except Exception as e:
+                print(
 
-
-            print(
-
-                "[DB TRADE ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # SAVE LOG
-    # =====================================================
-
-
-    def save_log(
-        self,
-        message
-    ):
-
-
-        try:
-
-
-            with self.lock:
-
-
-                self.conn.execute(
-"""
-INSERT INTO logs
-(
-time,
-message
-)
-
-VALUES
-(
-?,
-?
-)
-""",
-
-(
-
-time.strftime(
-
-"%Y-%m-%d %H:%M:%S"
-
-),
-
-str(message)
-
-)
+                    "[TRADE SAVED]"
 
                 )
 
 
-                self.conn.commit()
 
 
 
@@ -316,7 +340,7 @@ str(message)
 
             print(
 
-                "[DB LOG ERROR]",
+                "[SAVE TRADE ERROR]",
 
                 e
 
@@ -347,32 +371,41 @@ str(message)
             with self.lock:
 
 
-                self.conn.execute(
-"""
-INSERT INTO errors
-(
-time,
-error
-)
+                cursor = self.conn.cursor()
 
-VALUES
-(
-?,
-?
-)
-""",
 
-(
 
-time.strftime(
+                cursor.execute(
 
-"%Y-%m-%d %H:%M:%S"
+                    """
 
-),
+                    INSERT INTO errors
 
-str(error)
+                    (
 
-)
+                    time,
+
+                    error
+
+                    )
+
+                    VALUES (?,?)
+
+                    """,
+
+
+                    (
+
+                    time.strftime(
+
+                        "%Y-%m-%d %H:%M:%S"
+
+                    ),
+
+
+                    str(error)
+
+                    )
 
                 )
 
@@ -389,7 +422,7 @@ str(error)
 
             print(
 
-                "[DB ERROR]",
+                "[SAVE ERROR FAILED]",
 
                 e
 
@@ -404,11 +437,11 @@ str(error)
 
 
     # =====================================================
-    # RECENT TRADES
+    # GET RECENT TRADES
     # =====================================================
 
 
-    def get_recent_trades(
+    def get_trades(
         self,
         limit=50
     ):
@@ -417,138 +450,54 @@ str(error)
         try:
 
 
-            cur = self.conn.cursor()
+            cursor = self.conn.cursor()
 
 
 
-            rows = cur.execute(
-"""
-SELECT *
+            cursor.execute(
 
-FROM trades
+                """
 
-ORDER BY id DESC
+                SELECT *
 
-LIMIT ?
-""",
+                FROM trades
 
-(
-limit,
-)
+                ORDER BY id DESC
 
-            ).fetchall()
+                LIMIT ?
 
+                """,
 
+                (
 
-            return [
-
-                dict(r)
-
-                for r in rows
-
-            ]
-
-
-
-        except:
-
-
-            return []
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # STATISTICS
-    # =====================================================
-
-
-    def get_trade_stats(self):
-
-
-        try:
-
-
-            cur = self.conn.cursor()
-
-
-
-            total = cur.execute(
-"""
-SELECT COUNT(*) FROM trades
-"""
-            ).fetchone()[0]
-
-
-
-            wins = cur.execute(
-"""
-SELECT COUNT(*)
-
-FROM trades
-
-WHERE result='WIN'
-"""
-            ).fetchone()[0]
-
-
-
-            winrate = 0
-
-
-
-            if total > 0:
-
-
-                winrate = (
-
-                    wins /
-
-                    total *
-
-                    100
+                    limit,
 
                 )
 
+            )
 
 
-            return {
 
-
-                "trades":
-
-                    total,
-
-
-                "wins":
-
-                    wins,
-
-
-                "winrate":
-
-                    round(
-
-                        winrate,
-
-                        2
-
-                    )
-
-            }
+            return cursor.fetchall()
 
 
 
 
-        except:
 
 
-            return {}
+        except Exception as e:
+
+
+            print(
+
+                "[GET TRADES ERROR]",
+
+                e
+
+            )
+
+
+            return []
 
 
 
@@ -576,10 +525,6 @@ WHERE result='WIN'
 
 
 
-                self.conn = None
-
-
-
                 print(
 
                     "[DATABASE CLOSED]"
@@ -588,16 +533,10 @@ WHERE result='WIN'
 
 
 
-        except Exception as e:
+        except:
 
 
-            print(
-
-                "[DB CLOSE ERROR]",
-
-                e
-
-            )
+            pass
 
 
 
