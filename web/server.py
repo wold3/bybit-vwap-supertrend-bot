@@ -1,7 +1,8 @@
 # =====================================================
 # web/server.py
-# VWAP SUPERTREND AUTO BOT DASHBOARD SERVER
+# VWAP SUPERTREND AUTO BOT DASHBOARD
 # =====================================================
+
 
 from flask import (
     Flask,
@@ -24,7 +25,7 @@ from config import (
 
 
 # =====================================================
-# FLASK PATH FIX
+# TEMPLATE PATH
 # =====================================================
 
 BASE_DIR = os.path.dirname(
@@ -55,13 +56,14 @@ app = Flask(
 # GLOBAL
 # =====================================================
 
+
 bot_instance = None
 
 
 server_started = False
 
 
-_server_thread = None
+server_thread = None
 
 
 
@@ -72,8 +74,6 @@ MAX_LOGS = 500
 status_lock = threading.Lock()
 
 log_lock = threading.Lock()
-
-chart_lock = threading.Lock()
 
 
 
@@ -112,37 +112,17 @@ status = {
         0,
 
 
-    "equity":
-        0,
-
-
-    "vwap":
-        0,
-
-
-    "trend":
-        "NONE",
-
-
-    "volume":
-        0,
-
-
     "signal":
-        "NONE",
-
-
-    "watchdog":
-        "OFF"
+        "NONE"
 
 }
+
 
 
 
 logs = []
 
 
-chart_data = []
 
 
 
@@ -237,9 +217,7 @@ def set_bot_instance(bot):
     global bot_instance
 
 
-
     bot_instance = bot
-
 
 
     add_log(
@@ -247,6 +225,8 @@ def set_bot_instance(bot):
         "BOT INSTANCE CONNECTED"
 
     )
+
+
 
 
 
@@ -263,13 +243,7 @@ def get_trading_mode():
     with status_lock:
 
 
-        return status.get(
-
-            "mode",
-
-            "DEMO"
-
-        )
+        return status["mode"]
 
 
 
@@ -310,7 +284,7 @@ def api_status():
     with log_lock:
 
 
-        log_copy = logs[-100:]
+        log_copy = logs[-200:]
 
 
 
@@ -336,73 +310,6 @@ def api_status():
 
 
 
-# =====================================================
-# LOG API
-# =====================================================
-
-@app.route("/api/logs")
-
-def api_logs():
-
-
-    with log_lock:
-
-
-        return jsonify({
-
-            "logs":
-
-                logs.copy()
-
-        })
-
-
-
-
-
-
-
-
-# =====================================================
-# CHART
-# =====================================================
-
-@app.route("/api/chart")
-
-def api_chart():
-
-
-    with chart_lock:
-
-
-        return jsonify(
-
-            chart_data.copy()
-
-        )
-
-
-
-
-
-
-def update_chart(data):
-
-
-    with chart_lock:
-
-
-        chart_data.clear()
-
-
-        chart_data.extend(data)
-
-
-
-
-
-
-
 
 # =====================================================
 # START
@@ -419,27 +326,20 @@ def update_chart(data):
 def api_start():
 
 
+    add_log(
+
+        "BUTTON CLICK : START"
+
+    )
+
+
     try:
 
 
-        if bot_instance is None:
+        if bot_instance:
 
 
-            return jsonify({
-
-                "success":
-
-                    False,
-
-                "error":
-
-                    "BOT NOT READY"
-
-            })
-
-
-
-        bot_instance.start()
+            bot_instance.start()
 
 
 
@@ -452,10 +352,9 @@ def api_start():
         })
 
 
-
         add_log(
 
-            "BOT START"
+            "BOT START COMPLETE"
 
         )
 
@@ -496,6 +395,8 @@ def api_start():
 
 
 
+
+
 # =====================================================
 # STOP
 # =====================================================
@@ -509,6 +410,13 @@ def api_start():
 )
 
 def api_stop():
+
+
+    add_log(
+
+        "BUTTON CLICK : STOP"
+
+    )
 
 
     try:
@@ -530,10 +438,9 @@ def api_stop():
         })
 
 
-
         add_log(
 
-            "BOT STOP"
+            "BOT STOP COMPLETE"
 
         )
 
@@ -559,7 +466,6 @@ def api_stop():
         )
 
 
-
         return jsonify({
 
             "success":
@@ -567,6 +473,7 @@ def api_stop():
                 False
 
         })
+
 
 
 
@@ -608,6 +515,14 @@ def api_mode():
 
 
 
+    add_log(
+
+        f"BUTTON CLICK : MODE {mode}"
+
+    )
+
+
+
     if mode not in (
 
         "DEMO",
@@ -637,14 +552,6 @@ def api_mode():
 
 
 
-    add_log(
-
-        f"MODE CHANGE {mode}"
-
-    )
-
-
-
     try:
 
 
@@ -656,6 +563,14 @@ def api_mode():
             mode
 
         )
+
+
+        add_log(
+
+            f"MODE CHANGED {mode}"
+
+        )
+
 
 
     except Exception as e:
@@ -688,8 +603,9 @@ def api_mode():
 
 
 
+
 # =====================================================
-# CLOSE
+# CLOSE POSITION
 # =====================================================
 
 @app.route(
@@ -703,6 +619,14 @@ def api_mode():
 def api_close():
 
 
+    add_log(
+
+        "BUTTON CLICK : CLOSE POSITION"
+
+    )
+
+
+
     try:
 
 
@@ -711,6 +635,28 @@ def api_close():
 
 
         result = order_manager.close_position()
+
+
+
+        if result:
+
+
+            add_log(
+
+                "POSITION CLOSED"
+
+            )
+
+
+
+        else:
+
+
+            add_log(
+
+                "CLOSE FAILED"
+
+            )
 
 
 
@@ -750,23 +696,54 @@ def api_close():
 
 
 # =====================================================
-# PING
+# RESET
 # =====================================================
 
-@app.route("/api/ping")
+@app.route(
 
-def api_ping():
+    "/api/reset",
+
+    methods=["POST"]
+
+)
+
+def api_reset():
+
+
+    add_log(
+
+        "BUTTON CLICK : RESET"
+
+    )
+
+
+    update_status({
+
+        "position":
+
+            "NONE",
+
+        "position_size":
+
+            0,
+
+        "entry_price":
+
+            0,
+
+        "pnl":
+
+            0
+
+    })
+
 
 
     return jsonify({
 
         "success":
 
-            True,
-
-        "time":
-
-            int(time.time())
+            True
 
     })
 
@@ -777,7 +754,7 @@ def api_ping():
 
 
 # =====================================================
-# SERVER START
+# BOT INSTANCE
 # =====================================================
 
 def run_server():
@@ -785,21 +762,17 @@ def run_server():
 
     global server_started
 
-
-    global _server_thread
+    global server_thread
 
 
 
     if server_started:
-
 
         return
 
 
 
     server_started = True
-
-
 
 
 
@@ -824,7 +797,7 @@ def run_server():
 
 
 
-    _server_thread = threading.Thread(
+    server_thread = threading.Thread(
 
         target=run,
 
@@ -836,7 +809,7 @@ def run_server():
 
 
 
-    _server_thread.start()
+    server_thread.start()
 
 
 
@@ -859,12 +832,12 @@ def run_server():
 
 
 
-
 # =====================================================
 # EXPORT
 # =====================================================
 
 __all__ = [
+
 
     "app",
 
@@ -878,8 +851,6 @@ __all__ = [
 
     "add_log",
 
-    "get_trading_mode",
-
-    "update_chart"
+    "get_trading_mode"
 
 ]
