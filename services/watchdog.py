@@ -1,6 +1,6 @@
 # =====================================================
 # services/watchdog.py
-# Trading Bot Watchdog
+# Bot Watchdog Service
 # =====================================================
 
 import time
@@ -8,10 +8,14 @@ import threading
 
 
 
+
+
 from web.server import (
     update_status,
     add_log
 )
+
+
 
 
 
@@ -31,7 +35,6 @@ class Watchdog:
 
 
         self.last_heartbeat = time.time()
-
 
 
         self.timeout = 60
@@ -56,7 +59,6 @@ class Watchdog:
     # START
     # =====================================================
 
-
     def start(self):
 
 
@@ -67,13 +69,15 @@ class Watchdog:
 
 
 
+
+
         self.running = True
 
 
 
         self.thread = threading.Thread(
 
-            target=self.monitor,
+            target=self.loop,
 
             daemon=True
 
@@ -88,9 +92,17 @@ class Watchdog:
 
             "watchdog":
 
-                "RUNNING"
+                "ON"
 
         })
+
+
+
+        print(
+
+            "[WATCHDOG START]"
+
+        )
 
 
 
@@ -104,7 +116,6 @@ class Watchdog:
     # HEARTBEAT
     # =====================================================
 
-
     def heartbeat(self):
 
 
@@ -116,20 +127,14 @@ class Watchdog:
 
 
 
+
+
+
     # =====================================================
-    # MONITOR
+    # LOOP
     # =====================================================
 
-
-    def monitor(self):
-
-
-        print(
-
-            "[WATCHDOG THREAD START]"
-
-        )
-
+    def loop(self):
 
 
         while self.running:
@@ -138,7 +143,7 @@ class Watchdog:
             try:
 
 
-                elapsed = (
+                diff = (
 
                     time.time()
 
@@ -152,34 +157,26 @@ class Watchdog:
 
 
 
-                if elapsed > self.timeout:
-
-
-                    print(
-
-                        "[WATCHDOG WARNING]",
-
-                        elapsed
-
-                    )
-
-
-
-                    add_log(
-
-                        "WATCHDOG TIMEOUT"
-
-                    )
-
+                if diff > self.timeout:
 
 
                     update_status({
+
 
                         "watchdog":
 
                             "WARNING"
 
+
                     })
+
+
+
+                    add_log(
+
+                        "WATCHDOG WARNING : NO HEARTBEAT"
+
+                    )
 
 
 
@@ -190,11 +187,22 @@ class Watchdog:
 
                     update_status({
 
+
                         "watchdog":
 
-                            "HEALTHY"
+                            "OK"
+
 
                     })
+
+
+
+
+
+
+
+                time.sleep(10)
+
 
 
 
@@ -214,9 +222,7 @@ class Watchdog:
 
 
 
-
-
-            time.sleep(10)
+            time.sleep(1)
 
 
 
@@ -230,7 +236,6 @@ class Watchdog:
     # STOP
     # =====================================================
 
-
     def stop(self):
 
 
@@ -240,9 +245,11 @@ class Watchdog:
 
         update_status({
 
+
             "watchdog":
 
-                "STOPPED"
+                "OFF"
+
 
         })
 
@@ -265,6 +272,5 @@ class Watchdog:
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 watchdog = Watchdog()
