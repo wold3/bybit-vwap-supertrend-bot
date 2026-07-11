@@ -1,7 +1,10 @@
 # =====================================================
 # execution/order_manager.py
-# Order Manager + Risk Guard
+# Order Manager
 # =====================================================
+
+import time
+
 
 from config import (
     LIVE_ORDER,
@@ -29,7 +32,12 @@ class OrderManager:
 
     def __init__(self, api):
 
+
         self.api = api
+
+
+        self.last_order = {}
+
 
 
         print(
@@ -43,7 +51,7 @@ class OrderManager:
 
 
     # =====================================================
-    # EXECUTE ORDER
+    # EXECUTE
     # =====================================================
 
 
@@ -65,7 +73,9 @@ class OrderManager:
 
         side = signal.get(
 
-            "side"
+            "side",
+
+            ""
 
         )
 
@@ -82,9 +92,9 @@ class OrderManager:
 
             print(
 
-                "[INVALID SIGNAL]",
+                "[INVALID SIDE]",
 
-                signal
+                side
 
             )
 
@@ -97,9 +107,9 @@ class OrderManager:
 
 
 
-        # =============================
-        # RISK CHECK
-        # =============================
+        # =================================================
+        # POSITION CHECK
+        # =================================================
 
 
         position = (
@@ -112,7 +122,7 @@ class OrderManager:
 
 
 
-        if not risk_manager.can_trade(
+        current_size = float(
 
             position.get(
 
@@ -122,12 +132,20 @@ class OrderManager:
 
             )
 
+        )
+
+
+
+        if not risk_manager.can_trade(
+
+            current_size
+
         ):
 
 
             print(
 
-                "[ORDER BLOCKED BY RISK]"
+                "[ORDER BLOCKED]"
 
             )
 
@@ -150,17 +168,16 @@ class OrderManager:
 
 
 
-
-        # =============================
-        # ORDER SIZE
-        # =============================
+        # =================================================
+        # SIZE
+        # =================================================
 
 
         qty = DEFAULT_ORDER_QTY
 
 
 
-        calculated = (
+        calculated_qty = (
 
             risk_manager
 
@@ -174,10 +191,11 @@ class OrderManager:
 
 
 
-        if calculated > 0:
+        if calculated_qty > 0:
 
 
-            qty = calculated
+            qty = calculated_qty
+
 
 
 
@@ -201,12 +219,31 @@ class OrderManager:
 
 
 
-        # =============================
-        # TEST MODE
-        # =============================
+
+        # =================================================
+        # ORDER
+        # =================================================
 
 
-        if not LIVE_ORDER:
+        if LIVE_ORDER:
+
+
+            result = (
+
+                self.api
+
+                .place_order(
+
+                    side,
+
+                    qty
+
+                )
+
+            )
+
+
+        else:
 
 
             result = {
@@ -222,40 +259,20 @@ class OrderManager:
                     "LOCAL TEST ORDER",
 
 
-                "side":
+                "result":
 
-                    side,
+                    {
 
+                        "orderId":
 
-                "qty":
+                            "TEST_ORDER"
 
-                    qty
-
+                    }
 
             }
 
 
 
-
-
-
-
-        # =============================
-        # BYBIT ORDER
-        # =============================
-
-
-        else:
-
-
-
-            result = self.api.place_order(
-
-                side,
-
-                qty
-
-            )
 
 
 
@@ -281,11 +298,10 @@ class OrderManager:
 
         if result.get(
 
-            "retCode",
-
-            0
+            "retCode"
 
         ) != 0:
+
 
 
             print(
@@ -305,13 +321,78 @@ class OrderManager:
 
 
 
+        order_id = (
+
+            result
+
+            .get(
+
+                "result",
+
+                {}
+
+            )
+
+            .get(
+
+                "orderId",
+
+                ""
+
+            )
+
+        )
+
+
+
+
+
+
+
+        self.last_order = {
+
+
+            "order_id":
+
+                order_id,
+
+
+            "side":
+
+                side,
+
+
+            "qty":
+
+                qty,
+
+
+            "price":
+
+                price,
+
+
+            "time":
+
+                time.time()
+
+        }
+
+
+
+
+
+
         print(
 
             "[ORDER SUCCESS]",
 
-            result
+            self.last_order
 
         )
+
+
+
 
 
 
@@ -323,16 +404,20 @@ class OrderManager:
 
 
 
-        # =============================
-        # TP / SL
-        # =============================
+        # =================================================
+        # TP SL
+        # =================================================
 
 
-        tp, sl = self.calculate_tp_sl(
+        tp, sl = (
 
-            side,
+            self.calculate_tp_sl(
 
-            price
+                side,
+
+                price
+
+            )
 
         )
 
@@ -342,13 +427,47 @@ class OrderManager:
         if LIVE_ORDER:
 
 
-            self.api.set_trading_stop(
+            tpsl_result = (
+
+                self.api
+
+                .set_trading_stop(
+
+                    tp,
+
+                    sl
+
+                )
+
+            )
+
+
+            print(
+
+                "[TP SL RESULT]",
+
+                tpsl_result
+
+            )
+
+
+
+        else:
+
+
+            print(
+
+                "[LOCAL TP SL]",
 
                 tp,
 
                 sl
 
             )
+
+
+
+
 
 
 
@@ -381,6 +500,11 @@ class OrderManager:
                 sl,
 
 
+            "order_id":
+
+                order_id,
+
+
             "response":
 
                 result
@@ -396,7 +520,7 @@ class OrderManager:
 
 
     # =====================================================
-    # TP SL CALCULATE
+    # TP SL CALCULATOR
     # =====================================================
 
 
@@ -410,55 +534,98 @@ class OrderManager:
         if side == "Buy":
 
 
-            tp = price * (
+            tp = (
 
-                1 +
+                price *
 
-                TAKE_PROFIT_PERCENT / 100
+                (
+
+                    1 +
+
+                    TAKE_PROFIT_PERCENT / 100
+
+                )
+
+            )
+
+
+            sl = (
+
+                price *
+
+                (
+
+                    1 -
+
+                    STOP_LOSS_PERCENT / 100
+
+                )
 
             )
 
-
-            sl = price * (
-
-                1 -
-
-                STOP_LOSS_PERCENT / 100
-
-            )
 
 
         else:
 
 
-            tp = price * (
+            tp = (
 
-                1 -
+                price *
 
-                TAKE_PROFIT_PERCENT / 100
+                (
+
+                    1 -
+
+                    TAKE_PROFIT_PERCENT / 100
+
+                )
+
+            )
+
+
+            sl = (
+
+                price *
+
+                (
+
+                    1 +
+
+                    STOP_LOSS_PERCENT / 100
+
+                )
 
             )
 
-
-            sl = price * (
-
-                1 +
-
-                STOP_LOSS_PERCENT / 100
-
-            )
 
 
 
 
         return (
 
-            round(tp,2),
+            round(tp, 2),
 
-            round(sl,2)
+            round(sl, 2)
 
         )
 
+
+
+
+
+
+
+
+
+    # =====================================================
+    # LAST ORDER
+    # =====================================================
+
+
+    def get_last_order(self):
+
+
+        return self.last_order
 
 
 
@@ -472,6 +639,7 @@ class OrderManager:
 
 
 from api.bybit_api import bybit_api
+
 
 
 order_manager = OrderManager(
