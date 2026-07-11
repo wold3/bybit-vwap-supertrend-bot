@@ -1,73 +1,55 @@
 # =====================================================
 # web/server.py
-# FastAPI Dashboard Server
+# Dashboard Server
 # =====================================================
 
 import threading
-import time
+import json
+import os
 
 
-
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
-import uvicorn
-
-
-
-from config import (
-    WEB_HOST,
-    WEB_PORT
+from http.server import (
+    HTTPServer,
+    SimpleHTTPRequestHandler
 )
 
 
 
 
 
-app = FastAPI()
+HOST = "0.0.0.0"
+
+PORT = 8000
 
 
 
 
 
-# =====================================================
-# MEMORY STORE
-# =====================================================
-
-
-status = {
-
+STATUS = {
 
     "bot":
         "STOPPED",
 
-
     "symbol":
         "",
-
 
     "price":
         0,
 
-
     "vwap":
         0,
-
 
     "trend":
         "NONE",
 
-
     "volume":
         False,
-
 
     "signal":
         "NONE",
 
-
     "position":
         "NONE"
-
 
 }
 
@@ -75,16 +57,13 @@ status = {
 
 
 
-
-
-candles = []
-
-
-
-logs = []
+LOGS = []
 
 
 
+
+
+SERVER = None
 
 
 
@@ -92,21 +71,14 @@ logs = []
 
 
 # =====================================================
-# STATUS UPDATE
+# UPDATE STATUS
 # =====================================================
 
 
 def update_status(data):
 
 
-    status.update(
-
-        data
-
-    )
-
-
-
+    STATUS.update(data)
 
 
 
@@ -114,41 +86,23 @@ def update_status(data):
 
 
 # =====================================================
-# LOG
+# ADD LOG
 # =====================================================
 
 
 def add_log(message):
 
 
-    logs.append(
+    LOGS.append(
 
-        {
-
-        "time":
-
-            time.strftime(
-
-                "%H:%M:%S"
-
-            ),
-
-
-        "message":
-
-            str(message)
-
-        }
+        str(message)
 
     )
 
 
-    if len(logs) > 200:
+    if len(LOGS) > 100:
 
-
-        logs.pop(0)
-
-
+        LOGS.pop(0)
 
 
 
@@ -157,71 +111,62 @@ def add_log(message):
 
 
 # =====================================================
-# CANDLE
+# HTTP HANDLER
 # =====================================================
 
 
-def add_candle(candle):
+class DashboardHandler(
+    SimpleHTTPRequestHandler
+):
 
 
-    candles.append(
-
-        candle
-
-    )
+    def do_GET(self):
 
 
-    if len(candles) > 300:
+        if self.path == "/api/status":
 
 
-        candles.pop(0)
+            self.send_response(200)
 
 
+            self.send_header(
+
+                "Content-type",
+
+                "application/json"
+
+            )
 
 
-
-
-
-
-
-# =====================================================
-# DASHBOARD PAGE
-# =====================================================
-
-
-@app.get(
-
-    "/",
-
-    response_class=HTMLResponse
-
-)
-
-def index():
-
-
-    try:
-
-
-        with open(
-
-            "web/dashboard.html",
-
-            "r",
-
-            encoding="utf-8"
-
-        ) as f:
-
-
-            return f.read()
+            self.end_headers()
 
 
 
-    except Exception as e:
+            self.wfile.write(
+
+                json.dumps(
+
+                    {
+
+                        "status":
+
+                            STATUS,
 
 
-        return str(e)
+                        "logs":
+
+                            LOGS
+
+                    },
+
+                    ensure_ascii=False
+
+                ).encode()
+
+            )
+
+
+            return
 
 
 
@@ -229,21 +174,15 @@ def index():
 
 
 
+        if self.path == "/":
 
 
-# =====================================================
-# API STATUS
-# =====================================================
+            self.path = "/dashboard.html"
 
 
-@app.get("/api/status")
-
-def api_status():
 
 
-    return status
-
-
+        return super().do_GET()
 
 
 
@@ -252,66 +191,21 @@ def api_status():
 
 
 # =====================================================
-# API CHART
+# START SERVER
 # =====================================================
-
-
-@app.get("/api/chart")
-
-def api_chart():
-
-
-    return candles
-
-
-
-
-
-
-
-
-
-# =====================================================
-# API LOG
-# =====================================================
-
-
-@app.get("/api/logs")
-
-def api_logs():
-
-
-    return logs
-
-
-
-
-
-
-
-
-
-
-# =====================================================
-# SERVER START
-# =====================================================
-
-
-server_thread = None
-
 
 
 def start_dashboard():
 
 
-    global server_thread
+    global SERVER
 
 
 
-    if server_thread:
-
+    if SERVER:
 
         return
+
 
 
 
@@ -319,32 +213,60 @@ def start_dashboard():
     def run():
 
 
-        print(
-
-            "[WEB SERVER START]",
-
-            WEB_PORT
-
-        )
-
-
-        uvicorn.run(
-
-            app,
-
-            host=WEB_HOST,
-
-            port=WEB_PORT,
-
-            log_level="warning"
-
-        )
+        global SERVER
 
 
 
+        try:
 
 
-    server_thread = threading.Thread(
+            SERVER = HTTPServer(
+
+                (
+
+                    HOST,
+
+                    PORT
+
+                ),
+
+                DashboardHandler
+
+            )
+
+
+            print(
+
+                "[WEB SERVER START]",
+
+                PORT
+
+            )
+
+
+
+            SERVER.serve_forever()
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[WEB SERVER ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+    thread = threading.Thread(
 
         target=run,
 
@@ -353,4 +275,4 @@ def start_dashboard():
     )
 
 
-    server_thread.start()
+    thread.start()
