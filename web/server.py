@@ -1,30 +1,20 @@
 # =====================================================
 # web/server.py
 # VWAP SUPERTREND BOT WEB SERVER
-# BYBIT V5
 # =====================================================
 
-from flask import (
-    Flask,
-    jsonify,
-    request,
-    send_file
-)
+from flask import Flask, jsonify, request, send_file
 
 import threading
 import time
 import os
 
 
-
 app = Flask(__name__)
 
 
-
-
-
 # =====================================================
-# GLOBAL STATE
+# GLOBAL
 # =====================================================
 
 logs = []
@@ -51,7 +41,6 @@ status = {
 }
 
 
-
 trading_mode = "DEMO"
 
 trading_symbol = "BTCUSDT"
@@ -62,13 +51,11 @@ bot_status = "STOPPED"
 
 
 
-
 # =====================================================
 # LOG
 # =====================================================
 
 def add_log(message):
-
 
     text = (
 
@@ -87,10 +74,10 @@ def add_log(message):
     logs.append(text)
 
 
-
     if len(logs) > 300:
 
         logs.pop(0)
+
 
 
 
@@ -103,13 +90,9 @@ def add_log(message):
 
 def update_status(data):
 
-
     if isinstance(data, dict):
 
         status.update(data)
-
-
-
 
 
 
@@ -122,12 +105,12 @@ def get_status():
 
 
 
+
 # =====================================================
-# BOT CONTROL
+# BOT
 # =====================================================
 
 def set_bot(value):
-
 
     global bot_status
 
@@ -140,13 +123,12 @@ def set_bot(value):
 
     add_log(
 
-        f"BOT STATUS {value}"
+        f"BOT {value}"
 
     )
 
 
     return True
-
 
 
 
@@ -163,11 +145,10 @@ def get_bot():
 
 
 # =====================================================
-# TRADING MODE
+# MODE
 # =====================================================
 
 def get_trading_mode():
-
 
     return trading_mode
 
@@ -175,20 +156,15 @@ def get_trading_mode():
 
 
 
-
 def set_trading_mode(mode):
-
 
     global trading_mode
 
 
-    if mode in (
+    mode = str(mode).upper()
 
-        "DEMO",
 
-        "LIVE"
-
-    ):
+    if mode in ["DEMO", "LIVE"]:
 
 
         trading_mode = mode
@@ -199,7 +175,7 @@ def set_trading_mode(mode):
 
         add_log(
 
-            f"MODE {mode}"
+            f"MODE CHANGE {mode}"
 
         )
 
@@ -216,12 +192,12 @@ def set_trading_mode(mode):
 
 
 
+
 # =====================================================
 # SYMBOL
 # =====================================================
 
 def get_trading_symbol():
-
 
     return trading_symbol
 
@@ -231,7 +207,6 @@ def get_trading_symbol():
 
 
 def set_trading_symbol(symbol):
-
 
     global trading_symbol
 
@@ -244,7 +219,7 @@ def set_trading_symbol(symbol):
 
     add_log(
 
-        f"SYMBOL {trading_symbol}"
+        f"SYMBOL CHANGE {trading_symbol}"
 
     )
 
@@ -258,15 +233,15 @@ def set_trading_symbol(symbol):
 
 
 # =====================================================
-# HOME
+# PAGE
 # =====================================================
 
 @app.route("/")
 
-def home():
+def index():
 
 
-    path = os.path.join(
+    file = os.path.join(
 
         os.path.dirname(__file__),
 
@@ -275,9 +250,10 @@ def home():
     )
 
 
-    if os.path.exists(path):
+    if os.path.exists(file):
 
-        return send_file(path)
+        return send_file(file)
+
 
 
     return "VWAP SUPERTREND BOT"
@@ -297,7 +273,6 @@ def home():
 
 def api_status():
 
-
     return jsonify({
 
         "status": status,
@@ -311,11 +286,9 @@ def api_status():
 
 
 
-
 @app.route("/api/logs")
 
 def api_logs():
-
 
     return jsonify(logs)
 
@@ -325,8 +298,10 @@ def api_logs():
 
 
 
+
+
 # =====================================================
-# ORDER API
+# ORDER
 # =====================================================
 
 @app.route(
@@ -346,16 +321,14 @@ def api_order():
         data = request.json
 
 
-        side = data.get(
-
-            "side"
-
-        )
+        side = data.get("side")
 
 
         qty = data.get(
 
-            "qty"
+            "qty",
+
+            None
 
         )
 
@@ -379,11 +352,7 @@ def api_order():
 
             "success":
 
-                bool(result),
-
-            "result":
-
-                str(result)
+                bool(result)
 
         })
 
@@ -406,6 +375,7 @@ def api_order():
             "error":str(e)
 
         })
+
 
 
 
@@ -471,91 +441,37 @@ def api_close():
 
 
 
-# =====================================================
-# BOT START STOP
-# =====================================================
-
-@app.route(
-
-    "/api/start",
-
-    methods=["POST"]
-
-)
-
-def api_start():
-
-
-    set_bot(
-
-        "RUNNING"
-
-    )
-
-
-    return jsonify({
-
-        "success":True
-
-    })
-
-
-
-
-
-
-@app.route(
-
-    "/api/stop",
-
-    methods=["POST"]
-
-)
-
-def api_stop():
-
-
-    set_bot(
-
-        "STOPPED"
-
-    )
-
-
-    return jsonify({
-
-        "success":True
-
-    })
-
-
-
-
-
 
 
 # =====================================================
 # SERVER START
 # =====================================================
 
+def run_server():
+
+
+    app.run(
+
+        host="0.0.0.0",
+
+        port=8000,
+
+        debug=False,
+
+        use_reloader=False
+
+    )
+
+
+
+
+
 def start_server():
 
 
     thread = threading.Thread(
 
-        target=lambda:
-
-            app.run(
-
-                host="0.0.0.0",
-
-                port=8000,
-
-                debug=False,
-
-                use_reloader=False
-
-            ),
+        target=run_server,
 
         daemon=True
 
