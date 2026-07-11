@@ -30,6 +30,7 @@ class MarketData:
 
 
 
+
     # =====================================================
     # GET CANDLE DATA
     # =====================================================
@@ -48,9 +49,35 @@ class MarketData:
         try:
 
 
-            rows = bybit_api.get_kline(
+            response = bybit_api.get_kline(
+
+                interval=interval,
 
                 limit=limit
+
+            )
+
+
+
+            if not response:
+
+
+                return None
+
+
+
+
+            rows = response.get(
+
+                "result",
+
+                {}
+
+            ).get(
+
+                "list",
+
+                []
 
             )
 
@@ -59,7 +86,14 @@ class MarketData:
             if not rows:
 
 
+                add_log(
+
+                    "EMPTY KLINE DATA"
+
+                )
+
                 return None
+
 
 
 
@@ -72,35 +106,13 @@ class MarketData:
 
 
 
-            if len(df.columns) == 7:
 
-
-                df.columns = [
-
-                    "timestamp",
-
-                    "open",
-
-                    "high",
-
-                    "low",
-
-                    "close",
-
-                    "volume",
-
-                    "turnover"
-
-                ]
-
-
-
-            else:
+            if len(df.columns) != 7:
 
 
                 add_log(
 
-                    "INVALID KLINE FORMAT"
+                    f"INVALID KLINE FORMAT {df.columns}"
 
                 )
 
@@ -110,14 +122,11 @@ class MarketData:
 
 
 
-            # 최신 캔들 기준 정렬
 
-            df = df.iloc[::-1]
-
+            df.columns = [
 
 
-
-            numeric_columns = [
+                "timestamp",
 
                 "open",
 
@@ -130,6 +139,42 @@ class MarketData:
                 "volume",
 
                 "turnover"
+
+
+            ]
+
+
+
+
+
+            # Bybit 최신 → 과거 순서
+            # 전략 계산용 과거 → 최신 변경
+
+            df = df.iloc[::-1].reset_index(
+
+                drop=True
+
+            )
+
+
+
+
+
+            numeric_columns = [
+
+
+                "open",
+
+                "high",
+
+                "low",
+
+                "close",
+
+                "volume",
+
+                "turnover"
+
 
             ]
 
@@ -149,6 +194,8 @@ class MarketData:
 
 
 
+
+
             df["timestamp"] = pd.to_numeric(
 
                 df["timestamp"],
@@ -159,11 +206,31 @@ class MarketData:
 
 
 
+
+
             df.dropna(
 
                 inplace=True
 
             )
+
+
+
+
+
+            if len(df) < 50:
+
+
+                add_log(
+
+                    "NOT ENOUGH CANDLE DATA"
+
+                )
+
+
+                return None
+
+
 
 
 
@@ -176,7 +243,9 @@ class MarketData:
 
 
 
+
         except Exception as e:
+
 
 
             add_log(
@@ -192,9 +261,12 @@ class MarketData:
 
 
 
+
+
     # =====================================================
     # CURRENT PRICE
     # =====================================================
+
 
     def price(self):
 
@@ -202,11 +274,28 @@ class MarketData:
         try:
 
 
-            return bybit_api.get_price()
+            price = bybit_api.get_price()
+
+
+            if price:
+
+
+                return price
 
 
 
-        except Exception:
+            return 0
+
+
+
+        except Exception as e:
+
+
+            add_log(
+
+                f"PRICE ERROR {e}"
+
+            )
 
 
             return 0
@@ -215,9 +304,28 @@ class MarketData:
 
 
 
+
+
+    # =====================================================
+    # LAST DATA
+    # =====================================================
+
+
+    def get_last_data(self):
+
+
+        return self.last_data
+
+
+
+
+
+
+
     # =====================================================
     # WAIT
     # =====================================================
+
 
     def wait(
 
@@ -238,8 +346,11 @@ class MarketData:
 
 
 
+
+
 # =====================================================
 # INSTANCE
 # =====================================================
+
 
 market_data = MarketData()
