@@ -5,9 +5,6 @@
 
 import time
 import traceback
-import signal
-import sys
-
 
 
 from app import (
@@ -25,143 +22,44 @@ from web.server import (
 )
 
 
+from services.telegram import (
+    telegram
+)
 
 
 
-RUNNING = True
-
-
-
-
-
-# =====================================================
-# SIGNAL HANDLER
-# =====================================================
-
-
-def shutdown(
-    signum=None,
-    frame=None
-):
-
-
-    global RUNNING
-
-
-
-    print(
-
-        "\n===================="
-
-    )
-
-
-    print(
-
-        "[SYSTEM SHUTDOWN]"
-
-    )
-
-
-    print(
-
-        "===================="
-
-    )
-
-
-
-    RUNNING = False
-
-
-
-    try:
-
-
-        app.stop()
-
-
-
-    except Exception as e:
-
-
-        print(
-
-            "[STOP ERROR]",
-
-            e
-
-        )
-
-
-
-    print(
-
-        "[PROGRAM EXIT]"
-
-    )
-
-
-    sys.exit(0)
-
-
-
-
-
-
-
-
-
-# =====================================================
-# MAIN
-# =====================================================
 
 
 def main():
 
 
-    print(
-
-        "===================="
-
-    )
-
-
-    print(
-
-        "[BOT LAUNCH]"
-
-    )
-
-
-    print(
-
-        "===================="
-
-    )
-
-
+    print("====================")
+    print("[SYSTEM START]")
+    print("====================")
 
 
 
     try:
+
+
+        add_log(
+
+            "SYSTEM START"
+
+        )
+
+
+        telegram.bot_start()
+
 
 
         app.start()
 
 
 
-        add_log(
-
-            "BOT START COMPLETE"
-
-        )
 
 
-
-
-
-        while RUNNING:
+        while True:
 
 
             time.sleep(1)
@@ -171,11 +69,21 @@ def main():
 
 
 
-
     except KeyboardInterrupt:
 
 
-        shutdown()
+        print(
+
+            "[USER STOP]"
+
+        )
+
+
+        add_log(
+
+            "USER STOP"
+
+        )
 
 
 
@@ -215,7 +123,58 @@ def main():
 
 
 
-        shutdown()
+
+
+
+    finally:
+
+
+        print(
+
+            "[SYSTEM SHUTDOWN]"
+
+        )
+
+
+
+        try:
+
+
+            telegram.bot_stop()
+
+
+
+        except:
+
+
+            pass
+
+
+
+
+
+        try:
+
+
+            app.stop()
+
+
+
+        except:
+
+
+            pass
+
+
+
+
+
+
+        print(
+
+            "[PROGRAM EXIT]"
+
+        )
 
 
 
@@ -223,38 +182,6 @@ def main():
 
 
 
-# =====================================================
-# REGISTER SIGNAL
-# =====================================================
-
-
-signal.signal(
-
-    signal.SIGINT,
-
-    shutdown
-
-)
-
-
-signal.signal(
-
-    signal.SIGTERM,
-
-    shutdown
-
-)
-
-
-
-
-
-
-
-
-# =====================================================
-# START
-# =====================================================
 
 
 if __name__ == "__main__":
