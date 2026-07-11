@@ -1,7 +1,3 @@
-<!-- =====================================================
-     VWAP SUPERTREND BOT DASHBOARD
-===================================================== -->
-
 <!DOCTYPE html>
 
 <html>
@@ -10,13 +6,12 @@
 
 <meta charset="UTF-8">
 
-
 <title>
 VWAP SUPERTREND BOT
 </title>
 
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 
 
 <style>
@@ -35,52 +30,48 @@ body {
 }
 
 
-.box {
+.card {
 
-    background:#222;
+    background:#1e1e1e;
 
     padding:15px;
 
-    margin-bottom:15px;
+    margin:10px;
 
     border-radius:10px;
 
 }
 
 
-.title {
+.grid {
 
-    font-size:22px;
+    display:grid;
 
-    font-weight:bold;
+    grid-template-columns:
+    repeat(4,1fr);
+
+    gap:10px;
 
 }
-
 
 
 .value {
 
-    font-size:18px;
+    font-size:24px;
+
+    color:#00ff99;
 
 }
 
 
+#chart {
 
-.green {
-
-    color:#00ff88;
-
-}
-
-
-.red {
-
-    color:#ff5555;
+    height:400px;
 
 }
 
 
-#logs {
+.log {
 
     height:200px;
 
@@ -100,44 +91,30 @@ body {
 </head>
 
 
+
 <body>
 
 
-
-<div class="box">
-
-<div class="title">
-
+<h1>
 🚀 VWAP SUPERTREND BOT
+</h1>
+
+
+
+
+
+<div class="grid">
+
+
+<div class="card">
+
+BOT
+
+<div class="value" id="bot">
+
+-
 
 </div>
-
-
-<div id="bot">
-
-Loading...
-
-</div>
-
-
-</div>
-
-
-
-
-
-<div class="box">
-
-
-<h3>
-MARKET
-</h3>
-
-
-<div id="market">
-
-</div>
-
 
 </div>
 
@@ -145,19 +122,143 @@ MARKET
 
 
 
+<div class="card">
+
+PRICE
+
+<div class="value" id="price">
+
+-
+
+</div>
+
+</div>
 
 
-<div class="box">
 
 
-<h3>
+
+<div class="card">
+
+VWAP
+
+<div class="value" id="vwap">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
+TREND
+
+<div class="value" id="trend">
+
+-
+
+</div>
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="grid">
+
+
+<div class="card">
+
+SIGNAL
+
+<div class="value" id="signal">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
 POSITION
+
+<div class="value" id="position">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
+SIZE
+
+<div class="value" id="size">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
+PNL
+
+<div class="value" id="pnl">
+
+-
+
+</div>
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="card">
+
+<h3>
+
+BTCUSDT CHART
+
 </h3>
 
 
-<div id="position">
-
-</div>
+<div id="chart"></div>
 
 
 </div>
@@ -168,38 +269,18 @@ POSITION
 
 
 
-<div class="box">
+
+<div class="card">
 
 
 <h3>
-CHART
-</h3>
 
-
-<canvas id="chart">
-
-</canvas>
-
-
-</div>
-
-
-
-
-
-
-
-
-<div class="box">
-
-
-<h3>
 SYSTEM LOG
 
 </h3>
 
 
-<div id="logs">
+<div class="log" id="logs">
 
 </div>
 
@@ -217,274 +298,182 @@ SYSTEM LOG
 <script>
 
 
-let chart;
+// ===================================
+// CHART
+// ===================================
 
 
+const chart = LightweightCharts.createChart(
 
-function initChart(){
+    document.getElementById("chart"),
 
+    {
 
-const ctx = document
-.getElementById(
-"chart"
-)
-.getContext(
-"2d"
-);
+        layout:{
 
+            background:{
+                color:"#111"
+            },
 
+            textColor:"white"
 
-chart = new Chart(
+        }
 
-ctx,
-
-{
-
-type:"line",
-
-
-data:{
-
-
-labels:[],
-
-
-datasets:[
-
-{
-
-label:"BTC",
-
-data:[]
-
-}
-
-]
-
-
-},
-
-
-options:{
-
-
-responsive:true
-
-
-}
-
-
-}
+    }
 
 );
 
 
-}
+
+const candleSeries = chart.addCandlestickSeries();
 
 
 
 
 
 
+
+
+
+// ===================================
+// STATUS UPDATE
+// ===================================
 
 
 async function update(){
 
 
-try{
+    try{
 
 
-let res =
-await fetch(
-"/api/status"
-);
+        let res = await fetch(
 
+            "/api/status"
 
+        );
 
-let json =
-await res.json();
 
 
+        let data = await res.json();
 
 
-let s =
-json.status;
 
 
 
+        let s = data.status;
 
 
 
-document
-.getElementById(
-"bot"
-)
-.innerHTML =
 
 
-`
+        document.getElementById(
+            "bot"
+        ).innerHTML =
+        s.bot;
 
-BOT :
 
-<b>${s.bot}</b>
 
-<br>
 
-SYMBOL :
 
-${s.symbol}
+        document.getElementById(
+            "price"
+        ).innerHTML =
+        s.price;
 
-<br>
 
-WATCHDOG :
 
-${s.watchdog || "-"}
 
-`;
 
+        document.getElementById(
+            "vwap"
+        ).innerHTML =
+        s.vwap;
 
 
 
 
 
+        document.getElementById(
+            "trend"
+        ).innerHTML =
+        s.trend;
 
-document
-.getElementById(
-"market"
-)
-.innerHTML =
 
 
-`
 
-PRICE :
 
-${s.price}
+        document.getElementById(
+            "signal"
+        ).innerHTML =
+        s.signal;
 
-<br>
 
-VWAP :
 
-${s.vwap}
 
-<br>
 
-TREND :
+        document.getElementById(
+            "position"
+        ).innerHTML =
+        s.position;
 
-${s.trend}
 
-<br>
 
-VOLUME :
 
-${s.volume}
 
-<br>
+        document.getElementById(
+            "size"
+        ).innerHTML =
+        s.size;
 
-SIGNAL :
 
-${s.signal}
 
-`;
 
 
+        document.getElementById(
+            "pnl"
+        ).innerHTML =
+        s.pnl;
 
 
 
 
 
 
-document
-.getElementById(
-"position"
-)
-.innerHTML =
 
+        let log = "";
 
-`
 
-POSITION :
 
-${s.position}
+        data.logs.forEach(
 
-<br>
+            x => {
 
-ENTRY :
+                log += x+"<br>";
 
-${s.entry}
+            }
 
-<br>
+        );
 
-SIZE :
 
-${s.size}
 
-<br>
+        document.getElementById(
 
-PNL :
+            "logs"
 
-${s.pnl}
+        ).innerHTML = log;
 
-<br>
 
-TP :
 
-${s.tp}
 
-<br>
 
-SL :
+    }
 
-${s.sl}
+    catch(e){
 
-`;
 
+        console.log(e);
 
-
-
-
-
-
-
-let logs="";
-
-
-
-json.logs.forEach(
-
-l=>{
-
-logs += l+"<br>";
-
-}
-
-);
-
-
-
-
-document
-.getElementById(
-"logs"
-)
-.innerHTML = logs;
-
-
-
-
-
-
-
-}
-
-catch(e){
-
-
-console.log(e);
-
-
-}
-
+    }
 
 
 }
@@ -494,87 +483,93 @@ console.log(e);
 
 
 
+
+
+
+// ===================================
+// CHART UPDATE
+// ===================================
 
 
 async function updateChart(){
 
 
-try{
+    try{
 
 
-let res =
-await fetch(
-"/api/chart"
-);
+        let res = await fetch(
 
+            "/api/chart"
 
-
-let data =
-await res.json();
+        );
 
 
 
-if(!chart)
-return;
+        let data = await res.json();
 
 
 
 
-chart.data.labels =
-data.map(
 
-x=>new Date(
+        candleSeries.setData(
 
-x.time*1000
+            data.map(
 
-)
-.toLocaleTimeString()
-
-);
+                c => ({
 
 
-
-chart.data.datasets[0].data =
-data.map(
-
-x=>x.close
-
-);
+                    time:
+                    c.time,
 
 
+                    open:
+                    c.open,
 
-chart.update();
 
+                    high:
+                    c.high,
+
+
+                    low:
+                    c.low,
+
+
+                    close:
+                    c.close
+
+
+                })
+
+            )
+
+        );
+
+
+    }
+
+    catch(e){
+
+
+        console.log(e);
+
+    }
 
 
 }
 
-catch(e){
-
-
-
-}
-
-
-
-}
 
 
 
 
 
-
-
-
-initChart();
 
 
 
 setInterval(
 
-update,
+    update,
 
-5000
+    3000
 
 );
 
@@ -582,9 +577,9 @@ update,
 
 setInterval(
 
-updateChart,
+    updateChart,
 
-5000
+    5000
 
 );
 
@@ -592,11 +587,15 @@ updateChart,
 
 update();
 
+updateChart();
+
+
 
 </script>
 
 
 
 </body>
+
 
 </html>
