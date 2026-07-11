@@ -11,8 +11,11 @@ import threading
 
 
 from web.server import (
+
     update_status,
+
     add_log
+
 )
 
 
@@ -22,6 +25,7 @@ from web.server import (
 
 
 class Watchdog:
+
 
 
     def __init__(self):
@@ -34,10 +38,18 @@ class Watchdog:
 
 
 
+        self.lock = threading.Lock()
+
+
+
         self.last_heartbeat = time.time()
 
 
-        self.timeout = 60
+        self.timeout = 120
+
+
+
+        self.status = "OFF"
 
 
 
@@ -54,24 +66,25 @@ class Watchdog:
 
 
 
-
     # =====================================================
     # START
     # =====================================================
 
+
     def start(self):
 
 
-        if self.running:
+        with self.lock:
 
 
-            return
+            if self.running:
+
+
+                return
 
 
 
-
-
-        self.running = True
+            self.running = True
 
 
 
@@ -79,9 +92,12 @@ class Watchdog:
 
             target=self.loop,
 
-            daemon=True
+            daemon=True,
+
+            name="Watchdog"
 
         )
+
 
 
         self.thread.start()
@@ -98,9 +114,9 @@ class Watchdog:
 
 
 
-        print(
+        add_log(
 
-            "[WATCHDOG START]"
+            "WATCHDOG START"
 
         )
 
@@ -116,13 +132,45 @@ class Watchdog:
     # HEARTBEAT
     # =====================================================
 
+
     def heartbeat(self):
 
 
-        self.last_heartbeat = time.time()
+        with self.lock:
+
+
+            self.last_heartbeat = time.time()
 
 
 
+
+
+
+
+    # =====================================================
+    # CHECK
+    # =====================================================
+
+
+    def check(self):
+
+
+        with self.lock:
+
+
+            diff = (
+
+                time.time()
+
+                -
+
+                self.last_heartbeat
+
+            )
+
+
+
+        return diff < self.timeout
 
 
 
@@ -134,6 +182,7 @@ class Watchdog:
     # LOOP
     # =====================================================
 
+
     def loop(self):
 
 
@@ -143,68 +192,48 @@ class Watchdog:
             try:
 
 
-                diff = (
-
-                    time.time()
-
-                    -
-
-                    self.last_heartbeat
-
-                )
+                alive = self.check()
 
 
 
+                if alive:
 
 
-                if diff > self.timeout:
+                    self.status = "OK"
+
 
 
                     update_status({
 
-
                         "watchdog":
 
-                            "WARNING"
-
+                            "OK"
 
                     })
-
-
-
-                    add_log(
-
-                        "WATCHDOG WARNING : NO HEARTBEAT"
-
-                    )
-
-
 
 
 
                 else:
 
 
-                    update_status({
+                    self.status = "WARNING"
 
+
+
+                    update_status({
 
                         "watchdog":
 
-                            "OK"
-
+                            "WARNING"
 
                     })
 
 
+                    add_log(
 
+                        "WATCHDOG : NO HEARTBEAT"
 
-
-
-
-                time.sleep(10)
-
-
-
+                    )
 
 
 
@@ -212,17 +241,51 @@ class Watchdog:
             except Exception as e:
 
 
-                print(
+                add_log(
 
-                    "[WATCHDOG ERROR]",
-
-                    e
+                    f"WATCHDOG ERROR {e}"
 
                 )
 
 
 
-            time.sleep(1)
+            time.sleep(10)
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # STATUS
+    # =====================================================
+
+
+    def get_status(self):
+
+
+        return {
+
+
+            "status":
+
+                self.status,
+
+
+            "last_heartbeat":
+
+                self.last_heartbeat,
+
+
+            "timeout":
+
+                self.timeout
+
+
+        }
 
 
 
@@ -236,22 +299,31 @@ class Watchdog:
     # STOP
     # =====================================================
 
+
     def stop(self):
 
 
-        self.running = False
+        with self.lock:
+
+
+            self.running = False
 
 
 
         update_status({
 
-
             "watchdog":
 
                 "OFF"
 
-
         })
+
+
+        add_log(
+
+            "WATCHDOG STOP"
+
+        )
 
 
 
@@ -272,5 +344,6 @@ class Watchdog:
 # =====================================================
 # INSTANCE
 # =====================================================
+
 
 watchdog = Watchdog()
