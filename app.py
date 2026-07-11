@@ -1,38 +1,25 @@
-# =====================================================
+# =======================================================
 # app.py
-# VWAP SUPERTREND AUTO BOT CORE
-# =====================================================
+# VWAP SuperTrend Trading Bot Core
+# =======================================================
 
 import time
 import threading
-
+import traceback
 
 import config
 
-
 from api.bybit_api import bybit_api
-
-
 from services.private_ws import private_ws
 
-
 from portfolio.position_manager import position_manager
-
-
-from risk.risk_manager import risk_manager
-
-
 from order.order_manager import order_manager
-
+from risk.risk_manager import risk_manager
 
 from web.server import (
     update_status,
     add_log
 )
-
-
-
-
 
 
 class TradingApp:
@@ -46,12 +33,7 @@ class TradingApp:
 
         self.stop_lock = threading.Lock()
 
-
-        print(
-            "[TRADING APP READY]"
-        )
-
-
+        print("[거래 앱 준비 완료]")
 
 
 
@@ -61,66 +43,63 @@ class TradingApp:
 
     def start(self):
 
-
         if self.running:
 
             return
 
 
-
         print()
         print("====================")
-        print("[BOT START]")
+        print("[봇 시작]")
         print("====================")
-
 
 
         self.running = True
 
 
 
-
-        # -----------------------------
-        # API TEST
-        # -----------------------------
+        # -------------------------------------------------
+        # API BALANCE CHECK
+        # -------------------------------------------------
 
         try:
 
             balance = bybit_api.get_balance()
 
 
-            if balance is not None:
+            if balance:
 
                 print(
-                    "[BALANCE OK]"
+                    "[잔액 정상]"
                 )
 
             else:
 
                 print(
-                    "[BALANCE CHECK FAILED]"
+                    "[잔액 확인 실패 - 계속 진행]"
                 )
 
 
         except Exception as e:
 
             print(
-                "[BALANCE ERROR]",
+                "[잔액 API 보호 오류]",
                 e
             )
 
 
 
-
-
-
-        # -----------------------------
-        # PRIVATE WS
-        # -----------------------------
+        # -------------------------------------------------
+        # PRIVATE WS START
+        # -------------------------------------------------
 
         try:
 
             private_ws.start()
+
+            print(
+                "[PRIVATE WS START]"
+            )
 
 
         except Exception as e:
@@ -132,22 +111,33 @@ class TradingApp:
 
 
 
-
-
-
-
-        # -----------------------------
-        # WATCHDOG
-        # -----------------------------
+        # -------------------------------------------------
+        # POSITION SYNC
+        # -------------------------------------------------
 
         try:
 
+            position_manager.refresh()
 
-            from watchdog import watchdog
 
+        except Exception as e:
+
+            print(
+                "[POSITION REFRESH ERROR]",
+                e
+            )
+
+
+
+        # -------------------------------------------------
+        # WATCHDOG
+        # -------------------------------------------------
+
+        try:
+
+            from services.watchdog import watchdog
 
             watchdog.start()
-
 
             print(
                 "[WATCHDOG START]"
@@ -156,58 +146,57 @@ class TradingApp:
 
         except Exception:
 
-
             pass
 
 
 
+        # -------------------------------------------------
+        # MARKET LOOP THREAD
+        # -------------------------------------------------
+
+        if (
+
+            self.market_thread is None
+
+            or not self.market_thread.is_alive()
+
+        ):
 
 
+            self.market_thread = threading.Thread(
+
+                target=self.market_loop,
+
+                daemon=True,
+
+                name="MarketLoop"
+
+            )
 
 
-        # -----------------------------
-        # MARKET LOOP
-        # -----------------------------
-
-        self.market_thread = threading.Thread(
-
-            target=self.market_loop,
-
-            daemon=True
-
-        )
-
-
-        self.market_thread.start()
+            self.market_thread.start()
 
 
 
         update_status({
 
-            "bot":
-
-                "RUNNING"
+            "bot":"RUNNING"
 
         })
 
 
         add_log(
 
-            "BOT READY"
+            "BOT START"
 
         )
-
 
 
         print(
+
             "[BOT READY]"
+
         )
-
-
-
-
-
-
 
 
 
@@ -219,18 +208,10 @@ class TradingApp:
     def market_loop(self):
 
 
-        from market.market_data import (
+        from market.market_data import market_data
 
-            market_data
+        from strategy.vwap_supertrend import strategy
 
-        )
-
-
-        from strategy.vwap_supertrend import (
-
-            strategy
-
-        )
 
 
         print(
@@ -247,11 +228,6 @@ class TradingApp:
             try:
 
 
-
-                # -----------------------------
-                # KLINE DATA
-                # -----------------------------
-
                 df = market_data.get_candles(
 
                     interval="5",
@@ -259,7 +235,6 @@ class TradingApp:
                     limit=200
 
                 )
-
 
 
                 if df is None:
@@ -272,12 +247,6 @@ class TradingApp:
 
 
 
-
-
-                # -----------------------------
-                # SIGNAL
-                # -----------------------------
-
                 signal = strategy.generate_signal(
 
                     df
@@ -286,18 +255,7 @@ class TradingApp:
 
 
 
-
-
-
                 if signal:
-
-
-
-                    add_log(
-
-                        f"SIGNAL {signal}"
-
-                    )
 
 
                     print(
@@ -309,26 +267,24 @@ class TradingApp:
                     )
 
 
+                    add_log(
+
+                        f"SIGNAL {signal}"
+
+                    )
 
 
 
-
-
-                    # -----------------------------
-                    # POSITION CHECK
-                    # -----------------------------
-
-                    pos = (
+                    position = (
 
                         position_manager
-
                         .get_position()
 
                     )
 
 
 
-                    current = pos.get(
+                    current = position.get(
 
                         "side",
 
@@ -338,19 +294,13 @@ class TradingApp:
 
 
 
-
-
-
                     if (
 
                         signal == "Buy"
 
-                        and
-
-                        current == "Buy"
+                        and current == "Buy"
 
                     ):
-
 
                         add_log(
 
@@ -364,17 +314,11 @@ class TradingApp:
 
 
 
-
-
-
-
                     if (
 
                         signal == "Sell"
 
-                        and
-
-                        current == "Sell"
+                        and current == "Sell"
 
                     ):
 
@@ -392,13 +336,6 @@ class TradingApp:
 
 
 
-
-
-
-                    # -----------------------------
-                    # ORDER
-                    # -----------------------------
-
                     qty = config.MAX_POSITION_SIZE
 
 
@@ -406,7 +343,6 @@ class TradingApp:
                     result = (
 
                         order_manager
-
                         .open_position(
 
                             signal,
@@ -422,13 +358,11 @@ class TradingApp:
                     if result:
 
 
-
                         add_log(
 
                             f"ORDER SUCCESS {signal}"
 
                         )
-
 
                     else:
 
@@ -442,19 +376,14 @@ class TradingApp:
 
 
 
-
-
-
                 time.sleep(10)
-
-
-
-
 
 
 
             except Exception as e:
 
+
+                traceback.print_exc()
 
 
                 add_log(
@@ -469,11 +398,6 @@ class TradingApp:
 
 
 
-
-
-
-
-
     # =====================================================
     # STOP
     # =====================================================
@@ -484,13 +408,9 @@ class TradingApp:
         with self.stop_lock:
 
 
-
             if not self.running:
 
-
                 return
-
-
 
 
 
@@ -498,10 +418,9 @@ class TradingApp:
 
             print("====================")
 
-            print("[BOT STOP]")
+            print("[봇 정지]")
 
             print("====================")
-
 
 
 
@@ -510,12 +429,33 @@ class TradingApp:
 
 
 
+            # -------------------------------------------------
+            # CLOSE POSITION
+            # -------------------------------------------------
+
+            try:
+
+
+                order_manager.close_position()
+
+
+            except Exception as e:
+
+
+                print(
+
+                    "[CLOSE POSITION ERROR]",
+
+                    e
+
+                )
 
 
 
-            # -----------------------------
-            # PRIVATE WS
-            # -----------------------------
+
+            # -------------------------------------------------
+            # PRIVATE WS STOP
+            # -------------------------------------------------
 
             try:
 
@@ -528,7 +468,7 @@ class TradingApp:
 
                 print(
 
-                    "[WS STOP ERROR]",
+                    "[PRIVATE WS STOP ERROR]",
 
                     e
 
@@ -537,83 +477,64 @@ class TradingApp:
 
 
 
-
-
-
-
-            # -----------------------------
-            # WATCHDOG
-            # -----------------------------
+            # -------------------------------------------------
+            # WATCHDOG STOP
+            # -------------------------------------------------
 
             try:
 
 
-                from watchdog import watchdog
+                from services.watchdog import watchdog
 
 
                 watchdog.stop()
 
 
-                print(
-
-                    "[WATCHDOG STOPPED]"
-
-                )
-
-
             except Exception:
-
 
                 pass
 
 
 
 
+            # -------------------------------------------------
+            # THREAD JOIN
+            # -------------------------------------------------
+
+            if (
+
+                self.market_thread
+
+                and self.market_thread.is_alive()
+
+            ):
 
 
+                self.market_thread.join(
 
-            # -----------------------------
-            # POSITION
-            # -----------------------------
-
-            try:
-
-
-                position_manager.close()
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "[POSITION ERROR]",
-
-                    e
+                    timeout=5
 
                 )
 
 
 
-
+            self.market_thread = None
 
 
 
             update_status({
 
-                "bot":
-
-                    "STOPPED"
+                "bot":"STOPPED"
 
             })
 
 
+
             add_log(
 
-                "BOT STOP COMPLETE"
+                "BOT STOP"
 
             )
-
 
 
             print(
@@ -621,3 +542,11 @@ class TradingApp:
                 "[BOT STOP COMPLETE]"
 
             )
+
+
+
+# =====================================================
+# INSTANCE
+# =====================================================
+
+trading_app = TradingApp()
