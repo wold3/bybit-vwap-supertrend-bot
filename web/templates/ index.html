@@ -1,23 +1,22 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 
 <head>
+
+<meta charset="UTF-8">
 
 <title>
 VWAP SUPERTREND BOT
 </title>
 
 
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-
 <style>
 
 body{
 
-    background:#101217;
+    background:#111;
 
-    color:white;
+    color:#eee;
 
     font-family:Arial;
 
@@ -26,243 +25,184 @@ body{
 }
 
 
+.box{
 
-.container{
+    border:1px solid #444;
 
-    max-width:900px;
+    padding:15px;
 
-    margin:auto;
+    margin-bottom:15px;
 
-}
-
-
-
-.card{
-
-    background:#1c212b;
-
-    padding:20px;
-
-    margin-bottom:20px;
-
-    border-radius:15px;
+    border-radius:8px;
 
 }
-
-
-
-h1{
-
-    text-align:center;
-
-}
-
 
 
 button{
 
-    padding:12px 18px;
+    width:120px;
+
+    height:45px;
 
     margin:5px;
 
-    border:0;
-
-    border-radius:12px;
+    font-size:18px;
 
     cursor:pointer;
+
+}
+
+
+.buy{
+
+    background:#1b8f3a;
+
+    color:white;
+
+}
+
+
+.sell{
+
+    background:#b32626;
+
+    color:white;
+
+}
+
+
+.close{
+
+    background:#555;
+
+    color:white;
+
+}
+
+
+#logs{
+
+    height:300px;
+
+    overflow:auto;
+
+    background:#000;
+
+    padding:10px;
+
+    font-family:monospace;
+
+}
+
+
+.value{
+
+    color:#00ff99;
 
     font-weight:bold;
 
 }
 
 
-
-.demo{
-
-    background:#2979ff;
-
-    color:white;
-
-}
-
-
-
-.live{
-
-    background:#ff1744;
-
-    color:white;
-
-}
-
-
-
-.start{
-
-    background:#00c853;
-
-    color:white;
-
-}
-
-
-
-.stop{
-
-    background:#d50000;
-
-    color:white;
-
-}
-
-
-
-.close{
-
-    background:#ff9100;
-
-    color:white;
-
-}
-
-
-
-.reverse{
-
-    background:#aa00ff;
-
-    color:white;
-
-}
-
-
-
-.active{
-
-    border:3px solid white;
-
-}
-
-
-
-select{
-
-    width:100%;
-
-    padding:12px;
-
-    border-radius:10px;
-
-    background:#000;
-
-    color:white;
-
-}
-
-
-
-.grid{
-
-    display:grid;
-
-    grid-template-columns:
-
-    repeat(auto-fit,minmax(180px,1fr));
-
-    gap:10px;
-
-}
-
-
-
-.item{
-
-    background:#272d38;
-
-    padding:15px;
-
-    border-radius:10px;
-
-}
-
-
-
-.title{
-
-    color:#aaa;
-
-}
-
-
-
-.value{
-
-    font-size:22px;
-
-    margin-top:5px;
-
-}
-
-
-
-#logs{
-
-    height:250px;
-
-    overflow:auto;
-
-    background:#000;
-
-    padding:15px;
-
-    border-radius:10px;
-
-    font-size:13px;
-
-}
-
-
 </style>
 
-
 </head>
-
 
 
 <body>
 
 
-
-<div class="container">
-
-
-
 <h1>
-
-⚡ VWAP SUPERTREND BOT
-
+VWAP SUPERTREND BOT
 </h1>
 
 
 
+<div class="box">
 
 
-<div class="card">
+<h3>
+STATUS
+</h3>
 
 
-<h2>
-CONTROL
-</h2>
+<div>
+BOT :
+<span id="bot" class="value">
+-
+</span>
+</div>
 
+
+<div>
+MODE :
+<span id="mode" class="value">
+-
+</span>
+</div>
+
+
+<div>
+SYMBOL :
+<span id="symbol" class="value">
+-
+</span>
+</div>
+
+
+<div>
+POSITION :
+<span id="position" class="value">
+-
+</span>
+</div>
+
+
+<div>
+SIZE :
+<span id="size" class="value">
+-
+</span>
+</div>
+
+
+<div>
+ENTRY :
+<span id="entry" class="value">
+-
+</span>
+</div>
+
+
+<div>
+PNL :
+<span id="pnl" class="value">
+-
+</span>
+</div>
+
+
+</div>
+
+
+
+
+
+<div class="box">
+
+
+<h3>
+MANUAL ORDER
+</h3>
 
 
 <button
 
-class="demo"
+class="buy"
 
-onclick="setMode('DEMO')">
+onclick="order('Buy')">
 
-DEMO
+BUY
 
 </button>
 
@@ -270,78 +210,11 @@ DEMO
 
 <button
 
-class="live"
+class="sell"
 
-onclick="setMode('LIVE')">
+onclick="order('Sell')">
 
-LIVE
-
-</button>
-
-
-
-<br><br>
-
-
-
-<select id="symbol">
-
-
-<option>
-BTCUSDT
-</option>
-
-
-<option>
-ETHUSDT
-</option>
-
-
-<option>
-SOLUSDT
-</option>
-
-
-<option>
-XRPUSDT
-</option>
-
-
-</select>
-
-
-
-<button
-
-onclick="changeSymbol()">
-
-CHANGE SYMBOL
-
-</button>
-
-
-<br>
-
-
-<button
-
-class="start"
-
-onclick="startBot()">
-
-▶ START
-
-</button>
-
-
-
-<button
-
-class="stop"
-
-onclick="stopBot()">
-
-■ STOP
+SELL
 
 </button>
 
@@ -353,24 +226,11 @@ class="close"
 
 onclick="closePosition()">
 
-✖ CLOSE
+CLOSE
 
 </button>
 
 
-
-<button
-
-class="reverse"
-
-onclick="reversePosition()">
-
-🔄 REVERSE
-
-</button>
-
-
-
 </div>
 
 
@@ -378,167 +238,20 @@ onclick="reversePosition()">
 
 
 
+<div class="box">
 
-<div class="card">
 
-
-<h2>
-STATUS
-</h2>
-
-
-
-<div class="grid">
-
-
-
-<div class="item">
-
-<div class="title">
-BOT
-</div>
-
-<div class="value" id="bot">
--
-</div>
-
-</div>
-
-
-
-<div class="item">
-
-<div class="title">
-MODE
-</div>
-
-<div class="value" id="mode">
--
-</div>
-
-</div>
-
-
-
-
-<div class="item">
-
-<div class="title">
-SYMBOL
-</div>
-
-<div class="value" id="symbol">
--
-</div>
-
-</div>
-
-
-
-
-<div class="item">
-
-<div class="title">
-POSITION
-</div>
-
-<div class="value" id="position">
--
-</div>
-
-</div>
-
-
-
-
-<div class="item">
-
-<div class="title">
-SIZE
-</div>
-
-<div class="value" id="size">
-0
-</div>
-
-</div>
-
-
-
-
-<div class="item">
-
-<div class="title">
-ENTRY
-</div>
-
-<div class="value" id="entry">
-0
-</div>
-
-</div>
-
-
-
-
-<div class="item">
-
-<div class="title">
-PNL
-</div>
-
-<div class="value" id="pnl">
-0
-</div>
-
-</div>
-
-
-
-<div class="item">
-
-<div class="title">
-LAST ACTION
-</div>
-
-<div class="value" id="action">
--
-</div>
-
-</div>
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-
-<div class="card">
-
-
-<h2>
+<h3>
 LOG
-
-</h2>
+</h3>
 
 
 <div id="logs">
 
-Loading...
-
 </div>
 
 
 </div>
-
 
 
 
@@ -548,27 +261,44 @@ Loading...
 <script>
 
 
-
-function post(url,data={}){
+function order(side){
 
 
 fetch(
 
-url,
+"/api/order",
 
 {
 
+
 method:"POST",
+
 
 headers:{
 
-"Content-Type":"application/json"
+
+"Content-Type":
+
+"application/json"
+
 
 },
 
-body:JSON.stringify(data)
+
+body:JSON.stringify({
+
+
+side:side,
+
+
+qty:0.001
+
+
+})
+
 
 }
+
 
 )
 
@@ -580,102 +310,13 @@ r=>r.json()
 
 .then(
 
-d=>{
+data=>{
 
-console.log(d);
 
-update();
-
-}
-
-);
+console.log(data);
 
 
 }
-
-
-
-
-
-
-function setMode(mode){
-
-
-post(
-
-"/api/mode",
-
-{
-
-mode:mode
-
-}
-
-);
-
-
-}
-
-
-
-
-
-
-function changeSymbol(){
-
-
-let s=document.getElementById(
-
-"symbol"
-
-).value;
-
-
-
-post(
-
-"/api/symbol",
-
-{
-
-symbol:s
-
-}
-
-);
-
-
-}
-
-
-
-
-
-
-
-function startBot(){
-
-
-post(
-
-"/api/start"
-
-);
-
-
-}
-
-
-
-
-
-
-function stopBot(){
-
-
-post(
-
-"/api/stop"
 
 );
 
@@ -690,32 +331,39 @@ post(
 function closePosition(){
 
 
-post(
+fetch(
 
-"/api/close"
+"/api/close",
+
+{
+
+
+method:"POST"
+
+}
+
+)
+
+.then(
+
+r=>r.json()
+
+)
+
+.then(
+
+data=>{
+
+
+console.log(data);
+
+
+}
 
 );
 
 
 }
-
-
-
-
-
-
-function reversePosition(){
-
-
-post(
-
-"/api/reverse"
-
-);
-
-
-}
-
 
 
 
@@ -770,7 +418,7 @@ document.getElementById(
 
 "symbol"
 
-).value=s.symbol;
+).innerHTML=s.symbol;
 
 
 
@@ -806,23 +454,20 @@ document.getElementById(
 
 
 
-document.getElementById(
 
-"action"
-
-).innerHTML=s.last_action;
+let log="";
 
 
+data.logs.forEach(
 
-document.getElementById(
+x=>{
 
-"logs"
 
-).innerHTML=
+log += x+"<br>";
 
-data.logs.join(
 
-"<br>"
+}
+
 
 );
 
@@ -833,6 +478,11 @@ let box=document.getElementById(
 "logs"
 
 );
+
+
+
+box.innerHTML=log;
+
 
 
 box.scrollTop=box.scrollHeight;
@@ -851,11 +501,12 @@ box.scrollTop=box.scrollHeight;
 
 
 
+
 setInterval(
 
 update,
 
-2000
+1000
 
 );
 
@@ -868,9 +519,7 @@ update();
 </script>
 
 
-</div>
-
-
 </body>
+
 
 </html>
