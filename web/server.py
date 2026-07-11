@@ -1,19 +1,17 @@
 # =====================================================
 # web/server.py
-# Flask Dashboard Server
+# Dashboard Server
+# Demo / Live Trading Mode Control
 # =====================================================
 
 from flask import (
     Flask,
     render_template,
-    jsonify
+    jsonify,
+    request
 )
 
-
 import threading
-
-
-
 
 
 from config import (
@@ -25,27 +23,36 @@ from config import (
 
 
 
-app = Flask(
+# =====================================================
+# FLASK APP
+# =====================================================
 
-    __name__
-
-)
+app = Flask(__name__)
 
 
 
 
 
 # =====================================================
-# GLOBAL STATUS
+# THREAD LOCK
 # =====================================================
 
+lock = threading.Lock()
+
+
+
+
+
+# =====================================================
+# BOT STATUS
+# =====================================================
 
 status = {
 
 
     "bot":
 
-        "STARTING",
+        "STOPPED",
 
 
     "price":
@@ -99,12 +106,40 @@ status = {
 
 
 
+
+
+
+
+# =====================================================
+# TRADING MODE
+# =====================================================
+
+mode = {
+
+
+    "value":
+
+        "DEMO"
+
+
+}
+
+
+
+
+
+
+
+
+
+# =====================================================
+# LOG BUFFER
+# =====================================================
+
 logs = []
 
 
 
-lock = threading.Lock()
-
 
 
 
@@ -112,13 +147,16 @@ lock = threading.Lock()
 
 
 # =====================================================
-# UPDATE STATUS
+# STATUS UPDATE
 # =====================================================
 
+def update_status(data):
 
-def update_status(
-    data
-):
+
+    if not isinstance(data, dict):
+
+        return
+
 
 
     with lock:
@@ -139,13 +177,10 @@ def update_status(
 
 
 # =====================================================
-# LOG
+# ADD LOG
 # =====================================================
 
-
-def add_log(
-    message
-):
+def add_log(message):
 
 
     with lock:
@@ -153,13 +188,13 @@ def add_log(
 
         logs.append(
 
-            message
+            str(message)
 
         )
 
 
 
-        if len(logs) > 100:
+        if len(logs) > 300:
 
 
             logs.pop(0)
@@ -173,13 +208,93 @@ def add_log(
 
 
 # =====================================================
-# PAGE
+# GET CURRENT MODE
 # =====================================================
 
+def get_trading_mode():
+
+
+    with lock:
+
+
+        return mode["value"]
+
+
+
+
+
+
+
+
+
+
+# =====================================================
+# CHANGE MODE
+# =====================================================
+
+def set_trading_mode(new_mode):
+
+
+    new_mode = str(
+
+        new_mode
+
+    ).upper()
+
+
+
+
+
+    if new_mode not in [
+
+        "DEMO",
+
+        "LIVE"
+
+    ]:
+
+
+        return False
+
+
+
+
+
+    with lock:
+
+
+        mode["value"] = new_mode
+
+
+
+
+
+    add_log(
+
+        f"MODE CHANGE : {new_mode}"
+
+    )
+
+
+
+    return True
+
+
+
+
+
+
+
+
+
+
+# =====================================================
+# DASHBOARD PAGE
+# =====================================================
 
 @app.route("/")
 
-def index():
+def dashboard():
 
 
     return render_template(
@@ -200,10 +315,9 @@ def index():
 # STATUS API
 # =====================================================
 
-
 @app.route("/api/status")
 
-def api_status():
+def status_api():
 
 
     with lock:
@@ -217,11 +331,105 @@ def api_status():
                 status.copy(),
 
 
+
+            "mode":
+
+                mode["value"],
+
+
+
             "logs":
 
                 logs.copy()
 
+
         })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# MODE GET
+# =====================================================
+
+@app.route("/api/mode")
+
+def mode_get():
+
+
+    return jsonify({
+
+
+        "mode":
+
+            get_trading_mode()
+
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# MODE CHANGE
+# =====================================================
+
+@app.route(
+    "/api/mode",
+    methods=["POST"]
+)
+
+def mode_change():
+
+
+    data = request.get_json(
+
+        silent=True
+
+    ) or {}
+
+
+
+    new_mode = data.get(
+
+        "mode"
+
+    )
+
+
+
+    result = set_trading_mode(
+
+        new_mode
+
+    )
+
+
+
+    return jsonify({
+
+
+        "success":
+
+            result,
+
+
+        "mode":
+
+            get_trading_mode()
+
+
+    })
 
 
 
@@ -235,10 +443,9 @@ def api_status():
 # CHART API
 # =====================================================
 
-
 @app.route("/api/chart")
 
-def api_chart():
+def chart_api():
 
 
     try:
@@ -259,16 +466,19 @@ def api_chart():
 
 
 
-    except Exception:
+    except Exception as e:
 
 
-        return jsonify(
+        add_log(
 
-            []
+            f"CHART ERROR : {e}"
 
         )
 
 
+        return jsonify([])
+
+
 
 
 
@@ -277,9 +487,40 @@ def api_chart():
 
 
 # =====================================================
-# SERVER START
+# HEALTH CHECK
 # =====================================================
 
+@app.route("/api/health")
+
+def health():
+
+
+    return jsonify({
+
+
+        "server":
+
+            "OK",
+
+
+        "mode":
+
+            get_trading_mode()
+
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SERVER RUN
+# =====================================================
 
 def run_server():
 
