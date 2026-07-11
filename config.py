@@ -1,111 +1,33 @@
 # =====================================================
 # config.py
-# VWAP SUPERTREND AUTO BOT CONFIG
+# VWAP SUPERTREND BOT CONFIG
+# BYBIT V5
 # =====================================================
-
-import os
-
-from dotenv import load_dotenv
-
-
-load_dotenv()
-
 
 
 # =====================================================
-# MODE
+# API MODE
 # =====================================================
 
-DEFAULT_MODE = os.getenv(
-
-    "DEFAULT_MODE",
-
-    "DEMO"
-
-).upper()
-
-
-LIVE = (
-
-    DEFAULT_MODE == "LIVE"
-
-)
-
-
-# 직접 실행 시 자동 시작 여부
-# FALSE 권장 (Dashboard START 사용)
-
-AUTO_START = (
-
-    os.getenv(
-
-        "AUTO_START",
-
-        "FALSE"
-
-    ).upper()
-
-    ==
-
-    "TRUE"
-
-)
+DEMO_MODE = True
 
 
 
 # =====================================================
-# API
+# BYBIT API KEY
 # =====================================================
 
-DEMO_API_KEY = os.getenv(
+DEMO_API_KEY = "YOUR_DEMO_API_KEY"
 
-    "DEMO_API_KEY",
-
-    ""
-
-)
-
-
-DEMO_API_SECRET = os.getenv(
-
-    "DEMO_API_SECRET",
-
-    ""
-
-)
+DEMO_API_SECRET = "YOUR_DEMO_API_SECRET"
 
 
 
-LIVE_API_KEY = os.getenv(
+LIVE_API_KEY = "YOUR_LIVE_API_KEY"
 
-    "LIVE_API_KEY",
-
-    ""
-
-)
+LIVE_API_SECRET = "YOUR_LIVE_API_SECRET"
 
 
-LIVE_API_SECRET = os.getenv(
-
-    "LIVE_API_SECRET",
-
-    ""
-
-)
-
-
-
-if LIVE:
-
-    BYBIT_API_KEY = LIVE_API_KEY
-
-    BYBIT_API_SECRET = LIVE_API_SECRET
-
-else:
-
-    BYBIT_API_KEY = DEMO_API_KEY
-
-    BYBIT_API_SECRET = DEMO_API_SECRET
 
 
 
@@ -113,180 +35,62 @@ else:
 # MARKET
 # =====================================================
 
-CATEGORY = os.getenv(
-
-    "CATEGORY",
-
-    "linear"
-
-)
+CATEGORY = "linear"
 
 
-SYMBOL = os.getenv(
-
-    "SYMBOL",
-
-    "BTCUSDT"
-
-)
-
-
-DEFAULT_SYMBOL = SYMBOL
+SYMBOL = "BTCUSDT"
 
 
 
-# =====================================================
-# LEVERAGE
-# =====================================================
+# 지원 심볼
 
-LEVERAGE = int(
+SYMBOL_LIST = [
 
-    os.getenv(
+    "BTCUSDT",
 
-        "LEVERAGE",
+    "ETHUSDT",
 
-        "3"
+    "SOLUSDT",
 
-    )
+    "XRPUSDT"
 
-)
+]
+
+
+
 
 
 
 # =====================================================
-# POSITION
+# TRADE
 # =====================================================
 
-MAX_POSITION_SIZE = float(
-
-    os.getenv(
-
-        "MAX_POSITION_SIZE",
-
-        "0.001"
-
-    )
-
-)
+LEVERAGE = 3
 
 
-MAX_OPEN_POSITION = int(
 
-    os.getenv(
+MAX_POSITION_SIZE = 0.001
 
-        "MAX_OPEN_POSITION",
 
-        "1"
 
-    )
+POSITION_MODE = "ONEWAY"
 
-)
+
+
 
 
 
 # =====================================================
-# RISK
+# TAKE PROFIT / STOP LOSS
 # =====================================================
 
-RISK_PERCENT = float(
-
-    os.getenv(
-
-        "RISK_PERCENT",
-
-        "1"
-
-    )
-
-)
+TAKE_PROFIT_PERCENT = 3.0
 
 
-STOP_LOSS_PERCENT = float(
-
-    os.getenv(
-
-        "STOP_LOSS_PERCENT",
-
-        "1.5"
-
-    )
-
-)
-
-
-TAKE_PROFIT_PERCENT = float(
-
-    os.getenv(
-
-        "TAKE_PROFIT_PERCENT",
-
-        "3"
-
-    )
-
-)
-
-
-TRAILING_STOP_PERCENT = float(
-
-    os.getenv(
-
-        "TRAILING_STOP_PERCENT",
-
-        "1"
-
-    )
-
-)
+STOP_LOSS_PERCENT = 1.5
 
 
 
-# =====================================================
-# VWAP
-# =====================================================
-
-VWAP_LENGTH = int(
-
-    os.getenv(
-
-        "VWAP_LENGTH",
-
-        "20"
-
-    )
-
-)
-
-
-
-# =====================================================
-# SUPERTREND
-# =====================================================
-
-ATR_PERIOD = int(
-
-    os.getenv(
-
-        "ATR_PERIOD",
-
-        "10"
-
-    )
-
-)
-
-
-SUPERTREND_MULTIPLIER = float(
-
-    os.getenv(
-
-        "SUPERTREND_MULTIPLIER",
-
-        "3"
-
-    )
-
-)
 
 
 
@@ -294,290 +98,78 @@ SUPERTREND_MULTIPLIER = float(
 # CANDLE
 # =====================================================
 
-CANDLE_INTERVAL = os.getenv(
-
-    "CANDLE_INTERVAL",
-
-    "5"
-
-)
+TIMEFRAME = "5"
 
 
-MAX_HISTORY = int(
 
-    os.getenv(
+CANDLE_LIMIT = 200
 
-        "MAX_HISTORY",
 
-        "500"
 
-    )
-
-)
 
 
 
 # =====================================================
-# API CONTROL
+# VWAP
 # =====================================================
 
-API_TIMEOUT = int(
-
-    os.getenv(
-
-        "API_TIMEOUT",
-
-        "10"
-
-    )
-
-)
+VWAP_LENGTH = 20
 
 
-API_RETRY = int(
 
-    os.getenv(
-
-        "API_RETRY",
-
-        "3"
-
-    )
-
-)
-
-
-ORDER_TIMEOUT = int(
-
-    os.getenv(
-
-        "ORDER_TIMEOUT",
-
-        "15"
-
-    )
-
-)
 
 
 
 # =====================================================
-# WEBSOCKET
+# SUPERTREND
 # =====================================================
 
-WS_RECONNECT = int(
+ATR_PERIOD = 10
 
-    os.getenv(
 
-        "WS_RECONNECT",
+SUPERTREND_MULTIPLIER = 3
 
-        "5"
 
-    )
 
-)
 
 
 
 # =====================================================
-# WATCHDOG
+# BOT LOOP
 # =====================================================
 
-WATCHDOG_INTERVAL = int(
+MARKET_INTERVAL = 5
 
-    os.getenv(
 
-        "WATCHDOG_INTERVAL",
+POSITION_SYNC_INTERVAL = 10
 
-        "10"
 
-    )
-
-)
+WATCHDOG_INTERVAL = 10
 
 
 
-# =====================================================
-# WEB SERVER
-# =====================================================
-
-WEB_HOST = os.getenv(
-
-    "WEB_HOST",
-
-    "0.0.0.0"
-
-)
-
-
-WEB_PORT = int(
-
-    os.getenv(
-
-        "WEB_PORT",
-
-        "8000"
-
-    )
-
-)
 
 
 
 # =====================================================
-# DATABASE
+# RISK
 # =====================================================
 
-DATABASE = os.getenv(
+MAX_DAILY_LOSS = 50
 
-    "DATABASE",
 
-    "bot.db"
-
-)
+MAX_OPEN_POSITION = 1
 
 
 
-# =====================================================
-# TELEGRAM
-# =====================================================
-
-TELEGRAM_TOKEN = os.getenv(
-
-    "TELEGRAM_TOKEN",
-
-    ""
-
-)
-
-
-TELEGRAM_CHAT_ID = os.getenv(
-
-    "TELEGRAM_CHAT_ID",
-
-    ""
-
-)
 
 
 
 # =====================================================
-# REPORT
+# WEB
 # =====================================================
 
-REPORT_TIME = os.getenv(
-
-    "REPORT_TIME",
-
-    "00:00"
-
-)
+WEB_HOST = "0.0.0.0"
 
 
-
-# =====================================================
-# LOG
-# =====================================================
-
-LOG_LEVEL = os.getenv(
-
-    "LOG_LEVEL",
-
-    "INFO"
-
-)
-
-
-DEBUG = (
-
-    os.getenv(
-
-        "DEBUG",
-
-        "FALSE"
-
-    ).upper()
-
-    ==
-
-    "TRUE"
-
-)
-
-
-
-# =====================================================
-# PRINT CONFIG
-# =====================================================
-
-print("=" * 40)
-
-print("[CONFIG LOADED]")
-
-print("=" * 40)
-
-print(
-
-    "MODE :",
-
-    DEFAULT_MODE
-
-)
-
-print(
-
-    "AUTO START :", 
-
-    AUTO_START
-
-)
-
-print(
-
-    "CATEGORY :", 
-
-    CATEGORY
-
-)
-
-print(
-
-    "SYMBOL :", 
-
-    SYMBOL
-
-)
-
-print(
-
-    "LEVERAGE :", 
-
-    LEVERAGE
-
-)
-
-print(
-
-    "MAX POSITION :", 
-
-    MAX_POSITION_SIZE
-
-)
-
-print(
-
-    "API KEY LENGTH :", 
-
-    len(BYBIT_API_KEY)
-
-)
-
-print(
-
-    "SECRET LENGTH :", 
-
-    len(BYBIT_API_SECRET)
-
-)
-
-print("=" * 40)
+WEB_PORT = 8000
