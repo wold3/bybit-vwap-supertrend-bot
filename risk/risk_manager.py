@@ -1,15 +1,17 @@
 # =====================================================
 # risk/risk_manager.py
-# Risk Management Engine
+# Risk Management System
 # =====================================================
 
-import time
+import math
 
 
 from config import (
     RISK_PER_TRADE_PERCENT,
+    STOP_LOSS_PERCENT,
     MAX_POSITION_SIZE,
-    STOP_LOSS_PERCENT
+    LEVERAGE,
+    DEFAULT_SYMBOL
 )
 
 
@@ -25,25 +27,13 @@ class RiskManager:
         self.equity = 0
 
 
-        self.daily_loss = 0
-
-
-        self.trade_count = 0
-
-
-        self.win_count = 0
-
-
-        self.loss_count = 0
-
-
-        self.last_reset = time.time()
-
-
-
         print(
+
             "[RISK MANAGER INIT]"
+
         )
+
+
 
 
 
@@ -62,82 +52,68 @@ class RiskManager:
     ):
 
 
-        self.equity = float(
-
-            equity
-
-        )
+        try:
 
 
+            self.equity = float(
 
-        print(
+                equity
 
-            "[EQUITY UPDATE]",
+            )
+
+
+            print(
+
+                "[EQUITY UPDATED]",
+
+                self.equity
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[EQUITY ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # RISK AMOUNT
+    # =====================================================
+
+
+    def risk_amount(self):
+
+
+        return (
 
             self.equity
 
+            *
+
+            RISK_PER_TRADE_PERCENT
+
+            /
+
+            100
+
         )
 
 
-
-
-
-
-
-
-
-    # =====================================================
-    # CHECK TRADE
-    # =====================================================
-
-
-    def can_trade(
-        self,
-        current_position
-    ):
-
-
-        # 최대 포지션 체크
-
-        if abs(
-
-            float(current_position)
-
-        ) >= MAX_POSITION_SIZE:
-
-
-            print(
-
-                "[RISK BLOCK] MAX POSITION"
-
-            )
-
-
-            return False
-
-
-
-
-
-        # 잔고 확인
-
-        if self.equity <= 0:
-
-
-            print(
-
-                "[RISK BLOCK] NO EQUITY"
-
-            )
-
-
-            return False
-
-
-
-
-
-        return True
 
 
 
@@ -150,7 +126,7 @@ class RiskManager:
     # =====================================================
 
 
-    def calculate_size(
+    def calculate_qty(
         self,
         price
     ):
@@ -159,7 +135,7 @@ class RiskManager:
         try:
 
 
-            if self.equity <= 0:
+            if price <= 0:
 
 
                 return 0
@@ -168,23 +144,25 @@ class RiskManager:
 
 
 
-            risk_amount = (
+            risk_money = (
 
-                self.equity *
-
-                RISK_PER_TRADE_PERCENT /
-
-                100
+                self.risk_amount()
 
             )
+
+
 
 
 
             stop_distance = (
 
-                price *
+                price
 
-                STOP_LOSS_PERCENT /
+                *
+
+                STOP_LOSS_PERCENT
+
+                /
 
                 100
 
@@ -192,15 +170,40 @@ class RiskManager:
 
 
 
+
+
+            if stop_distance <= 0:
+
+
+                return 0
+
+
+
+
+
             qty = (
 
-                risk_amount /
+                risk_money
+
+                /
 
                 stop_distance
 
             )
 
 
+
+
+
+            # leverage 적용
+
+            qty = qty * LEVERAGE
+
+
+
+
+
+            # 최대 제한
 
             if qty > MAX_POSITION_SIZE:
 
@@ -215,9 +218,13 @@ class RiskManager:
 
                 qty,
 
-                3
+                6
 
             )
+
+
+
+
 
 
 
@@ -226,7 +233,7 @@ class RiskManager:
 
             print(
 
-                "[SIZE ERROR]",
+                "[QTY ERROR]",
 
                 e
 
@@ -242,111 +249,215 @@ class RiskManager:
 
 
     # =====================================================
-    # RECORD TRADE
+    # RISK CHECK
     # =====================================================
 
 
-    def record_trade(self):
-
-
-        self.trade_count += 1
-
-
-
-
-
-    # =====================================================
-    # RESULT UPDATE
-    # =====================================================
-
-
-    def update_result(
+    def check(
         self,
-        pnl
+        price
     ):
 
 
-        pnl = float(pnl)
+        qty = (
+
+            self.calculate_qty(
+
+                price
+
+            )
+
+        )
 
 
 
-        if pnl >= 0:
+        if qty <= 0:
 
 
-            self.win_count += 1
+            print(
 
-
-
-        else:
-
-
-            self.loss_count += 1
-
-
-            self.daily_loss += abs(
-
-                pnl
+                "[RISK BLOCK]"
 
             )
 
 
+            return None
 
 
-
-
-
-
-
-    # =====================================================
-    # STATISTICS
-    # =====================================================
-
-
-    def get_stats(self):
-
-
-        winrate = 0
-
-
-
-        if self.trade_count > 0:
-
-
-            winrate = (
-
-                self.win_count /
-
-                self.trade_count *
-
-                100
-
-            )
 
 
 
         return {
 
 
-            "trades":
+            "symbol":
 
-                self.trade_count,
-
-
-            "wins":
-
-                self.win_count,
+                DEFAULT_SYMBOL,
 
 
-            "loss":
+            "qty":
 
-                self.loss_count,
+                qty,
 
 
-            "winrate":
+            "risk":
+
+                self.risk_amount()
+
+        }
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # TP / SL CALCULATION
+    # =====================================================
+
+
+    def calculate_tp_sl(
+        self,
+        side,
+        entry
+    ):
+
+
+        tp_percent = 2.0
+
+
+        sl_percent = STOP_LOSS_PERCENT
+
+
+
+
+
+        if side == "Buy":
+
+
+            tp = (
+
+                entry
+
+                *
+
+                (
+
+                    1
+
+                    +
+
+                    tp_percent
+
+                    /
+
+                    100
+
+                )
+
+            )
+
+
+            sl = (
+
+                entry
+
+                *
+
+                (
+
+                    1
+
+                    -
+
+                    sl_percent
+
+                    /
+
+                    100
+
+                )
+
+            )
+
+
+
+
+
+        else:
+
+
+            tp = (
+
+                entry
+
+                *
+
+                (
+
+                    1
+
+                    -
+
+                    tp_percent
+
+                    /
+
+                    100
+
+                )
+
+            )
+
+
+            sl = (
+
+                entry
+
+                *
+
+                (
+
+                    1
+
+                    +
+
+                    sl_percent
+
+                    /
+
+                    100
+
+                )
+
+            )
+
+
+
+
+
+        return {
+
+
+            "tp":
 
                 round(
 
-                    winrate,
+                    tp,
+
+                    2
+
+                ),
+
+
+            "sl":
+
+                round(
+
+                    sl,
 
                     2
 
