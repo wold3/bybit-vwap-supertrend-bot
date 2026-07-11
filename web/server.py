@@ -20,10 +20,12 @@ from config import (
 )
 
 
+
 app = Flask(
     __name__,
     template_folder="templates"
 )
+
 
 
 # =====================================================
@@ -37,10 +39,16 @@ server_started = False
 _server_thread = None
 
 
-trading_mode = "DEMO"
-
-
 MAX_LOGS = 500
+
+
+
+status_lock = threading.Lock()
+
+log_lock = threading.Lock()
+
+chart_lock = threading.Lock()
+
 
 
 status = {
@@ -69,22 +77,18 @@ status = {
 
     "volume": 0,
 
-    "signal": "NONE"
+    "signal": "NONE",
+
+    "watchdog": "OFF"
 
 }
+
 
 
 logs = []
 
 
 chart_data = []
-
-
-status_lock = threading.Lock()
-
-log_lock = threading.Lock()
-
-chart_lock = threading.Lock()
 
 
 
@@ -96,7 +100,9 @@ def add_log(message):
 
     now = time.strftime("%H:%M:%S")
 
+
     text = f"[{now}] {message}"
+
 
     print(text)
 
@@ -106,7 +112,7 @@ def add_log(message):
         logs.append(text)
 
 
-        while len(logs) > MAX_LOGS:
+        if len(logs) > MAX_LOGS:
 
             logs.pop(0)
 
@@ -118,9 +124,15 @@ def add_log(message):
 
 def update_status(data):
 
+    if not data:
+
+        return
+
+
     with status_lock:
 
         status.update(data)
+
 
 
 
@@ -140,7 +152,13 @@ def set_bot_instance(bot):
 
     global bot_instance
 
+
     bot_instance = bot
+
+
+    add_log(
+        "BOT INSTANCE CONNECTED"
+    )
 
 
 
@@ -150,7 +168,9 @@ def set_bot_instance(bot):
 
 def get_trading_mode():
 
-    return trading_mode
+    with status_lock:
+
+        return status["mode"]
 
 
 
@@ -163,7 +183,7 @@ def get_trading_mode():
 def index():
 
     return render_template(
-        "dashboard.html"
+        "index.html"
     )
 
 
@@ -183,9 +203,11 @@ def api_status():
 
     return jsonify({
 
-        "status": get_status(),
+        "status":
+            get_status(),
 
-        "logs": log_copy
+        "logs":
+            log_copy
 
     })
 
@@ -203,14 +225,15 @@ def api_logs():
 
         return jsonify({
 
-            "logs": logs.copy()
+            "logs":
+                logs.copy()
 
         })
 
 
 
 # =====================================================
-# CHART API
+# CHART
 # =====================================================
 
 @app.route("/api/chart")
@@ -224,6 +247,7 @@ def api_chart():
             chart_data.copy()
 
         )
+
 
 
 
@@ -256,7 +280,8 @@ def api_start():
 
                 "success":False,
 
-                "error":"BOT NOT READY"
+                "error":
+                    "BOT NOT READY"
 
             })
 
@@ -266,7 +291,8 @@ def api_start():
 
         update_status({
 
-            "bot":"RUNNING"
+            "bot":
+                "RUNNING"
 
         })
 
@@ -278,9 +304,11 @@ def api_start():
 
         return jsonify({
 
-            "success":True
+            "success":
+                True
 
         })
+
 
 
     except Exception as e:
@@ -295,7 +323,8 @@ def api_start():
 
         return jsonify({
 
-            "success":False
+            "success":
+                False
 
         })
 
@@ -319,9 +348,11 @@ def api_stop():
             bot_instance.stop()
 
 
+
         update_status({
 
-            "bot":"STOPPED"
+            "bot":
+                "STOPPED"
 
         })
 
@@ -333,9 +364,11 @@ def api_stop():
 
         return jsonify({
 
-            "success":True
+            "success":
+                True
 
         })
+
 
 
     except Exception as e:
@@ -350,7 +383,8 @@ def api_stop():
 
         return jsonify({
 
-            "success":False
+            "success":
+                False
 
         })
 
@@ -371,16 +405,21 @@ def api_restart():
 
         if bot_instance:
 
+
             bot_instance.stop()
 
+
             time.sleep(1)
+
 
             bot_instance.start()
 
 
+
         update_status({
 
-            "bot":"RUNNING"
+            "bot":
+                "RUNNING"
 
         })
 
@@ -392,9 +431,11 @@ def api_restart():
 
         return jsonify({
 
-            "success":True
+            "success":
+                True
 
         })
+
 
 
     except Exception as e:
@@ -409,7 +450,8 @@ def api_restart():
 
         return jsonify({
 
-            "success":False
+            "success":
+                False
 
         })
 
@@ -425,9 +467,6 @@ def api_restart():
 )
 
 def api_mode():
-
-    global trading_mode
-
 
     data = request.get_json(
 
@@ -457,21 +496,20 @@ def api_mode():
 
         return jsonify({
 
-            "success":False,
+            "success":
+                False,
 
-            "error":"INVALID MODE"
+            "error":
+                "INVALID MODE"
 
         })
 
 
 
-    trading_mode = mode
-
-
-
     update_status({
 
-        "mode":mode
+        "mode":
+            mode
 
     })
 
@@ -486,7 +524,12 @@ def api_mode():
 
     try:
 
+
         from api.bybit_api import bybit_api
+
+        from services.private_ws import private_ws
+
+
 
         bybit_api.change_session(
 
@@ -495,12 +538,19 @@ def api_mode():
         )
 
 
+
+        if private_ws.running:
+
+            private_ws.restart()
+
+
+
     except Exception as e:
 
 
         add_log(
 
-            f"SESSION CHANGE ERROR {e}"
+            f"MODE SWITCH ERROR {e}"
 
         )
 
@@ -508,9 +558,11 @@ def api_mode():
 
     return jsonify({
 
-        "success":True,
+        "success":
+            True,
 
-        "mode":mode
+        "mode":
+            mode
 
     })
 
@@ -529,10 +581,13 @@ def api_close():
 
     try:
 
+
         from order.order_manager import order_manager
 
 
+
         result = order_manager.close_position()
+
 
 
         add_log(
@@ -544,9 +599,11 @@ def api_close():
 
         return jsonify({
 
-            "success":bool(result)
+            "success":
+                bool(result)
 
         })
+
 
 
     except Exception as e:
@@ -561,7 +618,8 @@ def api_close():
 
         return jsonify({
 
-            "success":False
+            "success":
+                False
 
         })
 
@@ -578,15 +636,20 @@ def api_close():
 
 def api_reset():
 
+
     update_status({
 
-        "position":"NONE",
+        "position":
+            "NONE",
 
-        "position_size":0,
+        "position_size":
+            0,
 
-        "entry_price":0,
+        "entry_price":
+            0,
 
-        "pnl":0
+        "pnl":
+            0
 
     })
 
@@ -600,7 +663,8 @@ def api_reset():
 
     return jsonify({
 
-        "success":True
+        "success":
+            True
 
     })
 
@@ -616,11 +680,14 @@ def api_ping():
 
     return jsonify({
 
-        "success":True,
+        "success":
+            True,
 
-        "server":"running",
+        "server":
+            "running",
 
-        "time":int(time.time())
+        "time":
+            int(time.time())
 
     })
 
@@ -633,7 +700,9 @@ def api_ping():
 def run_server():
 
     global server_started
+
     global _server_thread
+
 
 
     if server_started:
@@ -642,7 +711,7 @@ def run_server():
 
 
 
-    server_started=True
+    server_started = True
 
 
 
@@ -702,7 +771,8 @@ def stop_server():
 
     global server_started
 
-    server_started=False
+
+    server_started = False
 
 
     add_log(
@@ -714,7 +784,7 @@ def stop_server():
 
 
 # =====================================================
-# CLEAR LOG
+# LOG CONTROL
 # =====================================================
 
 def clear_logs():
@@ -722,6 +792,7 @@ def clear_logs():
     with log_lock:
 
         logs.clear()
+
 
 
     add_log(
@@ -738,37 +809,59 @@ def clear_logs():
 
 def reset_status():
 
+
     with status_lock:
+
+
+        mode = status["mode"]
+
 
         status.clear()
 
+
         status.update({
 
-            "mode":trading_mode,
+            "mode":
+                mode,
 
-            "bot":"STOPPED",
+            "bot":
+                "STOPPED",
 
-            "position":"NONE",
+            "position":
+                "NONE",
 
-            "position_size":0,
+            "position_size":
+                0,
 
-            "entry_price":0,
+            "entry_price":
+                0,
 
-            "pnl":0,
+            "pnl":
+                0,
 
-            "price":0,
+            "price":
+                0,
 
-            "balance":0,
+            "balance":
+                0,
 
-            "equity":0,
+            "equity":
+                0,
 
-            "vwap":0,
+            "vwap":
+                0,
 
-            "trend":"NONE",
+            "trend":
+                "NONE",
 
-            "volume":0,
+            "volume":
+                0,
 
-            "signal":"NONE"
+            "signal":
+                "NONE",
+
+            "watchdog":
+                "OFF"
 
         })
 
@@ -814,10 +907,11 @@ __all__ = [
 
 
 # =====================================================
-# MAIN
+# DIRECT RUN
 # =====================================================
 
 if __name__ == "__main__":
+
 
     run_server()
 
