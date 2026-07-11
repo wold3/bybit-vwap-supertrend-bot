@@ -13,16 +13,39 @@ VWAP SUPERTREND BOT
 
 <style>
 
-
 body{
 
-    background:#0f1115;
+    background:#101217;
 
-    color:#ffffff;
+    color:white;
 
-    font-family:Arial, sans-serif;
+    font-family:Arial;
 
     padding:20px;
+
+}
+
+
+
+.container{
+
+    max-width:900px;
+
+    margin:auto;
+
+}
+
+
+
+.card{
+
+    background:#1c212b;
+
+    padding:20px;
+
+    margin-bottom:20px;
+
+    border-radius:15px;
 
 }
 
@@ -36,93 +59,39 @@ h1{
 
 
 
-.container{
-
-    max-width:1000px;
-
-    margin:auto;
-
-}
-
-
-
-.card{
-
-    background:#1b1f27;
-
-    border-radius:15px;
-
-    padding:20px;
-
-    margin-bottom:20px;
-
-    box-shadow:0 0 15px #000;
-
-}
-
-
-
-.grid{
-
-    display:grid;
-
-    grid-template-columns:
-
-    repeat(auto-fit,minmax(200px,1fr));
-
-    gap:15px;
-
-}
-
-
-
-.box{
-
-    background:#242a35;
-
-    padding:15px;
-
-    border-radius:10px;
-
-}
-
-
-
-.title{
-
-    color:#aaa;
-
-    font-size:13px;
-
-}
-
-
-
-.value{
-
-    font-size:24px;
-
-    margin-top:8px;
-
-}
-
-
-
 button{
 
-
-    padding:12px 20px;
-
-    border:0;
-
-    border-radius:10px;
-
-    cursor:pointer;
-
-    font-size:15px;
+    padding:12px 18px;
 
     margin:5px;
 
+    border:0;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+    font-weight:bold;
+
+}
+
+
+
+.demo{
+
+    background:#2979ff;
+
+    color:white;
+
+}
+
+
+
+.live{
+
+    background:#ff1744;
+
+    color:white;
 
 }
 
@@ -140,7 +109,7 @@ button{
 
 .stop{
 
-    background:#ff1744;
+    background:#d50000;
 
     color:white;
 
@@ -158,10 +127,9 @@ button{
 
 
 
-.mode{
+.reverse{
 
-
-    background:#2979ff;
+    background:#aa00ff;
 
     color:white;
 
@@ -169,8 +137,15 @@ button{
 
 
 
-select{
+.active{
 
+    border:3px solid white;
+
+}
+
+
+
+select{
 
     width:100%;
 
@@ -178,9 +153,53 @@ select{
 
     border-radius:10px;
 
-    background:#111;
+    background:#000;
 
     color:white;
+
+}
+
+
+
+.grid{
+
+    display:grid;
+
+    grid-template-columns:
+
+    repeat(auto-fit,minmax(180px,1fr));
+
+    gap:10px;
+
+}
+
+
+
+.item{
+
+    background:#272d38;
+
+    padding:15px;
+
+    border-radius:10px;
+
+}
+
+
+
+.title{
+
+    color:#aaa;
+
+}
+
+
+
+.value{
+
+    font-size:22px;
+
+    margin-top:5px;
 
 }
 
@@ -203,27 +222,6 @@ select{
 }
 
 
-
-.switch{
-
-
-    display:flex;
-
-    gap:10px;
-
-}
-
-
-
-.active{
-
-
-    outline:3px solid white;
-
-}
-
-
-
 </style>
 
 
@@ -231,9 +229,8 @@ select{
 
 
 
-
-
 <body>
+
 
 
 <div class="container">
@@ -241,8 +238,11 @@ select{
 
 
 <h1>
+
 ⚡ VWAP SUPERTREND BOT
+
 </h1>
+
 
 
 
@@ -255,40 +255,33 @@ CONTROL
 </h2>
 
 
-<div class="switch">
-
 
 <button
 
-class="mode"
+class="demo"
 
-onclick="setMode('DEMO')"
-
-id="demoBtn">
+onclick="setMode('DEMO')">
 
 DEMO
 
 </button>
 
 
+
 <button
 
-class="mode"
+class="live"
 
-onclick="setMode('LIVE')"
-
-id="liveBtn">
+onclick="setMode('LIVE')">
 
 LIVE
 
 </button>
 
 
-</div>
 
+<br><br>
 
-
-<br>
 
 
 <select id="symbol">
@@ -318,12 +311,7 @@ XRPUSDT
 
 
 
-<br>
-
-
 <button
-
-class="mode"
 
 onclick="changeSymbol()">
 
@@ -332,9 +320,7 @@ CHANGE SYMBOL
 </button>
 
 
-
 <br>
-
 
 
 <button
@@ -372,6 +358,19 @@ onclick="closePosition()">
 </button>
 
 
+
+<button
+
+class="reverse"
+
+onclick="reversePosition()">
+
+🔄 REVERSE
+
+</button>
+
+
+
 </div>
 
 
@@ -392,36 +391,8 @@ STATUS
 <div class="grid">
 
 
-<div class="box">
 
-<div class="title">
-MODE
-</div>
-
-<div class="value" id="mode">
--
-</div>
-
-</div>
-
-
-
-<div class="box">
-
-<div class="title">
-SYMBOL
-</div>
-
-<div class="value" id="symbolView">
--
-</div>
-
-</div>
-
-
-
-
-<div class="box">
+<div class="item">
 
 <div class="title">
 BOT
@@ -435,8 +406,37 @@ BOT
 
 
 
+<div class="item">
 
-<div class="box">
+<div class="title">
+MODE
+</div>
+
+<div class="value" id="mode">
+-
+</div>
+
+</div>
+
+
+
+
+<div class="item">
+
+<div class="title">
+SYMBOL
+</div>
+
+<div class="value" id="symbol">
+-
+</div>
+
+</div>
+
+
+
+
+<div class="item">
 
 <div class="title">
 POSITION
@@ -450,7 +450,8 @@ POSITION
 
 
 
-<div class="box">
+
+<div class="item">
 
 <div class="title">
 SIZE
@@ -465,7 +466,7 @@ SIZE
 
 
 
-<div class="box">
+<div class="item">
 
 <div class="title">
 ENTRY
@@ -480,21 +481,7 @@ ENTRY
 
 
 
-<div class="box">
-
-<div class="title">
-MARK
-</div>
-
-<div class="value" id="mark">
-0
-</div>
-
-</div>
-
-
-
-<div class="box">
+<div class="item">
 
 <div class="title">
 PNL
@@ -508,33 +495,25 @@ PNL
 
 
 
-</div>
+<div class="item">
 
-
-</div>
-
-
-
-
-
-
-
-<div class="card">
-
-
-<h2>
+<div class="title">
 LAST ACTION
-</h2>
+</div>
 
-
-<div id="action">
-
+<div class="value" id="action">
 -
+</div>
+
+</div>
+
+
 
 </div>
 
 
 </div>
+
 
 
 
@@ -564,22 +543,16 @@ Loading...
 
 
 
-</div>
-
-
-
-
-
 
 
 <script>
 
 
 
-function api(url,data={}){
+function post(url,data={}){
 
 
-return fetch(
+fetch(
 
 url,
 
@@ -599,7 +572,23 @@ body:JSON.stringify(data)
 
 )
 
-.then(r=>r.json());
+.then(
+
+r=>r.json()
+
+)
+
+.then(
+
+d=>{
+
+console.log(d);
+
+update();
+
+}
+
+);
 
 
 }
@@ -612,7 +601,7 @@ body:JSON.stringify(data)
 function setMode(mode){
 
 
-api(
+post(
 
 "/api/mode",
 
@@ -623,7 +612,6 @@ mode:mode
 }
 
 );
-
 
 
 }
@@ -644,7 +632,7 @@ let s=document.getElementById(
 
 
 
-api(
+post(
 
 "/api/symbol",
 
@@ -657,8 +645,8 @@ symbol:s
 );
 
 
-
 }
+
 
 
 
@@ -668,15 +656,15 @@ symbol:s
 function startBot(){
 
 
-api(
+post(
 
 "/api/start"
 
 );
 
 
-
 }
+
 
 
 
@@ -685,12 +673,11 @@ api(
 function stopBot(){
 
 
-api(
+post(
 
 "/api/stop"
 
 );
-
 
 
 }
@@ -699,15 +686,32 @@ api(
 
 
 
+
 function closePosition(){
 
 
-api(
+post(
 
 "/api/close"
 
 );
 
+
+}
+
+
+
+
+
+
+function reversePosition(){
+
+
+post(
+
+"/api/reverse"
+
+);
 
 
 }
@@ -746,47 +750,103 @@ let s=data.status;
 
 
 
-document.getElementById("mode").innerHTML=s.mode;
+document.getElementById(
 
+"bot"
 
-document.getElementById("symbolView").innerHTML=s.symbol;
-
-
-document.getElementById("bot").innerHTML=s.bot;
-
-
-document.getElementById("position").innerHTML=s.position;
-
-
-document.getElementById("size").innerHTML=s.position_size;
-
-
-document.getElementById("entry").innerHTML=s.entry_price;
-
-
-document.getElementById("mark").innerHTML=s.mark_price;
-
-
-document.getElementById("pnl").innerHTML=s.pnl;
-
-
-document.getElementById("action").innerHTML=s.last_action || "-";
+).innerHTML=s.bot;
 
 
 
-document.getElementById("logs").innerHTML=
+document.getElementById(
 
-data.logs.join("<br>");
+"mode"
+
+).innerHTML=s.mode;
 
 
 
-}
+document.getElementById(
+
+"symbol"
+
+).value=s.symbol;
+
+
+
+document.getElementById(
+
+"position"
+
+).innerHTML=s.position;
+
+
+
+document.getElementById(
+
+"size"
+
+).innerHTML=s.position_size;
+
+
+
+document.getElementById(
+
+"entry"
+
+).innerHTML=s.entry_price;
+
+
+
+document.getElementById(
+
+"pnl"
+
+).innerHTML=s.pnl;
+
+
+
+document.getElementById(
+
+"action"
+
+).innerHTML=s.last_action;
+
+
+
+document.getElementById(
+
+"logs"
+
+).innerHTML=
+
+data.logs.join(
+
+"<br>"
 
 );
 
 
+
+let box=document.getElementById(
+
+"logs"
+
+);
+
+
+box.scrollTop=box.scrollHeight;
+
+
+
 }
 
+
+);
+
+
+
+}
 
 
 
@@ -800,11 +860,15 @@ update,
 );
 
 
+
 update();
 
 
 
 </script>
+
+
+</div>
 
 
 </body>
