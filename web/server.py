@@ -38,7 +38,7 @@ MAX_LOGS = 500
 
 
 
-lock = threading.Lock()
+lock = threading.RLock()
 
 
 
@@ -113,6 +113,7 @@ status = {
         "SYSTEM READY"
 
 }
+
 
 
 
@@ -194,15 +195,15 @@ def get_status():
 
 
 
+
 # =====================================================
-# MODE
+# MODE / SYMBOL
 # =====================================================
 
 def get_trading_mode():
 
 
     with lock:
-
 
         return status.get(
 
@@ -211,6 +212,27 @@ def get_trading_mode():
             "DEMO"
 
         )
+
+
+
+
+
+
+
+def get_trading_symbol():
+
+
+    with lock:
+
+        return status.get(
+
+            "symbol",
+
+            "BTCUSDT"
+
+        )
+
+
 
 
 
@@ -247,12 +269,13 @@ def set_bot_instance(bot):
 
 
 
+
+
 # =====================================================
 # HOME
 # =====================================================
 
 @app.route("/")
-
 
 def index():
 
@@ -272,11 +295,10 @@ def index():
 
 
 # =====================================================
-# STATUS API
+# STATUS
 # =====================================================
 
 @app.route("/api/status")
-
 
 def api_status():
 
@@ -335,7 +357,7 @@ def api_start():
 
 
             "last_action":
-                "START BUTTON"
+                "START CLICK"
 
         })
 
@@ -383,6 +405,8 @@ def api_start():
 
 
 
+
+
 # =====================================================
 # STOP
 # =====================================================
@@ -415,7 +439,7 @@ def api_stop():
 
 
             "last_action":
-                "STOP BUTTON"
+                "STOP CLICK"
 
         })
 
@@ -463,8 +487,10 @@ def api_stop():
 
 
 
+
+
 # =====================================================
-# MODE CHANGE
+# MODE
 # =====================================================
 
 @app.route(
@@ -478,7 +504,7 @@ def api_stop():
 def api_mode():
 
 
-    data = request.get_json(
+    data=request.get_json(
 
         silent=True
 
@@ -486,7 +512,7 @@ def api_mode():
 
 
 
-    mode = data.get(
+    mode=data.get(
 
         "mode",
 
@@ -514,8 +540,6 @@ def api_mode():
 
 
 
-
-
     update_status({
 
         "mode":
@@ -537,8 +561,6 @@ def api_mode():
 
 
 
-
-
     try:
 
 
@@ -554,7 +576,7 @@ def api_mode():
 
         add_log(
 
-            f"MODE SWITCH ERROR {e}"
+            f"SESSION CHANGE ERROR {e}"
 
         )
 
@@ -564,7 +586,6 @@ def api_mode():
 
         "success":
             True,
-
 
         "mode":
             mode
@@ -580,7 +601,7 @@ def api_mode():
 
 
 # =====================================================
-# SYMBOL CHANGE
+# SYMBOL
 # =====================================================
 
 @app.route(
@@ -594,7 +615,7 @@ def api_mode():
 def api_symbol():
 
 
-    data = request.get_json(
+    data=request.get_json(
 
         silent=True
 
@@ -602,7 +623,7 @@ def api_symbol():
 
 
 
-    symbol = data.get(
+    symbol=data.get(
 
         "symbol",
 
@@ -633,7 +654,6 @@ def api_symbol():
             f"SYMBOL ERROR {e}"
 
         )
-
 
 
 
@@ -677,8 +697,10 @@ def api_symbol():
 
 
 
+
+
 # =====================================================
-# CLOSE POSITION
+# CLOSE
 # =====================================================
 
 @app.route(
@@ -754,8 +776,10 @@ def api_close():
 
 
 
+
+
 # =====================================================
-# SERVER START
+# SERVER
 # =====================================================
 
 def run_server():
@@ -773,13 +797,13 @@ def run_server():
 
 
 
-    server_started = True
+    server_started=True
 
 
 
 
 
-    def run():
+    def _run():
 
 
         app.run(
@@ -800,9 +824,9 @@ def run_server():
 
 
 
-    _server_thread = threading.Thread(
+    _server_thread=threading.Thread(
 
-        target=run,
+        target=_run,
 
         daemon=True,
 
@@ -823,6 +847,7 @@ def run_server():
     )
 
 
+
     add_log(
 
         "WEB SERVER STARTED"
@@ -837,9 +862,7 @@ def run_server():
 
 
 
-# =====================================================
-# STOP SERVER
-# =====================================================
+
 
 def stop_server():
 
@@ -864,27 +887,41 @@ def stop_server():
 
 
 
+
+
 # =====================================================
 # EXPORT
 # =====================================================
 
 __all__=[
 
+
     "app",
+
 
     "run_server",
 
+
     "stop_server",
+
 
     "set_bot_instance",
 
+
     "update_status",
+
 
     "get_status",
 
+
     "get_trading_mode",
 
+
+    "get_trading_symbol",
+
+
     "add_log"
+
 
 ]
 
@@ -893,9 +930,8 @@ __all__=[
 
 
 
-# =====================================================
-# DIRECT RUN
-# =====================================================
+
+
 
 if __name__=="__main__":
 
