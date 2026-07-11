@@ -1,6 +1,6 @@
 # =====================================================
 # market/market_data.py
-# BYBIT MARKET DATA MANAGER
+# BYBIT V5 MARKET DATA MANAGER
 # =====================================================
 
 import pandas as pd
@@ -8,6 +8,14 @@ import time
 
 
 from api.bybit_api import bybit_api
+
+
+from config import (
+
+    CANDLE_INTERVAL,
+    MAX_HISTORY
+
+)
 
 
 from web.server import add_log
@@ -23,10 +31,12 @@ class MarketData:
 
         self.last_data = None
 
-        print(
-            "[MARKET DATA READY]"
-        )
 
+        print(
+
+            "[MARKET DATA READY]"
+
+        )
 
 
 
@@ -39,14 +49,27 @@ class MarketData:
 
         self,
 
-        interval="5",
+        interval=None,
 
-        limit=200
+        limit=None
 
     ):
 
 
         try:
+
+
+            if interval is None:
+
+                interval = CANDLE_INTERVAL
+
+
+
+            if limit is None:
+
+                limit = MAX_HISTORY
+
+
 
 
             response = bybit_api.get_kline(
@@ -62,24 +85,44 @@ class MarketData:
             if not response:
 
 
+                add_log(
+
+                    "KLINE EMPTY RESPONSE"
+
+                )
+
+
                 return None
 
 
 
 
-            rows = response.get(
+            # ---------------------------------
+            # BYBIT V5 RESULT PARSE
+            # ---------------------------------
 
-                "result",
+            rows = (
 
-                {}
+                response
 
-            ).get(
+                .get(
 
-                "list",
+                    "result",
 
-                []
+                    {}
+
+                )
+
+                .get(
+
+                    "list",
+
+                    []
+
+                )
 
             )
+
 
 
 
@@ -88,9 +131,10 @@ class MarketData:
 
                 add_log(
 
-                    "EMPTY KLINE DATA"
+                    "KLINE LIST EMPTY"
 
                 )
+
 
                 return None
 
@@ -107,12 +151,40 @@ class MarketData:
 
 
 
-            if len(df.columns) != 7:
+
+            # ---------------------------------
+            # COLUMN SET
+            # ---------------------------------
+
+            if len(df.columns) == 7:
+
+
+                df.columns = [
+
+                    "timestamp",
+
+                    "open",
+
+                    "high",
+
+                    "low",
+
+                    "close",
+
+                    "volume",
+
+                    "turnover"
+
+                ]
+
+
+
+            else:
 
 
                 add_log(
 
-                    f"INVALID KLINE FORMAT {df.columns}"
+                    f"INVALID KLINE COLUMN {len(df.columns)}"
 
                 )
 
@@ -123,32 +195,9 @@ class MarketData:
 
 
 
-            df.columns = [
-
-
-                "timestamp",
-
-                "open",
-
-                "high",
-
-                "low",
-
-                "close",
-
-                "volume",
-
-                "turnover"
-
-
-            ]
-
-
-
-
-
-            # Bybit 최신 → 과거 순서
-            # 전략 계산용 과거 → 최신 변경
+            # ---------------------------------
+            # SORT OLD -> NEW
+            # ---------------------------------
 
             df = df.iloc[::-1].reset_index(
 
@@ -159,6 +208,10 @@ class MarketData:
 
 
 
+
+            # ---------------------------------
+            # NUMERIC CONVERT
+            # ---------------------------------
 
             numeric_columns = [
 
@@ -195,7 +248,6 @@ class MarketData:
 
 
 
-
             df["timestamp"] = pd.to_numeric(
 
                 df["timestamp"],
@@ -218,7 +270,7 @@ class MarketData:
 
 
 
-            if len(df) < 50:
+            if len(df) < 10:
 
 
                 add_log(
@@ -238,6 +290,7 @@ class MarketData:
 
 
 
+
             return df
 
 
@@ -245,7 +298,6 @@ class MarketData:
 
 
         except Exception as e:
-
 
 
             add_log(
@@ -261,12 +313,9 @@ class MarketData:
 
 
 
-
-
     # =====================================================
     # CURRENT PRICE
     # =====================================================
-
 
     def price(self):
 
@@ -277,14 +326,15 @@ class MarketData:
             price = bybit_api.get_price()
 
 
-            if price:
+
+            if price is None:
+
+                return 0
 
 
-                return price
 
+            return price
 
-
-            return 0
 
 
 
@@ -304,12 +354,9 @@ class MarketData:
 
 
 
-
-
     # =====================================================
     # LAST DATA
     # =====================================================
-
 
     def get_last_data(self):
 
@@ -320,12 +367,9 @@ class MarketData:
 
 
 
-
-
     # =====================================================
     # WAIT
     # =====================================================
-
 
     def wait(
 
@@ -346,11 +390,8 @@ class MarketData:
 
 
 
-
-
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 market_data = MarketData()
