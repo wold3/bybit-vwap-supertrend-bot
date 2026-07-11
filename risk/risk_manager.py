@@ -1,11 +1,15 @@
 # =====================================================
 # risk/risk_manager.py
-# Risk Manager
+# Risk Management Engine
 # =====================================================
+
+import time
+
 
 from config import (
     RISK_PER_TRADE_PERCENT,
-    MAX_POSITION_SIZE
+    MAX_POSITION_SIZE,
+    STOP_LOSS_PERCENT
 )
 
 
@@ -27,14 +31,19 @@ class RiskManager:
         self.trade_count = 0
 
 
-        self.max_daily_loss_percent = 3.0
+        self.win_count = 0
+
+
+        self.loss_count = 0
+
+
+        self.last_reset = time.time()
 
 
 
         print(
             "[RISK MANAGER INIT]"
         )
-
 
 
 
@@ -63,7 +72,7 @@ class RiskManager:
 
         print(
 
-            "[RISK EQUITY]",
+            "[EQUITY UPDATE]",
 
             self.equity
 
@@ -76,15 +85,38 @@ class RiskManager:
 
 
 
+
     # =====================================================
-    # CHECK ENTRY
+    # CHECK TRADE
     # =====================================================
 
 
     def can_trade(
         self,
-        position_size=0
+        current_position
     ):
+
+
+        # 최대 포지션 체크
+
+        if abs(
+
+            float(current_position)
+
+        ) >= MAX_POSITION_SIZE:
+
+
+            print(
+
+                "[RISK BLOCK] MAX POSITION"
+
+            )
+
+
+            return False
+
+
+
 
 
         # 잔고 확인
@@ -105,66 +137,7 @@ class RiskManager:
 
 
 
-
-        # 기존 포지션 확인
-
-
-        if position_size > 0:
-
-
-            print(
-
-                "[RISK BLOCK] EXISTING POSITION"
-
-            )
-
-
-            return False
-
-
-
-
-
-
-
-
-        # 최대 손실 확인
-
-
-        max_loss = (
-
-            self.equity *
-
-            self.max_daily_loss_percent
-
-            /
-
-            100
-
-        )
-
-
-
-        if self.daily_loss >= max_loss:
-
-
-            print(
-
-                "[RISK BLOCK] DAILY LOSS LIMIT"
-
-            )
-
-
-            return False
-
-
-
-
-
-
-
         return True
-
 
 
 
@@ -183,21 +156,81 @@ class RiskManager:
     ):
 
 
-        risk_money = (
+        try:
 
-            self.equity *
 
-            RISK_PER_TRADE_PERCENT
+            if self.equity <= 0:
 
-            /
 
-            100
-
-        )
+                return 0
 
 
 
-        if price <= 0:
+
+
+            risk_amount = (
+
+                self.equity *
+
+                RISK_PER_TRADE_PERCENT /
+
+                100
+
+            )
+
+
+
+            stop_distance = (
+
+                price *
+
+                STOP_LOSS_PERCENT /
+
+                100
+
+            )
+
+
+
+            qty = (
+
+                risk_amount /
+
+                stop_distance
+
+            )
+
+
+
+            if qty > MAX_POSITION_SIZE:
+
+
+                qty = MAX_POSITION_SIZE
+
+
+
+
+
+            return round(
+
+                qty,
+
+                3
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[SIZE ERROR]",
+
+                e
+
+            )
 
 
             return 0
@@ -206,44 +239,10 @@ class RiskManager:
 
 
 
-        qty = (
-
-            risk_money
-
-            /
-
-            price
-
-        )
-
-
-
-        if qty > MAX_POSITION_SIZE:
-
-
-            qty = MAX_POSITION_SIZE
-
-
-
-
-
-        return round(
-
-            qty,
-
-            6
-
-        )
-
-
-
-
-
-
 
 
     # =====================================================
-    # TRADE RECORD
+    # RECORD TRADE
     # =====================================================
 
 
@@ -254,48 +253,41 @@ class RiskManager:
 
 
 
-        print(
-
-            "[TRADE COUNT]",
-
-            self.trade_count
-
-        )
-
-
-
-
-
-
-
 
 
     # =====================================================
-    # LOSS RECORD
+    # RESULT UPDATE
     # =====================================================
 
 
-    def record_loss(
+    def update_result(
         self,
-        amount
+        pnl
     ):
 
 
-        self.daily_loss += abs(
-
-            float(amount)
-
-        )
+        pnl = float(pnl)
 
 
 
-        print(
+        if pnl >= 0:
 
-            "[DAILY LOSS]",
 
-            self.daily_loss
+            self.win_count += 1
 
-        )
+
+
+        else:
+
+
+            self.loss_count += 1
+
+
+            self.daily_loss += abs(
+
+                pnl
+
+            )
 
 
 
@@ -306,31 +298,63 @@ class RiskManager:
 
 
     # =====================================================
-    # STATUS
+    # STATISTICS
     # =====================================================
 
 
-    def status(self):
+    def get_stats(self):
+
+
+        winrate = 0
+
+
+
+        if self.trade_count > 0:
+
+
+            winrate = (
+
+                self.win_count /
+
+                self.trade_count *
+
+                100
+
+            )
+
 
 
         return {
 
 
-            "equity":
+            "trades":
 
-                self.equity,
-
-
-            "daily_loss":
-
-                self.daily_loss,
+                self.trade_count,
 
 
-            "trade_count":
+            "wins":
 
-                self.trade_count
+                self.win_count,
+
+
+            "loss":
+
+                self.loss_count,
+
+
+            "winrate":
+
+                round(
+
+                    winrate,
+
+                    2
+
+                )
 
         }
+
+
 
 
 
