@@ -1,13 +1,13 @@
 # =====================================================
 # web/server.py
-# VWAP SUPERTREND BOT WEB SERVER
+# WEB DASHBOARD SERVER
 # =====================================================
 
 from flask import (
     Flask,
+    render_template,
     jsonify,
-    request,
-    render_template
+    request
 )
 
 import threading
@@ -16,8 +16,11 @@ import time
 
 
 app = Flask(
+
     __name__,
+
     template_folder="templates"
+
 )
 
 
@@ -25,42 +28,59 @@ app = Flask(
 
 
 # =====================================================
-# GLOBAL
+# GLOBAL STATE
 # =====================================================
 
-lock = threading.Lock()
-
-
-CURRENT_MODE = "DEMO"
-
-
-BOT_INSTANCE = None
+bot_instance = None
 
 
 
-STATUS = {
+trading_mode = "DEMO"
 
-    "bot": "STOPPED",
 
-    "mode": "DEMO",
 
-    "position": "NONE",
+status = {
 
-    "position_size": 0,
 
-    "entry_price": 0,
+    "mode":
 
-    "pnl": 0,
+        "DEMO",
 
-    "signal": "WAIT",
 
-    "watchdog": "OFF"
+    "bot":
+
+        "STOPPED",
+
+
+    "position":
+
+        "NONE",
+
+
+    "position_size":
+
+        0,
+
+
+    "entry_price":
+
+        0,
+
+
+    "pnl":
+
+        0
+
 
 }
 
 
 
-LOGS = []
+logs = []
+
+
+
+server_started = False
 
 
 
@@ -71,115 +91,56 @@ LOGS = []
 
 
 # =====================================================
-# BOT CONNECT
+# LOG
 # =====================================================
 
-def set_bot_instance(bot):
+def add_log(message):
 
-    global BOT_INSTANCE
 
-    BOT_INSTANCE = bot
+    now = time.strftime(
+
+        "%H:%M:%S"
+
+    )
+
+
+    text = (
+
+        f"[{now}] {message}"
+
+    )
+
+
+    print(text)
+
+
+
+    logs.append(text)
+
+
+
+    if len(logs) > 200:
+
+        logs.pop(0)
+
+
+
+
 
 
 
 
 
 # =====================================================
-# STATUS
+# STATUS UPDATE
 # =====================================================
 
 def update_status(data):
 
-    with lock:
 
-        STATUS.update(data)
+    status.update(
 
-
-
-
-
-
-
-
-
-def add_log(message):
-
-    with lock:
-
-        LOGS.append(
-
-            f"{time.strftime('%H:%M:%S')} {message}"
-
-        )
-
-
-        if len(LOGS) > 100:
-
-            LOGS.pop(0)
-
-
-
-
-
-
-
-
-
-def get_trading_mode():
-
-    with lock:
-
-        return CURRENT_MODE
-
-
-
-
-
-
-
-
-
-# =====================================================
-# MODE CHANGE
-# =====================================================
-
-def change_mode(mode):
-
-    global CURRENT_MODE
-
-
-    mode = str(mode).upper()
-
-
-
-    if mode not in [
-
-        "DEMO",
-
-        "LIVE"
-
-    ]:
-
-        return False
-
-
-
-
-
-    with lock:
-
-        CURRENT_MODE = mode
-
-        STATUS["mode"] = mode
-
-
-
-
-
-
-    add_log(
-
-        f"MODE CHANGE : {mode}"
+        data
 
     )
 
@@ -187,81 +148,20 @@ def change_mode(mode):
 
 
 
-    # Bybit session 변경
-
-    try:
-
-        from api.bybit_api import bybit_api
-
-
-        bybit_api.change_session(
-
-            mode
-
-        )
-
-
-        add_log(
-
-            f"BYBIT SESSION : {mode}"
-
-        )
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"SESSION ERROR : {e}"
-
-        )
 
 
 
+# =====================================================
+# BOT INSTANCE
+# =====================================================
+
+def set_bot_instance(bot):
 
 
-
-    # Private WS 재연결
-
-    try:
+    global bot_instance
 
 
-        from services.private_ws import private_ws
-
-
-
-        private_ws.stop()
-
-
-        time.sleep(1)
-
-
-        private_ws.start()
-
-
-
-        add_log(
-
-            "PRIVATE WS RESTART"
-
-        )
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"WS ERROR : {e}"
-
-        )
-
-
-
-
-    return True
-
+    bot_instance = bot
 
 
 
@@ -272,12 +172,28 @@ def change_mode(mode):
 
 
 # =====================================================
-# PAGE
+# MODE
+# =====================================================
+
+def get_trading_mode():
+
+
+    return trading_mode
+
+
+
+
+
+
+
+# =====================================================
+# HOME
 # =====================================================
 
 @app.route("/")
 
 def index():
+
 
     return render_template(
 
@@ -293,58 +209,33 @@ def index():
 
 
 
+
+
 # =====================================================
 # STATUS API
 # =====================================================
 
-@app.route("/api/status")
+@app.route(
+
+    "/api/status"
+
+)
 
 def api_status():
 
 
-    with lock:
-
-
-        return jsonify({
-
-            "status":
-
-                STATUS.copy(),
-
-
-            "logs":
-
-                LOGS[-50:]
-
-        })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# HEALTH
-# =====================================================
-
-@app.route("/api/health")
-
-def health():
-
-
     return jsonify({
 
-        "server":
 
-            "OK",
+        "status":
+
+            status,
 
 
-        "mode":
+        "logs":
 
-            CURRENT_MODE
+            logs[-100:]
+
 
     })
 
@@ -357,7 +248,7 @@ def health():
 
 
 # =====================================================
-# MODE API
+# MODE CHANGE
 # =====================================================
 
 @app.route(
@@ -371,19 +262,95 @@ def health():
 def api_mode():
 
 
-    data = request.get_json(
-
-        silent=True
-
-    ) or {}
+    global trading_mode
 
 
 
-    result = change_mode(
+    data = request.json
 
-        data.get("mode")
+
+
+    mode = data.get(
+
+        "mode",
+
+        "DEMO"
+
+    ).upper()
+
+
+
+
+
+    if mode not in [
+
+        "DEMO",
+
+        "LIVE"
+
+    ]:
+
+
+        return jsonify({
+
+            "error":
+
+                "invalid mode"
+
+        })
+
+
+
+
+
+
+    trading_mode = mode
+
+
+
+    status["mode"] = mode
+
+
+
+
+
+    add_log(
+
+        f"MODE CHANGE : {mode}"
 
     )
+
+
+
+
+
+
+    # Bybit Session 변경
+
+    try:
+
+
+        from api.bybit_api import bybit_api
+
+
+        bybit_api.change_session(
+
+            mode
+
+        )
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"MODE API ERROR {e}"
+
+        )
+
+
 
 
 
@@ -391,12 +358,12 @@ def api_mode():
 
         "success":
 
-            result,
+            True,
 
 
         "mode":
 
-            CURRENT_MODE
+            mode
 
     })
 
@@ -408,91 +375,10 @@ def api_mode():
 
 
 
-# =====================================================
-# BOT STOP
-# =====================================================
-
-@app.route(
-
-    "/api/stop",
-
-    methods=["POST"]
-
-)
-
-def api_stop():
-
-
-    try:
-
-
-        if BOT_INSTANCE:
-
-
-            BOT_INSTANCE.stop()
-
-
-
-        update_status({
-
-            "bot":
-
-                "STOPPED"
-
-        })
-
-
-
-        add_log(
-
-            "BOT STOP COMMAND"
-
-        )
-
-
-
-        return jsonify({
-
-            "success":
-
-                True
-
-        })
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"STOP ERROR {e}"
-
-        )
-
-
-        return jsonify({
-
-            "success":
-
-                False,
-
-            "error":
-
-                str(e)
-
-        })
-
-
-
-
-
-
-
 
 
 # =====================================================
-# BOT START
+# START
 # =====================================================
 
 @app.route(
@@ -506,58 +392,138 @@ def api_stop():
 def api_start():
 
 
+    global bot_instance
+
+
+
     try:
 
 
-        if BOT_INSTANCE:
+        if bot_instance:
 
 
-            BOT_INSTANCE.start()
-
-
-
-        update_status({
-
-            "bot":
-
-                "RUNNING"
-
-        })
+            bot_instance.start()
 
 
 
-        add_log(
+            add_log(
 
-            "BOT START COMMAND"
+                "BOT START"
 
-        )
+            )
 
 
 
-        return jsonify({
+            return jsonify({
 
-            "success":
+                "success":
 
-                True
+                    True
 
-        })
+            })
+
 
 
 
     except Exception as e:
 
 
-        return jsonify({
+        add_log(
 
-            "success":
+            f"START ERROR {e}"
 
-                False,
+        )
 
-            "error":
 
-                str(e)
 
-        })
+
+
+    return jsonify({
+
+        "success":
+
+            False
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# STOP
+# =====================================================
+
+@app.route(
+
+    "/api/stop",
+
+    methods=["POST"]
+
+)
+
+def api_stop():
+
+
+    global bot_instance
+
+
+
+    try:
+
+
+        if bot_instance:
+
+
+            bot_instance.stop()
+
+
+
+            add_log(
+
+                "BOT STOP"
+
+            )
+
+
+
+            return jsonify({
+
+                "success":
+
+                    True
+
+            })
+
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"STOP ERROR {e}"
+
+        )
+
+
+
+
+
+    return jsonify({
+
+        "success":
+
+            False
+
+    })
+
+
 
 
 
@@ -585,17 +551,17 @@ def api_close():
     try:
 
 
-        from api.bybit_api import bybit_api
+        from order.order_manager import order_manager
 
 
 
-        result = bybit_api.close_position()
+        result = order_manager.close_position()
 
 
 
         add_log(
 
-            "CLOSE POSITION COMMAND"
+            "MANUAL CLOSE"
 
         )
 
@@ -605,12 +571,7 @@ def api_close():
 
             "success":
 
-                True,
-
-
-            "result":
-
-                result
+                bool(result)
 
         })
 
@@ -626,15 +587,12 @@ def api_close():
         )
 
 
+
         return jsonify({
 
             "success":
 
-                False,
-
-            "error":
-
-                str(e)
+                False
 
         })
 
@@ -647,10 +605,52 @@ def api_close():
 
 
 # =====================================================
-# SERVER
+# SERVER THREAD
 # =====================================================
 
-def start_server():
+def run_server():
+
+
+    global server_started
+
+
+
+    if server_started:
+
+
+        return
+
+
+
+    server_started = True
+
+
+
+    thread = threading.Thread(
+
+        target=lambda:
+
+            app.run(
+
+                host="0.0.0.0",
+
+                port=8000,
+
+                debug=False,
+
+                use_reloader=False
+
+            ),
+
+
+        daemon=True
+
+    )
+
+
+
+    thread.start()
+
 
 
     print(
@@ -658,39 +658,3 @@ def start_server():
         "[WEB SERVER START] 8000"
 
     )
-
-
-
-    app.run(
-
-        host="0.0.0.0",
-
-        port=8000,
-
-        debug=False,
-
-        use_reloader=False
-
-    )
-
-
-
-
-
-
-
-
-
-def run_server():
-
-
-    thread = threading.Thread(
-
-        target=start_server,
-
-        daemon=True
-
-    )
-
-
-    thread.start()
