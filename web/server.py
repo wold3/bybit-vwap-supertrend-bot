@@ -1,55 +1,108 @@
 # =====================================================
 # web/server.py
-# Dashboard Server
+# Dashboard Web Server
 # =====================================================
 
+from flask import Flask, jsonify, render_template
 import threading
-import json
-import os
+import time
 
 
-from http.server import (
-    HTTPServer,
-    SimpleHTTPRequestHandler
+
+from config import (
+    WEB_HOST,
+    WEB_PORT
 )
 
 
 
 
 
-HOST = "0.0.0.0"
-
-PORT = 8000
-
-
-
+app = Flask(
+    __name__,
+    template_folder="templates"
+)
 
 
-STATUS = {
+
+
+
+# =====================================================
+# STATUS STORAGE
+# =====================================================
+
+
+status = {
+
 
     "bot":
+
         "STOPPED",
 
+
     "symbol":
+
         "",
 
+
     "price":
+
         0,
+
 
     "vwap":
+
         0,
 
+
     "trend":
+
         "NONE",
+
 
     "volume":
+
         False,
 
+
     "signal":
+
         "NONE",
 
+
     "position":
-        "NONE"
+
+        "NONE",
+
+
+    "size":
+
+        0,
+
+
+    "entry":
+
+        0,
+
+
+    "pnl":
+
+        0,
+
+
+    "order":
+
+        "NONE",
+
+
+    "tp":
+
+        0,
+
+
+    "sl":
+
+        0
 
 }
 
@@ -57,13 +110,47 @@ STATUS = {
 
 
 
-LOGS = []
+
+logs = []
 
 
 
 
 
-SERVER = None
+
+# =====================================================
+# CHART DATA
+# =====================================================
+
+
+chart_data = []
+
+
+
+
+
+
+
+def add_candle(data):
+
+
+    global chart_data
+
+
+    chart_data.append(
+
+        data
+
+    )
+
+
+    if len(chart_data) > 200:
+
+
+        chart_data.pop(0)
+
+
+
 
 
 
@@ -78,7 +165,12 @@ SERVER = None
 def update_status(data):
 
 
-    STATUS.update(data)
+    status.update(
+
+        data
+
+    )
+
 
 
 
@@ -93,96 +185,25 @@ def update_status(data):
 def add_log(message):
 
 
-    LOGS.append(
+    timestamp = time.strftime(
 
-        str(message)
+        "%H:%M:%S"
 
     )
 
 
-    if len(LOGS) > 100:
+    logs.append(
 
-        LOGS.pop(0)
+        f"[{timestamp}] {message}"
 
-
-
-
+    )
 
 
-
-# =====================================================
-# HTTP HANDLER
-# =====================================================
+    if len(logs) > 100:
 
 
-class DashboardHandler(
-    SimpleHTTPRequestHandler
-):
+        logs.pop(0)
 
-
-    def do_GET(self):
-
-
-        if self.path == "/api/status":
-
-
-            self.send_response(200)
-
-
-            self.send_header(
-
-                "Content-type",
-
-                "application/json"
-
-            )
-
-
-            self.end_headers()
-
-
-
-            self.wfile.write(
-
-                json.dumps(
-
-                    {
-
-                        "status":
-
-                            STATUS,
-
-
-                        "logs":
-
-                            LOGS
-
-                    },
-
-                    ensure_ascii=False
-
-                ).encode()
-
-            )
-
-
-            return
-
-
-
-
-
-
-
-        if self.path == "/":
-
-
-            self.path = "/dashboard.html"
-
-
-
-
-        return super().do_GET()
 
 
 
@@ -191,84 +212,116 @@ class DashboardHandler(
 
 
 # =====================================================
-# START SERVER
+# PAGE
 # =====================================================
+
+
+@app.route("/")
+
+def index():
+
+    return render_template(
+
+        "dashboard.html"
+
+    )
+
+
+
+
+
+
+
+# =====================================================
+# STATUS API
+# =====================================================
+
+
+@app.route("/api/status")
+
+def api_status():
+
+
+    return jsonify({
+
+
+        "status":
+
+            status,
+
+
+        "logs":
+
+            logs
+
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# CHART API
+# =====================================================
+
+
+@app.route("/api/chart")
+
+def api_chart():
+
+
+    return jsonify(
+
+        chart_data
+
+    )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SERVER START
+# =====================================================
+
+
+def run_server():
+
+
+    app.run(
+
+        host=WEB_HOST,
+
+        port=WEB_PORT,
+
+        debug=False,
+
+        use_reloader=False
+
+    )
+
+
+
+
+
+
 
 
 def start_dashboard():
 
 
-    global SERVER
-
-
-
-    if SERVER:
-
-        return
-
-
-
-
-
-    def run():
-
-
-        global SERVER
-
-
-
-        try:
-
-
-            SERVER = HTTPServer(
-
-                (
-
-                    HOST,
-
-                    PORT
-
-                ),
-
-                DashboardHandler
-
-            )
-
-
-            print(
-
-                "[WEB SERVER START]",
-
-                PORT
-
-            )
-
-
-
-            SERVER.serve_forever()
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[WEB SERVER ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-
     thread = threading.Thread(
 
-        target=run,
+        target=run_server,
 
         daemon=True
 
@@ -276,3 +329,37 @@ def start_dashboard():
 
 
     thread.start()
+
+
+
+    print(
+
+        "[WEB SERVER START]",
+
+        WEB_PORT
+
+    )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# TEST
+# =====================================================
+
+
+if __name__ == "__main__":
+
+
+    start_dashboard()
+
+
+    while True:
+
+
+        time.sleep(1)
