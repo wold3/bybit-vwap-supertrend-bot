@@ -1,18 +1,18 @@
 # =====================================================
 # risk/risk_manager.py
-# Risk Management
+# Risk Manager
 # =====================================================
 
 from config import (
     RISK_PER_TRADE_PERCENT,
-    LEVERAGE,
     MAX_POSITION_SIZE
 )
 
 
 
-class RiskManager:
 
+
+class RiskManager:
 
 
     def __init__(self):
@@ -21,11 +21,20 @@ class RiskManager:
         self.equity = 0
 
 
+        self.daily_loss = 0
+
+
+        self.trade_count = 0
+
+
+        self.max_daily_loss_percent = 3.0
+
+
+
         print(
-
             "[RISK MANAGER INIT]"
-
         )
+
 
 
 
@@ -36,6 +45,7 @@ class RiskManager:
     # =====================================================
     # UPDATE EQUITY
     # =====================================================
+
 
     def update_equity(
         self,
@@ -50,9 +60,10 @@ class RiskManager:
         )
 
 
+
         print(
 
-            "[RISK READY]",
+            "[RISK EQUITY]",
 
             self.equity
 
@@ -65,148 +76,90 @@ class RiskManager:
 
 
 
-
     # =====================================================
-    # POSITION SIZE
+    # CHECK ENTRY
     # =====================================================
 
-    def calculate_position_size(
+
+    def can_trade(
         self,
-        price
+        position_size=0
     ):
 
 
-        try:
-
-
-
-            if self.equity <= 0:
-
-
-                return 0
-
-
-
-
-
-
-            # 위험 금액
-
-            risk_amount = (
-
-                self.equity
-
-                *
-
-                RISK_PER_TRADE_PERCENT
-
-                /
-
-                100
-
-            )
-
-
-
-
-
-            # 레버리지 적용
-
-            position_value = (
-
-                risk_amount
-
-                *
-
-                LEVERAGE
-
-            )
-
-
-
-
-
-
-            qty = (
-
-                position_value
-
-                /
-
-                float(price)
-
-            )
-
-
-
-
-
-
-            # 최대 제한
-
-
-            if qty > MAX_POSITION_SIZE:
-
-
-                qty = MAX_POSITION_SIZE
-
-
-
-
-
-
-            # Bybit 최소 단위 보정
-
-            qty = round(
-
-                qty,
-
-                3
-
-            )
-
-
-
-
-
-            return qty
-
-
-
-
-
-        except Exception as e:
-
-
-
-            print(
-
-                "[RISK ERROR]",
-
-                e
-
-            )
-
-
-            return 0
-
-
-
-
-
-
-
-    # =====================================================
-    # RISK CHECK
-    # =====================================================
-
-    def check_risk(self):
-
+        # 잔고 확인
 
         if self.equity <= 0:
 
 
+            print(
+
+                "[RISK BLOCK] NO EQUITY"
+
+            )
+
+
             return False
+
+
+
+
+
+
+        # 기존 포지션 확인
+
+
+        if position_size > 0:
+
+
+            print(
+
+                "[RISK BLOCK] EXISTING POSITION"
+
+            )
+
+
+            return False
+
+
+
+
+
+
+
+
+        # 최대 손실 확인
+
+
+        max_loss = (
+
+            self.equity *
+
+            self.max_daily_loss_percent
+
+            /
+
+            100
+
+        )
+
+
+
+        if self.daily_loss >= max_loss:
+
+
+            print(
+
+                "[RISK BLOCK] DAILY LOSS LIMIT"
+
+            )
+
+
+            return False
+
+
+
+
 
 
 
@@ -218,8 +171,176 @@ class RiskManager:
 
 
 
+
+    # =====================================================
+    # POSITION SIZE
+    # =====================================================
+
+
+    def calculate_size(
+        self,
+        price
+    ):
+
+
+        risk_money = (
+
+            self.equity *
+
+            RISK_PER_TRADE_PERCENT
+
+            /
+
+            100
+
+        )
+
+
+
+        if price <= 0:
+
+
+            return 0
+
+
+
+
+
+        qty = (
+
+            risk_money
+
+            /
+
+            price
+
+        )
+
+
+
+        if qty > MAX_POSITION_SIZE:
+
+
+            qty = MAX_POSITION_SIZE
+
+
+
+
+
+        return round(
+
+            qty,
+
+            6
+
+        )
+
+
+
+
+
+
+
+
+    # =====================================================
+    # TRADE RECORD
+    # =====================================================
+
+
+    def record_trade(self):
+
+
+        self.trade_count += 1
+
+
+
+        print(
+
+            "[TRADE COUNT]",
+
+            self.trade_count
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # LOSS RECORD
+    # =====================================================
+
+
+    def record_loss(
+        self,
+        amount
+    ):
+
+
+        self.daily_loss += abs(
+
+            float(amount)
+
+        )
+
+
+
+        print(
+
+            "[DAILY LOSS]",
+
+            self.daily_loss
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # STATUS
+    # =====================================================
+
+
+    def status(self):
+
+
+        return {
+
+
+            "equity":
+
+                self.equity,
+
+
+            "daily_loss":
+
+                self.daily_loss,
+
+
+            "trade_count":
+
+                self.trade_count
+
+        }
+
+
+
+
+
+
+
 # =====================================================
-# SINGLETON
+# INSTANCE
 # =====================================================
+
 
 risk_manager = RiskManager()
