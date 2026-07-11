@@ -1,350 +1,676 @@
 # =====================================================
-# web/server.py
-# Flask Dashboard Server
-# Demo / Live Mode Switch
+# api/bybit_api.py
+# Bybit V5 API Manager
+# Demo / Live Dynamic Switch
 # =====================================================
 
-from flask import (
-    Flask,
-    render_template,
-    jsonify,
-    request
-)
+from pybit.unified_trading import HTTP
 
 import threading
 
 
 
 from config import (
-    WEB_HOST,
-    WEB_PORT
+
+    BYBIT_API_KEY,
+
+    BYBIT_API_SECRET,
+
+    CATEGORY,
+
+    DEFAULT_SYMBOL
+
 )
 
 
 
 
 
-# =====================================================
-# FLASK
-# =====================================================
+from web.server import (
 
-app = Flask(__name__)
+    get_trading_mode
 
-
-
-
-
-# =====================================================
-# GLOBAL STATUS
-# =====================================================
-
-status = {
-
-
-    "bot":
-
-        "STOPPED",
-
-
-    "price":
-
-        0,
-
-
-    "vwap":
-
-        0,
-
-
-    "trend":
-
-        "-",
-
-
-    "signal":
-
-        "-",
-
-
-    "position":
-
-        "NONE",
-
-
-    "entry":
-
-        0,
-
-
-    "size":
-
-        0,
-
-
-    "pnl":
-
-        0,
-
-
-    "watchdog":
-
-        "OFF"
-
-}
-
-
-
-
-
-# =====================================================
-# TRADING MODE
-# =====================================================
-
-trading_mode = {
-
-
-    "mode":
-
-        "DEMO"
-
-}
-
-
-
-
-
-# =====================================================
-# LOG STORAGE
-# =====================================================
-
-logs = []
-
-
-lock = threading.Lock()
-
-
-
-
-
-
-
-# =====================================================
-# STATUS UPDATE
-# =====================================================
-
-def update_status(data):
-
-
-    with lock:
-
-
-        status.update(
-
-            data
-
-        )
-
-
-
-
-
-
-
-
-
-# =====================================================
-# ADD LOG
-# =====================================================
-
-def add_log(message):
-
-
-    with lock:
-
-
-        logs.append(
-
-            str(message)
-
-        )
-
-
-
-        if len(logs) > 200:
-
-
-            logs.pop(0)
-
-
-
-
-
-
-
-
-
-# =====================================================
-# MODE CONTROL
-# =====================================================
-
-def set_trading_mode(mode):
-
-
-    mode = str(mode).upper()
-
-
-
-    if mode not in [
-
-        "DEMO",
-
-        "LIVE"
-
-    ]:
-
-
-        return False
-
-
-
-
-
-    with lock:
-
-
-        trading_mode["mode"] = mode
-
-
-
-    add_log(
-
-        f"TRADING MODE : {mode}"
-
-    )
-
-
-
-    return True
-
-
-
-
-
-
-
-
-
-
-# =====================================================
-# DASHBOARD PAGE
-# =====================================================
-
-@app.route("/")
-
-def index():
-
-
-    return render_template(
-
-        "dashboard.html"
-
-    )
-
-
-
-
-
-
-
-
-
-# =====================================================
-# STATUS API
-# =====================================================
-
-@app.route("/api/status")
-
-def api_status():
-
-
-    with lock:
-
-
-        return jsonify({
-
-
-            "status":
-
-                status.copy(),
-
-
-            "mode":
-
-                trading_mode["mode"],
-
-
-            "logs":
-
-                logs.copy()
-
-
-        })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# MODE API
-# =====================================================
-
-@app.route(
-    "/api/mode",
-    methods=["POST"]
 )
 
-def api_mode():
-
-
-    data = request.json or {}
-
-
-    mode = data.get(
-
-        "mode",
-
-        "DEMO"
-
-    )
 
 
 
-    result = set_trading_mode(
-
-        mode
-
-    )
 
 
 
-    return jsonify({
+class BybitAPI:
 
 
-        "success":
 
-            result,
-
-
-        "mode":
-
-            trading_mode["mode"]
+    def __init__(self):
 
 
-    })
+        self.session = None
+
+
+        self.current_mode = None
+
+
+        self.lock = threading.Lock()
+
+
+
+        self.create_session()
+
+
+
+
+
+
+
+    # =====================================================
+    # CREATE SESSION
+    # =====================================================
+
+    def create_session(self):
+
+
+        mode = get_trading_mode()
+
+
+
+        with self.lock:
+
+
+            if mode == self.current_mode:
+
+
+                return
+
+
+
+
+
+            print(
+
+                "[BYBIT SESSION CHANGE]",
+
+                mode
+
+            )
+
+
+
+
+
+            if mode == "DEMO":
+
+
+                self.session = HTTP(
+
+
+                    testnet=False,
+
+
+                    demo=True,
+
+
+                    api_key=BYBIT_API_KEY,
+
+
+                    api_secret=BYBIT_API_SECRET
+
+
+                )
+
+
+
+
+
+            else:
+
+
+                self.session = HTTP(
+
+
+                    testnet=False,
+
+
+                    demo=False,
+
+
+                    api_key=BYBIT_API_KEY,
+
+
+                    api_secret=BYBIT_API_SECRET
+
+
+                )
+
+
+
+
+
+            self.current_mode = mode
+
+
+
+
+
+            print(
+
+                "[BYBIT READY]",
+
+                mode
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # CHECK SESSION
+    # =====================================================
+
+    def check_session(self):
+
+
+        if get_trading_mode() != self.current_mode:
+
+
+            self.create_session()
+
+
+
+
+
+
+
+    # =====================================================
+    # KLINE
+    # =====================================================
+
+    def get_kline(
+
+        self,
+
+        limit=200
+
+    ):
+
+
+        try:
+
+
+            self.check_session()
+
+
+
+            result = self.session.get_kline(
+
+
+                category=CATEGORY,
+
+
+                symbol=DEFAULT_SYMBOL,
+
+
+                interval="5",
+
+
+                limit=limit
+
+
+            )
+
+
+
+
+
+            if result.get("retCode") != 0:
+
+
+                print(
+
+                    "[KLINE ERROR]",
+
+                    result
+
+                )
+
+
+                return []
+
+
+
+
+
+            return result["result"]["list"]
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[KLINE ERROR]",
+
+                e
+
+            )
+
+
+            return []
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # MARKET ORDER
+    # =====================================================
+
+    def place_order(
+
+        self,
+
+        side,
+
+        qty
+
+    ):
+
+
+        try:
+
+
+            self.check_session()
+
+
+
+            result = self.session.place_order(
+
+
+                category=CATEGORY,
+
+
+                symbol=DEFAULT_SYMBOL,
+
+
+                side=side,
+
+
+                orderType="Market",
+
+
+                qty=str(qty)
+
+
+            )
+
+
+
+
+
+            print(
+
+                "[ORDER RESULT]",
+
+                result
+
+            )
+
+
+
+
+
+            return result
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[ORDER ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # POSITION
+    # =====================================================
+
+    def get_position(self):
+
+
+        try:
+
+
+            self.check_session()
+
+
+
+            return self.session.get_positions(
+
+
+                category=CATEGORY,
+
+
+                symbol=DEFAULT_SYMBOL
+
+
+            )
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[POSITION ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # WALLET BALANCE
+    # =====================================================
+
+    def get_balance(self):
+
+
+        try:
+
+
+            self.check_session()
+
+
+
+            result = self.session.get_wallet_balance(
+
+
+                accountType="UNIFIED"
+
+
+            )
+
+
+
+
+
+            if result.get("retCode") != 0:
+
+
+                print(
+
+                    "[BALANCE ERROR]",
+
+                    result
+
+                )
+
+
+                return None
+
+
+
+
+
+            return result
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[BALANCE ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # TP / SL
+    # =====================================================
+
+    def set_trading_stop(
+
+        self,
+
+        tp,
+
+        sl
+
+    ):
+
+
+        try:
+
+
+            self.check_session()
+
+
+
+            result = self.session.set_trading_stop(
+
+
+                category=CATEGORY,
+
+
+                symbol=DEFAULT_SYMBOL,
+
+
+                takeProfit=str(tp),
+
+
+                stopLoss=str(sl)
+
+
+            )
+
+
+
+
+
+            print(
+
+                "[TP SL RESULT]",
+
+                result
+
+            )
+
+
+
+
+
+            return result
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[TP SL ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # CLOSE POSITION
+    # =====================================================
+
+    def close_position(self):
+
+
+        try:
+
+
+            position = self.get_position()
+
+
+
+            if not position:
+
+
+                return None
+
+
+
+
+
+            item = position["result"]["list"][0]
+
+
+
+            size = float(
+
+                item.get(
+
+                    "size",
+
+                    0
+
+                )
+
+            )
+
+
+
+
+
+            if size <= 0:
+
+
+                return None
+
+
+
+
+
+            side = item.get(
+
+                "side"
+
+            )
+
+
+
+            close_side = (
+
+                "Sell"
+
+                if side == "Buy"
+
+                else
+
+                "Buy"
+
+            )
+
+
+
+
+
+            return self.place_order(
+
+                close_side,
+
+                size
+
+            )
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[CLOSE ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
 
 
 
@@ -355,107 +681,7 @@ def api_mode():
 
 
 # =====================================================
-# CHART API
+# INSTANCE
 # =====================================================
 
-@app.route("/api/chart")
-
-def api_chart():
-
-
-    try:
-
-
-        from web.chart_data import (
-
-            get_chart
-
-        )
-
-
-        return jsonify(
-
-            get_chart()
-
-        )
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"CHART ERROR : {e}"
-
-        )
-
-
-        return jsonify([])
-
-
-
-
-
-
-
-
-
-# =====================================================
-# MODE GET API
-# =====================================================
-
-@app.route("/api/mode")
-
-def get_mode():
-
-
-    return jsonify({
-
-
-        "mode":
-
-            trading_mode["mode"]
-
-
-    })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# SERVER START
-# =====================================================
-
-def run_server():
-
-
-    print(
-
-        "[WEB SERVER START]",
-
-        WEB_PORT
-
-    )
-
-
-
-    app.run(
-
-        host=WEB_HOST,
-
-
-        port=WEB_PORT,
-
-
-        debug=False,
-
-
-        use_reloader=False
-
-    )
+bybit_api = BybitAPI()
