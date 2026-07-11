@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+
+<title>
+VWAP SUPERTREND BOT
+</title>
+
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
+
+<style>
+
+body {
+
+    background:#111;
+
+    color:#eee;
+
+    font-family:Arial;
+
+}
+
+
+.card {
+
+    background:#222;
+
+    padding:15px;
+
+    margin:10px;
+
+    border-radius:10px;
+
+}
+
+
+.value {
+
+    font-size:24px;
+
+    color:#00ff99;
+
+}
+
+
+.grid {
+
+    display:grid;
+
+    grid-template-columns:
+
+    repeat(4,1fr);
+
+}
+
+
+#logs {
+
+    height:250px;
+
+    overflow:auto;
+
+    background:#000;
+
+    padding:10px;
+
+}
+
+
+</style>
+
+
+</head>
+
+
+
+
+
+<body>
+
+
+
+<h1>
+VWAP SUPERTREND BOT
+</h1>
+
+
+
+
+
+<div class="grid">
+
+
+<div class="card">
+
+BOT
+
+<div id="bot" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+PRICE
+
+<div id="price" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+VWAP
+
+<div id="vwap" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+TREND
+
+<div id="trend" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
+POSITION
+
+<div id="position" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+SIZE
+
+<div id="size" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+ENTRY
+
+<div id="entry" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+PNL
+
+<div id="pnl" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
+ORDER
+
+<div id="order" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+TAKE PROFIT
+
+<div id="tp" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+STOP LOSS
+
+<div id="sl" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+SIGNAL
+
+<div id="signal" class="value">
+
+-
+
+</div>
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+<h2>
+BTCUSDT Chart
+</h2>
+
+
+<div id="chart"
+
+style="height:400px">
+
+</div>
+
+
+
+
+
+
+<h2>
+LOG
+</h2>
+
+
+<div id="logs">
+
+</div>
+
+
+
+
+
+
+
+
+<script>
+
+
+
+const chart = LightweightCharts.createChart(
+
+document.getElementById("chart"),
+
+{
+
+height:400
+
+}
+
+);
+
+
+
+const candleSeries = chart.addCandlestickSeries();
+
+
+
+
+
+
+
+
+async function update(){
+
+
+
+try{
+
+
+let res = await fetch(
+
+"/api/status"
+
+);
+
+
+
+let data = await res.json();
+
+
+
+
+let s = data.status;
+
+
+
+
+
+document.getElementById(
+"bot"
+).innerHTML = s.bot;
+
+
+
+document.getElementById(
+"price"
+).innerHTML =
+Number(s.price).toFixed(2);
+
+
+
+document.getElementById(
+"vwap"
+).innerHTML =
+Number(s.vwap).toFixed(2);
+
+
+
+document.getElementById(
+"trend"
+).innerHTML =
+s.trend;
+
+
+
+document.getElementById(
+"position"
+).innerHTML =
+s.position;
+
+
+
+document.getElementById(
+"size"
+).innerHTML =
+s.size;
+
+
+
+document.getElementById(
+"entry"
+).innerHTML =
+Number(s.entry).toFixed(2);
+
+
+
+document.getElementById(
+"pnl"
+).innerHTML =
+Number(s.pnl).toFixed(3);
+
+
+
+document.getElementById(
+"order"
+).innerHTML =
+s.order;
+
+
+
+document.getElementById(
+"tp"
+).innerHTML =
+Number(s.tp).toFixed(2);
+
+
+
+document.getElementById(
+"sl"
+).innerHTML =
+Number(s.sl).toFixed(2);
+
+
+
+document.getElementById(
+"signal"
+).innerHTML =
+s.signal;
+
+
+
+
+
+document.getElementById(
+"logs"
+).innerHTML =
+data.logs.join("<br>");
+
+
+
+}
+
+catch(e){
+
+
+console.log(e);
+
+
+}
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+async function chartUpdate(){
+
+
+try{
+
+
+let r = await fetch(
+
+"/api/chart"
+
+);
+
+
+
+let data = await r.json();
+
+
+
+
+candleSeries.setData(
+
+data
+
+);
+
+
+
+}
+
+catch(e){
+
+
+
+}
+
+
+
+}
+
+
+
+
+
+
+setInterval(
+
+update,
+
+2000
+
+);
+
+
+
+setInterval(
+
+chartUpdate,
+
+5000
+
+);
+
+
+
+update();
+
+
+chartUpdate();
+
+
+
+</script>
+
+
+
+</body>
+
+
+</html>
