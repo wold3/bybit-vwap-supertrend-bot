@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 
 
-
 from config import (
 
     ATR_PERIOD,
@@ -20,10 +19,7 @@ from config import (
 
 
 
-
-
 class VWAPSuperTrend:
-
 
 
     def __init__(self):
@@ -32,16 +28,11 @@ class VWAPSuperTrend:
         self.last_signal = None
 
 
-
         print(
 
             "[STRATEGY READY]"
 
         )
-
-
-
-
 
 
 
@@ -63,18 +54,20 @@ class VWAPSuperTrend:
         try:
 
 
-            price = (
+            price = df["close"]
 
-                df["close"]
-
-            )
+            volume = df["volume"]
 
 
-            volume = (
 
-                df["volume"]
+            cumulative_volume = volume.cumsum()
 
-            )
+
+
+            if cumulative_volume.iloc[-1] == 0:
+
+
+                return None
 
 
 
@@ -86,7 +79,7 @@ class VWAPSuperTrend:
 
                 /
 
-                volume.cumsum()
+                cumulative_volume
 
             )
 
@@ -96,16 +89,19 @@ class VWAPSuperTrend:
 
 
 
+        except Exception as e:
 
 
-        except Exception:
+            print(
+
+                "[VWAP ERROR]",
+
+                e
+
+            )
 
 
             return None
-
-
-
-
 
 
 
@@ -124,74 +120,92 @@ class VWAPSuperTrend:
     ):
 
 
-        high = df["high"]
+        try:
 
 
-        low = df["low"]
+            high = df["high"]
 
+            low = df["low"]
 
-        close = df["close"]
-
-
-
-
-
-        tr1 = high - low
+            close = df["close"]
 
 
 
-        tr2 = abs(
-
-            high - close.shift()
-
-        )
+            tr1 = high - low
 
 
+            tr2 = (
 
-        tr3 = abs(
+                high - close.shift()
 
-            low - close.shift()
-
-        )
-
+            ).abs()
 
 
-        tr = pd.concat(
+            tr3 = (
 
-            [
+                low - close.shift()
 
-                tr1,
-
-                tr2,
-
-                tr3
-
-            ],
-
-            axis=1
-
-        ).max(
-
-            axis=1
-
-        )
+            ).abs()
 
 
 
-        atr = tr.rolling(
+            tr = pd.concat(
 
-            ATR_PERIOD
+                [
 
-        ).mean()
+                    tr1,
+
+                    tr2,
+
+                    tr3
+
+                ],
+
+                axis=1
+
+            ).max(
+
+                axis=1
+
+            )
 
 
 
-        return atr
+            atr = (
+
+                tr
+
+                .rolling(
+
+                    ATR_PERIOD
+
+                )
+
+                .mean()
+
+                .fillna(0)
+
+            )
 
 
 
+            return atr
 
 
+
+        except Exception as e:
+
+
+            print(
+
+                "[ATR ERROR]",
+
+                e
+
+            )
+
+
+            return None
 
 
 
@@ -210,121 +224,150 @@ class VWAPSuperTrend:
     ):
 
 
-        atr = self.calculate_atr(
-
-            df
-
-        )
+        try:
 
 
+            atr = self.calculate_atr(
 
-        hl2 = (
+                df
 
-            df["high"]
+            )
 
-            +
 
-            df["low"]
+            if atr is None:
 
-        ) / 2
+                return None
 
 
 
+            hl2 = (
 
+                df["high"]
 
-        upper = (
+                +
 
-            hl2
+                df["low"]
 
-            +
-
-            SUPERTREND_MULTIPLIER
-
-            *
-
-            atr
-
-        )
-
-
-
-        lower = (
-
-            hl2
-
-            -
-
-            SUPERTREND_MULTIPLIER
-
-            *
-
-            atr
-
-        )
+            ) / 2
 
 
 
 
+            upper_band = (
 
-        trend = []
+                hl2
 
+                +
 
+                (
 
-        current = 1
+                    SUPERTREND_MULTIPLIER
 
+                    *
 
+                    atr
 
+                )
 
-
-        for i in range(
-
-            len(df)
-
-        ):
-
-
-
-            if df["close"].iloc[i] > upper.iloc[i]:
-
-
-                current = 1
+            )
 
 
 
-            elif df["close"].iloc[i] < lower.iloc[i]:
+            lower_band = (
 
+                hl2
 
-                current = -1
+                -
 
+                (
 
+                    SUPERTREND_MULTIPLIER
 
-            trend.append(
+                    *
 
-                current
+                    atr
+
+                )
 
             )
 
 
 
 
-        return pd.Series(
+            trend = []
 
-            trend,
 
-            index=df.index
 
-        )
+            direction = 1
 
 
 
 
+            for i in range(
+
+                len(df)
+
+            ):
+
+
+
+                close = df["close"].iloc[i]
+
+
+
+                if close > upper_band.iloc[i]:
+
+
+                    direction = 1
+
+
+
+                elif close < lower_band.iloc[i]:
+
+
+                    direction = -1
+
+
+
+
+                trend.append(
+
+                    direction
+
+                )
+
+
+
+            return pd.Series(
+
+                trend,
+
+                index=df.index
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[SUPERTREND ERROR]",
+
+                e
+
+            )
+
+
+            return None
 
 
 
 
 
     # =====================================================
-    # SIGNAL
+    # GENERATE SIGNAL
     # =====================================================
 
     def generate_signal(
@@ -336,130 +379,187 @@ class VWAPSuperTrend:
     ):
 
 
+        try:
 
-        if len(df) < 50:
+
+            if df is None:
+
+
+                return None
+
+
+
+            if len(df) < 50:
+
+
+                return None
+
+
+
+
+            data = df.copy()
+
+
+
+
+            data["vwap"] = self.calculate_vwap(
+
+                data
+
+            )
+
+
+
+            data["supertrend"] = self.calculate_supertrend(
+
+                data
+
+            )
+
+
+
+
+
+            if (
+
+                data["vwap"] is None
+
+                or
+
+                data["supertrend"] is None
+
+            ):
+
+
+                return None
+
+
+
+
+            # ---------------------------------
+            # CLOSED CANDLE
+            # ---------------------------------
+
+            candle = data.iloc[-2]
+
+
+
+            signal = None
+
+
+
+
+            # ---------------------------------
+            # BUY
+            # ---------------------------------
+
+            if (
+
+                candle["close"]
+
+                >
+
+                candle["vwap"]
+
+                and
+
+                candle["supertrend"]
+
+                ==
+
+                1
+
+            ):
+
+
+                signal = "Buy"
+
+
+
+
+
+            # ---------------------------------
+            # SELL
+            # ---------------------------------
+
+            elif (
+
+                candle["close"]
+
+                <
+
+                candle["vwap"]
+
+                and
+
+                candle["supertrend"]
+
+                ==
+
+                -1
+
+            ):
+
+
+                signal = "Sell"
+
+
+
+
+
+            # ---------------------------------
+            # DUPLICATE BLOCK
+            # ---------------------------------
+
+            if signal is None:
+
+
+                return None
+
+
+
+            if signal == self.last_signal:
+
+
+                return None
+
+
+
+
+
+            self.last_signal = signal
+
+
+
+            print(
+
+                "[STRATEGY SIGNAL]",
+
+                signal
+
+            )
+
+
+
+            return signal
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[SIGNAL ERROR]",
+
+                e
+
+            )
 
 
             return None
-
-
-
-
-
-
-        df = df.copy()
-
-
-
-        df["vwap"] = self.calculate_vwap(
-
-            df
-
-        )
-
-
-
-        df["supertrend"] = self.calculate_supertrend(
-
-            df
-
-        )
-
-
-
-
-
-        last = df.iloc[-1]
-
-
-
-
-
-        signal = None
-
-
-
-
-
-
-        # BUY
-
-        if (
-
-            last["close"]
-
-            >
-
-            last["vwap"]
-
-            and
-
-            last["supertrend"]
-
-            ==
-
-            1
-
-        ):
-
-
-
-            signal = "Buy"
-
-
-
-
-
-
-
-        # SELL
-
-        elif (
-
-            last["close"]
-
-            <
-
-            last["vwap"]
-
-            and
-
-            last["supertrend"]
-
-            ==
-
-            -1
-
-        ):
-
-
-
-            signal = "Sell"
-
-
-
-
-
-
-
-        if signal == self.last_signal:
-
-
-            return None
-
-
-
-
-
-        self.last_signal = signal
-
-
-
-        return signal
-
-
-
-
 
 
 
