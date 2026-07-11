@@ -3,12 +3,10 @@
 # VWAP SuperTrend Trading Bot MAIN
 # =======================================================
 
-
 import time
 import signal
 import sys
 import traceback
-
 
 
 from app import TradingApp
@@ -17,6 +15,8 @@ from app import TradingApp
 from web.server import (
 
     run_server,
+
+    stop_server,
 
     set_bot_instance,
 
@@ -28,12 +28,9 @@ from web.server import (
 
 
 
-
-
 # =======================================================
 # GLOBAL
 # =======================================================
-
 
 bot = None
 
@@ -41,12 +38,9 @@ running = True
 
 
 
-
-
 # =======================================================
-# SIGNAL HANDLER
+# SHUTDOWN
 # =======================================================
-
 
 def shutdown_handler(
 
@@ -78,7 +72,6 @@ def shutdown_handler(
 
         if bot:
 
-
             bot.stop()
 
 
@@ -88,7 +81,7 @@ def shutdown_handler(
 
         print(
 
-            "[SHUTDOWN ERROR]",
+            "[BOT STOP ERROR]",
 
             e
 
@@ -96,11 +89,34 @@ def shutdown_handler(
 
 
 
+
+    try:
+
+
+        stop_server()
+
+
+
+    except Exception as e:
+
+
+        print(
+
+            "[SERVER STOP ERROR]",
+
+            e
+
+        )
+
+
+
+
     add_log(
 
-        "SYSTEM SHUTDOWN"
+        "SYSTEM SHUTDOWN COMPLETE"
 
     )
+
 
 
     sys.exit(0)
@@ -110,9 +126,8 @@ def shutdown_handler(
 
 
 # =======================================================
-# STARTUP
+# START
 # =======================================================
-
 
 def start():
 
@@ -122,11 +137,11 @@ def start():
 
     print()
 
-    print("====================")
+    print("======================")
 
     print(" VWAP SUPERTREND BOT ")
 
-    print("====================")
+    print("======================")
 
 
 
@@ -148,8 +163,10 @@ def start():
 
 
 
+
+
         # ---------------------------------
-        # BOT INSTANCE
+        # CREATE BOT
         # ---------------------------------
 
         bot = TradingApp()
@@ -172,6 +189,8 @@ def start():
 
 
 
+
+
         update_status({
 
             "bot":
@@ -179,6 +198,8 @@ def start():
                 "STOPPED"
 
         })
+
+
 
 
 
@@ -223,6 +244,21 @@ def start():
 
 
 
+    except KeyboardInterrupt:
+
+
+        shutdown_handler(
+
+            None,
+
+            None
+
+        )
+
+
+
+
+
     except Exception as e:
 
 
@@ -244,12 +280,11 @@ def start():
 
             if bot:
 
-
                 bot.stop()
 
 
 
-        except:
+        except Exception:
 
 
             pass
@@ -257,11 +292,9 @@ def start():
 
 
 
-
 # =======================================================
 # ENTRY
 # =======================================================
-
 
 if __name__ == "__main__":
 
@@ -274,6 +307,7 @@ if __name__ == "__main__":
         shutdown_handler
 
     )
+
 
 
     signal.signal(
