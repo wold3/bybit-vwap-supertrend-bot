@@ -6,9 +6,11 @@
 import json
 import time
 import threading
-import websocket
 import hmac
 import hashlib
+
+import websocket
+
 
 from config import (
 
@@ -20,12 +22,14 @@ from config import (
 
 )
 
+
 from web.server import (
 
     add_log,
     get_trading_mode
 
 )
+
 
 from portfolio.position_manager import (
 
@@ -34,9 +38,14 @@ from portfolio.position_manager import (
 )
 
 
+
+
+
 class PrivateWS:
 
+
     def __init__(self):
+
 
         self.ws = None
 
@@ -48,11 +57,16 @@ class PrivateWS:
 
         self.lock = threading.Lock()
 
+
         print(
 
             "[PRIVATE WS READY]"
 
         )
+
+
+
+
 
     # =====================================================
     # URL
@@ -60,13 +74,31 @@ class PrivateWS:
 
     def get_url(self):
 
+
         mode = get_trading_mode()
+
+
 
         if mode == "DEMO":
 
-            return "wss://stream-demo.bybit.com/v5/private"
 
-        return "wss://stream.bybit.com/v5/private"
+            return (
+
+                "wss://stream-demo.bybit.com/v5/private"
+
+            )
+
+
+
+        return (
+
+            "wss://stream.bybit.com/v5/private"
+
+        )
+
+
+
+
 
     # =====================================================
     # API KEY
@@ -74,23 +106,39 @@ class PrivateWS:
 
     def api_key(self):
 
+
         if get_trading_mode() == "DEMO":
+
 
             return DEMO_API_KEY
 
+
+
         return LIVE_API_KEY
 
+
+
+
+
     # =====================================================
-    # API SECRET
+    # SECRET
     # =====================================================
 
     def api_secret(self):
 
+
         if get_trading_mode() == "DEMO":
+
 
             return DEMO_API_SECRET
 
+
+
         return LIVE_API_SECRET
+
+
+
+
 
     # =====================================================
     # AUTH
@@ -98,11 +146,17 @@ class PrivateWS:
 
     def auth_message(self):
 
-        expires = int(
 
-            time.time() * 1000
+        expires = (
 
-        ) + 10000
+            int(time.time() * 1000)
+
+            +
+
+            10000
+
+        )
+
 
         payload = (
 
@@ -114,7 +168,10 @@ class PrivateWS:
 
         )
 
+
+
         signature = hmac.new(
+
 
             self.api_secret().encode(
 
@@ -122,19 +179,26 @@ class PrivateWS:
 
             ),
 
+
             payload.encode(
 
                 "utf-8"
 
             ),
 
+
             hashlib.sha256
+
 
         ).hexdigest()
 
+
+
         return {
 
+
             "op": "auth",
+
 
             "args": [
 
@@ -148,23 +212,35 @@ class PrivateWS:
 
         }
 
+
+
+
+
     # =====================================================
     # SUBSCRIBE
     # =====================================================
 
     def subscribe(self):
 
+
         if not self.ws:
 
+
             return
+
+
 
         topics = [
 
             "position",
 
-            "execution"
+            "execution",
+
+            "wallet"
 
         ]
+
+
 
         self.ws.send(
 
@@ -178,11 +254,15 @@ class PrivateWS:
 
         )
 
+
+
         print(
 
             "[WS SUBSCRIBE OK]"
 
         )
+
+
 
 
 
@@ -198,13 +278,24 @@ class PrivateWS:
 
     ):
 
+
         print(
 
             "[PRIVATE WS CONNECTED]"
 
         )
 
+
+        add_log(
+
+            "PRIVATE WS CONNECTED"
+
+        )
+
+
         self.authenticated = False
+
+
 
         ws.send(
 
@@ -215,6 +306,8 @@ class PrivateWS:
             )
 
         )
+
+
 
 
 
@@ -232,53 +325,80 @@ class PrivateWS:
 
     ):
 
+
         try:
 
-            data = json.loads(message)
 
-            # -----------------------------
+            data = json.loads(
+
+                message
+
+            )
+
+
+
+            # -------------------------
             # AUTH
-            # -----------------------------
+            # -------------------------
 
             if data.get("op") == "auth":
 
+
+
                 if data.get("success"):
 
-                    if not self.authenticated:
 
-                        self.authenticated = True
+                    self.authenticated = True
 
-                        print(
 
-                            "[WS AUTH OK]"
 
-                        )
+                    print(
 
-                        add_log(
-
-                            "PRIVATE WS AUTH"
-
-                        )
-
-                        self.subscribe()
-
-                else:
-
-                    add_log(
-
-                        f"AUTH FAILED {data}"
+                        "[WS AUTH OK]"
 
                     )
 
+
+                    add_log(
+
+                        "PRIVATE WS AUTH OK"
+
+                    )
+
+
+                    self.subscribe()
+
+
+
+                else:
+
+
+                    add_log(
+
+                        f"WS AUTH FAIL {data}"
+
+                    )
+
+
+
                 return
 
-            # -----------------------------
-            # SUBSCRIBE
-            # -----------------------------
+
+
+
+
+            # -------------------------
+            # SUBSCRIBE RESPONSE
+            # -------------------------
 
             if data.get("op") == "subscribe":
 
+
                 return
+
+
+
+
 
             topic = data.get(
 
@@ -288,15 +408,21 @@ class PrivateWS:
 
             )
 
-            # -----------------------------
+
+
+
+
+            # -------------------------
             # POSITION
-            # -----------------------------
+            # -------------------------
 
             if topic.startswith(
 
                 "position"
 
             ):
+
+
 
                 rows = data.get(
 
@@ -306,25 +432,39 @@ class PrivateWS:
 
                 )
 
+
+
                 if rows:
 
-                    position_manager.update(
 
-                        rows
+                    for row in rows:
 
-                    )
+
+                        position_manager.update(
+
+                            row
+
+                        )
+
+
 
                 return
 
-            # -----------------------------
+
+
+
+
+            # -------------------------
             # EXECUTION
-            # -----------------------------
+            # -------------------------
 
             if topic.startswith(
 
                 "execution"
 
             ):
+
+
 
                 executions = data.get(
 
@@ -334,47 +474,112 @@ class PrivateWS:
 
                 )
 
+
+
                 for item in executions:
 
-                    side = item.get(
 
-                        "side",
-
-                        ""
-
-                    )
-
-                    qty = item.get(
-
-                        "execQty",
-
-                        ""
-
-                    )
-
-                    price = item.get(
-
-                        "execPrice",
-
-                        ""
-
-                    )
 
                     add_log(
 
-                        f"EXECUTION {side} {qty}@{price}"
+                        "EXECUTION "
+
+                        +
+
+                        str(
+
+                            item.get(
+
+                                "side",
+
+                                ""
+
+                            )
+
+                        )
+
+                        +
+
+                        " "
+
+                        +
+
+                        str(
+
+                            item.get(
+
+                                "execQty",
+
+                                ""
+
+                            )
+
+                        )
+
+                        +
+
+                        "@"
+
+                        +
+
+                        str(
+
+                            item.get(
+
+                                "execPrice",
+
+                                ""
+
+                            )
+
+                        )
 
                     )
 
+
+
                 return
 
+
+
+
+
+            # -------------------------
+            # WALLET
+            # -------------------------
+
+            if topic.startswith(
+
+                "wallet"
+
+            ):
+
+
+                add_log(
+
+                    "WALLET UPDATE"
+
+                )
+
+
+                return
+
+
+
+
+
         except Exception as e:
+
 
             add_log(
 
                 f"WS MESSAGE ERROR {e}"
 
             )
+
+
+
+
 
     # =====================================================
     # ERROR
@@ -390,11 +595,14 @@ class PrivateWS:
 
     ):
 
+
         add_log(
 
             f"PRIVATE WS ERROR {error}"
 
         )
+
+
 
 
 
@@ -408,13 +616,16 @@ class PrivateWS:
 
         ws,
 
-        close_status_code,
+        code,
 
-        close_msg
+        msg
 
     ):
 
+
         self.authenticated = False
+
+
 
         print(
 
@@ -422,20 +633,28 @@ class PrivateWS:
 
         )
 
+
         add_log(
 
             "PRIVATE WS CLOSED"
 
         )
 
-        # REST API와 동기화
+
+
         try:
+
 
             position_manager.refresh()
 
+
+
         except Exception:
 
+
             pass
+
+
 
 
 
@@ -445,11 +664,16 @@ class PrivateWS:
 
     def run(self):
 
+
         while self.running:
+
 
             try:
 
+
                 url = self.get_url()
+
+
 
                 print(
 
@@ -459,31 +683,45 @@ class PrivateWS:
 
                 )
 
-                self.authenticated = False
+
 
                 self.ws = websocket.WebSocketApp(
 
+
                     url,
+
 
                     on_open=self.on_open,
 
+
                     on_message=self.on_message,
+
 
                     on_error=self.on_error,
 
+
                     on_close=self.on_close
 
+
                 )
+
+
 
                 self.ws.run_forever(
 
+
                     ping_interval=20,
+
 
                     ping_timeout=10
 
+
                 )
 
+
+
             except Exception as e:
+
 
                 add_log(
 
@@ -491,9 +729,14 @@ class PrivateWS:
 
                 )
 
+
+
             if self.running:
 
+
                 time.sleep(5)
+
+
 
 
 
@@ -503,25 +746,47 @@ class PrivateWS:
 
     def start(self):
 
+
         with self.lock:
+
 
             if self.running:
 
+
                 return
+
+
 
             self.running = True
 
+
+
         self.thread = threading.Thread(
+
 
             target=self.run,
 
+
             daemon=True,
+
 
             name="PrivateWS"
 
+
         )
 
+
         self.thread.start()
+
+
+
+        add_log(
+
+            "PRIVATE WS START"
+
+        )
+
+
 
 
 
@@ -531,23 +796,41 @@ class PrivateWS:
 
     def stop(self):
 
+
         with self.lock:
+
 
             self.running = False
 
+
+
         try:
+
 
             if self.ws:
 
+
                 self.ws.close()
+
+
 
         except Exception:
 
+
             pass
+
+
 
         if self.thread and self.thread.is_alive():
 
-            self.thread.join(timeout=3)
+
+            self.thread.join(
+
+                timeout=3
+
+            )
+
+
 
         self.ws = None
 
@@ -555,17 +838,42 @@ class PrivateWS:
 
         self.authenticated = False
 
-        print(
 
-            "[PRIVATE WS STOPPED]"
-
-        )
 
         add_log(
 
             "PRIVATE WS STOPPED"
 
         )
+
+
+
+
+
+    # =====================================================
+    # RESTART
+    # =====================================================
+
+    def restart(self):
+
+
+        add_log(
+
+            "PRIVATE WS RESTART"
+
+        )
+
+
+        self.stop()
+
+
+        time.sleep(1)
+
+
+        self.start()
+
+
+
 
 
 # =====================================================
