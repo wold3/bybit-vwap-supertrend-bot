@@ -5,7 +5,6 @@
 # Demo / Live Dynamic Switch
 # =====================================================
 
-
 from pybit.unified_trading import HTTP
 
 import threading
@@ -29,7 +28,6 @@ from config import (
 from web.server import (
 
     get_trading_mode,
-
     add_log
 
 )
@@ -41,9 +39,7 @@ from web.server import (
 class BybitAPI:
 
 
-
     def __init__(self):
-
 
         self.session = None
 
@@ -72,30 +68,24 @@ class BybitAPI:
         with self.lock:
 
 
-
             if mode == self.current_mode:
 
                 return
 
 
 
-
-
             if mode == "DEMO":
 
+                api_key = DEMO_API_KEY
 
-                key = DEMO_API_KEY
-
-                secret = DEMO_API_SECRET
-
+                api_secret = DEMO_API_SECRET
 
 
             else:
 
+                api_key = LIVE_API_KEY
 
-                key = LIVE_API_KEY
-
-                secret = LIVE_API_SECRET
+                api_secret = LIVE_API_SECRET
 
 
 
@@ -103,18 +93,13 @@ class BybitAPI:
 
             self.session = HTTP(
 
-
                 testnet=False,
-
 
                 demo=(mode == "DEMO"),
 
+                api_key=api_key,
 
-                api_key=key,
-
-
-                api_secret=secret
-
+                api_secret=api_secret
 
             )
 
@@ -126,7 +111,7 @@ class BybitAPI:
 
             print(
 
-                "[BYBIT READY]",
+                "[BYBIT SESSION]",
 
                 mode
 
@@ -143,8 +128,6 @@ class BybitAPI:
 
 
 
-
-
     # =====================================================
     # SESSION CHECK
     # =====================================================
@@ -152,12 +135,12 @@ class BybitAPI:
     def check_session(self):
 
 
-        if get_trading_mode() != self.current_mode:
+        mode = get_trading_mode()
 
+
+        if mode != self.current_mode:
 
             self.create_session()
-
-
 
 
 
@@ -175,9 +158,8 @@ class BybitAPI:
             self.current_mode = None
 
 
+
         self.create_session()
-
-
 
 
 
@@ -200,25 +182,45 @@ class BybitAPI:
 
         try:
 
-
             self.check_session()
 
 
 
-            return self.session.get_kline(
-
+            result = self.session.get_kline(
 
                 category=CATEGORY,
 
-
                 symbol=SYMBOL,
-
 
                 interval=str(interval),
 
-
                 limit=limit
 
+            )
+
+
+
+            if result.get("retCode") != 0:
+
+                add_log(
+
+                    f"KLINE FAILED {result}"
+
+                )
+
+                return None
+
+
+
+
+
+            return (
+
+                result
+
+                .get("result", {})
+
+                .get("list", [])
 
             )
 
@@ -259,22 +261,38 @@ class BybitAPI:
 
             result = self.session.get_tickers(
 
-
                 category=CATEGORY,
-
 
                 symbol=SYMBOL
 
+            )
+
+
+
+            if result.get("retCode") != 0:
+
+                return None
+
+
+
+
+            price = (
+
+                result
+
+                ["result"]
+
+                ["list"]
+
+                [0]
+
+                ["lastPrice"]
 
             )
 
 
 
-            return float(
-
-                result["result"]["list"][0]["lastPrice"]
-
-            )
+            return float(price)
 
 
 
@@ -311,22 +329,43 @@ class BybitAPI:
 
 
 
-            return self.session.set_leverage(
-
+            result = self.session.set_leverage(
 
                 category=CATEGORY,
 
-
                 symbol=SYMBOL,
-
 
                 buyLeverage=str(LEVERAGE),
 
-
                 sellLeverage=str(LEVERAGE)
 
+            )
+
+
+
+            if result.get("retCode") == 0:
+
+                return result
+
+
+
+            # 이미 동일 레버리지
+
+            if result.get("retCode") == 110043:
+
+                return True
+
+
+
+            add_log(
+
+                f"LEVERAGE FAILED {result}"
 
             )
+
+
+            return None
+
 
 
 
@@ -374,28 +413,36 @@ class BybitAPI:
 
             result = self.session.place_order(
 
-
-
                 category=CATEGORY,
-
 
                 symbol=SYMBOL,
 
-
                 side=side,
-
 
                 orderType="Market",
 
-
                 qty=str(qty),
-
 
                 reduceOnly=reduce_only
 
-
-
             )
+
+
+
+
+            if result.get("retCode") != 0:
+
+
+                add_log(
+
+                    f"ORDER FAILED {result}"
+
+                )
+
+
+                return None
+
+
 
 
 
@@ -404,6 +451,7 @@ class BybitAPI:
                 f"ORDER {side} {qty}"
 
             )
+
 
 
             return result
@@ -429,7 +477,6 @@ class BybitAPI:
 
 
 
-
     # =====================================================
     # POSITION
     # =====================================================
@@ -444,16 +491,24 @@ class BybitAPI:
 
 
 
-            return self.session.get_positions(
-
+            result = self.session.get_positions(
 
                 category=CATEGORY,
 
-
                 symbol=SYMBOL
 
-
             )
+
+
+
+            if result.get("retCode") != 0:
+
+                return None
+
+
+
+            return result
+
 
 
 
@@ -475,7 +530,6 @@ class BybitAPI:
 
 
 
-
     # =====================================================
     # BALANCE
     # =====================================================
@@ -490,13 +544,21 @@ class BybitAPI:
 
 
 
-            return self.session.get_wallet_balance(
-
+            result = self.session.get_wallet_balance(
 
                 accountType="UNIFIED"
 
-
             )
+
+
+
+            if result.get("retCode") != 0:
+
+                return None
+
+
+
+            return result
 
 
 
@@ -520,7 +582,7 @@ class BybitAPI:
 
 
     # =====================================================
-    # TP SL
+    # TP / SL
     # =====================================================
 
     def set_trading_stop(
@@ -541,22 +603,36 @@ class BybitAPI:
 
 
 
-            return self.session.set_trading_stop(
-
+            result = self.session.set_trading_stop(
 
                 category=CATEGORY,
 
-
                 symbol=SYMBOL,
-
 
                 takeProfit=str(tp),
 
-
                 stopLoss=str(sl)
 
-
             )
+
+
+
+            if result.get("retCode") != 0:
+
+
+                add_log(
+
+                    f"TP SL FAILED {result}"
+
+                )
+
+
+                return None
+
+
+
+            return result
+
 
 
 
@@ -588,98 +664,101 @@ class BybitAPI:
         try:
 
 
-            pos = self.get_position()
+            position = self.get_position()
 
 
 
-            if not pos:
-
-                return None
-
-
-
-
-            rows = pos["result"]["list"]
-
-
-
-            if not rows:
+            if not position:
 
                 return None
 
 
 
+            rows = (
 
-            p = rows[0]
+                position
+
+                .get("result", {})
+
+                .get("list", [])
+
+            )
 
 
 
-            size = float(
+            for p in rows:
 
-                p.get(
 
-                    "size",
+                if p.get("symbol") != SYMBOL:
 
-                    0
+                    continue
+
+
+
+                size = float(
+
+                    p.get(
+
+                        "size",
+
+                        0
+
+                    )
+
+                    or 0
 
                 )
 
-            )
+
+
+                if size <= 0:
+
+                    continue
 
 
 
-            if size <= 0:
+                side = p.get(
 
-                return None
+                    "side",
 
+                    ""
 
-
-
-            side = p.get(
-
-                "side",
-
-                ""
-
-            )
+                )
 
 
 
-            if side == "Buy":
-
-
-                close_side = "Sell"
+                close_side = None
 
 
 
-            elif side == "Sell":
+                if side == "Buy":
 
-
-                close_side = "Buy"
-
-
-
-            else:
-
-
-                return None
+                    close_side = "Sell"
 
 
 
+                elif side == "Sell":
 
-            return self.place_order(
-
-
-                close_side,
+                    close_side = "Buy"
 
 
-                size,
+
+                if close_side:
 
 
-                True
+                    return self.place_order(
+
+                        close_side,
+
+                        size,
+
+                        True
+
+                    )
 
 
-            )
+
+            return None
 
 
 
@@ -695,6 +774,7 @@ class BybitAPI:
 
 
             return None
+
 
 
 
