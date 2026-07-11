@@ -1,320 +1,101 @@
 // =====================================================
 // VWAP SUPERTREND BOT
-// CHART.JS MANAGER
-// BYBIT V5
+// CANDLE CHART
 // =====================================================
 
 
-let priceChart = null;
+let candleChart = null;
 
 
-
-// =====================================================
-// LOAD CANDLES
-// =====================================================
 
 async function loadChart(){
 
 
-    try{
+try{
 
 
-        const response = await fetch(
-            "/api/candles"
-        );
-
-
-        const data = await response.json();
+let response =
+await fetch("/api/candles");
 
 
 
-        if(
-            !data.result ||
-            !data.result.list
-        ){
-
-            return;
-
-        }
+let data =
+await response.json();
 
 
 
-        let candles =
-            data.result.list;
+if(!data.result)
+
+return;
 
 
 
-        candles.reverse();
+let list =
+data.result.list;
 
 
 
-        let labels = [];
-
-        let prices = [];
-
-        let volumes = [];
+list.reverse();
 
 
 
-
-        candles.forEach(c=>{
-
-
-            labels.push(
-
-                new Date(
-
-                    Number(c[0])
-
-                ).toLocaleTimeString()
-
-            );
+let candles=[];
 
 
 
-            prices.push(
-
-                Number(c[4])
-
-            );
+list.forEach(c=>{
 
 
+candles.push({
 
-            volumes.push(
-
-                Number(c[5])
-
-            );
+x:
+Number(c[0]),
 
 
-        });
+o:
+Number(c[1]),
+
+
+h:
+Number(c[2]),
+
+
+l:
+Number(c[3]),
+
+
+c:
+Number(c[4])
+
+
+});
+
+
+});
 
 
 
 
 
-        drawChart(
 
-            labels,
+drawCandles(candles);
 
-            prices
-
-        );
-
-
-
-    }
-
-
-    catch(e){
-
-
-        console.log(
-
-            "CHART ERROR",
-
-            e
-
-        );
-
-
-    }
 
 
 }
 
+catch(e){
 
+console.log(
 
+"CHART ERROR",
 
+e
 
+);
 
 
-
-// =====================================================
-// DRAW
-// =====================================================
-
-function drawChart(
-
-    labels,
-
-    prices
-
-){
-
-
-
-    const canvas =
-
-        document.getElementById(
-
-            "chart"
-
-        );
-
-
-
-    if(!canvas)
-
-        return;
-
-
-
-
-
-
-
-    if(priceChart == null){
-
-
-
-        priceChart = new Chart(
-
-            canvas,
-
-            {
-
-
-            type:"line",
-
-
-
-            data:{
-
-
-                labels:labels,
-
-
-
-                datasets:[{
-
-
-                    label:"BTCUSDT",
-
-
-                    data:prices,
-
-
-                    borderWidth:2,
-
-
-                    tension:0.2,
-
-
-                    pointRadius:0
-
-
-
-                }]
-
-
-
-            },
-
-
-
-            options:{
-
-
-                responsive:true,
-
-
-                animation:false,
-
-
-                interaction:{
-
-
-                    intersect:false,
-
-
-                    mode:"index"
-
-
-                },
-
-
-
-                plugins:{
-
-
-                    legend:{
-
-
-                        display:true
-
-
-                    }
-
-
-                },
-
-
-
-                scales:{
-
-
-                    x:{
-
-
-                        ticks:{
-
-
-                            maxTicksLimit:10
-
-
-                        }
-
-
-                    },
-
-
-
-                    y:{
-
-
-                        beginAtZero:false
-
-
-                    }
-
-
-                }
-
-
-
-            }
-
-
-
-            }
-
-
-        );
-
-
-
-    }
-
-
-
-    else{
-
-
-
-        priceChart.data.labels = labels;
-
-
-
-        priceChart.data.datasets[0].data = prices;
-
-
-
-        priceChart.update();
-
-
-
-    }
+}
 
 
 
@@ -327,19 +108,153 @@ function drawChart(
 
 
 
-// =====================================================
-// AUTO UPDATE
-// =====================================================
+function drawCandles(data){
+
+
+
+let ctx =
+document
+.getElementById("chart");
+
+
+
+if(!ctx)
+
+return;
+
+
+
+
+
+
+if(!candleChart){
+
+
+
+candleChart =
+new Chart(
+
+ctx,
+
+{
+
+
+type:"candlestick",
+
+
+
+data:{
+
+
+datasets:[{
+
+
+label:"BTCUSDT",
+
+
+data:data
+
+
+
+}]
+
+
+
+},
+
+
+
+options:{
+
+
+responsive:true,
+
+
+animation:false,
+
+
+
+scales:{
+
+
+x:{
+
+
+type:"time",
+
+
+time:{
+
+
+unit:"minute"
+
+
+}
+
+
+
+},
+
+
+
+y:{
+
+
+beginAtZero:false
+
+
+}
+
+
+
+}
+
+
+
+}
+
+
+
+}
+
+
+
+);
+
+
+
+}
+
+
+else{
+
+
+candleChart.data.datasets[0].data=data;
+
+
+candleChart.update();
+
+
+}
+
+
+
+}
+
+
+
+
+
+
 
 
 setInterval(
 
-    loadChart,
+loadChart,
 
-    5000
+5000
 
 );
-
 
 
 loadChart();
