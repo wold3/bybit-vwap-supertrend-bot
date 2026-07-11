@@ -1,95 +1,620 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
+
 <head>
-    <title>Trading Dashboard</title>
 
-    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<meta charset="UTF-8">
 
-    <style>
-        body {
-            background: #0e1116;
-            color: white;
-            font-family: Arial;
-        }
+<title>
+Bybit VWAP SuperTrend Bot
+</title>
 
-        .row {
-            display: flex;
-        }
 
-        #priceChart, #equityChart {
-            width: 50%;
-            height: 500px;
-        }
-    </style>
+<style>
+
+body {
+
+    background:#111;
+
+    color:#eee;
+
+    font-family: Arial, sans-serif;
+
+    margin:20px;
+
+}
+
+
+h1 {
+
+    color:#00ff99;
+
+}
+
+
+.card {
+
+    background:#1b1b1b;
+
+    padding:20px;
+
+    margin-bottom:15px;
+
+    border-radius:10px;
+
+}
+
+
+button {
+
+    padding:12px 20px;
+
+    margin:5px;
+
+    border:0;
+
+    border-radius:6px;
+
+    cursor:pointer;
+
+    font-weight:bold;
+
+}
+
+
+.demo {
+
+    background:#3498db;
+
+    color:white;
+
+}
+
+
+.live {
+
+    background:#e74c3c;
+
+    color:white;
+
+}
+
+
+.start {
+
+    background:#2ecc71;
+
+}
+
+
+.stop {
+
+    background:#95a5a6;
+
+}
+
+
+.restart {
+
+    background:#f1c40f;
+
+}
+
+
+.close {
+
+    background:#9b59b6;
+
+    color:white;
+
+}
+
+
+#logs {
+
+    height:250px;
+
+    overflow:auto;
+
+    background:#000;
+
+    padding:10px;
+
+    font-size:13px;
+
+}
+
+
+
+.value {
+
+    font-size:24px;
+
+    color:#00ff99;
+
+}
+
+
+</style>
+
+
 </head>
+
 
 <body>
 
-<h2>🚀 LIVE TRADING DASHBOARD</h2>
 
-<div class="row">
-    <div id="priceChart"></div>
-    <div id="equityChart"></div>
+<h1>
+🚀 Bybit VWAP SuperTrend Bot
+</h1>
+
+
+
+<div class="card">
+
+
+<h2>
+TRADING MODE
+</h2>
+
+
+<button class="demo"
+onclick="changeMode('DEMO')">
+
+DEMO
+
+</button>
+
+
+<button class="live"
+onclick="changeMode('LIVE')">
+
+LIVE
+
+</button>
+
+
+<h3 id="mode">
+
+-
+
+</h3>
+
+
 </div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+BOT CONTROL
+</h2>
+
+
+<button class="start"
+onclick="api('/api/start')">
+
+START
+
+</button>
+
+
+<button class="stop"
+onclick="api('/api/stop')">
+
+STOP
+
+</button>
+
+
+<button class="restart"
+onclick="api('/api/restart')">
+
+RESTART
+
+</button>
+
+
+<button class="close"
+onclick="api('/api/close')">
+
+CLOSE POSITION
+
+</button>
+
+
+<h3 id="bot">
+
+-
+
+</h3>
+
+
+</div>
+
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+ACCOUNT
+
+</h2>
+
+
+<p>
+Balance :
+<span class="value" id="balance">
+0
+</span>
+</p>
+
+
+<p>
+Equity :
+<span class="value" id="equity">
+0
+</span>
+</p>
+
+
+<p>
+PNL :
+<span class="value" id="pnl">
+0
+</span>
+</p>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+POSITION
+
+</h2>
+
+
+<p>
+
+Side :
+
+<span id="position">
+NONE
+</span>
+
+</p>
+
+
+<p>
+
+Size :
+
+<span id="size">
+0
+</span>
+
+</p>
+
+
+<p>
+
+Entry :
+
+<span id="entry">
+0
+</span>
+
+</p>
+
+
+<p>
+
+Price :
+
+<span id="price">
+0
+</span>
+
+</p>
+
+
+
+</div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+SYSTEM LOG
+
+</h2>
+
+
+<div id="logs">
+
+</div>
+
+
+</div>
+
+
+
+
+
+
 
 <script>
 
-// ============================
-// PRICE CHART
-// ============================
-const priceChart = LightweightCharts.createChart(document.getElementById('priceChart'), {
-    layout: { background: { color: "#0e1116" }, textColor: "#fff" }
-});
 
-const priceSeries = priceChart.addLineSeries();
 
-let priceData = [];
+async function api(url){
 
-async function loadPrice() {
 
-    const res = await fetch("/api/price");
-    const json = await res.json();
+    await fetch(
 
-    priceData.push({
-        time: Math.floor(Date.now() / 1000),
-        value: json.price
-    });
+        url,
 
-    if (priceData.length > 200) priceData.shift();
+        {
 
-    priceSeries.setData(priceData);
+            method:"POST"
+
+        }
+
+    );
+
+
+    refresh();
+
 }
 
-setInterval(loadPrice, 1000);
 
 
-// ============================
-// EQUITY CHART
-// ============================
-const equityChart = LightweightCharts.createChart(document.getElementById('equityChart'), {
-    layout: { background: { color: "#0e1116" }, textColor: "#fff" }
-});
 
-const equitySeries = equityChart.addLineSeries();
 
-let equityData = [];
 
-async function loadEquity() {
 
-    const res = await fetch("/api/equity");
-    const json = await res.json();
+async function changeMode(mode){
 
-    equityData = json.map(x => ({
-        time: x.time,
-        value: x.value
-    }));
 
-    equitySeries.setData(equityData);
+    await fetch(
+
+        "/api/mode",
+
+        {
+
+            method:"POST",
+
+            headers:{
+
+                "Content-Type":
+                "application/json"
+
+            },
+
+
+            body:JSON.stringify({
+
+                mode:mode
+
+            })
+
+        }
+
+    );
+
+
+    refresh();
+
 }
 
-setInterval(loadEquity, 2000);
+
+
+
+
+
+
+
+async function refresh(){
+
+
+    try{
+
+
+        let status = await fetch(
+
+            "/api/status"
+
+        );
+
+
+        let data = await status.json();
+
+
+
+
+        document.getElementById(
+
+            "mode"
+
+        ).innerHTML = data.mode;
+
+
+
+        document.getElementById(
+
+            "bot"
+
+        ).innerHTML = data.bot;
+
+
+
+        document.getElementById(
+
+            "balance"
+
+        ).innerHTML =
+        data.balance;
+
+
+
+        document.getElementById(
+
+            "equity"
+
+        ).innerHTML =
+        data.equity;
+
+
+
+        document.getElementById(
+
+            "pnl"
+
+        ).innerHTML =
+        data.pnl;
+
+
+
+        document.getElementById(
+
+            "position"
+
+        ).innerHTML =
+        data.position;
+
+
+
+        document.getElementById(
+
+            "size"
+
+        ).innerHTML =
+        data.position_size;
+
+
+
+        document.getElementById(
+
+            "entry"
+
+        ).innerHTML =
+        data.entry_price;
+
+
+
+        document.getElementById(
+
+            "price"
+
+        ).innerHTML =
+        data.price;
+
+
+
+
+    }
+
+
+    catch(e){
+
+
+        console.log(e);
+
+
+    }
+
+
+
+
+
+
+    try{
+
+
+        let logs = await fetch(
+
+            "/api/logs"
+
+        );
+
+
+        let data = await logs.json();
+
+
+
+        document.getElementById(
+
+            "logs"
+
+        ).innerHTML =
+
+        data.logs
+        .reverse()
+        .join("<br>");
+
+
+
+    }
+
+
+    catch(e){
+
+
+
+        console.log(e);
+
+
+    }
+
+
+}
+
+
+
+
+
+
+setInterval(
+
+    refresh,
+
+    2000
+
+);
+
+
+
+refresh();
+
+
 
 </script>
 
+
+
 </body>
+
 </html>
