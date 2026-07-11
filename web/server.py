@@ -1,6 +1,6 @@
 # =====================================================
 # web/server.py
-# Dashboard Web Server
+# Flask Dashboard Server
 # =====================================================
 
 from flask import (
@@ -9,24 +9,14 @@ from flask import (
     render_template
 )
 
+
 import threading
 import time
 
 
 
-from config import (
-    WEB_HOST,
-    WEB_PORT
-)
-
-
-from database.database import (
-    database
-)
-
-
 from web.chart_data import (
-    chart_data
+    get_chart
 )
 
 
@@ -34,8 +24,11 @@ from web.chart_data import (
 
 
 app = Flask(
+
     __name__,
+
     template_folder="templates"
+
 )
 
 
@@ -43,7 +36,7 @@ app = Flask(
 
 
 # =====================================================
-# STATUS MEMORY
+# GLOBAL STATUS
 # =====================================================
 
 
@@ -52,12 +45,12 @@ status = {
 
     "bot":
 
-        "STOPPED",
+        "STARTING",
 
 
     "symbol":
 
-        "BTCUSDT",
+        "",
 
 
     "price":
@@ -90,12 +83,12 @@ status = {
         "NONE",
 
 
-    "size":
+    "entry":
 
         0,
 
 
-    "entry":
+    "size":
 
         0,
 
@@ -115,20 +108,22 @@ status = {
         0,
 
 
-    "order":
+    "watchdog":
 
-        "",
-
-
-    "stats":
-
-        {}
+        "STARTING"
 
 }
 
 
 
+
+
 logs = []
+
+
+
+lock = threading.Lock()
+
 
 
 
@@ -143,7 +138,7 @@ logs = []
 def update_status(data):
 
 
-    try:
+    with lock:
 
 
         status.update(
@@ -151,19 +146,6 @@ def update_status(data):
             data
 
         )
-
-
-    except Exception as e:
-
-
-        print(
-
-            "[STATUS ERROR]",
-
-            e
-
-        )
-
 
 
 
@@ -180,61 +162,21 @@ def update_status(data):
 def add_log(message):
 
 
-    try:
-
-
-        text = (
-
-            time.strftime(
-
-                "%H:%M:%S"
-
-            )
-
-            +
-
-            " "
-
-            +
-
-            str(message)
-
-        )
+    with lock:
 
 
         logs.append(
 
-            text
+            f"{time.strftime('%H:%M:%S')}  {message}"
 
         )
 
 
 
-        if len(logs) > 200:
+        if len(logs) > 100:
 
 
-            del logs[0]
-
-
-
-        database.save_log(
-
-            text
-
-        )
-
-
-
-    except Exception as e:
-
-
-        print(
-
-            "[LOG ERROR]",
-
-            e
-
-        )
+            logs.pop(0)
 
 
 
@@ -245,34 +187,20 @@ def add_log(message):
 
 
 # =====================================================
-# DASHBOARD
+# DASHBOARD PAGE
 # =====================================================
 
 
 @app.route("/")
-def index():
+
+def dashboard():
 
 
-    try:
+    return render_template(
 
+        "dashboard.html"
 
-        return render_template(
-
-            "dashboard.html"
-
-        )
-
-
-    except:
-
-
-        return """
-
-        <h1>VWAP SUPERTREND BOT</h1>
-
-        <p>Dashboard Running</p>
-
-        """
+    )
 
 
 
@@ -287,36 +215,28 @@ def index():
 # =====================================================
 
 
-@app.route(
-    "/api/status"
-)
+@app.route("/api/status")
 
 def api_status():
 
 
-    status["stats"] = (
-
-        database
-
-        .get_trade_stats()
-
-    )
+    with lock:
 
 
-
-    return jsonify({
-
-
-        "status":
-
-            status,
+        return jsonify({
 
 
-        "logs":
+            "status":
 
-            logs[-50:]
+                status,
 
-    })
+
+            "logs":
+
+                logs[::-1]
+
+
+        })
 
 
 
@@ -331,16 +251,14 @@ def api_status():
 # =====================================================
 
 
-@app.route(
-    "/api/chart"
-)
+@app.route("/api/chart")
 
 def api_chart():
 
 
     return jsonify(
 
-        chart_data.get()
+        get_chart()
 
     )
 
@@ -353,24 +271,24 @@ def api_chart():
 
 
 # =====================================================
-# TRADES API
+# HEALTH CHECK
 # =====================================================
 
 
-@app.route(
-    "/api/trades"
-)
+@app.route("/health")
 
-def api_trades():
+def health():
 
 
-    return jsonify(
+    return jsonify({
 
-        database
 
-        .get_recent_trades()
+        "status":
 
-    )
+            "OK"
+
+
+    })
 
 
 
@@ -381,38 +299,8 @@ def api_trades():
 
 
 # =====================================================
-# SERVER THREAD
+# SERVER START
 # =====================================================
-
-
-def run_server():
-
-
-    app.run(
-
-        host=
-
-            WEB_HOST,
-
-
-        port=
-
-            WEB_PORT,
-
-
-        debug=False,
-
-
-        use_reloader=False
-
-    )
-
-
-
-
-
-
-
 
 
 def start_dashboard():
@@ -420,7 +308,20 @@ def start_dashboard():
 
     thread = threading.Thread(
 
-        target=run_server,
+        target=lambda:
+
+            app.run(
+
+                host="0.0.0.0",
+
+                port=8000,
+
+                debug=False,
+
+                use_reloader=False
+
+            ),
+
 
         daemon=True
 
@@ -433,8 +334,6 @@ def start_dashboard():
 
     print(
 
-        "[WEB SERVER START]",
-
-        WEB_PORT
+        "[WEB SERVER START] 8000"
 
     )
