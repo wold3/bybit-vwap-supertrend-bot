@@ -3,39 +3,65 @@
 # Order Execution Manager
 # =====================================================
 
+import time
+
+
+
+
+
 from api.bybit_api import (
+
     bybit_api
-)
 
-
-from config import (
-    DEFAULT_SYMBOL
-)
-
-
-from risk.risk_manager import (
-    risk_manager
 )
 
 
 from portfolio.position_manager import (
+
     position_manager
+
+)
+
+
+from risk.risk_manager import (
+
+    risk_manager
+
 )
 
 
 from database.database import (
+
     database
+
 )
 
 
 from services.telegram import (
+
     telegram
+
 )
 
 
 from web.server import (
-    add_log
+
+    add_log,
+
+    update_status
+
 )
+
+
+from config import (
+
+    DEFAULT_SYMBOL
+
+)
+
+
+
+
 
 
 
@@ -47,7 +73,11 @@ class OrderManager:
     def __init__(self):
 
 
-        self.order_lock = False
+        self.last_order_time = 0
+
+
+        self.cooldown = 30
+
 
 
         print(
@@ -68,24 +98,20 @@ class OrderManager:
     # EXECUTE
     # =====================================================
 
-
     def execute(
+
         self,
+
         signal
+
     ):
 
 
         try:
 
 
-            if self.order_lock:
 
-
-                print(
-
-                    "[ORDER BLOCK] ACTIVE ORDER"
-
-                )
+            if not signal:
 
 
                 return False
@@ -98,29 +124,20 @@ class OrderManager:
 
             side = signal.get(
 
-                "side"
+                "signal"
 
             )
 
 
 
-            price = float(
-
-                signal.get(
-
-                    "price",
-
-                    0
-
-                )
-
-            )
+            if side not in [
 
 
+                "BUY",
 
+                "SELL"
 
-
-            if not side or price <= 0:
+            ]:
 
 
                 return False
@@ -131,17 +148,50 @@ class OrderManager:
 
 
 
+            # -------------------------
+            # Cooldown
+            # -------------------------
+
+            if (
+
+                time.time()
+
+                -
+
+                self.last_order_time
+
+                <
+
+                self.cooldown
+
+            ):
 
 
-            # 이미 포지션 존재 확인
+                add_log(
 
+                    "ORDER BLOCK : COOLDOWN"
+
+                )
+
+
+                return False
+
+
+
+
+
+
+
+            # -------------------------
+            # Existing Position
+            # -------------------------
 
             if position_manager.has_position():
 
 
-                print(
+                add_log(
 
-                    "[ORDER BLOCK] POSITION EXISTS"
+                    "ORDER BLOCK : POSITION EXISTS"
 
                 )
 
@@ -154,40 +204,28 @@ class OrderManager:
 
 
 
+            # -------------------------
+            # Risk Check
+            # -------------------------
 
-
-            # 주문 잠금
-
-
-            self.order_lock = True
-
-
-
-
-
-
-
-            # Risk 계산
-
-
-            risk = (
+            qty = (
 
                 risk_manager
 
-                .check(
-
-                    price
-
-                )
+                .calculate_position_size()
 
             )
 
 
 
-            if not risk:
+            if qty <= 0:
 
 
-                self.order_lock = False
+                add_log(
+
+                    "ORDER BLOCK : RISK"
+
+                )
 
 
                 return False
@@ -198,7 +236,20 @@ class OrderManager:
 
 
 
-            qty = risk["qty"]
+            order_side = (
+
+                "Buy"
+
+                if side == "BUY"
+
+                else
+
+                "Sell"
+
+            )
+
+
+
 
 
 
@@ -208,7 +259,7 @@ class OrderManager:
 
                 "[ORDER SEND]",
 
-                side,
+                order_side,
 
                 qty
 
@@ -221,9 +272,9 @@ class OrderManager:
 
 
 
-
-            # 주문 전송
-
+            # -------------------------
+            # SEND ORDER
+            # -------------------------
 
             result = (
 
@@ -231,7 +282,7 @@ class OrderManager:
 
                 .place_order(
 
-                    side,
+                    order_side,
 
                     qty
 
@@ -243,10 +294,16 @@ class OrderManager:
 
 
 
+
+
             if not result:
 
 
-                self.order_lock = False
+                add_log(
+
+                    "ORDER FAILED"
+
+                )
 
 
                 return False
@@ -264,16 +321,11 @@ class OrderManager:
             ) != 0:
 
 
-                print(
+                add_log(
 
-                    "[ORDER FAILED]",
-
-                    result
+                    str(result)
 
                 )
-
-
-                self.order_lock = False
 
 
                 return False
@@ -284,17 +336,17 @@ class OrderManager:
 
 
 
-            print(
+            self.last_order_time = time.time()
 
-                "[ORDER SUCCESS]"
 
-            )
+
+
 
 
 
             add_log(
 
-                f"{side} ORDER {qty}"
+                f"ORDER SUCCESS {order_side}"
 
             )
 
@@ -305,108 +357,57 @@ class OrderManager:
 
 
 
+            # -------------------------
+            # TP / SL
+            # -------------------------
 
-            # TP / SL 계산
+            try:
 
 
-            tp_sl = (
+                price = signal.get(
 
-                risk_manager
+                    "price",
 
-                .calculate_tp_sl(
-
-                    side,
-
-                    price
+                    0
 
                 )
 
-            )
 
 
+                tp, sl = (
 
+                    risk_manager
 
+                    .calculate_tp_sl(
 
+                        price,
 
+                        side
 
-            stop_result = (
-
-                bybit_api
-
-                .set_trading_stop(
-
-                    tp_sl["tp"],
-
-                    tp_sl["sl"]
+                    )
 
                 )
 
-            )
+
+
+                bybit_api.set_trading_stop(
+
+                    tp,
+
+                    sl
+
+                )
 
 
 
+            except Exception as e:
 
 
+                add_log(
 
+                    f"TP SL ERROR {e}"
 
-            print(
-
-                "[TP/SL]",
-
-                tp_sl
-
-            )
-
-
-
-
-
-
-
-
-
-            # DB 저장
-
-
-            database.save_trade({
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL,
-
-
-                "side":
-
-                    side,
-
-
-                "qty":
-
-                    qty,
-
-
-                "entry":
-
-                    price,
-
-
-                "tp":
-
-                    tp_sl["tp"],
-
-
-                "sl":
-
-                    tp_sl["sl"],
-
-
-                "result":
-
-                    "OPEN"
-
-
-            })
+                )
 
 
 
@@ -416,28 +417,65 @@ class OrderManager:
 
 
 
-            # Telegram
+            # -------------------------
+            # DB
+            # -------------------------
 
+            database.save_trade(
 
-            telegram.order(
-
-                side,
 
                 DEFAULT_SYMBOL,
 
+
+                order_side,
+
+
                 qty,
 
-                price
+
+                signal.get(
+
+                    "price",
+
+                    0
+
+                )
+
 
             )
 
 
 
-            telegram.tp_sl(
 
-                tp_sl["tp"],
 
-                tp_sl["sl"]
+
+
+
+
+            # -------------------------
+            # Telegram
+            # -------------------------
+
+            telegram.order(
+
+
+                order_side,
+
+
+                DEFAULT_SYMBOL,
+
+
+                qty,
+
+
+                signal.get(
+
+                    "price",
+
+                    0
+
+                )
+
 
             )
 
@@ -448,8 +486,15 @@ class OrderManager:
 
 
 
+            update_status({
 
-            self.order_lock = False
+
+                "signal":
+
+                    side
+
+
+            })
 
 
 
@@ -487,10 +532,9 @@ class OrderManager:
             )
 
 
-            self.order_lock = False
-
-
             return False
+
+
 
 
 
@@ -503,6 +547,5 @@ class OrderManager:
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 order_manager = OrderManager()
