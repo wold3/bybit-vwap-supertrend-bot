@@ -1,60 +1,35 @@
 # =====================================================
 # main.py
-# VWAP SUPERTREND BOT ENTRY POINT
-# Manual Run Version
+# VWAP SUPERTREND AUTO BOT
 # =====================================================
 
 import time
-import threading
 import signal
 import sys
 
 
 
+from app import TradingApp
 
-
-from app import (
-    app
-)
 
 
 from web.server import (
-    run_server
+
+    run_server,
+
+    set_bot_instance,
+
+    update_status,
+
+    add_log
+
 )
 
 
-from services.telegram import (
-    telegram
-)
 
 
 
-
-
-# =====================================================
-# GLOBAL
-# =====================================================
-
-
-running = True
-
-
-
-
-
-
-
-# =====================================================
-# WEB SERVER THREAD
-# =====================================================
-
-
-def start_web():
-
-
-    run_server()
-
-
+app_instance = None
 
 
 
@@ -64,48 +39,28 @@ def start_web():
 # SHUTDOWN
 # =====================================================
 
+def shutdown():
 
-def shutdown(
-    sig=None,
-    frame=None
-):
-
-
-    global running
-
-
-
-    if not running:
-
-
-        return
-
-
-
-    running = False
-
+    global app_instance
 
 
     print()
 
     print("====================")
 
-    print("[SYSTEM STOP]")
+    print("[SYSTEM SHUTDOWN]")
 
     print("====================")
-
-
 
 
 
     try:
 
 
-        app.stop()
+        if app_instance:
 
 
-
-        telegram.bot_stop()
+            app_instance.stop()
 
 
 
@@ -114,7 +69,7 @@ def shutdown(
 
         print(
 
-            "[SHUTDOWN ERROR]",
+            "[STOP ERROR]",
 
             e
 
@@ -122,11 +77,29 @@ def shutdown(
 
 
 
+    update_status({
+
+        "bot":
+
+            "STOPPED"
+
+    })
 
 
-    print()
 
-    print("[EXIT COMPLETE]")
+    add_log(
+
+        "SYSTEM STOPPED"
+
+    )
+
+
+
+    print(
+
+        "[PROGRAM EXIT]"
+
+    )
 
 
 
@@ -141,15 +114,33 @@ def shutdown(
 
 
 # =====================================================
-# SIGNAL HANDLER
+# CTRL+C
 # =====================================================
+
+def signal_handler(
+
+    sig,
+
+    frame
+
+):
+
+
+    shutdown()
+
+
+
+
+
+
+
 
 
 signal.signal(
 
     signal.SIGINT,
 
-    shutdown
+    signal_handler
 
 )
 
@@ -158,7 +149,7 @@ signal.signal(
 
     signal.SIGTERM,
 
-    shutdown
+    signal_handler
 
 )
 
@@ -174,8 +165,11 @@ signal.signal(
 # MAIN
 # =====================================================
 
-
 def main():
+
+
+    global app_instance
+
 
 
     print()
@@ -186,123 +180,22 @@ def main():
 
     print("==============================")
 
+    print("[MODE] MANUAL RUN")
 
 
 
 
-    print(
 
-        "[MODE]",
+    try:
 
-        "MANUAL RUN"
 
-    )
 
+        # -------------------------
+        # WEB SERVER
+        # -------------------------
 
+        run_server()
 
-
-
-
-
-
-
-    # Telegram START
-
-
-    telegram.bot_start()
-
-
-
-
-
-
-
-
-
-    # Dashboard
-
-
-    web_thread = threading.Thread(
-
-        target=start_web,
-
-        daemon=True
-
-    )
-
-
-    web_thread.start()
-
-
-
-
-
-
-
-
-
-    time.sleep(2)
-
-
-
-
-
-
-
-
-
-    # Trading System Start
-
-
-    app.start()
-
-
-
-
-
-
-
-
-
-    print()
-
-    print("==============================")
-
-    print("[BOT RUNNING]")
-
-    print("==============================")
-
-    print()
-
-    print(
-
-        "Dashboard:"
-
-    )
-
-    print(
-
-        "http://127.0.0.1:8000"
-
-    )
-
-    print()
-
-    print(
-
-        "STOP : Ctrl + C"
-
-    )
-
-
-
-
-
-
-
-
-
-    while running:
 
 
         time.sleep(1)
@@ -311,14 +204,146 @@ def main():
 
 
 
+        # -------------------------
+        # BOT INIT
+        # -------------------------
+
+        app_instance = TradingApp()
+
+
+
+        set_bot_instance(
+
+            app_instance
+
+        )
+
+
+
+        print(
+
+            "[TRADING APP READY]"
+
+        )
+
+
+
+
+
+
+
+        # -------------------------
+        # BOT START
+        # -------------------------
+
+        app_instance.start()
+
+
+
+        update_status({
+
+            "bot":
+
+                "RUNNING"
+
+        })
+
+
+
+        add_log(
+
+            "BOT RUNNING"
+
+        )
+
+
+
+
+
+        print()
+
+        print("==============================")
+
+        print("[BOT RUNNING]")
+
+        print("==============================")
+
+        print()
+
+        print(
+
+            "Dashboard:"
+
+        )
+
+        print(
+
+            "http://127.0.0.1:8000"
+
+        )
+
+        print()
+
+        print(
+
+            "STOP : Ctrl + C"
+
+        )
+
+
+
+
+
+        # -------------------------
+        # MAIN LOOP
+        # -------------------------
+
+        while True:
+
+
+            time.sleep(1)
+
+
+
+
+
+    except KeyboardInterrupt:
+
+
+        shutdown()
+
+
+
+
+
+    except Exception as e:
+
+
+
+        print(
+
+            "[MAIN ERROR]",
+
+            e
+
+        )
+
+
+
+        shutdown()
+
+
+
+
+
+
 
 
 
 
 # =====================================================
-# EXECUTE
+# ENTRY
 # =====================================================
-
 
 if __name__ == "__main__":
 
