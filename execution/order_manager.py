@@ -3,14 +3,14 @@
 # Order Manager
 # =====================================================
 
-import time
-
-
 from config import (
-    LIVE_ORDER,
-    DEFAULT_ORDER_QTY,
-    STOP_LOSS_PERCENT,
-    TAKE_PROFIT_PERCENT
+    DEFAULT_SYMBOL,
+    STOP_LOSS_PERCENT
+)
+
+
+from api.bybit_api import (
+    bybit_api
 )
 
 
@@ -24,20 +24,29 @@ from portfolio.position_manager import (
 )
 
 
+from database.database import (
+    database
+)
+
+
+from services.telegram import (
+    telegram
+)
+
+
+from web.server import (
+    update_status,
+    add_log
+)
+
+
 
 
 
 class OrderManager:
 
 
-    def __init__(self, api):
-
-
-        self.api = api
-
-
-        self.last_order = {}
-
+    def __init__(self):
 
 
         print(
@@ -50,187 +59,151 @@ class OrderManager:
 
 
 
+
     # =====================================================
-    # EXECUTE
+    # EXECUTE SIGNAL
     # =====================================================
 
 
     def execute(
         self,
-        signal,
-        price
+        signal
     ):
 
 
-        if not signal:
+        try:
 
 
-            return None
+            side = signal.get(
 
+                "side"
 
-
-
-
-        side = signal.get(
-
-            "side",
-
-            ""
-
-        )
+            )
 
 
 
-        if side not in [
+            if side not in [
 
-            "Buy",
+                "Buy",
 
-            "Sell"
+                "Sell"
 
-        ]:
+            ]:
+
+
+                return False
+
+
+
+
+
+
+            current = (
+
+                position_manager
+
+                .get_position()
+
+                .get(
+
+                    "size",
+
+                    0
+
+                )
+
+            )
+
+
+
+
+
+            if not risk_manager.can_trade(
+
+                current
+
+            ):
+
+
+                add_log(
+
+                    "RISK BLOCK"
+
+                )
+
+
+                return False
+
+
+
+
+
+
+
+
+
+            price = (
+
+                self.get_price()
+
+            )
+
+
+
+            if price <= 0:
+
+
+                return False
+
+
+
+
+
+
+            qty = (
+
+                risk_manager
+
+                .calculate_size(
+
+                    price
+
+                )
+
+            )
+
+
+
+            if qty <= 0:
+
+
+                return False
+
+
+
+
+
 
 
             print(
 
-                "[INVALID SIDE]",
+                "[ORDER SEND]",
 
-                side
+                side,
 
-            )
-
-
-            return None
-
-
-
-
-
-
-
-        # =================================================
-        # POSITION CHECK
-        # =================================================
-
-
-        position = (
-
-            position_manager
-
-            .get_position()
-
-        )
-
-
-
-        current_size = float(
-
-            position.get(
-
-                "size",
-
-                0
-
-            )
-
-        )
-
-
-
-        if not risk_manager.can_trade(
-
-            current_size
-
-        ):
-
-
-            print(
-
-                "[ORDER BLOCKED]"
+                qty
 
             )
 
 
-            return None
 
 
 
-
-
-        print(
-
-            "[RISK OK]"
-
-        )
-
-
-
-
-
-
-
-        # =================================================
-        # SIZE
-        # =================================================
-
-
-        qty = DEFAULT_ORDER_QTY
-
-
-
-        calculated_qty = (
-
-            risk_manager
-
-            .calculate_size(
-
-                price
-
-            )
-
-        )
-
-
-
-        if calculated_qty > 0:
-
-
-            qty = calculated_qty
-
-
-
-
-
-
-
-
-        print(
-
-            "[ORDER SEND]",
-
-            side,
-
-            qty
-
-        )
-
-
-
-
-
-
-
-
-        # =================================================
-        # ORDER
-        # =================================================
-
-
-        if LIVE_ORDER:
 
 
             result = (
 
-                self.api
+                bybit_api
 
                 .place_order(
 
@@ -243,31 +216,214 @@ class OrderManager:
             )
 
 
-        else:
 
 
-            result = {
 
 
-                "retCode":
-
-                    0,
+            if not result:
 
 
-                "retMsg":
 
-                    "LOCAL TEST ORDER",
+                return False
+
+
+
+
+
+
+
+            if result.get(
+
+                "retCode"
+
+            ) != 0:
+
+
+
+                print(
+
+                    "[ORDER FAILED]",
+
+                    result
+
+                )
+
+
+
+                return False
+
+
+
+
+
+
+
+
+            print(
+
+                "[ORDER SUCCESS]"
+
+            )
+
+
+
+
+
+            risk_manager.record_trade()
+
+
+
+
+
+
+
+
+
+            # =========================
+            # TP / SL 계산
+            # =========================
+
+
+            if side == "Buy":
+
+
+                tp = (
+
+                    price *
+
+                    1.02
+
+                )
+
+
+                sl = (
+
+                    price *
+
+                    (
+
+                    1 -
+
+                    STOP_LOSS_PERCENT
+
+                    /
+
+                    100
+
+                    )
+
+                )
+
+
+
+            else:
+
+
+                tp = (
+
+                    price *
+
+                    0.98
+
+                )
+
+
+                sl = (
+
+                    price *
+
+                    (
+
+                    1 +
+
+                    STOP_LOSS_PERCENT
+
+                    /
+
+                    100
+
+                    )
+
+                )
+
+
+
+
+
+
+
+
+
+            tp_result = (
+
+                bybit_api
+
+                .set_trading_stop(
+
+                    round(tp,2),
+
+                    round(sl,2)
+
+                )
+
+            )
+
+
+
+
+
+            print(
+
+                "[TP SL RESULT]",
+
+                tp_result
+
+            )
+
+
+
+
+
+
+
+
+
+            trade = {
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL,
+
+
+                "side":
+
+                    side,
+
+
+                "qty":
+
+                    qty,
+
+
+                "entry":
+
+                    price,
+
+
+                "tp":
+
+                    tp,
+
+
+                "sl":
+
+                    sl,
 
 
                 "result":
 
-                    {
-
-                        "orderId":
-
-                            "TEST_ORDER"
-
-                    }
+                    "OPEN"
 
             }
 
@@ -275,20 +431,13 @@ class OrderManager:
 
 
 
+            database.save_trade(
 
-
-
-        if not result:
-
-
-            print(
-
-                "[ORDER FAILED]"
+                trade
 
             )
 
 
-            return None
 
 
 
@@ -296,220 +445,100 @@ class OrderManager:
 
 
 
-        if result.get(
+            update_status({
 
-            "retCode"
 
-        ) != 0:
+                "order":
 
+                    side,
 
 
-            print(
-
-                "[BYBIT ORDER ERROR]",
-
-                result
-
-            )
-
-
-            return None
-
-
-
-
-
-
-
-        order_id = (
-
-            result
-
-            .get(
-
-                "result",
-
-                {}
-
-            )
-
-            .get(
-
-                "orderId",
-
-                ""
-
-            )
-
-        )
-
-
-
-
-
-
-
-        self.last_order = {
-
-
-            "order_id":
-
-                order_id,
-
-
-            "side":
-
-                side,
-
-
-            "qty":
-
-                qty,
-
-
-            "price":
-
-                price,
-
-
-            "time":
-
-                time.time()
-
-        }
-
-
-
-
-
-
-        print(
-
-            "[ORDER SUCCESS]",
-
-            self.last_order
-
-        )
-
-
-
-
-
-
-        risk_manager.record_trade()
-
-
-
-
-
-
-
-        # =================================================
-        # TP SL
-        # =================================================
-
-
-        tp, sl = (
-
-            self.calculate_tp_sl(
-
-                side,
-
-                price
-
-            )
-
-        )
-
-
-
-
-        if LIVE_ORDER:
-
-
-            tpsl_result = (
-
-                self.api
-
-                .set_trading_stop(
+                "tp":
 
                     tp,
 
+
+                "sl":
+
                     sl
 
-                )
+            })
+
+
+
+
+
+            add_log(
+
+                str(trade)
 
             )
+
+
+
+
+
+
+
+
+
+            telegram.send(
+
+f"""
+🚀 VWAP SUPERTREND BOT
+
+SIDE : {side}
+
+SYMBOL : {DEFAULT_SYMBOL}
+
+ENTRY : {price}
+
+QTY : {qty}
+
+TP : {round(tp,2)}
+
+SL : {round(sl,2)}
+
+MODE : AUTO
+"""
+
+            )
+
+
+
+
+
+
+
+            return True
+
+
+
+
+
+
+
+        except Exception as e:
 
 
             print(
 
-                "[TP SL RESULT]",
+                "[ORDER ERROR]",
 
-                tpsl_result
-
-            )
-
-
-
-        else:
-
-
-            print(
-
-                "[LOCAL TP SL]",
-
-                tp,
-
-                sl
+                e
 
             )
 
 
+            database.save_error(
+
+                e
+
+            )
 
 
+            return False
 
-
-
-
-        return {
-
-
-            "side":
-
-                side,
-
-
-            "qty":
-
-                qty,
-
-
-            "entry":
-
-                price,
-
-
-            "tp":
-
-                tp,
-
-
-            "sl":
-
-                sl,
-
-
-            "order_id":
-
-                order_id,
-
-
-            "response":
-
-                result
-
-        }
 
 
 
@@ -520,112 +549,56 @@ class OrderManager:
 
 
     # =====================================================
-    # TP SL CALCULATOR
+    # CURRENT PRICE
     # =====================================================
 
 
-    def calculate_tp_sl(
-        self,
-        side,
-        price
-    ):
+    def get_price(self):
 
 
-        if side == "Buy":
+        try:
 
 
-            tp = (
+            from api.bybit_api import (
 
-                price *
-
-                (
-
-                    1 +
-
-                    TAKE_PROFIT_PERCENT / 100
-
-                )
-
-            )
-
-
-            sl = (
-
-                price *
-
-                (
-
-                    1 -
-
-                    STOP_LOSS_PERCENT / 100
-
-                )
+                bybit_api
 
             )
 
 
 
-        else:
+            data = (
 
+                bybit_api
 
-            tp = (
-
-                price *
-
-                (
-
-                    1 -
-
-                    TAKE_PROFIT_PERCENT / 100
-
-                )
-
-            )
-
-
-            sl = (
-
-                price *
-
-                (
-
-                    1 +
-
-                    STOP_LOSS_PERCENT / 100
-
-                )
+                .get_kline()
 
             )
 
 
 
+            if data:
 
 
-        return (
+                return float(
 
-            round(tp, 2),
+                    data[-1][4]
 
-            round(sl, 2)
-
-        )
-
-
+                )
 
 
 
+        except:
+
+
+            pass
 
 
 
 
-    # =====================================================
-    # LAST ORDER
-    # =====================================================
+        return 0
 
 
-    def get_last_order(self):
-
-
-        return self.last_order
 
 
 
@@ -638,12 +611,4 @@ class OrderManager:
 # =====================================================
 
 
-from api.bybit_api import bybit_api
-
-
-
-order_manager = OrderManager(
-
-    bybit_api
-
-)
+order_manager = OrderManager()
