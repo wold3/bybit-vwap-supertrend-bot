@@ -8,16 +8,22 @@ import time
 import hmac
 import hashlib
 import threading
+
+
 import websocket
 
 
 
 from config import (
     BYBIT_API_KEY,
-    BYBIT_API_SECRET,
-    LIVE
+    BYBIT_API_SECRET
 )
 
+
+from web.server import (
+    get_trading_mode,
+    add_log
+)
 
 
 from portfolio.position_manager import (
@@ -26,9 +32,6 @@ from portfolio.position_manager import (
 
 
 
-from web.server import (
-    add_log
-)
 
 
 
@@ -50,29 +53,6 @@ class PrivateWebSocket:
 
 
 
-        if LIVE:
-
-
-            self.url = (
-
-                "wss://stream.bybit.com/v5/private"
-
-            )
-
-
-        else:
-
-
-            self.url = (
-
-                "wss://stream-demo.bybit.com/v5/private"
-
-            )
-
-
-
-
-
         print(
 
             "[PRIVATE WS READY]"
@@ -88,11 +68,48 @@ class PrivateWebSocket:
 
 
     # =====================================================
+    # URL
+    # =====================================================
+
+    def get_url(self):
+
+
+        mode = get_trading_mode()
+
+
+
+        if mode == "DEMO":
+
+
+            return (
+
+                "wss://stream-demo.bybit.com/v5/private"
+
+            )
+
+
+        else:
+
+
+            return (
+
+                "wss://stream.bybit.com/v5/private"
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
     # AUTH
     # =====================================================
 
-
-    def auth_message(self):
+    def get_auth(self):
 
 
         expires = int(
@@ -105,7 +122,7 @@ class PrivateWebSocket:
 
 
 
-        param = (
+        payload = (
 
             "GET/realtime"
 
@@ -123,7 +140,7 @@ class PrivateWebSocket:
 
             BYBIT_API_SECRET.encode(),
 
-            param.encode(),
+            payload.encode(),
 
             hashlib.sha256
 
@@ -167,7 +184,6 @@ class PrivateWebSocket:
     # START
     # =====================================================
 
-
     def start(self):
 
 
@@ -178,17 +194,20 @@ class PrivateWebSocket:
 
 
 
+
+
         self.running = True
 
 
 
         self.thread = threading.Thread(
 
-            target=self.run,
+            target=self.loop,
 
             daemon=True
 
         )
+
 
 
         self.thread.start()
@@ -199,12 +218,14 @@ class PrivateWebSocket:
 
 
 
-    # =====================================================
-    # RUN
-    # =====================================================
 
 
-    def run(self):
+
+    # =====================================================
+    # LOOP
+    # =====================================================
+
+    def loop(self):
 
 
         while self.running:
@@ -213,31 +234,49 @@ class PrivateWebSocket:
             try:
 
 
+                url = self.get_url()
+
+
+
                 print(
 
-                    "[PRIVATE WS CONNECTING]"
+                    "[PRIVATE WS CONNECT]",
+
+                    url
 
                 )
+
+
 
 
 
                 self.ws = websocket.WebSocketApp(
 
-                    self.url,
+
+                    url,
+
 
                     on_open=self.on_open,
 
+
                     on_message=self.on_message,
+
 
                     on_error=self.on_error,
 
+
                     on_close=self.on_close
+
 
                 )
 
 
 
+
+
                 self.ws.run_forever()
+
+
 
 
 
@@ -268,7 +307,6 @@ class PrivateWebSocket:
     # OPEN
     # =====================================================
 
-
     def on_open(
         self,
         ws
@@ -282,7 +320,6 @@ class PrivateWebSocket:
         )
 
 
-
         add_log(
 
             "PRIVATE WS CONNECTED"
@@ -291,41 +328,15 @@ class PrivateWebSocket:
 
 
 
+
+
         ws.send(
 
             json.dumps(
 
-                self.auth_message()
+                self.get_auth()
 
             )
-
-        )
-
-
-
-        time.sleep(1)
-
-
-
-        ws.send(
-
-            json.dumps({
-
-                "op":
-
-                    "subscribe",
-
-                "args":
-
-                    [
-
-                    "position",
-
-                    "order"
-
-                    ]
-
-            })
 
         )
 
@@ -340,7 +351,6 @@ class PrivateWebSocket:
     # =====================================================
     # MESSAGE
     # =====================================================
-
 
     def on_message(
         self,
@@ -360,6 +370,53 @@ class PrivateWebSocket:
 
 
 
+            if data.get(
+
+                "success"
+
+            ):
+
+
+                print(
+
+                    "[WS AUTH OK]"
+
+                )
+
+
+
+                ws.send(
+
+                    json.dumps({
+
+
+                        "op":
+
+                            "subscribe",
+
+
+                        "args":
+
+                            [
+
+                                "position",
+
+                                "order"
+
+                            ]
+
+
+                    })
+
+                )
+
+
+                return
+
+
+
+
+
 
 
             topic = data.get(
@@ -372,20 +429,18 @@ class PrivateWebSocket:
 
 
 
+            # -------------------------
+            # POSITION
+            # -------------------------
+
             if topic == "position":
 
 
-                rows = (
+                rows = data.get(
 
-                    data
+                    "data",
 
-                    .get(
-
-                        "data",
-
-                        []
-
-                    )
+                    []
 
                 )
 
@@ -408,6 +463,10 @@ class PrivateWebSocket:
 
 
 
+            # -------------------------
+            # ORDER
+            # -------------------------
+
             elif topic == "order":
 
 
@@ -416,6 +475,8 @@ class PrivateWebSocket:
                     "ORDER UPDATE"
 
                 )
+
+
 
 
 
@@ -446,7 +507,6 @@ class PrivateWebSocket:
     # ERROR
     # =====================================================
 
-
     def on_error(
         self,
         ws,
@@ -463,6 +523,13 @@ class PrivateWebSocket:
         )
 
 
+        add_log(
+
+            f"WS ERROR {error}"
+
+        )
+
+
 
 
 
@@ -473,7 +540,6 @@ class PrivateWebSocket:
     # =====================================================
     # CLOSE
     # =====================================================
-
 
     def on_close(
         self,
@@ -490,6 +556,13 @@ class PrivateWebSocket:
         )
 
 
+        add_log(
+
+            "PRIVATE WS CLOSED"
+
+        )
+
+
 
 
 
@@ -500,7 +573,6 @@ class PrivateWebSocket:
     # =====================================================
     # STOP
     # =====================================================
-
 
     def stop(self):
 
@@ -533,6 +605,5 @@ class PrivateWebSocket:
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 private_ws = PrivateWebSocket()
