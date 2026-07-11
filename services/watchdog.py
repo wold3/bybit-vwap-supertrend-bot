@@ -1,10 +1,17 @@
 # =====================================================
 # services/watchdog.py
-# Bot Watchdog Service
+# System Watchdog
 # =====================================================
 
 import time
 import threading
+
+
+
+from web.server import (
+    update_status,
+    add_log
+)
 
 
 
@@ -41,20 +48,6 @@ class Watchdog:
 
 
 
-    # =====================================================
-    # HEARTBEAT
-    # =====================================================
-
-
-    def heartbeat(self):
-
-
-        self.last_heartbeat = time.time()
-
-
-
-
-
 
 
     # =====================================================
@@ -85,7 +78,6 @@ class Watchdog:
         )
 
 
-
         self.thread.start()
 
 
@@ -105,6 +97,22 @@ class Watchdog:
 
 
     # =====================================================
+    # HEARTBEAT
+    # =====================================================
+
+
+    def heartbeat(self):
+
+
+        self.last_heartbeat = time.time()
+
+
+
+
+
+
+
+    # =====================================================
     # LOOP
     # =====================================================
 
@@ -115,41 +123,59 @@ class Watchdog:
         while self.running:
 
 
-            now = time.time()
+            try:
 
 
+                delay = (
 
-            diff = (
+                    time.time()
 
-                now -
+                    -
 
-                self.last_heartbeat
-
-            )
-
-
-
-            if diff > self.timeout:
-
-
-                print(
-
-                    "[WATCHDOG WARNING]"
-
-                )
-
-
-                print(
-
-                    "NO MARKET HEARTBEAT",
-
-                    diff
+                    self.last_heartbeat
 
                 )
 
 
 
-                self.recovery()
+
+
+                if delay > self.timeout:
+
+
+                    self.warning(
+
+                        f"MARKET THREAD STOP {int(delay)} sec"
+
+                    )
+
+
+
+                else:
+
+
+                    update_status({
+
+                        "watchdog":
+
+                            "OK"
+
+                    })
+
+
+
+
+
+            except Exception as e:
+
+
+                print(
+
+                    "[WATCHDOG ERROR]",
+
+                    e
+
+                )
 
 
 
@@ -166,28 +192,43 @@ class Watchdog:
 
 
     # =====================================================
-    # RECOVERY
+    # WARNING
     # =====================================================
 
 
-    def recovery(self):
+    def warning(
+        self,
+        message
+    ):
 
 
         print(
 
-            "[WATCHDOG RECOVERY]"
+            "[WATCHDOG WARNING]",
+
+            message
 
         )
 
 
 
-        # 향후 추가 가능
+        add_log(
 
-        # websocket reconnect
+            message
 
-        # market thread restart
+        )
 
-        # api reconnect
+
+
+        update_status({
+
+            "watchdog":
+
+                "WARNING"
+
+        })
+
+
 
 
 
@@ -212,6 +253,8 @@ class Watchdog:
             "[WATCHDOG STOP]"
 
         )
+
+
 
 
 
