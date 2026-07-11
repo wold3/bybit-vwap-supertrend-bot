@@ -5,15 +5,16 @@
 
 <meta charset="UTF-8">
 
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-
-
 <title>
 VWAP SUPERTREND BOT
 </title>
 
 
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+
 <style>
+
 
 body{
 
@@ -23,18 +24,31 @@ body{
 
     background:#0b0f14;
 
-    color:white;
+    color:#eee;
 
     font-family:
-    Arial,
-    sans-serif;
+    "Segoe UI",
+    Arial;
 
 }
+
 
 
 h1{
 
     text-align:center;
+
+    color:#00ff99;
+
+}
+
+
+
+.container{
+
+    max-width:900px;
+
+    margin:auto;
 
 }
 
@@ -42,7 +56,7 @@ h1{
 
 .card{
 
-    background:#151b23;
+    background:#151b22;
 
     border-radius:15px;
 
@@ -57,49 +71,54 @@ h1{
 
 
 
-button{
+.title{
+
+    font-size:20px;
+
+    margin-bottom:15px;
+
+    color:#00ccff;
+
+}
+
+
+
+
+button,
+select{
+
 
     border:0;
 
-    padding:15px 25px;
+    border-radius:12px;
+
+    padding:12px 20px;
 
     margin:5px;
-
-    border-radius:30px;
 
     cursor:pointer;
 
     font-weight:bold;
 
-    font-size:15px;
+    transition:.2s;
 
 }
 
 
 
-.start{
+button:hover{
 
-    background:#00c853;
-
-    color:white;
+    transform:scale(1.05);
 
 }
 
 
-
-.stop{
-
-    background:#ff1744;
-
-    color:white;
-
-}
 
 
 
 .demo{
 
-    background:#2979ff;
+    background:#3498db;
 
     color:white;
 
@@ -109,9 +128,25 @@ button{
 
 .live{
 
-    background:#ff6d00;
+    background:#e74c3c;
 
     color:white;
+
+}
+
+
+
+.start{
+
+    background:#2ecc71;
+
+}
+
+
+
+.stop{
+
+    background:#f39c12;
 
 }
 
@@ -119,7 +154,7 @@ button{
 
 .close{
 
-    background:#9c27b0;
+    background:#c0392b;
 
     color:white;
 
@@ -127,13 +162,16 @@ button{
 
 
 
+.active{
+
+    box-shadow:
+    0 0 15px white;
+
+}
+
+
+
 select{
-
-    width:200px;
-
-    padding:12px;
-
-    border-radius:10px;
 
     background:#222;
 
@@ -147,19 +185,33 @@ select{
 
     color:#00ff99;
 
-    font-size:20px;
+    font-size:22px;
 
 }
 
 
 
-#logs{
+.grid{
 
-    background:#000;
+    display:grid;
+
+    grid-template-columns:
+    repeat(2,1fr);
+
+    gap:10px;
+
+}
+
+
+
+
+#logs{
 
     height:250px;
 
     overflow:auto;
+
+    background:#000;
 
     padding:15px;
 
@@ -171,19 +223,9 @@ select{
 
 
 
-.switch{
+.status-line{
 
-    display:flex;
-
-    flex-wrap:wrap;
-
-}
-
-
-
-.item{
-
-    margin:5px;
+    margin:8px;
 
 }
 
@@ -198,33 +240,68 @@ select{
 <body>
 
 
+<div class="container">
+
+
+
 <h1>
-🚀 VWAP SUPERTREND BOT
+VWAP SUPERTREND AUTO BOT
 </h1>
+
 
 
 
 <div class="card">
 
 
-<h2>
+<div class="title">
 CONTROL
-</h2>
+</div>
 
 
-<div class="switch">
+
+<select id="symbol"
+onchange="changeSymbol()">
+
+<option>
+BTCUSDT
+</option>
+
+<option>
+ETHUSDT
+</option>
+
+<option>
+SOLUSDT
+</option>
+
+<option>
+XRPUSDT
+</option>
+
+</select>
 
 
-<button class="demo"
-onclick="modeChange('DEMO')">
+
+<br>
+
+
+
+<button
+id="demoBtn"
+class="demo"
+onclick="changeMode('DEMO')">
 
 DEMO
 
 </button>
 
 
-<button class="live"
-onclick="modeChange('LIVE')">
+
+<button
+id="liveBtn"
+class="live"
+onclick="changeMode('LIVE')">
 
 LIVE
 
@@ -232,28 +309,39 @@ LIVE
 
 
 
-<button class="start"
-onclick="startBot()">
 
-▶ START
-
-</button>
+<br>
 
 
 
-<button class="stop"
-onclick="stopBot()">
+<button
+id="startBtn"
+class="start"
+onclick="botStart()">
 
-■ STOP
+START
 
 </button>
 
 
 
-<button class="close"
+<button
+id="stopBtn"
+class="stop"
+onclick="botStop()">
+
+STOP
+
+</button>
+
+
+
+<button
+id="closeBtn"
+class="close"
 onclick="closePosition()">
 
-CLOSE
+CLOSE POSITION
 
 </button>
 
@@ -261,7 +349,6 @@ CLOSE
 </div>
 
 
-</div>
 
 
 
@@ -270,135 +357,58 @@ CLOSE
 <div class="card">
 
 
-<h2>
-SYMBOL
-</h2>
-
-
-<select id="symbol">
-
-
-<option>
-BTCUSDT
-</option>
-
-
-<option>
-ETHUSDT
-</option>
-
-
-<option>
-XRPUSDT
-</option>
-
-
-<option>
-SOLUSDT
-</option>
-
-
-</select>
-
-
-
-<button onclick="changeSymbol()">
-
-CHANGE
-
-</button>
-
-
-
-</div>
-
-
-
-
-
-<div class="card">
-
-
-<h2>
+<div class="title">
 STATUS
-</h2>
+</div>
 
 
-<p>
+<div class="grid">
 
-MODE :
 
+<div>
+MODE
+<br>
 <span id="mode"
 class="value">
 -
 </span>
-
-</p>
-
-
-
-<p>
-
-SYMBOL :
-
-<span id="symbol_view"
-class="value">
--
-</span>
-
-</p>
+</div>
 
 
 
-<p>
-
-BOT :
-
+<div>
+BOT
+<br>
 <span id="bot"
 class="value">
 -
 </span>
-
-</p>
-
+</div>
 
 
-<p>
 
-POSITION :
-
+<div>
+POSITION
+<br>
 <span id="position"
 class="value">
 -
 </span>
-
-</p>
-
+</div>
 
 
-<p>
 
-PNL :
-
+<div>
+PNL
+<br>
 <span id="pnl"
 class="value">
 -
 </span>
-
-</p>
-
+</div>
 
 
-<p>
-
-LAST ACTION :
-
-<span id="action"
-class="value">
--
-</span>
-
-</p>
+</div>
 
 
 </div>
@@ -408,12 +418,37 @@ class="value">
 
 
 
+
 <div class="card">
 
 
-<h2>
+<div class="title">
+LAST ACTION
+</div>
+
+
+<div id="action">
+
+대기중
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<div class="title">
 LOG
-</h2>
+
+</div>
 
 
 <div id="logs">
@@ -427,9 +462,27 @@ LOG
 
 
 
+</div>
+
+
+
+
+
 
 
 <script>
+
+
+function action(text){
+
+document.getElementById(
+"action"
+).innerHTML=text;
+
+}
+
+
+
 
 
 
@@ -452,12 +505,15 @@ headers:{
 },
 
 body:
-
 JSON.stringify(data)
 
 }
 
-);
+)
+
+.then(
+r=>r.json()
+)
 
 }
 
@@ -465,32 +521,37 @@ JSON.stringify(data)
 
 
 
-function startBot(){
+function changeMode(mode){
 
 
-post(
-"/api/start"
+action(
+"MODE 변경 : "+mode
 );
 
 
-}
-
-
-
-function stopBot(){
-
-
-post(
-"/api/stop"
+document.querySelectorAll(
+"button"
+)
+.forEach(
+b=>b.classList.remove("active")
 );
 
 
-}
 
+document.getElementById(
 
+mode=="DEMO"
+?
+"demoBtn"
+:
+"liveBtn"
 
+)
 
-function modeChange(mode){
+.classList.add(
+"active"
+);
+
 
 
 post(
@@ -503,7 +564,10 @@ mode:mode
 
 }
 
-);
+)
+
+.then(update);
+
 
 
 }
@@ -516,10 +580,14 @@ function changeSymbol(){
 
 
 let s=document.getElementById(
-
 "symbol"
-
 ).value;
+
+
+
+action(
+"SYMBOL 변경 : "+s
+);
 
 
 
@@ -533,10 +601,75 @@ symbol:s
 
 }
 
-);
+)
+
+.then(update);
 
 
 }
+
+
+
+
+
+
+function botStart(){
+
+
+action(
+"START 버튼 클릭"
+);
+
+
+document.getElementById(
+"startBtn"
+)
+.classList.add(
+"active"
+);
+
+
+
+post(
+"/api/start"
+)
+.then(update);
+
+
+}
+
+
+
+
+
+
+function botStop(){
+
+
+action(
+"STOP 버튼 클릭"
+);
+
+
+document.getElementById(
+"stopBtn"
+)
+.classList.add(
+"active"
+);
+
+
+
+post(
+"/api/stop"
+)
+.then(update);
+
+
+
+}
+
+
 
 
 
@@ -545,21 +678,27 @@ function closePosition(){
 
 
 if(confirm(
-
 "포지션 종료?"
-
 )){
+
+
+action(
+"CLOSE POSITION 실행"
+);
+
 
 
 post(
 "/api/close"
-);
+)
+.then(update);
 
 
 }
 
 
 }
+
 
 
 
@@ -571,68 +710,32 @@ post(
 function update(){
 
 
-
 fetch(
-
 "/api/status"
-
 )
 
-.then(r=>r.json())
+.then(
+r=>r.json()
+)
 
-.then(data=>{
+.then(
+data=>{
 
 
 let s=data.status;
 
 
 
-document.getElementById(
-
-"mode"
-
-).innerHTML=s.mode;
+mode.innerHTML=s.mode;
 
 
-
-document.getElementById(
-
-"symbol_view"
-
-).innerHTML=s.symbol;
+bot.innerHTML=s.bot;
 
 
-
-document.getElementById(
-
-"bot"
-
-).innerHTML=s.bot;
+position.innerHTML=s.position;
 
 
-
-document.getElementById(
-
-"position"
-
-).innerHTML=s.position;
-
-
-
-document.getElementById(
-
-"pnl"
-
-).innerHTML=s.pnl;
-
-
-
-document.getElementById(
-
-"action"
-
-).innerHTML=s.last_action;
-
+pnl.innerHTML=s.pnl;
 
 
 
@@ -640,13 +743,25 @@ document.getElementById(
 let html="";
 
 
-
 data.logs.forEach(
 
 x=>{
 
+html += x+"<br>";
 
-html+=x+"<br>";
+}
+
+);
+
+
+
+logs.innerHTML=html;
+
+
+
+logs.scrollTop =
+logs.scrollHeight;
+
 
 
 }
@@ -655,40 +770,14 @@ html+=x+"<br>";
 
 
 
-document.getElementById(
-
-"logs"
-
-).innerHTML=html;
-
-
-
-let box=document.getElementById(
-
-"logs"
-
-);
-
-
-box.scrollTop=box.scrollHeight;
-
-
-
-});
-
-
 }
-
 
 
 
 
 setInterval(
-
 update,
-
 2000
-
 );
 
 
@@ -698,7 +787,6 @@ update();
 
 
 </script>
-
 
 
 </body>
