@@ -1,23 +1,19 @@
 # =====================================================
 # portfolio/position_manager.py
-# Position Management System
+# Position Manager
 # =====================================================
 
 import threading
 
 
 
-
-
-from api.bybit_api import bybit_api
-
-
 from web.server import (
+
     update_status,
+
     add_log
+
 )
-
-
 
 
 
@@ -31,26 +27,28 @@ class PositionManager:
     def __init__(self):
 
 
-        self.position = {
-
-
-            "side": "NONE",
-
-            "size": 0,
-
-            "entry": 0,
-
-            "pnl": 0
-
-        }
-
-
         self.lock = threading.Lock()
 
 
 
+        self.position = {
+
+            "side": "NONE",
+
+            "size": 0.0,
+
+            "entry_price": 0.0,
+
+            "pnl": 0.0
+
+        }
+
+
+
         print(
+
             "[POSITION MANAGER READY]"
+
         )
 
 
@@ -66,24 +64,29 @@ class PositionManager:
     # =====================================================
 
     def safe_float(
+
         self,
-        value
+
+        value,
+
+        default=0.0
+
     ):
 
 
         try:
 
 
-            if value in (
+            if value in [
 
                 "",
 
                 None
 
-            ):
+            ]:
 
 
-                return 0
+                return default
 
 
 
@@ -91,13 +94,10 @@ class PositionManager:
 
 
 
+        except:
 
 
-        except Exception:
-
-
-            return 0
-
+            return default
 
 
 
@@ -108,281 +108,134 @@ class PositionManager:
 
 
     # =====================================================
-    # REST SYNC
+    # UPDATE FROM BYBIT WS
     # =====================================================
 
-    def sync(self):
+    def update(
 
-
-        try:
-
-
-            result = (
-
-                bybit_api
-
-                .get_position()
-
-            )
-
-
-
-            if not result:
-
-
-                return
-
-
-
-
-
-            rows = (
-
-                result
-
-                .get(
-
-                    "result",
-
-                    {}
-
-                )
-
-                .get(
-
-                    "list",
-
-                    []
-
-                )
-
-            )
-
-
-
-
-
-            if rows:
-
-
-                self.update_position(
-
-                    rows[0]
-
-                )
-
-
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[POSITION SYNC ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # UPDATE FROM WEBSOCKET
-    # =====================================================
-
-    def update_from_ws(
         self,
+
         data
+
     ):
 
 
         try:
-
-
-            if isinstance(
-
-                data,
-
-                list
-
-            ):
-
-
-                if len(data) == 0:
-
-
-                    return
-
-
-                data = data[0]
-
-
-
-
-
-            self.update_position(
-
-                data
-
-            )
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[WS POSITION ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # UPDATE POSITION
-    # =====================================================
-
-    def update_position(
-        self,
-        data
-    ):
-
-
-        try:
-
-
-            if not data:
-
-
-                return
-
-
-
-
-
-            side = data.get(
-
-                "side",
-
-                ""
-
-            )
-
-
-
-            size = self.safe_float(
-
-                data.get(
-
-                    "size"
-
-                )
-
-            )
-
-
-
-            entry = self.safe_float(
-
-                data.get(
-
-                    "avgPrice"
-
-                )
-
-            )
-
-
-
-            pnl = self.safe_float(
-
-                data.get(
-
-                    "unrealisedPnl"
-
-                )
-
-            )
-
-
-
-
-
-            if size <= 0:
-
-
-                side = "NONE"
-
-                size = 0
-
-                entry = 0
-
-                pnl = 0
-
-
-
-
-
-
-
-            position = {
-
-
-                "side":
-
-                    side,
-
-
-                "size":
-
-                    size,
-
-
-                "entry":
-
-                    entry,
-
-
-                "pnl":
-
-                    pnl
-
-
-            }
-
-
-
-
-
 
 
 
             with self.lock:
 
 
-                self.position = position.copy()
 
+                if not data:
+
+
+                    return
+
+
+
+
+
+
+                item = data[0]
+
+
+
+
+
+                size = self.safe_float(
+
+                    item.get(
+
+                        "size",
+
+                        0
+
+                    )
+
+                )
+
+
+
+
+
+                entry = self.safe_float(
+
+                    item.get(
+
+                        "avgPrice",
+
+                        0
+
+                    )
+
+                )
+
+
+
+
+
+                pnl = self.safe_float(
+
+                    item.get(
+
+                        "unrealisedPnl",
+
+                        0
+
+                    )
+
+                )
+
+
+
+
+
+                side = item.get(
+
+                    "side",
+
+                    ""
+
+                )
+
+
+
+                if size <= 0:
+
+
+
+                    side = "NONE"
+
+
+
+
+
+                self.position = {
+
+
+                    "side":
+
+                        side,
+
+
+                    "size":
+
+                        size,
+
+
+                    "entry_price":
+
+                        entry,
+
+
+                    "pnl":
+
+                        pnl
+
+
+                }
 
 
 
@@ -390,7 +243,6 @@ class PositionManager:
 
 
             update_status({
-
 
                 "position":
 
@@ -418,26 +270,13 @@ class PositionManager:
 
 
 
-            add_log(
-
-                f"POSITION {side} SIZE {size}"
-
-            )
-
-
-
-
-
-
-
         except Exception as e:
 
 
-            print(
 
-                "[POSITION UPDATE ERROR]",
+            add_log(
 
-                e
+                f"POSITION UPDATE ERROR {e}"
 
             )
 
@@ -450,7 +289,7 @@ class PositionManager:
 
 
     # =====================================================
-    # GET POSITION
+    # GET
     # =====================================================
 
     def get_position(self):
@@ -460,83 +299,6 @@ class PositionManager:
 
 
             return self.position.copy()
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # CHECK POSITION
-    # =====================================================
-
-    def has_position(self):
-
-
-        with self.lock:
-
-
-            return (
-
-                self.position["size"]
-
-                >
-
-                0
-
-            )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # SIDE
-    # =====================================================
-
-    def get_side(self):
-
-
-        with self.lock:
-
-
-            return (
-
-                self.position["side"]
-
-            )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # SIZE
-    # =====================================================
-
-    def get_size(self):
-
-
-        with self.lock:
-
-
-            return (
-
-                self.position["size"]
-
-            )
 
 
 
@@ -556,6 +318,7 @@ class PositionManager:
         with self.lock:
 
 
+
             self.position = {
 
 
@@ -566,17 +329,17 @@ class PositionManager:
 
                 "size":
 
-                    0,
+                    0.0,
 
 
-                "entry":
+                "entry_price":
 
-                    0,
+                    0.0,
 
 
                 "pnl":
 
-                    0
+                    0.0
 
 
             }
@@ -584,10 +347,7 @@ class PositionManager:
 
 
 
-
-
         update_status({
-
 
             "position":
 
@@ -608,8 +368,57 @@ class PositionManager:
 
                 0
 
-
         })
+
+
+
+        add_log(
+
+            "POSITION RESET"
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # CLOSE
+    # =====================================================
+
+    def close(self):
+
+
+        try:
+
+
+            self.reset()
+
+
+
+            print(
+
+                "[POSITION MANAGER CLOSED]"
+
+            )
+
+
+
+        except Exception as e:
+
+
+
+            print(
+
+                "[POSITION CLOSE ERROR]",
+
+                e
+
+            )
 
 
 
