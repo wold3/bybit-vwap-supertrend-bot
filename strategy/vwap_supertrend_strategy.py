@@ -3,14 +3,9 @@
 # VWAP + SuperTrend Strategy
 # =====================================================
 
+
 from config import (
-    USE_VOLUME_FILTER,
-    MIN_VOLUME_MULTIPLIER
-)
-
-
-from indicators.indicator_engine import (
-    indicator_engine
+    USE_VOLUME_FILTER
 )
 
 
@@ -20,29 +15,10 @@ from indicators.indicator_engine import (
 class VWAPSuperTrendStrategy:
 
 
-
     def __init__(self):
 
-
-        self.last_indicator = {
-
-
-            "vwap":0,
-
-
-            "trend":"NONE",
-
-
-            "volume":False
-
-
-        }
-
-
         print(
-
             "[VWAP SUPERTREND STRATEGY READY]"
-
         )
 
 
@@ -50,157 +26,30 @@ class VWAPSuperTrendStrategy:
 
 
 
-
-
-
-    # =====================================================
-    # ANALYZE
-    # =====================================================
-
-    def analyze(
+    def check_signal(
         self,
-        candles
+        indicator
     ):
 
 
         try:
 
 
+            price = indicator["price"]
 
-            if len(candles) < 50:
+            vwap = indicator["vwap"]
 
+            trend = indicator["trend"]
 
-                return None
+            volume_ok = indicator["volume"]
 
 
 
 
 
-            result = (
-
-                indicator_engine.calculate(
-
-                    candles
-
-                )
-
-            )
-
-
-
-
-
-            price = float(
-
-                candles[-1]
-
-                ["close"]
-
-            )
-
-
-
-
-
-            vwap = result.get(
-
-                "vwap",
-
-                0
-
-            )
-
-
-
-
-
-            trend = result.get(
-
-                "trend",
-
-                "NONE"
-
-            )
-
-
-
-
-
-            volume_ok = result.get(
-
-                "volume",
-
-                False
-
-            )
-
-
-
-
-
-
-
-
-            self.last_indicator = {
-
-
-                "vwap":
-
-                    vwap,
-
-
-                "trend":
-
-                    trend,
-
-
-                "volume":
-
-                    volume_ok
-
-
-            }
-
-
-
-
-
-
-
-            print(
-
-                "[INDICATOR]",
-
-                "PRICE:",
-
-                price,
-
-                "VWAP:",
-
-                round(vwap,2),
-
-                "TREND:",
-
-                trend,
-
-                "VOLUME:",
-
-                volume_ok
-
-            )
-
-
-
-
-
-
-
-
-
-            # -----------------------------
-            # VOLUME FILTER
-            # -----------------------------
-
+            # ============================
+            # Volume Filter
+            # ============================
 
             if USE_VOLUME_FILTER:
 
@@ -209,9 +58,7 @@ class VWAPSuperTrendStrategy:
 
 
                     print(
-
                         "[NO SIGNAL] VOLUME"
-
                     )
 
 
@@ -223,9 +70,9 @@ class VWAPSuperTrendStrategy:
 
 
 
-            # -----------------------------
-            # BUY
-            # -----------------------------
+            # ============================
+            # BUY CONDITION
+            # ============================
 
 
             if (
@@ -233,9 +80,7 @@ class VWAPSuperTrendStrategy:
 
                 trend == "UP"
 
-
                 and
-
 
                 price > vwap
 
@@ -243,13 +88,12 @@ class VWAPSuperTrendStrategy:
             ):
 
 
+                print(
+                    "[SIGNAL] BUY"
+                )
+
 
                 return {
-
-
-                    "signal":
-
-                        "BUY",
 
 
                     "side":
@@ -257,9 +101,9 @@ class VWAPSuperTrendStrategy:
                         "Buy",
 
 
-                    "price":
+                    "reason":
 
-                        price
+                        "VWAP ABOVE + SUPERTREND UP"
 
 
                 }
@@ -270,11 +114,9 @@ class VWAPSuperTrendStrategy:
 
 
 
-
-
-            # -----------------------------
-            # SELL
-            # -----------------------------
+            # ============================
+            # SELL CONDITION
+            # ============================
 
 
             if (
@@ -282,9 +124,7 @@ class VWAPSuperTrendStrategy:
 
                 trend == "DOWN"
 
-
                 and
-
 
                 price < vwap
 
@@ -292,13 +132,12 @@ class VWAPSuperTrendStrategy:
             ):
 
 
+                print(
+                    "[SIGNAL] SELL"
+                )
+
 
                 return {
-
-
-                    "signal":
-
-                        "SELL",
 
 
                     "side":
@@ -306,9 +145,9 @@ class VWAPSuperTrendStrategy:
                         "Sell",
 
 
-                    "price":
+                    "reason":
 
-                        price
+                        "VWAP BELOW + SUPERTREND DOWN"
 
 
                 }
@@ -317,6 +156,13 @@ class VWAPSuperTrendStrategy:
 
 
 
+
+
+            print(
+
+                "[NO SIGNAL]"
+
+            )
 
 
             return None
@@ -329,7 +175,6 @@ class VWAPSuperTrendStrategy:
         except Exception as e:
 
 
-
             print(
 
                 "[STRATEGY ERROR]",
@@ -340,15 +185,3 @@ class VWAPSuperTrendStrategy:
 
 
             return None
-
-
-
-
-
-
-
-# =====================================================
-# SINGLETON
-# =====================================================
-
-vwap_supertrend_strategy = VWAPSuperTrendStrategy()
