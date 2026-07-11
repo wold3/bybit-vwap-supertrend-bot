@@ -1,9 +1,11 @@
 # =====================================================
 # portfolio/position_manager.py
-# Position Manager
+# Position Management System
 # =====================================================
 
-from api.bybit_api import bybit_api
+from config import (
+    DEFAULT_SYMBOL
+)
 
 
 from web.server import (
@@ -24,6 +26,11 @@ class PositionManager:
         self.position = {
 
 
+            "symbol":
+
+                DEFAULT_SYMBOL,
+
+
             "side":
 
                 "NONE",
@@ -39,14 +46,15 @@ class PositionManager:
                 0,
 
 
-            "pnl":
+            "mark":
 
                 0,
 
 
-            "liq":
+            "pnl":
 
                 0
+
 
         }
 
@@ -74,10 +82,14 @@ class PositionManager:
     def sync(self):
 
 
+        from api.bybit_api import bybit_api
+
+
+
         try:
 
 
-            data = (
+            result = (
 
                 bybit_api
 
@@ -87,7 +99,7 @@ class PositionManager:
 
 
 
-            if not data:
+            if not result:
 
 
                 return False
@@ -96,64 +108,40 @@ class PositionManager:
 
 
 
-            if data.get(
+            rows = (
 
-                "retCode"
+                result
 
-            ) != 0:
+                .get(
 
+                    "result",
 
-                print(
-
-                    "[POSITION API ERROR]",
-
-                    data
+                    {}
 
                 )
 
+                .get(
 
-                return False
+                    "list",
 
+                    []
 
-
-
-
-
-
-            items = (
-
-                data
-
-                ["result"]
-
-                ["list"]
+                )
 
             )
 
 
 
-            if not items:
 
 
-                self.clear()
+            if rows:
 
 
-                return True
+                self.update_from_ws(
 
+                    rows[0]
 
-
-
-
-
-            pos = items[0]
-
-
-
-            self.update(
-
-                pos
-
-            )
+                )
 
 
 
@@ -184,19 +172,20 @@ class PositionManager:
 
 
 
+
+
     # =====================================================
-    # UPDATE
+    # UPDATE FROM WS
     # =====================================================
 
 
-    def update(
+    def update_from_ws(
         self,
         data
     ):
 
 
         try:
-
 
 
             size = float(
@@ -213,6 +202,8 @@ class PositionManager:
 
 
 
+
+
             side = data.get(
 
                 "side",
@@ -223,79 +214,98 @@ class PositionManager:
 
 
 
+
+
             if size == 0:
 
 
-                self.clear()
+                self.position.update({
+
+
+                    "side":
+
+                        "NONE",
+
+
+                    "size":
+
+                        0,
+
+
+                    "entry":
+
+                        0,
+
+
+                    "pnl":
+
+                        0
+
+                })
 
 
 
-                return
+            else:
 
 
+                self.position.update({
 
 
+                    "side":
+
+                        side,
 
 
+                    "size":
 
-            self.position = {
-
-
-                "side":
-
-                    side,
+                        size,
 
 
-                "size":
+                    "entry":
 
-                    size,
+                        float(
+
+                            data.get(
+
+                                "avgPrice",
+
+                                0
+
+                            )
+
+                        ),
 
 
-                "entry":
+                    "mark":
 
-                    float(
+                        float(
 
-                        data.get(
+                            data.get(
 
-                            "avgPrice",
+                                "markPrice",
 
-                            0
+                                0
+
+                            )
+
+                        ),
+
+
+                    "pnl":
+
+                        float(
+
+                            data.get(
+
+                                "unrealisedPnl",
+
+                                0
+
+                            )
 
                         )
 
-                    ),
-
-
-                "pnl":
-
-                    float(
-
-                        data.get(
-
-                            "unrealisedPnl",
-
-                            0
-
-                        )
-
-                    ),
-
-
-                "liq":
-
-                    float(
-
-                        data.get(
-
-                            "liqPrice",
-
-                            0
-
-                        )
-
-                    )
-
-            }
+                })
 
 
 
@@ -303,29 +313,22 @@ class PositionManager:
 
 
 
-            update_status({
+
+            self.dashboard_update()
 
 
-                "position":
 
-                    side,
+            print(
 
+                "[POSITION UPDATED]",
 
-                "size":
+                self.position
 
-                    size,
-
-
-                "entry":
-
-                    self.position["entry"],
+            )
 
 
-                "pnl":
 
-                    self.position["pnl"]
-
-            })
+            return True
 
 
 
@@ -345,6 +348,9 @@ class PositionManager:
             )
 
 
+            return False
+
+
 
 
 
@@ -353,29 +359,80 @@ class PositionManager:
 
 
     # =====================================================
-    # UPDATE FROM PRIVATE WS
+    # GET POSITION
     # =====================================================
 
 
-    def update_from_ws(
-        self,
-        data
-    ):
+    def get_position(self):
 
 
-        self.update(
+        return self.position
 
-            data
+
+
+
+
+
+
+
+
+    # =====================================================
+    # CHECK OPEN
+    # =====================================================
+
+
+    def has_position(self):
+
+
+        return (
+
+            self.position["side"]
+
+            !=
+
+            "NONE"
 
         )
 
 
 
-        add_log(
 
-            "POSITION UPDATED"
 
-        )
+
+
+
+
+    # =====================================================
+    # DASHBOARD UPDATE
+    # =====================================================
+
+
+    def dashboard_update(self):
+
+
+        update_status({
+
+
+            "position":
+
+                self.position["side"],
+
+
+            "entry":
+
+                self.position["entry"],
+
+
+            "size":
+
+                self.position["size"],
+
+
+            "pnl":
+
+                self.position["pnl"]
+
+        })
 
 
 
@@ -386,14 +443,19 @@ class PositionManager:
 
 
     # =====================================================
-    # CLEAR
+    # RESET
     # =====================================================
 
 
-    def clear(self):
+    def reset(self):
 
 
         self.position = {
+
+
+            "symbol":
+
+                DEFAULT_SYMBOL,
 
 
             "side":
@@ -411,12 +473,12 @@ class PositionManager:
                 0,
 
 
-            "pnl":
+            "mark":
 
                 0,
 
 
-            "liq":
+            "pnl":
 
                 0
 
@@ -424,48 +486,11 @@ class PositionManager:
 
 
 
-        update_status({
+        add_log(
 
+            "POSITION RESET"
 
-            "position":
-
-                "NONE",
-
-
-            "size":
-
-                0,
-
-
-            "entry":
-
-                0,
-
-
-            "pnl":
-
-                0
-
-        })
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # GET
-    # =====================================================
-
-
-    def get_position(self):
-
-
-        return self.position
-
+        )
 
 
 
