@@ -1,6 +1,6 @@
 # =====================================================
 # web/chart_data.py
-# Realtime Chart Data Manager
+# Chart Data Manager
 # =====================================================
 
 import threading
@@ -10,15 +10,11 @@ import threading
 
 
 # =====================================================
-# STORAGE
+# MEMORY STORAGE
 # =====================================================
 
 
 candles = []
-
-
-MAX_CANDLES = 200
-
 
 
 lock = threading.Lock()
@@ -30,12 +26,12 @@ lock = threading.Lock()
 
 
 # =====================================================
-# ADD CANDLE
+# UPDATE CANDLE
 # =====================================================
 
 
-def add_candle(
-    candle
+def update_chart(
+    data
 ):
 
 
@@ -47,13 +43,68 @@ def add_candle(
 
             candles.append(
 
-                candle
+
+                {
+
+
+                    "time":
+
+                        int(
+
+                            data["time"]
+
+                        ),
+
+
+                    "open":
+
+                        float(
+
+                            data["open"]
+
+                        ),
+
+
+                    "high":
+
+                        float(
+
+                            data["high"]
+
+                        ),
+
+
+                    "low":
+
+                        float(
+
+                            data["low"]
+
+                        ),
+
+
+                    "close":
+
+                        float(
+
+                            data["close"]
+
+                        )
+
+
+                }
+
 
             )
 
 
 
-            if len(candles) > MAX_CANDLES:
+
+
+            # 최대 500개 유지
+
+
+            if len(candles) > 500:
 
 
                 candles.pop(0)
@@ -62,12 +113,14 @@ def add_candle(
 
 
 
+
+
     except Exception as e:
 
 
         print(
 
-            "[CHART DATA ERROR]",
+            "[CHART UPDATE ERROR]",
 
             e
 
@@ -82,11 +135,32 @@ def add_candle(
 
 
 # =====================================================
-# GET CHART DATA
+# GET CHART
 # =====================================================
 
 
 def get_chart():
+
+
+    with lock:
+
+
+        return candles.copy()
+
+
+
+
+
+
+
+# =====================================================
+# LOAD INITIAL DATA
+# =====================================================
+
+
+def load_initial(
+    data
+):
 
 
     try:
@@ -95,11 +169,48 @@ def get_chart():
         with lock:
 
 
-            return list(
+            candles.clear()
 
-                candles
 
-            )
+
+            for c in data:
+
+
+                candles.append(
+
+
+                    {
+
+
+                        "time":
+
+                            int(c["time"]),
+
+
+                        "open":
+
+                            float(c["open"]),
+
+
+                        "high":
+
+                            float(c["high"]),
+
+
+                        "low":
+
+                            float(c["low"]),
+
+
+                        "close":
+
+                            float(c["close"])
+
+
+                    }
+
+
+                )
 
 
 
@@ -108,11 +219,8 @@ def get_chart():
 
         print(
 
-            "[CHART GET ERROR]",
+            "[CHART LOAD ERROR]",
 
             e
 
         )
-
-
-        return []
