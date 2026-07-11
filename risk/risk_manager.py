@@ -3,22 +3,32 @@
 # Risk Management System
 # =====================================================
 
-from api.bybit_api import bybit_api
+import threading
+import datetime
+
 
 
 from config import (
 
     RISK_PER_TRADE_PERCENT,
 
-    STOP_LOSS_PERCENT,
-
-    TAKE_PROFIT_PERCENT,
-
-    MAX_POSITION_SIZE,
-
-    LEVERAGE
+    MAX_POSITION_SIZE
 
 )
+
+
+
+from web.server import (
+
+    update_status,
+
+    add_log
+
+)
+
+
+
+
 
 
 
@@ -28,6 +38,38 @@ class RiskManager:
 
 
     def __init__(self):
+
+
+        self.lock = threading.Lock()
+
+
+
+        self.enabled = True
+
+
+
+        self.kill_switch = False
+
+
+
+        self.daily_pnl = 0
+
+
+
+        self.loss_count = 0
+
+
+
+        self.max_daily_loss = -5.0
+
+
+
+        self.max_loss_count = 5
+
+
+
+        self.today = datetime.date.today()
+
 
 
         print(
@@ -45,134 +87,38 @@ class RiskManager:
 
 
     # =====================================================
-    # BALANCE
+    # DAILY RESET
     # =====================================================
 
-    def get_balance(self):
+    def reset_check(self):
 
 
-        try:
-
-
-            data = (
-
-                bybit_api
-
-                .get_balance()
-
-            )
+        today = datetime.date.today()
 
 
 
-            if not data:
+        if today != self.today:
 
 
-                return 0
+            self.today = today
+
+
+            self.daily_pnl = 0
+
+
+            self.loss_count = 0
 
 
 
+            self.kill_switch = False
 
 
 
+            add_log(
 
-            account = (
-
-                data
-
-                .get(
-
-                    "result",
-
-                    {}
-
-                )
-
-                .get(
-
-                    "list",
-
-                    []
-
-                )
+                "RISK DAILY RESET"
 
             )
-
-
-
-
-
-            if not account:
-
-
-                return 0
-
-
-
-
-
-
-
-            coin = (
-
-                account[0]
-
-                .get(
-
-                    "coin",
-
-                    []
-
-                )
-
-            )
-
-
-
-
-
-            if not coin:
-
-
-                return 0
-
-
-
-
-
-            return float(
-
-                coin[0]
-
-                .get(
-
-                    "walletBalance",
-
-                    0
-
-                )
-
-            )
-
-
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[BALANCE ERROR]",
-
-                e
-
-            )
-
-
-            return 0
-
 
 
 
@@ -183,300 +129,113 @@ class RiskManager:
 
 
     # =====================================================
-    # POSITION SIZE
+    # ORDER CHECK
     # =====================================================
 
-    def calculate_position_size(self):
-
-
-        try:
-
-
-            balance = self.get_balance()
-
-
-
-
-
-            if balance <= 0:
-
-
-                # Demo 초기 오류 방어
-
-                return MAX_POSITION_SIZE
-
-
-
-
-
-            risk_amount = (
-
-                balance
-
-                *
-
-                RISK_PER_TRADE_PERCENT
-
-                /
-
-                100
-
-            )
-
-
-
-
-
-            qty = (
-
-                risk_amount
-
-                *
-
-                LEVERAGE
-
-                /
-
-                100000
-
-            )
-
-
-
-
-
-
-
-            if qty > MAX_POSITION_SIZE:
-
-
-                qty = MAX_POSITION_SIZE
-
-
-
-
-
-            return round(
-
-                qty,
-
-                6
-
-            )
-
-
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[SIZE ERROR]",
-
-                e
-
-            )
-
-
-            return 0
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # TP / SL
-    # =====================================================
-
-    def calculate_tp_sl(
+    def allow_order(
 
         self,
 
-        price,
-
-        side
+        qty
 
     ):
 
 
-        try:
-
-
-            price = float(price)
+        with self.lock:
 
 
 
-
-
-            if side == "BUY":
+            self.reset_check()
 
 
 
-                stop_loss = (
+            if not self.enabled:
 
-                    price
 
-                    *
+                add_log(
 
-                    (
-
-                    1
-
-                    -
-
-                    STOP_LOSS_PERCENT
-
-                    /
-
-                    100
-
-                    )
+                    "RISK DISABLED"
 
                 )
 
 
+                return False
 
-                take_profit = (
 
-                    price
 
-                    *
 
-                    (
 
-                    1
+            if self.kill_switch:
 
-                    +
 
-                    TAKE_PROFIT_PERCENT
+                add_log(
 
-                    /
-
-                    100
-
-                    )
+                    "KILL SWITCH ACTIVE"
 
                 )
 
 
+                return False
 
 
 
 
-            else:
 
 
+            if float(qty) > MAX_POSITION_SIZE:
 
-                stop_loss = (
 
-                    price
+                add_log(
 
-                    *
-
-                    (
-
-                    1
-
-                    +
-
-                    STOP_LOSS_PERCENT
-
-                    /
-
-                    100
-
-                    )
+                    "POSITION SIZE LIMIT"
 
                 )
 
 
+                return False
 
-                take_profit = (
 
-                    price
 
-                    *
 
-                    (
 
-                    1
 
-                    -
 
-                    TAKE_PROFIT_PERCENT
+            if self.daily_pnl <= self.max_daily_loss:
 
-                    /
 
-                    100
+                self.activate_kill(
 
-                    )
+                    "DAILY LOSS LIMIT"
 
                 )
 
 
+                return False
 
 
 
 
 
 
-            return (
 
-                round(
-
-                    take_profit,
-
-                    2
-
-                ),
+            if self.loss_count >= self.max_loss_count:
 
 
-                round(
+                self.activate_kill(
 
-                    stop_loss,
-
-                    2
+                    "LOSS COUNT LIMIT"
 
                 )
 
-            )
+
+                return False
 
 
 
 
 
+            return True
 
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[TP SL CALC ERROR]",
-
-                e
-
-            )
-
-
-            return (
-
-                0,
-
-                0
-
-            )
 
 
 
@@ -487,28 +246,162 @@ class RiskManager:
 
 
     # =====================================================
-    # RISK CHECK
+    # PNL UPDATE
     # =====================================================
 
-    def check_trade(self):
+    def update_pnl(
+
+        self,
+
+        pnl
+
+    ):
 
 
-        qty = (
+        with self.lock:
 
-            self.calculate_position_size()
+
+
+            self.daily_pnl += float(pnl)
+
+
+
+            if pnl < 0:
+
+
+                self.loss_count += 1
+
+
+
+            update_status({
+
+                "daily_pnl":
+
+                    self.daily_pnl,
+
+
+                "loss_count":
+
+                    self.loss_count
+
+            })
+
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # KILL SWITCH
+    # =====================================================
+
+    def activate_kill(
+
+        self,
+
+        reason
+
+    ):
+
+
+        self.kill_switch = True
+
+
+
+        add_log(
+
+            f"KILL SWITCH : {reason}"
 
         )
 
 
 
-        if qty <= 0:
+        update_status({
+
+            "bot":
+
+                "KILLED"
+
+        })
 
 
-            return False
 
 
 
-        return True
+
+
+
+
+
+
+    # =====================================================
+    # MANUAL RESET
+    # =====================================================
+
+    def reset_kill(self):
+
+
+        with self.lock:
+
+
+
+            self.kill_switch = False
+
+
+
+            add_log(
+
+                "KILL SWITCH RESET"
+
+            )
+
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # STATUS
+    # =====================================================
+
+    def status(self):
+
+
+        return {
+
+
+            "enabled":
+
+                self.enabled,
+
+
+            "kill_switch":
+
+                self.kill_switch,
+
+
+            "daily_pnl":
+
+                self.daily_pnl,
+
+
+            "loss_count":
+
+                self.loss_count
+
+
+        }
+
 
 
 
