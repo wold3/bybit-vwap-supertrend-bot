@@ -1,32 +1,35 @@
-# =======================================================
+# =====================================================
 # app.py
-# VWAP SUPERTREND AUTO BOT CORE
-# =======================================================
+# VWAP SUPERTREND BOT APPLICATION
+# =====================================================
 
-import time
 import threading
-import traceback
-
-
-import config
-
-
-from api.bybit_api import bybit_api
-
-from services.private_ws import private_ws
-
-from portfolio.position_manager import position_manager
-
-from order.order_manager import order_manager
+import time
 
 
 from web.server import (
 
+    add_log,
+
     update_status,
 
-    add_log
+    set_bot
 
 )
+
+
+
+from market.market_data import market_data
+
+
+from strategy.vwap_supertrend import strategy
+
+
+from order.order_manager import order_manager
+
+
+from portfolio.position_manager import position_manager
+
 
 
 
@@ -35,242 +38,18 @@ from web.server import (
 class TradingApp:
 
 
+
     def __init__(self):
 
 
         self.running = False
 
+
         self.market_thread = None
 
+
+
         self.lock = threading.Lock()
-
-
-
-        print(
-
-            "[TRADING APP READY]"
-
-        )
-
-
-
-
-
-    # ===================================================
-    # START
-    # ===================================================
-
-    def start(self):
-
-
-        with self.lock:
-
-
-            if self.running:
-
-                return
-
-
-            self.running = True
-
-
-
-        print()
-
-        print("====================")
-
-        print("[BOT START]")
-
-        print("====================")
-
-
-
-
-
-        # -----------------------------
-        # BALANCE
-        # -----------------------------
-
-        try:
-
-
-            balance = bybit_api.get_balance()
-
-
-
-            if balance:
-
-
-                print(
-
-                    "[BALANCE OK]"
-
-                )
-
-            else:
-
-
-                print(
-
-                    "[BALANCE CHECK FAILED]"
-
-                )
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"BALANCE ERROR {e}"
-
-            )
-
-
-
-
-
-
-
-        # -----------------------------
-        # PRIVATE WS
-        # -----------------------------
-
-        try:
-
-
-            private_ws.start()
-
-
-            print(
-
-                "[PRIVATE WS STARTED]"
-
-            )
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"PRIVATE WS ERROR {e}"
-
-            )
-
-
-
-
-
-
-
-        # -----------------------------
-        # POSITION SYNC
-        # -----------------------------
-
-        try:
-
-
-            position_manager.refresh()
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"POSITION SYNC ERROR {e}"
-
-            )
-
-
-
-
-
-
-
-
-        # -----------------------------
-        # WATCHDOG
-        # -----------------------------
-
-        try:
-
-
-            from services.watchdog import watchdog
-
-
-            watchdog.start()
-
-
-
-            print(
-
-                "[WATCHDOG START]"
-
-            )
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"WATCHDOG ERROR {e}"
-
-            )
-
-
-
-
-
-
-
-
-
-        # -----------------------------
-        # MARKET THREAD
-        # -----------------------------
-
-        self.market_thread = threading.Thread(
-
-
-            target=self.market_loop,
-
-
-            daemon=True,
-
-
-            name="MarketLoop"
-
-
-        )
-
-
-        self.market_thread.start()
-
-
-
-
-
-
-        update_status({
-
-            "bot":
-
-            "RUNNING"
-
-        })
-
-
-
-        add_log(
-
-            "BOT START"
-
-        )
 
 
 
@@ -288,69 +67,210 @@ class TradingApp:
 
 
 
-    # ===================================================
-    # MARKET LOOP
-    # ===================================================
+    # =====================================================
+    # START
+    # =====================================================
 
-    def market_loop(self):
-
-
-        from market.market_data import market_data
+    def start(self):
 
 
-        from strategy.vwap_supertrend import strategy
+        with self.lock:
+
+
+            if self.running:
+
+
+                add_log(
+
+                    "BOT ALREADY RUNNING"
+
+                )
+
+
+                return False
 
 
 
+            self.running = True
 
 
-        print(
 
-            "[MARKET LOOP START]"
+        set_bot(
+
+            self
 
         )
 
 
+
+        update_status({
+
+            "bot":
+
+                "RUNNING"
+
+        })
+
+
+
+        add_log(
+
+            "BOT START"
+
+        )
+
+
+
+        self.market_thread = threading.Thread(
+
+            target=self.market_loop,
+
+            daemon=True,
+
+            name="MarketLoop"
+
+        )
+
+
+        self.market_thread.start()
+
+
+
+        add_log(
+
+            "BOT START COMPLETE"
+
+        )
+
+
+
+        return True
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # STOP
+    # =====================================================
+
+    def stop(self):
+
+
+        with self.lock:
+
+
+            if not self.running:
+
+
+                return False
+
+
+
+            self.running=False
+
+
+
+
+
+        add_log(
+
+            "BOT STOP"
+
+        )
+
+
+
+        update_status({
+
+            "bot":
+
+                "STOPPED"
+
+        })
+
+
+
+        return True
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # MARKET LOOP
+    # =====================================================
+
+    def market_loop(self):
+
+
+        add_log(
+
+            "MARKET LOOP START"
+
+        )
 
 
 
         while self.running:
 
 
-
             try:
 
 
 
+                # -------------------------
+                # POSITION SYNC
+                # -------------------------
+
+                position_manager.refresh()
+
+
+
+
+
+                # -------------------------
+                # MARKET DATA
+                # -------------------------
 
                 df = market_data.get_candles(
 
 
-                    interval=str(
-
-                        config.CANDLE_INTERVAL
-
-                    ),
+                    interval="5",
 
 
-                    limit=config.MAX_HISTORY
+                    limit=200
 
 
                 )
 
 
 
-
                 if df is None:
 
 
-                    time.sleep(10)
+                    time.sleep(5)
 
                     continue
 
 
 
 
+
+
+
+                # -------------------------
+                # STRATEGY
+                # -------------------------
 
                 signal = strategy.generate_signal(
 
@@ -361,9 +281,11 @@ class TradingApp:
 
 
 
-
-
                 if signal:
+
+
+
+                    price = market_data.price()
 
 
 
@@ -375,124 +297,47 @@ class TradingApp:
 
 
 
-                    position = position_manager.get_position()
+
+                    update_status({
+
+                        "last_action":
+
+                            f"SIGNAL {signal}",
 
 
+                        "mark_price":
 
-                    side = position.get(
+                            price
 
-                        "side",
-
-                        "NONE"
-
-                    )
-
-
-                    size = float(
-
-                        position.get(
-
-                            "size",
-
-                            0
-
-                        )
-
-                    )
+                    })
 
 
 
 
 
+                    # -------------------------
+                    # ORDER EXECUTION
+                    # -------------------------
 
+                    order_manager.open_position(
 
-                    if size > 0:
-
-
-
-                        if side == signal:
-
-
-                            add_log(
-
-                                "SAME POSITION SKIP"
-
-                            )
-
-
-                        else:
-
-
-                            add_log(
-
-                                "OPPOSITE POSITION EXISTS"
-
-                            )
-
-
-
-                        time.sleep(30)
-
-                        continue
-
-
-
-
-
-
-
-                    result = order_manager.open_position(
-
-
-                        signal,
-
-
-                        config.MAX_POSITION_SIZE
-
+                        signal
 
                     )
 
 
 
-                    if result:
-
-
-                        add_log(
-
-                            f"ORDER SUCCESS {signal}"
-
-                        )
-
-
-                    else:
-
-
-                        add_log(
-
-                            "ORDER FAILED"
-
-                        )
 
 
 
 
-
-
-
-                time.sleep(30)
-
-
-
+                time.sleep(5)
 
 
 
 
 
             except Exception as e:
-
-
-
-                traceback.print_exc()
 
 
 
@@ -503,170 +348,17 @@ class TradingApp:
                 )
 
 
+                time.sleep(5)
 
-                time.sleep(10)
 
 
 
-
-
-
-
-
-
-    # ===================================================
-    # STOP
-    # ===================================================
-
-    def stop(self):
-
-
-        with self.lock:
-
-
-
-            if not self.running:
-
-
-                return
-
-
-
-            self.running = False
-
-
-
-
-
-        print()
-
-        print("====================")
-
-        print("[BOT STOP]")
-
-        print("====================")
-
-
-
-
-
-
-
-        # CLOSE POSITION
-
-        try:
-
-
-            order_manager.close_position()
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"CLOSE ERROR {e}"
-
-            )
-
-
-
-
-
-
-
-        # PRIVATE WS STOP
-
-        try:
-
-
-            private_ws.stop()
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"WS STOP ERROR {e}"
-
-            )
-
-
-
-
-
-
-
-        # WATCHDOG STOP
-
-        try:
-
-
-            from services.watchdog import watchdog
-
-
-            watchdog.stop()
-
-
-
-        except Exception:
-
-
-            pass
-
-
-
-
-
-
-
-
-        if self.market_thread:
-
-
-
-            if self.market_thread.is_alive():
-
-
-                self.market_thread.join(
-
-                    timeout=5
-
-                )
-
-
-
-        self.market_thread = None
-
-
-
-
-
-
-        update_status({
-
-            "bot":
-
-            "STOPPED"
-
-        })
 
 
 
         add_log(
 
-            "BOT STOP COMPLETE"
-
-        )
-
-
-
-        print(
-
-            "[SYSTEM SHUTDOWN]"
+            "MARKET LOOP STOP"
 
         )
 
@@ -674,12 +366,34 @@ class TradingApp:
 
 
 
-# =======================================================
-# EXPORT
-# =======================================================
 
-__all__ = [
 
-    "TradingApp"
 
-]
+
+    # =====================================================
+    # STATUS
+    # =====================================================
+
+    def status(self):
+
+
+        return {
+
+
+            "running":
+
+                self.running
+
+        }
+
+
+
+
+
+
+
+# =====================================================
+# INSTANCE
+# =====================================================
+
+trading_app = TradingApp()
