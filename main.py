@@ -1,7 +1,7 @@
-# =====================================================
+# =======================================================
 # main.py
-# VWAP SUPERTREND AUTO BOT
-# =====================================================
+# VWAP SUPERTREND BOT MAIN RUNNER
+# =======================================================
 
 import time
 import signal
@@ -19,11 +19,19 @@ from web.server import (
 
 
 
+# =======================================================
+# GLOBAL
+# =======================================================
+
 bot = None
 
 
 
-def shutdown(sig=None, frame=None):
+# =======================================================
+# SHUTDOWN
+# =======================================================
+
+def shutdown(signum=None, frame=None):
 
     print()
 
@@ -42,7 +50,7 @@ def shutdown(sig=None, frame=None):
     except Exception as e:
 
         print(
-            "STOP ERROR",
+            "[STOP ERROR]",
             e
         )
 
@@ -52,6 +60,27 @@ def shutdown(sig=None, frame=None):
 
 
 
+
+# CTRL+C 등록
+
+signal.signal(
+    signal.SIGINT,
+    shutdown
+)
+
+
+signal.signal(
+    signal.SIGTERM,
+    shutdown
+)
+
+
+
+
+
+# =======================================================
+# MAIN
+# =======================================================
 
 def main():
 
@@ -63,8 +92,9 @@ def main():
     print()
 
     print("====================")
-    print("[MAIN READY]")
+    print("[VWAP SUPERTREND BOT]")
     print("====================")
+
 
 
 
@@ -74,7 +104,7 @@ def main():
 
 
 
-    # BOT INSTANCE
+    # BOT CREATE
 
     bot = TradingApp()
 
@@ -88,42 +118,8 @@ def main():
 
 
 
-    add_log(
 
-        "BOT INSTANCE CREATED"
-
-    )
-
-
-
-    # CTRL+C 처리
-
-    signal.signal(
-
-        signal.SIGINT,
-
-        shutdown
-
-    )
-
-
-    signal.signal(
-
-        signal.SIGTERM,
-
-        shutdown
-
-    )
-
-
-
-    print()
-
-    print("====================")
-    print("[AUTO START]")
-    print("====================")
-
-
+    # AUTO START
 
     bot.start()
 
@@ -143,6 +139,9 @@ def main():
 
 
 
+
+    # MAIN LOOP
+
     while True:
 
 
@@ -152,6 +151,12 @@ def main():
 
 
 
+
+
+
+# =======================================================
+# RUN
+# =======================================================
 
 if __name__ == "__main__":
 
