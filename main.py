@@ -1,162 +1,262 @@
-# =======================================================
+# =====================================================
 # main.py
-# VWAP SUPERTREND BOT MAIN RUNNER
-# =======================================================
+# VWAP SUPERTREND BOT MAIN
+# =====================================================
 
 import time
 import signal
-import sys
+import threading
+import traceback
 
 
 from app import TradingApp
 
 
 from web.server import (
+
     run_server,
-    set_bot_instance,
+
     add_log
+
 )
 
 
 
-# =======================================================
-# GLOBAL
-# =======================================================
-
-bot = None
 
 
+app = None
 
-# =======================================================
-# SHUTDOWN
-# =======================================================
+shutdown_event = threading.Event()
 
-def shutdown(signum=None, frame=None):
+
+
+
+
+# =====================================================
+# CTRL+C HANDLER
+# =====================================================
+
+def shutdown_handler(
+
+    signum,
+
+    frame
+
+):
+
 
     print()
 
     print("====================")
+
     print("[SYSTEM SHUTDOWN]")
+
     print("====================")
+
 
 
     try:
 
-        if bot:
 
-            bot.stop()
+        if app:
+
+
+            app.stop()
+
 
 
     except Exception as e:
 
+
         print(
+
             "[STOP ERROR]",
+
             e
+
         )
 
 
-    sys.exit(0)
-
-
-
-
-
-# CTRL+C 등록
-
-signal.signal(
-    signal.SIGINT,
-    shutdown
-)
-
-
-signal.signal(
-    signal.SIGTERM,
-    shutdown
-)
-
-
-
-
-
-# =======================================================
-# MAIN
-# =======================================================
-
-def main():
-
-
-    global bot
-
-
-
-    print()
-
-    print("====================")
-    print("[VWAP SUPERTREND BOT]")
-    print("====================")
-
-
-
-
-    # WEB SERVER
-
-    run_server()
-
-
-
-    # BOT CREATE
-
-    bot = TradingApp()
-
-
-
-    set_bot_instance(
-
-        bot
-
-    )
-
-
-
-
-    # AUTO START
-
-    bot.start()
+        traceback.print_exc()
 
 
 
     add_log(
 
-        "AUTO START COMPLETE"
+        "SYSTEM SHUTDOWN"
 
     )
+
+
+    shutdown_event.set()
+
+
+
+
+
+# =====================================================
+# MAIN
+# =====================================================
+
+def main():
+
+
+    global app
 
 
 
     print()
 
-    print("[RUNNING]")
+    print("================================")
+
+    print(" VWAP SUPERTREND TRADING BOT ")
+
+    print("================================")
 
 
 
 
-    # MAIN LOOP
+    # CTRL+C
 
-    while True:
+    signal.signal(
 
+        signal.SIGINT,
 
-        time.sleep(1)
+        shutdown_handler
 
-
-
-
-
+    )
 
 
+    signal.signal(
 
-# =======================================================
-# RUN
-# =======================================================
+        signal.SIGTERM,
+
+        shutdown_handler
+
+    )
+
+
+
+
+
+    # ---------------------------------
+    # WEB SERVER
+    # ---------------------------------
+
+    web_thread = threading.Thread(
+
+        target=run_server,
+
+        daemon=True,
+
+        name="WebServer"
+
+    )
+
+
+    web_thread.start()
+
+
+
+    time.sleep(1)
+
+
+
+
+
+    # ---------------------------------
+    # BOT START
+    # ---------------------------------
+
+    try:
+
+
+        app = TradingApp()
+
+
+        app.start()
+
+
+
+        add_log(
+
+            "AUTO START COMPLETE"
+
+        )
+
+
+
+        print()
+
+        print("[RUNNING]")
+
+
+
+    except Exception as e:
+
+
+        print(
+
+            "[START ERROR]",
+
+            e
+
+        )
+
+
+        traceback.print_exc()
+
+
+        return
+
+
+
+
+
+
+
+    # ---------------------------------
+    # MAIN WAIT LOOP
+    # ---------------------------------
+
+    try:
+
+
+        while not shutdown_event.is_set():
+
+
+            time.sleep(1)
+
+
+
+    except KeyboardInterrupt:
+
+
+        shutdown_handler(
+
+            None,
+
+            None
+
+        )
+
+
+
+
+
+    print()
+
+    print("[EXIT COMPLETE]")
+
+
+
+
+
+
+
+# =====================================================
+# START
+# =====================================================
 
 if __name__ == "__main__":
 
