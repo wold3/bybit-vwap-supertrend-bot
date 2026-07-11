@@ -1,17 +1,13 @@
 # =====================================================
 # main.py
-# Trading Bot Entry Point
+# VWAP SuperTrend Trading Bot
 # =====================================================
-
 
 import time
 import traceback
 
 
-
-from app import (
-    app
-)
+from app import app
 
 
 from database.database import (
@@ -27,8 +23,13 @@ from database.database import (
 def main():
 
 
-    try:
+    print("====================")
+    print("[SYSTEM START]")
+    print("====================")
 
+
+
+    try:
 
 
         app.start()
@@ -38,10 +39,7 @@ def main():
         while True:
 
 
-
             time.sleep(1)
-
-
 
 
 
@@ -50,27 +48,15 @@ def main():
     except KeyboardInterrupt:
 
 
-
         print()
 
         print(
-
             "[USER STOP]"
-
         )
 
 
 
-        app.stop()
-
-
-
-
-
-
-
     except Exception as e:
-
 
 
         print(
@@ -104,11 +90,6 @@ def main():
 
 
 
-        app.stop()
-
-
-
-
 
 
 
@@ -116,10 +97,38 @@ def main():
 
 
 
+        print()
+
         print(
+            "[SYSTEM SHUTDOWN]"
+        )
 
+
+
+        try:
+
+
+            app.stop()
+
+
+
+        except Exception as e:
+
+
+
+            print(
+
+                "[STOP ERROR]",
+
+                e
+
+            )
+
+
+
+
+        print(
             "[PROGRAM EXIT]"
-
         )
 
 
