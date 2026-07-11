@@ -2,7 +2,6 @@
 # api/bybit_api.py
 # VWAP SUPERTREND BOT
 # BYBIT V5 API MANAGER
-# DEMO / LIVE + DYNAMIC SYMBOL
 # =====================================================
 
 from pybit.unified_trading import HTTP
@@ -28,6 +27,8 @@ from config import (
 from web.server import (
 
     get_trading_mode,
+
+    get_trading_symbol,
 
     add_log
 
@@ -57,8 +58,12 @@ class BybitAPI:
 
 
 
+
+
+
+
     # =====================================================
-    # SESSION
+    # SESSION CREATE
     # =====================================================
 
     def create_session(self):
@@ -77,18 +82,24 @@ class BybitAPI:
 
 
 
+
+
             if mode == "DEMO":
+
 
                 key = DEMO_API_KEY
 
                 secret = DEMO_API_SECRET
 
 
+
             else:
+
 
                 key = LIVE_API_KEY
 
                 secret = LIVE_API_SECRET
+
 
 
 
@@ -124,12 +135,25 @@ class BybitAPI:
 
 
 
+
+
+    # =====================================================
+    # SESSION CHECK
+    # =====================================================
+
     def check_session(self):
 
 
-        if get_trading_mode() != self.current_mode:
+        mode = get_trading_mode()
+
+
+
+        if mode != self.current_mode:
+
 
             self.create_session()
+
+
 
 
 
@@ -140,8 +164,11 @@ class BybitAPI:
     # =====================================================
 
     def change_symbol(
+
         self,
+
         symbol
+
     ):
 
 
@@ -151,11 +178,13 @@ class BybitAPI:
             self.symbol = symbol.upper()
 
 
+
             add_log(
 
-                f"MARKET SYMBOL SWITCH {self.symbol}"
+                f"SYMBOL CHANGE {self.symbol}"
 
             )
+
 
 
             return True
@@ -173,6 +202,41 @@ class BybitAPI:
 
 
             return False
+
+
+
+
+
+
+
+    def sync_symbol(self):
+
+
+        try:
+
+
+            symbol = get_trading_symbol()
+
+
+
+            if symbol != self.symbol:
+
+
+                self.symbol = symbol.upper()
+
+
+                add_log(
+
+                    f"MARKET SYMBOL SWITCH {self.symbol}"
+
+                )
+
+
+
+        except Exception:
+
+
+            pass
 
 
 
@@ -199,6 +263,9 @@ class BybitAPI:
 
 
             self.check_session()
+
+            self.sync_symbol()
+
 
 
             return self.session.get_kline(
@@ -245,6 +312,9 @@ class BybitAPI:
 
             self.check_session()
 
+            self.sync_symbol()
+
+
 
             result = self.session.get_tickers(
 
@@ -253,6 +323,7 @@ class BybitAPI:
                 symbol=self.symbol
 
             )
+
 
 
             return float(
@@ -293,10 +364,11 @@ class BybitAPI:
 
             self.check_session()
 
+            self.sync_symbol()
+
 
 
             result = self.session.set_leverage(
-
 
                 category=CATEGORY,
 
@@ -306,19 +378,19 @@ class BybitAPI:
 
                 sellLeverage=str(LEVERAGE)
 
-
             )
+
 
 
             add_log(
 
-                f"LEVERAGE SET {LEVERAGE}X"
+                f"LEVERAGE OK {LEVERAGE}X"
 
             )
 
 
-            return result
 
+            return result
 
 
 
@@ -330,9 +402,15 @@ class BybitAPI:
 
 
 
-            # 이미 설정된 경우
+            if (
 
-            if "110043" in msg or "not modified" in msg:
+                "110043" in msg
+
+                or
+
+                "not modified" in msg
+
+            ):
 
 
                 add_log(
@@ -355,15 +433,9 @@ class BybitAPI:
 
             return None
 
-
-
-
-
-
-
-    # =====================================================
-    # ORDER
-    # =====================================================
+# =====================================================
+# ORDER
+# =====================================================
 
     def place_order(
 
@@ -383,10 +455,11 @@ class BybitAPI:
 
             self.check_session()
 
+            self.sync_symbol()
+
 
 
             result = self.session.place_order(
-
 
                 category=CATEGORY,
 
@@ -400,7 +473,6 @@ class BybitAPI:
 
                 reduceOnly=reduce_only
 
-
             )
 
 
@@ -413,8 +485,28 @@ class BybitAPI:
 
 
 
-            return result
+            if result.get("retCode") == 0:
 
+
+                add_log(
+
+                    "ORDER SUCCESS"
+
+                )
+
+
+            else:
+
+
+                add_log(
+
+                    f"ORDER FAILED {result}"
+
+                )
+
+
+
+            return result
 
 
 
@@ -436,9 +528,9 @@ class BybitAPI:
 
 
 
-    # =====================================================
-    # POSITION
-    # =====================================================
+# =====================================================
+# POSITION
+# =====================================================
 
     def get_position(self):
 
@@ -447,6 +539,9 @@ class BybitAPI:
 
 
             self.check_session()
+
+            self.sync_symbol()
+
 
 
             return self.session.get_positions(
@@ -477,9 +572,9 @@ class BybitAPI:
 
 
 
-    # =====================================================
-    # BALANCE
-    # =====================================================
+# =====================================================
+# BALANCE
+# =====================================================
 
     def get_balance(self):
 
@@ -517,9 +612,9 @@ class BybitAPI:
 
 
 
-    # =====================================================
-    # TP / SL
-    # =====================================================
+# =====================================================
+# TP / SL
+# =====================================================
 
     def set_trading_stop(
 
@@ -537,10 +632,11 @@ class BybitAPI:
 
             self.check_session()
 
+            self.sync_symbol()
+
 
 
             result = self.session.set_trading_stop(
-
 
                 category=CATEGORY,
 
@@ -550,13 +646,18 @@ class BybitAPI:
 
                 stopLoss=str(sl)
 
-
             )
 
 
 
-            return result
+            add_log(
 
+                f"TP {tp} SL {sl}"
+
+            )
+
+
+            return result
 
 
 
@@ -578,9 +679,9 @@ class BybitAPI:
 
 
 
-    # =====================================================
-    # CLOSE POSITION
-    # =====================================================
+# =====================================================
+# CLOSE POSITION
+# =====================================================
 
     def close_position(self):
 
@@ -588,19 +689,21 @@ class BybitAPI:
         try:
 
 
-            pos = self.get_position()
+            position = self.get_position()
 
 
 
-            if not pos:
+            if not position:
 
                 return None
 
 
 
+
+
             rows = (
 
-                pos
+                position
 
                 .get(
 
@@ -624,7 +727,9 @@ class BybitAPI:
 
             if not rows:
 
+
                 return None
+
 
 
 
@@ -633,7 +738,7 @@ class BybitAPI:
 
 
 
-            size=float(
+            size = float(
 
                 p.get(
 
@@ -651,7 +756,9 @@ class BybitAPI:
 
             if size <= 0:
 
+
                 return None
+
 
 
 
@@ -667,17 +774,18 @@ class BybitAPI:
 
 
 
+
             if side == "Buy":
 
 
-                close_side="Sell"
+                close_side = "Sell"
 
 
 
             elif side == "Sell":
 
 
-                close_side="Buy"
+                close_side = "Buy"
 
 
 
@@ -690,7 +798,8 @@ class BybitAPI:
 
 
 
-            return self.place_order(
+
+            result = self.place_order(
 
                 close_side,
 
@@ -699,6 +808,18 @@ class BybitAPI:
                 True
 
             )
+
+
+
+            add_log(
+
+                "POSITION CLOSED"
+
+            )
+
+
+
+            return result
 
 
 
@@ -720,9 +841,9 @@ class BybitAPI:
 
 
 
-    # =====================================================
-    # STATUS
-    # =====================================================
+# =====================================================
+# STATUS
+# =====================================================
 
     def status(self):
 
@@ -739,8 +860,8 @@ class BybitAPI:
 
                 self.symbol
 
-
         }
+
 
 
 
