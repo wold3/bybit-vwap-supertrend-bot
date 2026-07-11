@@ -1,22 +1,33 @@
 # =====================================================
 # services/private_ws.py
-# Bybit Private WebSocket
+# Bybit Private WebSocket Manager
 # =====================================================
 
-import time
 import json
+import time
 import hmac
 import hashlib
 import threading
 import websocket
 
 
+
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
-    BYBIT_WS_URL,
     CATEGORY,
     DEFAULT_SYMBOL
+)
+
+
+from portfolio.position_manager import (
+    position_manager
+)
+
+
+from web.server import (
+    update_status,
+    add_log
 )
 
 
@@ -31,7 +42,9 @@ class PrivateWS:
 
         self.running = False
 
+
         self.ws = None
+
 
         self.thread = None
 
@@ -39,66 +52,6 @@ class PrivateWS:
         print(
             "[PRIVATE WS READY]"
         )
-
-
-
-
-
-
-
-
-    # =====================================================
-    # AUTH SIGN
-    # =====================================================
-
-
-    def sign(self):
-
-
-        expires = int(
-
-            (time.time()+5)*1000
-
-        )
-
-
-        param = (
-
-            "GET/realtime"
-
-            +
-
-            str(expires)
-
-        )
-
-
-
-        signature = hmac.new(
-
-            BYBIT_API_SECRET.encode(),
-
-            param.encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-
-        return [
-
-            "auth",
-
-            BYBIT_API_KEY,
-
-            expires,
-
-            signature
-
-        ]
-
-
 
 
 
@@ -126,7 +79,7 @@ class PrivateWS:
 
         self.thread = threading.Thread(
 
-            target=self.run,
+            target=self.connect_loop,
 
             daemon=True
 
@@ -141,13 +94,12 @@ class PrivateWS:
 
 
 
-
     # =====================================================
-    # RUN
+    # CONNECT LOOP
     # =====================================================
 
 
-    def run(self):
+    def connect_loop(self):
 
 
         while self.running:
@@ -163,16 +115,19 @@ class PrivateWS:
                 )
 
 
-
                 self.ws = websocket.WebSocketApp(
 
-                    BYBIT_WS_URL + "/v5/private",
+                    "wss://stream.bybit.com/v5/private",
+
 
                     on_open=self.on_open,
 
+
                     on_message=self.on_message,
 
+
                     on_error=self.on_error,
+
 
                     on_close=self.on_close
 
@@ -208,6 +163,88 @@ class PrivateWS:
 
 
     # =====================================================
+    # AUTH
+    # =====================================================
+
+
+    def auth(self):
+
+
+        expires = int(
+
+            (time.time()+1)
+
+            *
+
+            1000
+
+        )
+
+
+
+        param = (
+
+            "GET/realtime"
+
+            +
+
+            str(expires)
+
+        )
+
+
+
+        signature = hmac.new(
+
+            BYBIT_API_SECRET.encode(),
+
+            param.encode(),
+
+            hashlib.sha256
+
+        ).hexdigest()
+
+
+
+        message = {
+
+
+            "op":
+
+                "auth",
+
+
+            "args":
+
+                [
+
+                    BYBIT_API_KEY,
+
+                    expires,
+
+                    signature
+
+                ]
+
+        }
+
+
+
+        self.ws.send(
+
+            json.dumps(message)
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
     # OPEN
     # =====================================================
 
@@ -226,24 +263,42 @@ class PrivateWS:
 
 
 
+        self.auth()
+
+
+
+        time.sleep(1)
+
+
+
         ws.send(
 
-            json.dumps(
+            json.dumps({
 
-                {
+                "op":
 
-                    "op":
-
-                    "auth",
+                    "subscribe",
 
 
-                    "args":
+                "args":
 
-                    self.sign()
+                    [
 
-                }
+                        "position",
 
-            )
+                        "order"
+
+                    ]
+
+            })
+
+        )
+
+
+
+        print(
+
+            "[PRIVATE WS SUBSCRIBED]"
 
         )
 
@@ -278,71 +333,42 @@ class PrivateWS:
 
 
 
-            if data.get(
+            topic = data.get(
 
-                "op"
+                "topic",
 
-            ) == "auth":
+                ""
 
-
-
-                print(
-
-                    "[PRIVATE WS AUTH OK]"
-
-                )
+            )
 
 
 
-                ws.send(
-
-                    json.dumps(
-
-                        {
-
-                            "op":
-
-                            "subscribe",
 
 
-                            "args":
+            if topic == "position":
 
-                            [
 
-                                "position",
+                self.position_update(
 
-                                "order",
-
-                                "execution"
-
-                            ]
-
-                        }
-
-                    )
+                    data
 
                 )
 
 
 
-                print(
-
-                    "[PRIVATE WS SUBSCRIBED]"
-
-                )
 
 
+            elif topic == "order":
 
-            else:
 
+                self.order_update(
 
-                print(
-
-                    "[PRIVATE WS DATA]",
-
-                    data.get("topic")
+                    data
 
                 )
+
+
+
 
 
 
@@ -351,7 +377,127 @@ class PrivateWS:
 
             print(
 
-                "[WS PARSE ERROR]",
+                "[WS MESSAGE ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # POSITION UPDATE
+    # =====================================================
+
+
+    def position_update(
+        self,
+        data
+    ):
+
+
+        try:
+
+
+            item = data["data"][0]
+
+
+
+            position_manager.update_from_ws(
+
+                item
+
+            )
+
+
+
+            add_log(
+
+                "[POSITION WS UPDATE]"
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[POSITION UPDATE ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # ORDER UPDATE
+    # =====================================================
+
+
+    def order_update(
+        self,
+        data
+    ):
+
+
+        try:
+
+
+            order = data["data"][0]
+
+
+
+            status = order.get(
+
+                "orderStatus",
+
+                ""
+
+            )
+
+
+
+            update_status({
+
+                "order":
+
+                    status
+
+            })
+
+
+
+            print(
+
+                "[ORDER WS]",
+
+                status
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[ORDER UPDATE ERROR]",
 
                 e
 
@@ -419,6 +565,7 @@ class PrivateWS:
 
 
 
+
     # =====================================================
     # STOP
     # =====================================================
@@ -436,11 +583,13 @@ class PrivateWS:
 
             if self.ws:
 
+
                 self.ws.close()
 
 
 
         except:
+
 
             pass
 
@@ -451,6 +600,7 @@ class PrivateWS:
             "[PRIVATE WS STOPPED]"
 
         )
+
 
 
 
