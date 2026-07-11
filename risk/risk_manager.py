@@ -1,21 +1,19 @@
 # =====================================================
 # risk/risk_manager.py
-# Risk Management System
+# VWAP SUPERTREND BOT RISK MANAGER
 # =====================================================
 
 import threading
 import datetime
 
 
-
 from config import (
 
-    RISK_PER_TRADE_PERCENT,
+    RISK_PERCENT,
 
     MAX_POSITION_SIZE
 
 )
-
 
 
 from web.server import (
@@ -30,11 +28,8 @@ from web.server import (
 
 
 
-
-
-
-
 class RiskManager:
+
 
 
     def __init__(self):
@@ -43,25 +38,23 @@ class RiskManager:
         self.lock = threading.Lock()
 
 
-
         self.enabled = True
-
 
 
         self.kill_switch = False
 
 
 
-        self.daily_pnl = 0
-
+        self.daily_pnl = 0.0
 
 
         self.loss_count = 0
 
 
 
-        self.max_daily_loss = -5.0
+        # Daily limits
 
+        self.max_daily_loss = -5.0
 
 
         self.max_loss_count = 5
@@ -77,10 +70,6 @@ class RiskManager:
             "[RISK MANAGER READY]"
 
         )
-
-
-
-
 
 
 
@@ -103,11 +92,10 @@ class RiskManager:
             self.today = today
 
 
-            self.daily_pnl = 0
+            self.daily_pnl = 0.0
 
 
             self.loss_count = 0
-
 
 
             self.kill_switch = False
@@ -125,24 +113,14 @@ class RiskManager:
 
 
 
-
-
-
     # =====================================================
-    # ORDER CHECK
+    # ORDER PERMISSION
     # =====================================================
 
-    def allow_order(
-
-        self,
-
-        qty
-
-    ):
+    def allow_order(self, qty):
 
 
         with self.lock:
-
 
 
             self.reset_check()
@@ -157,7 +135,6 @@ class RiskManager:
                     "RISK DISABLED"
 
                 )
-
 
                 return False
 
@@ -174,7 +151,6 @@ class RiskManager:
 
                 )
 
-
                 return False
 
 
@@ -182,18 +158,52 @@ class RiskManager:
 
 
 
-            if float(qty) > MAX_POSITION_SIZE:
+            try:
+
+                qty = float(qty)
+
+
+            except:
 
 
                 add_log(
 
-                    "POSITION SIZE LIMIT"
+                    "INVALID ORDER QTY"
 
                 )
 
+                return False
+
+
+
+
+
+
+            if qty <= 0:
+
+
+                add_log(
+
+                    "ZERO QTY BLOCK"
+
+                )
 
                 return False
 
+
+
+
+
+            if qty > MAX_POSITION_SIZE:
+
+
+                add_log(
+
+                    "MAX POSITION SIZE LIMIT"
+
+                )
+
+                return False
 
 
 
@@ -209,9 +219,7 @@ class RiskManager:
 
                 )
 
-
                 return False
-
 
 
 
@@ -227,8 +235,8 @@ class RiskManager:
 
                 )
 
-
                 return False
+
 
 
 
@@ -242,27 +250,32 @@ class RiskManager:
 
 
 
-
-
-
     # =====================================================
     # PNL UPDATE
     # =====================================================
 
-    def update_pnl(
-
-        self,
-
-        pnl
-
-    ):
+    def update_pnl(self, pnl):
 
 
         with self.lock:
 
 
+            try:
 
-            self.daily_pnl += float(pnl)
+                pnl = float(pnl)
+
+
+            except:
+
+
+                return False
+
+
+
+
+
+            self.daily_pnl += pnl
+
 
 
 
@@ -273,7 +286,10 @@ class RiskManager:
 
 
 
+
+
             update_status({
+
 
                 "daily_pnl":
 
@@ -284,11 +300,12 @@ class RiskManager:
 
                     self.loss_count
 
+
             })
 
 
 
-
+            return True
 
 
 
@@ -300,13 +317,7 @@ class RiskManager:
     # KILL SWITCH
     # =====================================================
 
-    def activate_kill(
-
-        self,
-
-        reason
-
-    ):
+    def activate_kill(self, reason):
 
 
         self.kill_switch = True
@@ -323,9 +334,11 @@ class RiskManager:
 
         update_status({
 
+
             "bot":
 
                 "KILLED"
+
 
         })
 
@@ -334,20 +347,14 @@ class RiskManager:
 
 
 
-
-
-
-
-
     # =====================================================
-    # MANUAL RESET
+    # RESET KILL
     # =====================================================
 
     def reset_kill(self):
 
 
         with self.lock:
-
 
 
             self.kill_switch = False
@@ -362,8 +369,60 @@ class RiskManager:
 
 
 
+            update_status({
 
 
+                "bot":
+
+                    "STOPPED"
+
+
+            })
+
+
+
+
+
+
+
+    # =====================================================
+    # ENABLE / DISABLE
+    # =====================================================
+
+    def enable(self):
+
+
+        with self.lock:
+
+
+            self.enabled = True
+
+
+            add_log(
+
+                "RISK ENABLE"
+
+            )
+
+
+
+
+
+
+    def disable(self):
+
+
+        with self.lock:
+
+
+            self.enabled = False
+
+
+            add_log(
+
+                "RISK DISABLE"
+
+            )
 
 
 
@@ -377,35 +436,38 @@ class RiskManager:
     def status(self):
 
 
-        return {
+        with self.lock:
 
 
-            "enabled":
-
-                self.enabled,
+            return {
 
 
-            "kill_switch":
+                "enabled":
 
-                self.kill_switch,
-
-
-            "daily_pnl":
-
-                self.daily_pnl,
+                    self.enabled,
 
 
-            "loss_count":
+                "kill_switch":
 
-                self.loss_count
-
-
-        }
+                    self.kill_switch,
 
 
+                "risk_percent":
+
+                    RISK_PERCENT,
 
 
+                "daily_pnl":
 
+                    self.daily_pnl,
+
+
+                "loss_count":
+
+                    self.loss_count
+
+
+            }
 
 
 
