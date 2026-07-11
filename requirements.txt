@@ -1,23 +1,49 @@
-python-dotenv==1.0.1
+# =====================================================
+# VWAP SUPERTREND BOT
+# Python Dependencies
+# =====================================================
 
-requests==2.32.3
 
-websocket-client==1.8.0
+# HTTP API
+requests>=2.31.0
 
-pybit==5.11.0
 
-pandas==2.2.2
+# WebSocket (Bybit Private WS)
+websocket-client>=1.8.0
 
-numpy==2.0.1
 
-ta==0.11.0
+# Web Dashboard
+Flask>=3.0.0
 
-pytest==8.3.2
 
-pytz==2024.1
+# Data Processing
+pandas>=2.2.0
+numpy>=1.26.0
 
-APScheduler==3.10.4
 
-flask==3.0.3
+# Environment Variable
+python-dotenv>=1.0.1
 
-scikit-learn==1.5.1
+
+# Timezone Support
+pytz>=2024.1
+
+
+# Technical Indicator Support
+ta>=0.11.0
+
+
+# Async Support
+aiohttp>=3.9.0
+
+
+# =====================================================
+# OPTIONAL
+# =====================================================
+
+# Better console output
+colorama>=0.4.6
+
+
+# JSON / Config Utility
+pyyaml>=6.0.1
