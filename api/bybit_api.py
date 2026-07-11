@@ -7,24 +7,41 @@ import time
 import hmac
 import hashlib
 import json
+
 import requests
+
+from urllib.parse import urlencode
+
+from requests.adapters import HTTPAdapter
+
+from urllib3.util.retry import Retry
 
 
 from config import (
-    BYBIT_API_KEY,
-    BYBIT_API_SECRET,
-    SYMBOL,
-    CATEGORY,
-    LEVERAGE
-)
 
+    SYMBOL,
+
+    CATEGORY,
+
+    LEVERAGE,
+
+    DEMO_API_KEY,
+    DEMO_API_SECRET,
+
+    LIVE_API_KEY,
+    LIVE_API_SECRET,
+
+    API_TIMEOUT,
+    API_RETRY
+
+)
 
 
 from web.server import (
+
     add_log
+
 )
-
-
 
 
 
@@ -39,11 +56,59 @@ class BybitAPI:
         self.mode = "DEMO"
 
 
+        self.api_key = DEMO_API_KEY
+        self.api_secret = DEMO_API_SECRET
+
+
+        self.base_url = ""
+
+
         self.session = requests.Session()
 
 
-        self.update_endpoint()
+        retry = Retry(
 
+            total=API_RETRY,
+
+            connect=API_RETRY,
+
+            read=API_RETRY,
+
+            backoff_factor=0.5,
+
+            status_forcelist=[
+                429,
+                500,
+                502,
+                503,
+                504
+            ],
+
+            allowed_methods=[
+                "GET",
+                "POST"
+            ]
+
+        )
+
+
+        adapter = HTTPAdapter(
+
+            max_retries=retry
+
+        )
+
+
+        self.session.mount(
+
+            "https://",
+
+            adapter
+
+        )
+
+
+        self.update_endpoint()
 
 
         print(
@@ -53,12 +118,6 @@ class BybitAPI:
             self.mode
 
         )
-
-
-
-
-
-
 
 
 
@@ -72,26 +131,21 @@ class BybitAPI:
         if self.mode == "DEMO":
 
 
-            self.base_url = (
+            self.base_url = "https://api-demo.bybit.com"
 
-                "https://api-demo.bybit.com"
+            self.api_key = DEMO_API_KEY
 
-            )
+            self.api_secret = DEMO_API_SECRET
 
 
         else:
 
 
-            self.base_url = (
+            self.base_url = "https://api.bybit.com"
 
-                "https://api.bybit.com"
+            self.api_key = LIVE_API_KEY
 
-            )
-
-
-
-
-
+            self.api_secret = LIVE_API_SECRET
 
 
 
@@ -108,11 +162,24 @@ class BybitAPI:
     ):
 
 
-        self.mode = mode.upper()
+        mode = mode.upper()
+
+
+        if mode not in [
+
+            "DEMO",
+
+            "LIVE"
+
+        ]:
+
+            return False
+
+
+        self.mode = mode
 
 
         self.update_endpoint()
-
 
 
         print(
@@ -124,10 +191,7 @@ class BybitAPI:
         )
 
 
-
-
-
-
+        return True
 
 
 
@@ -154,7 +218,7 @@ class BybitAPI:
 
             +
 
-            BYBIT_API_KEY
+            self.api_key
 
             +
 
@@ -167,20 +231,15 @@ class BybitAPI:
         )
 
 
-
         signature = hmac.new(
 
-            bytes(
-
-                BYBIT_API_SECRET,
+            self.api_secret.encode(
 
                 "utf-8"
 
             ),
 
-            bytes(
-
-                origin,
+            origin.encode(
 
                 "utf-8"
 
@@ -191,16 +250,7 @@ class BybitAPI:
         ).hexdigest()
 
 
-
         return signature
-
-
-
-
-
-
-
-
 
     # =====================================================
     # REQUEST
@@ -218,121 +268,53 @@ class BybitAPI:
 
     ):
 
-
         try:
-
-
 
             timestamp = str(
 
-                int(
-
-                    time.time()*1000
-
-                )
+                int(time.time() * 1000)
 
             )
 
-
-
             recv_window = "5000"
 
+            params = params or {}
 
+            # ---------------------------------
+            # GET
+            # ---------------------------------
 
+            if method.upper() == "GET":
 
+                query = urlencode(
 
-            if method == "GET":
+                    sorted(params.items())
 
-
-
-                query = ""
-
-
-
-                if params:
-
-
-                    query = "&".join(
-
-                        [
-
-                            f"{k}={v}"
-
-                            for k,v in sorted(
-
-                                params.items()
-
-                            )
-
-                        ]
-
-                    )
-
-
+                )
 
                 payload = query
 
-
-
-                url = (
-
-                    self.base_url
-
-                    +
-
-                    path
-
-                )
-
-
+                url = self.base_url + path
 
                 if query:
 
-
                     url += "?" + query
 
-
-
-
-
-
+            # ---------------------------------
+            # POST
+            # ---------------------------------
 
             else:
 
-
-
                 payload = json.dumps(
 
-                    params or {},
+                    params,
 
-                    separators=(
-
-                        ",",
-
-                        ":"
-
-                    )
+                    separators=(",", ":")
 
                 )
 
-
-
-                url = (
-
-                    self.base_url
-
-                    +
-
-                    path
-
-                )
-
-
-
-
-
-
-
+                url = self.base_url + path
 
             signature = self.sign(
 
@@ -344,71 +326,53 @@ class BybitAPI:
 
             )
 
-
-
-
-
-
-
             headers = {
-
 
                 "X-BAPI-API-KEY":
 
-                    BYBIT_API_KEY,
-
+                    self.api_key,
 
                 "X-BAPI-SIGN":
 
                     signature,
 
-
                 "X-BAPI-SIGN-TYPE":
 
                     "2",
-
 
                 "X-BAPI-TIMESTAMP":
 
                     timestamp,
 
-
                 "X-BAPI-RECV-WINDOW":
 
                     recv_window,
-
 
                 "Content-Type":
 
                     "application/json"
 
-
             }
 
+            # ---------------------------------
+            # SEND
+            # ---------------------------------
 
+            if method.upper() == "GET":
 
-
-
-
-
-            if method == "GET":
-
-
-                r = self.session.get(
+                response = self.session.get(
 
                     url,
 
                     headers=headers,
 
-                    timeout=10
+                    timeout=API_TIMEOUT
 
                 )
 
-
             else:
 
-
-                r = self.session.post(
+                response = self.session.post(
 
                     url,
 
@@ -416,22 +380,47 @@ class BybitAPI:
 
                     data=payload,
 
-                    timeout=10
+                    timeout=API_TIMEOUT
 
                 )
 
+            # ---------------------------------
+            # HTTP ERROR
+            # ---------------------------------
 
+            if not response.ok:
 
+                add_log(
 
+                    f"HTTP ERROR {response.status_code}"
 
+                )
 
+                return None
 
-            data = r.json()
+            # ---------------------------------
+            # JSON
+            # ---------------------------------
 
+            try:
 
+                data = response.json()
+
+            except ValueError:
+
+                add_log(
+
+                    f"INVALID RESPONSE : {response.text[:300]}"
+
+                )
+
+                return None
+
+            # ---------------------------------
+            # BYBIT ERROR
+            # ---------------------------------
 
             if data.get("retCode") != 0:
-
 
                 add_log(
 
@@ -439,21 +428,31 @@ class BybitAPI:
 
                 )
 
-
                 return None
-
-
-
-
 
             return data
 
+        except requests.Timeout:
 
+            add_log(
 
+                "REQUEST TIMEOUT"
 
+            )
+
+            return None
+
+        except requests.ConnectionError:
+
+            add_log(
+
+                "NETWORK ERROR"
+
+            )
+
+            return None
 
         except Exception as e:
-
 
             add_log(
 
@@ -461,24 +460,13 @@ class BybitAPI:
 
             )
 
-
             return None
-
-
-
-
-
-
-
-
-
 
     # =====================================================
     # BALANCE
     # =====================================================
 
     def get_balance(self):
-
 
         return self.request(
 
@@ -488,9 +476,7 @@ class BybitAPI:
 
             {
 
-                "accountType":
-
-                    "UNIFIED"
+                "accountType": "UNIFIED"
 
             }
 
@@ -498,9 +484,27 @@ class BybitAPI:
 
 
 
+    # =====================================================
+    # POSITION
+    # =====================================================
 
+    def get_position(self):
 
+        return self.request(
 
+            "GET",
+
+            "/v5/position/list",
+
+            {
+
+                "category": CATEGORY,
+
+                "symbol": SYMBOL
+
+            }
+
+        )
 
 
 
@@ -510,7 +514,6 @@ class BybitAPI:
 
     def get_price(self):
 
-
         data = self.request(
 
             "GET",
@@ -519,45 +522,29 @@ class BybitAPI:
 
             {
 
-                "category":
+                "category": CATEGORY,
 
-                    CATEGORY,
-
-
-                "symbol":
-
-                    SYMBOL
+                "symbol": SYMBOL
 
             }
 
         )
 
+        if not data:
 
+            return None
 
         try:
 
-
             return float(
 
-                data["result"]
-
-                ["list"][0]
-
-                ["lastPrice"]
+                data["result"]["list"][0]["lastPrice"]
 
             )
 
+        except Exception:
 
-        except:
-
-
-            return 0
-
-
-
-
-
-
+            return None
 
 
 
@@ -575,7 +562,6 @@ class BybitAPI:
 
     ):
 
-
         return self.request(
 
             "GET",
@@ -584,25 +570,13 @@ class BybitAPI:
 
             {
 
+                "category": CATEGORY,
 
-                "category":
+                "symbol": SYMBOL,
 
-                    CATEGORY,
+                "interval": interval,
 
-
-                "symbol":
-
-                    SYMBOL,
-
-
-                "interval":
-
-                    interval,
-
-
-                "limit":
-
-                    limit
+                "limit": limit
 
             }
 
@@ -610,14 +584,36 @@ class BybitAPI:
 
 
 
+    # =====================================================
+    # LEVERAGE
+    # =====================================================
 
+    def set_leverage(self):
 
+        return self.request(
 
+            "POST",
+
+            "/v5/position/set-leverage",
+
+            {
+
+                "category": CATEGORY,
+
+                "symbol": SYMBOL,
+
+                "buyLeverage": str(LEVERAGE),
+
+                "sellLeverage": str(LEVERAGE)
+
+            }
+
+        )
 
 
 
     # =====================================================
-    # ORDER
+    # MARKET ORDER
     # =====================================================
 
     def place_order(
@@ -626,48 +622,29 @@ class BybitAPI:
 
         side,
 
-        qty
+        qty,
+
+        reduce_only=False
 
     ):
 
-
         body = {
 
+            "category": CATEGORY,
 
-            "category":
+            "symbol": SYMBOL,
 
-                CATEGORY,
+            "side": side,
 
+            "orderType": "Market",
 
-            "symbol":
+            "qty": str(qty),
 
-                SYMBOL,
+            "timeInForce": "IOC",
 
-
-            "side":
-
-                side,
-
-
-            "orderType":
-
-                "Market",
-
-
-            "qty":
-
-                str(qty),
-
-
-            "timeInForce":
-
-                "IOC"
+            "reduceOnly": reduce_only
 
         }
-
-
-
-
 
         return self.request(
 
@@ -681,14 +658,8 @@ class BybitAPI:
 
 
 
-
-
-
-
-
-
     # =====================================================
-    # TP SL
+    # TP / SL
     # =====================================================
 
     def set_trading_stop(
@@ -701,35 +672,17 @@ class BybitAPI:
 
     ):
 
-
-
         body = {
 
+            "category": CATEGORY,
 
-            "category":
+            "symbol": SYMBOL,
 
-                CATEGORY,
+            "takeProfit": str(tp),
 
-
-            "symbol":
-
-                SYMBOL,
-
-
-            "takeProfit":
-
-                str(tp),
-
-
-            "stopLoss":
-
-                str(sl)
+            "stopLoss": str(sl)
 
         }
-
-
-
-
 
         return self.request(
 
@@ -743,66 +696,45 @@ class BybitAPI:
 
 
 
-
-
-
-
-
-
     # =====================================================
-    # CLOSE
+    # CLOSE POSITION
     # =====================================================
 
     def close_position(self):
 
+        pos = self.get_position()
 
-        return self.request(
+        if not pos:
 
-            "POST",
+            return None
 
-            "/v5/order/create",
+        try:
 
-            {
+            item = pos["result"]["list"][0]
 
+            side = item["side"]
 
-                "category":
+            qty = float(item["size"])
 
-                    CATEGORY,
+        except Exception:
 
+            return None
 
-                "symbol":
+        if qty <= 0:
 
-                    SYMBOL,
+            return True
 
+        close_side = "Sell" if side == "Buy" else "Buy"
 
-                "side":
+        return self.place_order(
 
-                    "Sell",
+            close_side,
 
+            qty,
 
-                "orderType":
-
-                    "Market",
-
-
-                "qty":
-
-                    "0",
-
-
-                "reduceOnly":
-
-                    True
-
-            }
+            reduce_only=True
 
         )
-
-
-
-
-
-
 
 
 
