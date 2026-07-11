@@ -1,12 +1,14 @@
-# =====================================================
+# =======================================================
 # main.py
-# VWAP SUPERTREND AUTO BOT
-# Launcher
-# =====================================================
+# VWAP SuperTrend Trading Bot MAIN
+# =======================================================
+
 
 import time
 import signal
 import sys
+import traceback
+
 
 
 from app import TradingApp
@@ -18,55 +20,66 @@ from web.server import (
 
     set_bot_instance,
 
-    update_status,
+    add_log,
 
-    add_log
+    update_status
 
 )
 
 
 
-app_instance = None
-
-shutdown_called = False
 
 
-
-# =====================================================
-# SHUTDOWN
-# =====================================================
-
-def shutdown():
-
-    global app_instance
-    global shutdown_called
+# =======================================================
+# GLOBAL
+# =======================================================
 
 
-    if shutdown_called:
+bot = None
 
-        return
+running = True
 
 
-    shutdown_called = True
+
+
+
+# =======================================================
+# SIGNAL HANDLER
+# =======================================================
+
+
+def shutdown_handler(
+
+    signum,
+
+    frame
+
+):
+
+    global running
 
 
     print()
 
-    print("==============================")
+    print("====================")
 
     print("[SYSTEM SHUTDOWN]")
 
-    print("==============================")
+    print("====================")
+
+
+
+    running = False
 
 
 
     try:
 
 
-        if app_instance:
+        if bot:
 
 
-            app_instance.stop()
+            bot.stop()
 
 
 
@@ -75,7 +88,7 @@ def shutdown():
 
         print(
 
-            "[STOP ERROR]",
+            "[SHUTDOWN ERROR]",
 
             e
 
@@ -83,30 +96,11 @@ def shutdown():
 
 
 
-    update_status({
-
-        "bot":
-
-            "STOPPED"
-
-    })
-
-
-
     add_log(
 
-        "SYSTEM STOPPED"
+        "SYSTEM SHUTDOWN"
 
     )
-
-
-
-    print(
-
-        "[PROGRAM EXIT]"
-
-    )
-
 
 
     sys.exit(0)
@@ -115,66 +109,24 @@ def shutdown():
 
 
 
-# =====================================================
-# SIGNAL HANDLER
-# =====================================================
-
-def signal_handler(
-
-    sig,
-
-    frame
-
-):
+# =======================================================
+# STARTUP
+# =======================================================
 
 
-    shutdown()
+def start():
 
-
-
-
-
-signal.signal(
-
-    signal.SIGINT,
-
-    signal_handler
-
-)
-
-
-signal.signal(
-
-    signal.SIGTERM,
-
-    signal_handler
-
-)
-
-
-
-
-
-# =====================================================
-# MAIN
-# =====================================================
-
-def main():
-
-
-    global app_instance
+    global bot
 
 
 
     print()
 
-    print("==============================")
+    print("====================")
 
-    print(" VWAP SUPERTREND AUTO BOT ")
+    print(" VWAP SUPERTREND BOT ")
 
-    print("==============================")
-
-    print("[MODE] MANUAL CONTROL")
+    print("====================")
 
 
 
@@ -183,30 +135,38 @@ def main():
     try:
 
 
+
         # ---------------------------------
-        # WEB SERVER START
+        # WEB SERVER
         # ---------------------------------
 
         run_server()
+
 
 
         time.sleep(1)
 
 
 
-
-
         # ---------------------------------
-        # TRADING APP INIT
+        # BOT INSTANCE
         # ---------------------------------
 
-        app_instance = TradingApp()
+        bot = TradingApp()
 
 
 
         set_bot_instance(
 
-            app_instance
+            bot
+
+        )
+
+
+
+        add_log(
+
+            "BOT INSTANCE CREATED"
 
         )
 
@@ -222,63 +182,29 @@ def main():
 
 
 
+        print(
+
+            "[MAIN READY]"
+
+        )
+
+
+
+
+
+        # ---------------------------------
+        # AUTO START
+        # ---------------------------------
+
+        bot.start()
+
+
+
         add_log(
 
-            "TRADING APP READY"
+            "AUTO START COMPLETE"
 
         )
-
-
-
-        print(
-
-            "[TRADING APP READY]"
-
-        )
-
-
-
-
-
-        print()
-
-        print("==============================")
-
-        print("[SYSTEM READY]")
-
-        print("==============================")
-
-
-
-        print()
-
-        print(
-
-            "Dashboard:"
-
-        )
-
-        print(
-
-            "http://127.0.0.1:8000"
-
-        )
-
-        print()
-
-        print(
-
-            "START / STOP : Dashboard"
-
-        )
-
-        print(
-
-            "EXIT : Ctrl + C"
-
-        )
-
-        print()
 
 
 
@@ -288,7 +214,7 @@ def main():
         # MAIN LOOP
         # ---------------------------------
 
-        while True:
+        while running:
 
 
             time.sleep(1)
@@ -297,39 +223,67 @@ def main():
 
 
 
-
-    except KeyboardInterrupt:
-
-
-        shutdown()
-
-
-
-
-
     except Exception as e:
 
 
-        print(
 
-            "[MAIN ERROR]",
+        traceback.print_exc()
 
-            e
+
+
+        add_log(
+
+            f"MAIN ERROR {e}"
 
         )
 
 
-        shutdown()
+
+        try:
+
+
+            if bot:
+
+
+                bot.stop()
+
+
+
+        except:
+
+
+            pass
 
 
 
 
 
-# =====================================================
+# =======================================================
 # ENTRY
-# =====================================================
+# =======================================================
+
 
 if __name__ == "__main__":
 
 
-    main()
+
+    signal.signal(
+
+        signal.SIGINT,
+
+        shutdown_handler
+
+    )
+
+
+    signal.signal(
+
+        signal.SIGTERM,
+
+        shutdown_handler
+
+    )
+
+
+
+    start()
