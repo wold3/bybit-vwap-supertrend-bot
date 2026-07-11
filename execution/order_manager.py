@@ -1,11 +1,10 @@
 # =====================================================
 # execution/order_manager.py
-# Order Manager
+# Order Execution Manager
 # =====================================================
 
 from config import (
-    DEFAULT_SYMBOL,
-    STOP_LOSS_PERCENT
+    DEFAULT_SYMBOL
 )
 
 
@@ -49,9 +48,15 @@ class OrderManager:
     def __init__(self):
 
 
+        self.ordering = False
+
+
         print(
+
             "[ORDER MANAGER READY]"
+
         )
+
 
 
 
@@ -74,22 +79,14 @@ class OrderManager:
         try:
 
 
-            side = signal.get(
-
-                "side"
-
-            )
+            if self.ordering:
 
 
+                print(
 
-            if side not in [
+                    "[ORDER BLOCK] RUNNING"
 
-                "Buy",
-
-                "Sell"
-
-            ]:
-
+                )
 
                 return False
 
@@ -104,9 +101,64 @@ class OrderManager:
 
                 .get_position()
 
-                .get(
+            )
 
-                    "size",
+
+
+            if current["side"] != "NONE":
+
+
+                print(
+
+                    "[ORDER BLOCK] POSITION EXISTS"
+
+                )
+
+
+                return False
+
+
+
+
+
+
+
+            self.ordering = True
+
+
+
+
+
+
+
+            side = signal.get(
+
+                "side"
+
+            )
+
+
+
+            print(
+
+                "[ORDER SEND]",
+
+                side
+
+            )
+
+
+
+
+
+
+            # 현재 가격
+
+            price = (
+
+                signal.get(
+
+                    "price",
 
                     0
 
@@ -118,16 +170,12 @@ class OrderManager:
 
 
 
-            if not risk_manager.can_trade(
-
-                current
-
-            ):
+            if price <= 0:
 
 
-                add_log(
+                print(
 
-                    "RISK BLOCK"
+                    "[PRICE ERROR]"
 
                 )
 
@@ -140,31 +188,16 @@ class OrderManager:
 
 
 
+            # =========================
+            # Risk Calculation
+            # =========================
 
 
-            price = (
-
-                self.get_price()
-
-            )
-
-
-
-            if price <= 0:
-
-
-                return False
-
-
-
-
-
-
-            qty = (
+            risk = (
 
                 risk_manager
 
-                .calculate_size(
+                .check(
 
                     price
 
@@ -174,7 +207,14 @@ class OrderManager:
 
 
 
-            if qty <= 0:
+            if not risk:
+
+
+                print(
+
+                    "[RISK BLOCK]"
+
+                )
 
 
                 return False
@@ -184,21 +224,17 @@ class OrderManager:
 
 
 
-
-            print(
-
-                "[ORDER SEND]",
-
-                side,
-
-                qty
-
-            )
+            qty = risk["qty"]
 
 
 
 
 
+
+
+            # =========================
+            # SEND ORDER
+            # =========================
 
 
             result = (
@@ -220,8 +256,8 @@ class OrderManager:
 
 
 
-            if not result:
 
+            if not result:
 
 
                 return False
@@ -239,19 +275,16 @@ class OrderManager:
             ) != 0:
 
 
-
                 print(
 
-                    "[ORDER FAILED]",
+                    "[ORDER ERROR]",
 
                     result
 
                 )
 
 
-
                 return False
-
 
 
 
@@ -267,11 +300,26 @@ class OrderManager:
 
 
 
+            add_log(
+
+                f"{side} ORDER {qty}"
+
+            )
 
 
-            risk_manager.record_trade()
 
 
+
+
+
+
+            update_status({
+
+                "order":
+
+                    side
+
+            })
 
 
 
@@ -280,75 +328,23 @@ class OrderManager:
 
 
             # =========================
-            # TP / SL 계산
+            # TP / SL
             # =========================
 
 
-            if side == "Buy":
+            tp_sl = (
 
+                risk_manager
 
-                tp = (
+                .calculate_tp_sl(
 
-                    price *
+                    side,
 
-                    1.02
-
-                )
-
-
-                sl = (
-
-                    price *
-
-                    (
-
-                    1 -
-
-                    STOP_LOSS_PERCENT
-
-                    /
-
-                    100
-
-                    )
+                    price
 
                 )
 
-
-
-            else:
-
-
-                tp = (
-
-                    price *
-
-                    0.98
-
-                )
-
-
-                sl = (
-
-                    price *
-
-                    (
-
-                    1 +
-
-                    STOP_LOSS_PERCENT
-
-                    /
-
-                    100
-
-                    )
-
-                )
-
-
-
-
+            )
 
 
 
@@ -360,9 +356,9 @@ class OrderManager:
 
                 .set_trading_stop(
 
-                    round(tp,2),
+                    tp_sl["tp"],
 
-                    round(sl,2)
+                    tp_sl["sl"]
 
                 )
 
@@ -374,7 +370,7 @@ class OrderManager:
 
             print(
 
-                "[TP SL RESULT]",
+                "[TP SL]",
 
                 tp_result
 
@@ -386,9 +382,12 @@ class OrderManager:
 
 
 
+            # =========================
+            # DATABASE
+            # =========================
 
 
-            trade = {
+            database.save_trade({
 
 
                 "symbol":
@@ -413,54 +412,17 @@ class OrderManager:
 
                 "tp":
 
-                    tp,
+                    tp_sl["tp"],
 
 
                 "sl":
 
-                    sl,
+                    tp_sl["sl"],
 
 
                 "result":
 
                     "OPEN"
-
-            }
-
-
-
-
-
-            database.save_trade(
-
-                trade
-
-            )
-
-
-
-
-
-
-
-
-
-            update_status({
-
-
-                "order":
-
-                    side,
-
-
-                "tp":
-
-                    tp,
-
-
-                "sl":
-
-                    sl
 
             })
 
@@ -468,43 +430,24 @@ class OrderManager:
 
 
 
-            add_log(
-
-                str(trade)
-
-            )
 
 
+            # =========================
+            # TELEGRAM
+            # =========================
 
 
+            telegram.order(
 
+                side,
 
+                DEFAULT_SYMBOL,
 
+                qty,
 
-
-            telegram.send(
-
-f"""
-🚀 VWAP SUPERTREND BOT
-
-SIDE : {side}
-
-SYMBOL : {DEFAULT_SYMBOL}
-
-ENTRY : {price}
-
-QTY : {qty}
-
-TP : {round(tp,2)}
-
-SL : {round(sl,2)}
-
-MODE : AUTO
-"""
+                price
 
             )
-
-
 
 
 
@@ -517,13 +460,12 @@ MODE : AUTO
 
 
 
-
         except Exception as e:
 
 
             print(
 
-                "[ORDER ERROR]",
+                "[ORDER MANAGER ERROR]",
 
                 e
 
@@ -537,68 +479,23 @@ MODE : AUTO
             )
 
 
+            telegram.error(
+
+                e
+
+            )
+
+
+
             return False
 
 
 
 
+        finally:
 
 
-
-
-
-
-    # =====================================================
-    # CURRENT PRICE
-    # =====================================================
-
-
-    def get_price(self):
-
-
-        try:
-
-
-            from api.bybit_api import (
-
-                bybit_api
-
-            )
-
-
-
-            data = (
-
-                bybit_api
-
-                .get_kline()
-
-            )
-
-
-
-            if data:
-
-
-                return float(
-
-                    data[-1][4]
-
-                )
-
-
-
-        except:
-
-
-            pass
-
-
-
-
-        return 0
-
-
+            self.ordering = False
 
 
 
