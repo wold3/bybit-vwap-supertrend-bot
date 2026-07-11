@@ -7,19 +7,29 @@ import time
 import threading
 import traceback
 
+
 import config
 
+
 from api.bybit_api import bybit_api
+
 from services.private_ws import private_ws
 
 from portfolio.position_manager import position_manager
+
 from order.order_manager import order_manager
-from risk.risk_manager import risk_manager
+
 
 from web.server import (
+
     update_status,
+
     add_log
+
 )
+
+
+
 
 
 class TradingApp:
@@ -27,13 +37,22 @@ class TradingApp:
 
     def __init__(self):
 
+
         self.running = False
 
         self.market_thread = None
 
         self.stop_lock = threading.Lock()
 
-        print("[거래 앱 준비 완료]")
+
+
+        print(
+
+            "[TRADING APP READY]"
+
+        )
+
+
 
 
 
@@ -43,71 +62,108 @@ class TradingApp:
 
     def start(self):
 
+
         if self.running:
+
 
             return
 
 
+
+
         print()
+
         print("====================")
-        print("[봇 시작]")
+
+        print("[BOT START]")
+
         print("====================")
+
 
 
         self.running = True
 
 
 
+
+
         # -------------------------------------------------
-        # API BALANCE CHECK
+        # BALANCE CHECK
         # -------------------------------------------------
 
         try:
+
 
             balance = bybit_api.get_balance()
 
 
+
             if balance:
 
+
                 print(
-                    "[잔액 정상]"
+
+                    "[BALANCE OK]"
+
                 )
+
 
             else:
 
+
                 print(
-                    "[잔액 확인 실패 - 계속 진행]"
+
+                    "[BALANCE CHECK FAILED - CONTINUE]"
+
                 )
+
 
 
         except Exception as e:
 
+
             print(
-                "[잔액 API 보호 오류]",
+
+                "[BALANCE ERROR PROTECTED]",
+
                 e
+
             )
 
 
 
+
+
         # -------------------------------------------------
-        # PRIVATE WS START
+        # PRIVATE WS
         # -------------------------------------------------
 
         try:
 
+
             private_ws.start()
 
+
+
             print(
-                "[PRIVATE WS START]"
+
+                "[PRIVATE WS STARTED]"
+
             )
 
 
         except Exception as e:
 
+
             print(
+
                 "[PRIVATE WS ERROR]",
+
                 e
+
             )
+
+
 
 
 
@@ -117,15 +173,23 @@ class TradingApp:
 
         try:
 
+
             position_manager.refresh()
+
 
 
         except Exception as e:
 
+
             print(
-                "[POSITION REFRESH ERROR]",
+
+                "[POSITION SYNC ERROR]",
+
                 e
+
             )
+
+
 
 
 
@@ -135,32 +199,45 @@ class TradingApp:
 
         try:
 
+
             from services.watchdog import watchdog
+
 
             watchdog.start()
 
+
+
             print(
+
                 "[WATCHDOG START]"
+
             )
 
 
+
         except Exception:
+
 
             pass
 
 
 
+
+
         # -------------------------------------------------
-        # MARKET LOOP THREAD
+        # MARKET LOOP
         # -------------------------------------------------
 
         if (
 
             self.market_thread is None
 
-            or not self.market_thread.is_alive()
+            or
+
+            not self.market_thread.is_alive()
 
         ):
+
 
 
             self.market_thread = threading.Thread(
@@ -178,11 +255,16 @@ class TradingApp:
 
 
 
+
+
         update_status({
 
-            "bot":"RUNNING"
+            "bot":
+
+                "RUNNING"
 
         })
+
 
 
         add_log(
@@ -192,11 +274,13 @@ class TradingApp:
         )
 
 
+
         print(
 
             "[BOT READY]"
 
         )
+
 
 
 
@@ -225,7 +309,9 @@ class TradingApp:
         while self.running:
 
 
+
             try:
+
 
 
                 df = market_data.get_candles(
@@ -237,12 +323,15 @@ class TradingApp:
                 )
 
 
+
                 if df is None:
 
 
-                    time.sleep(5)
+
+                    time.sleep(30)
 
                     continue
+
 
 
 
@@ -255,7 +344,10 @@ class TradingApp:
 
 
 
+
+
                 if signal:
+
 
 
                     print(
@@ -275,12 +367,9 @@ class TradingApp:
 
 
 
-                    position = (
 
-                        position_manager
-                        .get_position()
 
-                    )
+                    position = position_manager.get_position()
 
 
 
@@ -294,62 +383,75 @@ class TradingApp:
 
 
 
-                    if (
+                    size = position.get(
 
-                        signal == "Buy"
+                        "size",
 
-                        and current == "Buy"
+                        0
 
-                    ):
-
-                        add_log(
-
-                            "SKIP EXIST BUY"
-
-                        )
-
-                        time.sleep(10)
-
-                        continue
+                    )
 
 
 
-                    if (
-
-                        signal == "Sell"
-
-                        and current == "Sell"
-
-                    ):
 
 
-                        add_log(
+                    # ---------------------------------
+                    # EXIST POSITION PROTECTION
+                    # ---------------------------------
 
-                            "SKIP EXIST SELL"
-
-                        )
-
-                        time.sleep(10)
-
-                        continue
+                    if size > 0:
 
 
 
+                        if current == signal:
+
+
+
+                            add_log(
+
+                                "SKIP EXIST POSITION"
+
+                            )
+
+                            time.sleep(30)
+
+                            continue
+
+
+
+
+                        else:
+
+
+
+                            add_log(
+
+                                "DIFFERENT POSITION EXISTS"
+
+                            )
+
+
+                            time.sleep(30)
+
+                            continue
+
+
+
+
+
+                    # ---------------------------------
+                    # ORDER
+                    # ---------------------------------
 
                     qty = config.MAX_POSITION_SIZE
 
 
 
-                    result = (
+                    result = order_manager.open_position(
 
-                        order_manager
-                        .open_position(
+                        signal,
 
-                            signal,
-
-                            qty
-
-                        )
+                        qty
 
                     )
 
@@ -358,11 +460,13 @@ class TradingApp:
                     if result:
 
 
+
                         add_log(
 
                             f"ORDER SUCCESS {signal}"
 
                         )
+
 
                     else:
 
@@ -376,14 +480,21 @@ class TradingApp:
 
 
 
-                time.sleep(10)
+
+                # candle 보호
+
+                time.sleep(30)
+
+
 
 
 
             except Exception as e:
 
 
+
                 traceback.print_exc()
+
 
 
                 add_log(
@@ -393,7 +504,9 @@ class TradingApp:
                 )
 
 
-                time.sleep(5)
+
+                time.sleep(10)
+
 
 
 
@@ -408,9 +521,12 @@ class TradingApp:
         with self.stop_lock:
 
 
+
             if not self.running:
 
+
                 return
+
 
 
 
@@ -418,13 +534,16 @@ class TradingApp:
 
             print("====================")
 
-            print("[봇 정지]")
+            print("[BOT STOP]")
 
             print("====================")
 
 
 
+
+
             self.running = False
+
 
 
 
@@ -439,12 +558,13 @@ class TradingApp:
                 order_manager.close_position()
 
 
+
             except Exception as e:
 
 
                 print(
 
-                    "[CLOSE POSITION ERROR]",
+                    "[POSITION CLOSE ERROR]",
 
                     e
 
@@ -453,8 +573,9 @@ class TradingApp:
 
 
 
+
             # -------------------------------------------------
-            # PRIVATE WS STOP
+            # PRIVATE WS
             # -------------------------------------------------
 
             try:
@@ -463,12 +584,13 @@ class TradingApp:
                 private_ws.stop()
 
 
+
             except Exception as e:
 
 
                 print(
 
-                    "[PRIVATE WS STOP ERROR]",
+                    "[WS STOP ERROR]",
 
                     e
 
@@ -477,8 +599,9 @@ class TradingApp:
 
 
 
+
             # -------------------------------------------------
-            # WATCHDOG STOP
+            # WATCHDOG
             # -------------------------------------------------
 
             try:
@@ -490,9 +613,12 @@ class TradingApp:
                 watchdog.stop()
 
 
+
             except Exception:
 
+
                 pass
+
 
 
 
@@ -505,7 +631,9 @@ class TradingApp:
 
                 self.market_thread
 
-                and self.market_thread.is_alive()
+                and
+
+                self.market_thread.is_alive()
 
             ):
 
@@ -522,9 +650,13 @@ class TradingApp:
 
 
 
+
+
             update_status({
 
-                "bot":"STOPPED"
+                "bot":
+
+                    "STOPPED"
 
             })
 
@@ -532,9 +664,10 @@ class TradingApp:
 
             add_log(
 
-                "BOT STOP"
+                "BOT STOP COMPLETE"
 
             )
+
 
 
             print(
@@ -545,8 +678,9 @@ class TradingApp:
 
 
 
-# =====================================================
-# INSTANCE
-# =====================================================
 
-trading_app = TradingApp()
+
+# =======================================================
+# NO GLOBAL INSTANCE
+# main.py에서 생성
+# =======================================================
