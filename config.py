@@ -1,7 +1,6 @@
 # =====================================================
 # config.py
-# VWAP SUPERTREND BOT CONFIG
-# Demo / Live Support
+# VWAP SUPERTREND AUTO BOT CONFIG
 # =====================================================
 
 import os
@@ -10,6 +9,8 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
+
+
 
 
 
@@ -22,9 +23,8 @@ print("==============================")
 
 
 # =====================================================
-# API KEY
+# BYBIT API
 # =====================================================
-
 
 BYBIT_API_KEY = os.getenv(
 
@@ -33,7 +33,6 @@ BYBIT_API_KEY = os.getenv(
     ""
 
 )
-
 
 
 BYBIT_API_SECRET = os.getenv(
@@ -51,27 +50,16 @@ BYBIT_API_SECRET = os.getenv(
 # =====================================================
 # TRADING MODE
 # =====================================================
+# 기본 실행 모드
+# DEMO : 모의투자
+# LIVE : 실거래
+#
+# Dashboard에서 변경 가능
 
-
-# False = Bybit Demo Trading
-# True  = Real Trading
+DEFAULT_MODE = "DEMO"
 
 
 LIVE = False
-
-
-
-
-
-print(
-
-    "LIVE :",
-
-    LIVE
-
-)
-
-
 
 
 
@@ -82,7 +70,6 @@ print(
 # =====================================================
 # MARKET
 # =====================================================
-
 
 CATEGORY = "linear"
 
@@ -96,51 +83,41 @@ INTERVAL = "5"
 
 
 
-print(
-
-    "CATEGORY :",
-
-    CATEGORY
-
-)
-
-
-print(
-
-    "SYMBOL :",
-
-    DEFAULT_SYMBOL
-
-)
-
-
-
-
-
-
-
-
-
 # =====================================================
 # LEVERAGE
 # =====================================================
-
 
 LEVERAGE = 3
 
 
 
-print(
-
-    "LEVERAGE :",
-
-    LEVERAGE
-
-)
 
 
+# =====================================================
+# RISK MANAGEMENT
+# =====================================================
+
+# 1회 거래 위험률 (%)
+
+RISK_PER_TRADE_PERCENT = 0.5
 
 
+
+# 손절 %
+
+STOP_LOSS_PERCENT = 1.0
+
+
+
+# 익절 %
+
+TAKE_PROFIT_PERCENT = 2.0
+
+
+
+# 최대 주문 수량
+
+MAX_POSITION_SIZE = 0.001
 
 
 
@@ -150,11 +127,13 @@ print(
 # STRATEGY
 # =====================================================
 
+# ATR
 
-# SuperTrend
+ATR_PERIOD = 14
 
-ATR_PERIOD = 10
 
+
+# SuperTrend 배수
 
 SUPERTREND_MULTIPLIER = 3
 
@@ -162,10 +141,7 @@ SUPERTREND_MULTIPLIER = 3
 
 
 
-
-
-# Volume Filter
-
+# 거래량 필터
 
 USE_VOLUME_FILTER = True
 
@@ -179,54 +155,11 @@ MIN_VOLUME_MULTIPLIER = 1.2
 
 
 
-
-
-# =====================================================
-# RISK MANAGEMENT
-# =====================================================
-
-
-# 거래당 위험 %
-
-RISK_PER_TRADE_PERCENT = 0.5
-
-
-
-# 손절 %
-
-STOP_LOSS_PERCENT = 1.0
-
-
-
-# 최대 주문 BTC 수량
-
-MAX_POSITION_SIZE = 0.001
-
-
-
-
-
-
-
-# =====================================================
-# TAKE PROFIT
-# =====================================================
-
-
-TAKE_PROFIT_PERCENT = 2.0
-
-
-
-
-
-
-
 # =====================================================
 # DATABASE
 # =====================================================
 
-
-DATABASE_FILE = (
+DATABASE_PATH = (
 
     "database/trading.db"
 
@@ -236,14 +169,9 @@ DATABASE_FILE = (
 
 
 
-
-
-
-
 # =====================================================
 # WEB DASHBOARD
 # =====================================================
-
 
 WEB_HOST = "0.0.0.0"
 
@@ -254,15 +182,9 @@ WEB_PORT = 8000
 
 
 
-
-
 # =====================================================
 # TELEGRAM
 # =====================================================
-
-
-TELEGRAM_ENABLE = False
-
 
 TELEGRAM_TOKEN = os.getenv(
 
@@ -285,27 +207,83 @@ TELEGRAM_CHAT_ID = os.getenv(
 
 
 
+# =====================================================
+# BOT CONTROL
+# =====================================================
+
+# 직접 실행 방식
+
+AUTO_START = True
+
+
+
+# 작업 스케줄러 사용 안 함
+
+USE_TASK_SCHEDULER = False
+
 
 
 
 
 # =====================================================
-# SYSTEM
+# DEBUG
 # =====================================================
 
+DEBUG = True
 
-BOT_NAME = (
 
-    "VWAP_SUPERTREND_BOT"
+
+
+
+
+
+# =====================================================
+# CONFIG CHECK
+# =====================================================
+
+print(
+
+    "LIVE :",
+
+    LIVE
 
 )
 
 
+print(
 
-VERSION = "1.0"
+    "DEFAULT MODE :",
+
+    DEFAULT_MODE
+
+)
 
 
+print(
 
+    "CATEGORY :",
+
+    CATEGORY
+
+)
+
+
+print(
+
+    "SYMBOL :",
+
+    DEFAULT_SYMBOL
+
+)
+
+
+print(
+
+    "LEVERAGE :",
+
+    LEVERAGE
+
+)
 
 
 print(
