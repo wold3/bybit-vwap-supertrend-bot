@@ -19,12 +19,9 @@ from config import (
 class OrderManager:
 
 
-    def __init__(
-        self,
-        bybit_api
-    ):
+    def __init__(self, api):
 
-        self.api = bybit_api
+        self.api = api
 
 
         print(
@@ -35,9 +32,11 @@ class OrderManager:
 
 
 
+
     # =====================================================
-    # CREATE ORDER
+    # EXECUTE
     # =====================================================
+
 
     def execute(
         self,
@@ -52,16 +51,34 @@ class OrderManager:
 
 
 
+
+
         side = signal.get(
             "side"
         )
 
 
 
-        print(
-            "[ORDER SIGNAL]",
-            side
-        )
+        if side not in [
+
+            "Buy",
+
+            "Sell"
+
+        ]:
+
+
+            print(
+
+                "[INVALID SIDE]",
+
+                side
+
+            )
+
+
+            return None
+
 
 
 
@@ -73,26 +90,52 @@ class OrderManager:
 
 
 
-        # =========================
+        print(
+
+            "[ORDER SIGNAL]",
+
+            side
+
+        )
+
+
+
+
+
+
+
+
+        # =================================================
         # TEST MODE
-        # =========================
+        # =================================================
+
 
         if not LIVE:
 
 
             print(
+
                 "[TEST ORDER]",
+
                 side,
+
                 qty
+
             )
 
 
-            result = {
+
+            order_result = {
 
 
                 "retCode":
 
                     0,
+
+
+                "retMsg":
+
+                    "TEST ORDER",
 
 
                 "side":
@@ -116,10 +159,17 @@ class OrderManager:
 
 
 
+
+
+        # =================================================
+        # LIVE MODE
+        # =================================================
+
+
         else:
 
 
-            result = self.api.place_order(
+            order_result = self.api.place_order(
 
                 side,
 
@@ -131,22 +181,24 @@ class OrderManager:
 
 
 
-        if not result:
 
 
-            print(
-                "[ORDER FAILED]"
-            )
+            if not order_result:
 
 
-            return None
+                print(
+
+                    "[ORDER FAILED]"
+
+                )
+
+
+                return None
 
 
 
 
 
-
-        # TP / SL 계산
 
 
         tp, sl = self.calculate_tp_sl(
@@ -159,25 +211,35 @@ class OrderManager:
 
 
 
+
         print(
+
             "[TP]",
+
             tp
+
         )
 
 
         print(
+
             "[SL]",
+
             sl
+
         )
 
 
 
 
+
+
+        # LIVE에서만 등록
 
         if LIVE:
 
 
-            self.set_trading_stop(
+            self.set_tp_sl(
 
                 tp,
 
@@ -189,20 +251,31 @@ class OrderManager:
 
 
 
+
         return {
 
 
             "order":
 
-                result,
+                order_result,
 
 
-            "tp":
+            "side":
+
+                side,
+
+
+            "entry":
+
+                price,
+
+
+            "take_profit":
 
                 tp,
 
 
-            "sl":
+            "stop_loss":
 
                 sl
 
@@ -218,21 +291,21 @@ class OrderManager:
 
 
     # =====================================================
-    # TP SL CALCULATION
+    # TP SL CALCULATE
     # =====================================================
 
 
     def calculate_tp_sl(
         self,
         side,
-        entry
+        price
     ):
 
 
         if side == "Buy":
 
 
-            tp = entry * (
+            tp = price * (
 
                 1 +
 
@@ -241,7 +314,7 @@ class OrderManager:
             )
 
 
-            sl = entry * (
+            sl = price * (
 
                 1 -
 
@@ -254,7 +327,7 @@ class OrderManager:
         else:
 
 
-            tp = entry * (
+            tp = price * (
 
                 1 -
 
@@ -263,7 +336,7 @@ class OrderManager:
             )
 
 
-            sl = entry * (
+            sl = price * (
 
                 1 +
 
@@ -275,9 +348,9 @@ class OrderManager:
 
         return (
 
-            round(tp, 2),
+            round(tp,2),
 
-            round(sl, 2)
+            round(sl,2)
 
         )
 
@@ -288,13 +361,12 @@ class OrderManager:
 
 
 
-
     # =====================================================
-    # BYBIT TP SL
+    # SET TP SL
     # =====================================================
 
 
-    def set_trading_stop(
+    def set_tp_sl(
         self,
         tp,
         sl
@@ -304,7 +376,7 @@ class OrderManager:
         try:
 
 
-            return self.api.request(
+            result = self.api.request(
 
                 "POST",
 
@@ -330,11 +402,33 @@ class OrderManager:
 
                     "stopLoss":
 
-                        str(sl)
+                        str(sl),
+
+
+                    "tpslMode":
+
+                        "Full"
 
                 }
 
             )
+
+
+
+            print(
+
+                "[TP SL SET]",
+
+                result
+
+            )
+
+
+
+            return result
+
+
+
 
 
         except Exception as e:
@@ -350,3 +444,22 @@ class OrderManager:
 
 
             return None
+
+
+
+
+
+
+
+# =====================================================
+# SINGLETON
+# =====================================================
+
+from api.bybit_api import bybit_api
+
+
+order_manager = OrderManager(
+
+    bybit_api
+
+)
