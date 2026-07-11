@@ -1,12 +1,22 @@
-// =====================================================
+//////////////////////////////////////////////////////
 // VWAP SUPERTREND BOT
 // BYBIT V5 CANDLE CHART
-// =====================================================
+//////////////////////////////////////////////////////
 
+
+// ==================================================
+// GLOBAL
+// ==================================================
 
 let candleChart = null;
 
 
+
+
+
+// ==================================================
+// LOAD CANDLES
+// ==================================================
 
 async function loadChart(){
 
@@ -14,12 +24,14 @@ async function loadChart(){
     try{
 
 
-        const res = await fetch(
+        const response = await fetch(
+
             "/api/candles"
+
         );
 
 
-        const json = await res.json();
+        const json = await response.json();
 
 
 
@@ -39,6 +51,7 @@ async function loadChart(){
 
 
         let list =
+
             json.result.list;
 
 
@@ -56,15 +69,21 @@ async function loadChart(){
 
             candles.push({
 
-                x: Number(c[0]),
 
-                o: Number(c[1]),
+                x:Number(c[0]),
 
-                h: Number(c[2]),
 
-                l: Number(c[3]),
+                o:Number(c[1]),
 
-                c: Number(c[4])
+
+                h:Number(c[2]),
+
+
+                l:Number(c[3]),
+
+
+                c:Number(c[4])
+
 
             });
 
@@ -75,25 +94,35 @@ async function loadChart(){
 
 
         console.log(
+
             "CANDLES",
-            candles
+
+            candles.length
+
         );
 
 
 
-        drawChart(candles);
+        drawChart(
+
+            candles
+
+        );
 
 
 
     }
 
 
-    catch(e){
+    catch(error){
 
 
         console.log(
+
             "CANDLE ERROR",
-            e
+
+            error
+
         );
 
 
@@ -109,18 +138,26 @@ async function loadChart(){
 
 
 
+
+// ==================================================
+// DRAW CHART
+// ==================================================
+
 function drawChart(data){
 
 
 
-    const ctx =
-    document.getElementById(
-        "chart"
-    );
+    const canvas =
+
+        document.getElementById(
+
+            "chart"
+
+        );
 
 
 
-    if(!ctx)
+    if(!canvas)
 
         return;
 
@@ -132,10 +169,13 @@ function drawChart(data){
     if(candleChart){
 
 
+
         candleChart.data.datasets[0].data = data;
 
 
+
         candleChart.update();
+
 
 
         return;
@@ -148,9 +188,11 @@ function drawChart(data){
 
 
 
+
     candleChart = new Chart(
 
-        ctx,
+        canvas,
+
 
         {
 
@@ -165,10 +207,18 @@ function drawChart(data){
             datasets:[{
 
 
-                label:"BTCUSDT",
+                label:
+
+                "BTCUSDT",
 
 
-                data:data
+
+                data:data,
+
+
+
+                borderWidth:1
+
 
 
             }]
@@ -198,20 +248,49 @@ function drawChart(data){
 
 
 
+            plugins:{
+
+
+                legend:{
+
+
+                    display:true
+
+
+                }
+
+
+            },
+
+
+
+
+
             scales:{
+
 
 
                 x:{
 
 
-                    type:"timeseries",
+                    type:"time",
+
+
+
+                    time:{
+
+
+                        unit:"minute"
+
+
+                    },
 
 
 
                     ticks:{
 
 
-                        maxTicksLimit:10
+                        maxTicksLimit:12
 
 
                     }
@@ -222,27 +301,28 @@ function drawChart(data){
 
 
 
+
                 y:{
 
 
-                    position:"right"
-
-
-                }
+                    position:"right",
 
 
 
-            },
+                    ticks:{
 
 
-
-            plugins:{
-
-
-                legend:{
+                        callback:function(value){
 
 
-                    display:true
+                            return value.toFixed(0);
+
+
+                        }
+
+
+                    }
+
 
 
                 }
@@ -271,6 +351,12 @@ function drawChart(data){
 
 
 
+
+
+
+// ==================================================
+// AUTO UPDATE
+// ==================================================
 
 setInterval(
 
