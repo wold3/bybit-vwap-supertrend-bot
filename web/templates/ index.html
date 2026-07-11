@@ -13,32 +13,45 @@ VWAP SUPERTREND BOT
 <style>
 
 body{
-    background:#101010;
-    color:#eee;
-    font-family:Arial;
+
+    background:#0f1115;
+    color:white;
+    font-family:"Segoe UI",Arial;
     padding:30px;
+
 }
+
+
+h1{
+
+    text-align:center;
+    color:#00ff99;
+
+}
+
 
 
 .card{
 
-    background:#1e1e1e;
-    padding:20px;
+    background:#1b1f27;
+    padding:25px;
     margin-bottom:20px;
     border-radius:15px;
+    box-shadow:0 0 20px #000;
 
 }
 
 
+
 button{
 
-    padding:12px 25px;
+    padding:14px 25px;
     margin:5px;
     border:none;
-    border-radius:8px;
+    border-radius:10px;
     cursor:pointer;
-    font-weight:bold;
     font-size:15px;
+    font-weight:bold;
 
 }
 
@@ -48,6 +61,7 @@ button:hover{
     transform:scale(1.05);
 
 }
+
 
 
 .demo{
@@ -60,7 +74,7 @@ button:hover{
 
 .live{
 
-    background:#c0392b;
+    background:#e74c3c;
     color:white;
 
 }
@@ -90,6 +104,7 @@ button:hover{
 }
 
 
+
 .value{
 
     font-size:22px;
@@ -98,11 +113,51 @@ button:hover{
 }
 
 
-pre{
 
+.action{
+
+
+    background:#000;
+    border:1px solid #00ff99;
+    padding:15px;
+    border-radius:10px;
+    color:#00ff99;
+    font-size:18px;
+
+}
+
+
+
+.status-grid{
+
+
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+
+}
+
+
+
+.item{
+
+    background:#111;
+    padding:15px;
+    border-radius:10px;
+
+}
+
+
+
+#logs{
+
+    height:300px;
+    overflow:auto;
     background:#000;
     padding:15px;
     border-radius:10px;
+    color:#00ff99;
+    font-size:13px;
 
 }
 
@@ -110,6 +165,7 @@ pre{
 </style>
 
 </head>
+
 
 
 <body>
@@ -129,21 +185,34 @@ CONTROL
 </h2>
 
 
-<button class="demo"
-onclick="modeChange('DEMO')">
+<div id="action"
+class="action">
 
-DEMO
+READY
+
+</div>
+
+
+
+<br>
+
+
+
+<button class="demo"
+onclick="changeMode('DEMO')">
+
+DEMO MODE
 
 </button>
+
 
 
 <button class="live"
-onclick="modeChange('LIVE')">
+onclick="changeMode('LIVE')">
 
-LIVE
+LIVE MODE
 
 </button>
-
 
 
 <br>
@@ -152,7 +221,7 @@ LIVE
 <button class="start"
 onclick="startBot()">
 
-START
+▶ START
 
 </button>
 
@@ -160,7 +229,7 @@ START
 <button class="stop"
 onclick="stopBot()">
 
-STOP
+■ STOP
 
 </button>
 
@@ -169,64 +238,11 @@ STOP
 <button class="close"
 onclick="closePosition()">
 
-CLOSE
+✖ CLOSE POSITION
 
 </button>
 
 
-</div>
-
-
-
-
-
-<div class="card">
-
-
-<h2>
-STATUS
-</h2>
-
-
-<p>
-MODE :
-<span id="mode" class="value">
--
-</span>
-</p>
-
-
-<p>
-BOT :
-<span id="bot" class="value">
--
-</span>
-</p>
-
-
-<p>
-POSITION :
-<span id="position">
--
-</span>
-</p>
-
-
-<p>
-SIZE :
-<span id="size">
--
-</span>
-</p>
-
-
-<p>
-PNL :
-<span id="pnl">
--
-</span>
-</p>
-
 
 </div>
 
@@ -238,13 +254,135 @@ PNL :
 
 
 <h2>
-LOG
-
+SYSTEM STATUS
 </h2>
 
 
-<pre id="logs">
-</pre>
+<div class="status-grid">
+
+
+<div class="item">
+
+MODE
+
+<br>
+
+<span id="mode"
+class="value">
+
+-
+
+</span>
+
+</div>
+
+
+
+<div class="item">
+
+BOT
+
+<br>
+
+<span id="bot"
+class="value">
+
+-
+
+</span>
+
+</div>
+
+
+
+<div class="item">
+
+POSITION
+
+<br>
+
+<span id="position"
+class="value">
+
+-
+
+</span>
+
+</div>
+
+
+
+<div class="item">
+
+SIZE
+
+<br>
+
+<span id="size"
+class="value">
+
+-
+
+</span>
+
+</div>
+
+
+
+<div class="item">
+
+ENTRY
+
+<br>
+
+<span id="entry"
+class="value">
+
+-
+
+</span>
+
+</div>
+
+
+
+<div class="item">
+
+PNL
+
+<br>
+
+<span id="pnl"
+class="value">
+
+-
+
+</span>
+
+</div>
+
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+EVENT LOG
+</h2>
+
+
+<div id="logs">
+
+</div>
 
 
 </div>
@@ -254,6 +392,16 @@ LOG
 
 
 <script>
+
+
+function showAction(text){
+
+    document.getElementById(
+        "action"
+    ).innerHTML=text;
+
+}
+
 
 
 
@@ -274,10 +422,7 @@ headers:{
 
 },
 
-body:
-
-JSON.stringify(data)
-
+body:JSON.stringify(data)
 
 }
 
@@ -290,7 +435,14 @@ JSON.stringify(data)
 
 
 
-function modeChange(mode){
+
+function changeMode(mode){
+
+
+showAction(
+"실행 : MODE 변경 → "+mode
+);
+
 
 
 post(
@@ -305,14 +457,37 @@ mode:mode
 
 )
 
-.then(()=>{
+.then(r=>r.json())
+
+.then(data=>{
+
+
+if(data.success){
+
+showAction(
+"완료 : "+mode+" MODE"
+);
+
+}
+
+else{
+
+showAction(
+"실패 : MODE 변경"
+);
+
+}
+
 
 update();
+
 
 });
 
 
 }
+
+
 
 
 
@@ -321,20 +496,50 @@ update();
 function startBot(){
 
 
+showAction(
+"실행 : START 버튼"
+);
+
+
+
 post(
 
 "/api/start"
 
 )
 
-.then(()=>{
+.then(r=>r.json())
+
+.then(data=>{
+
+
+if(data.success){
+
+showAction(
+"완료 : BOT START"
+);
+
+}
+
+else{
+
+showAction(
+"실패 : BOT START"
+);
+
+}
+
 
 update();
+
 
 });
 
 
 }
+
+
+
 
 
 
@@ -343,20 +548,50 @@ update();
 function stopBot(){
 
 
+showAction(
+"실행 : STOP 버튼"
+);
+
+
+
 post(
 
 "/api/stop"
 
 )
 
-.then(()=>{
+.then(r=>r.json())
+
+.then(data=>{
+
+
+if(data.success){
+
+showAction(
+"완료 : BOT STOP"
+);
+
+}
+
+else{
+
+showAction(
+"실패 : BOT STOP"
+);
+
+}
+
 
 update();
+
 
 });
 
 
 }
+
+
+
 
 
 
@@ -365,7 +600,20 @@ update();
 function closePosition(){
 
 
-if(confirm("포지션 종료?")){
+if(!confirm(
+"포지션을 종료하시겠습니까?"
+)){
+
+return;
+
+}
+
+
+
+showAction(
+"실행 : CLOSE POSITION"
+);
+
 
 
 post(
@@ -374,17 +622,36 @@ post(
 
 )
 
-.then(()=>{
+.then(r=>r.json())
+
+.then(data=>{
+
+
+if(data.success){
+
+showAction(
+"완료 : POSITION CLOSED"
+);
+
+}
+
+else{
+
+showAction(
+"실패 : CLOSE POSITION"
+);
+
+}
+
 
 update();
+
 
 });
 
 
 }
 
-
-}
 
 
 
@@ -400,15 +667,9 @@ fetch(
 
 )
 
-.then(
+.then(r=>r.json())
 
-r=>r.json()
-
-)
-
-.then(
-
-data=>{
+.then(data=>{
 
 
 let s=data.status;
@@ -440,6 +701,12 @@ document.getElementById(
 
 
 document.getElementById(
+"entry"
+).innerHTML=s.entry_price;
+
+
+
+document.getElementById(
 "pnl"
 ).innerHTML=s.pnl;
 
@@ -447,28 +714,38 @@ document.getElementById(
 
 document.getElementById(
 "logs"
-).textContent=
+).innerHTML=
 
-data.logs.join("\n");
+data.logs.join("<br>");
 
 
 
-}
-
-)
-
-.catch(
-
-e=>{
-
-console.log(e);
-
-}
-
+let logBox=document.getElementById(
+"logs"
 );
 
 
+logBox.scrollTop=
+logBox.scrollHeight;
+
+
+
+})
+
+.catch(e=>{
+
+
+showAction(
+"STATUS ERROR"
+);
+
+
+});
+
+
 }
+
+
 
 
 
@@ -482,7 +759,9 @@ update,
 );
 
 
+
 update();
+
 
 
 </script>
