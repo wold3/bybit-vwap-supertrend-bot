@@ -1,15 +1,23 @@
 # =====================================================
 # execution/order_manager.py
-# Order Manager
+# Order Manager + Risk Guard
 # =====================================================
 
 from config import (
-    LIVE,
+    LIVE_ORDER,
     DEFAULT_ORDER_QTY,
-    CATEGORY,
-    DEFAULT_SYMBOL,
     STOP_LOSS_PERCENT,
     TAKE_PROFIT_PERCENT
+)
+
+
+from risk.risk_manager import (
+    risk_manager
+)
+
+
+from portfolio.position_manager import (
+    position_manager
 )
 
 
@@ -33,8 +41,9 @@ class OrderManager:
 
 
 
+
     # =====================================================
-    # EXECUTE
+    # EXECUTE ORDER
     # =====================================================
 
 
@@ -47,6 +56,7 @@ class OrderManager:
 
         if not signal:
 
+
             return None
 
 
@@ -54,7 +64,9 @@ class OrderManager:
 
 
         side = signal.get(
+
             "side"
+
         )
 
 
@@ -70,9 +82,9 @@ class OrderManager:
 
             print(
 
-                "[INVALID SIDE]",
+                "[INVALID SIGNAL]",
 
-                side
+                signal
 
             )
 
@@ -84,7 +96,43 @@ class OrderManager:
 
 
 
-        qty = DEFAULT_ORDER_QTY
+
+        # =============================
+        # RISK CHECK
+        # =============================
+
+
+        position = (
+
+            position_manager
+
+            .get_position()
+
+        )
+
+
+
+        if not risk_manager.can_trade(
+
+            position.get(
+
+                "size",
+
+                0
+
+            )
+
+        ):
+
+
+            print(
+
+                "[ORDER BLOCKED BY RISK]"
+
+            )
+
+
+            return None
 
 
 
@@ -92,9 +140,7 @@ class OrderManager:
 
         print(
 
-            "[ORDER SIGNAL]",
-
-            side
+            "[RISK OK]"
 
         )
 
@@ -105,27 +151,65 @@ class OrderManager:
 
 
 
-        # =================================================
-        # TEST MODE
-        # =================================================
+        # =============================
+        # ORDER SIZE
+        # =============================
 
 
-        if not LIVE:
+        qty = DEFAULT_ORDER_QTY
 
 
-            print(
 
-                "[TEST ORDER]",
+        calculated = (
 
-                side,
+            risk_manager
 
-                qty
+            .calculate_size(
+
+                price
 
             )
 
+        )
 
 
-            order_result = {
+
+        if calculated > 0:
+
+
+            qty = calculated
+
+
+
+
+
+
+
+        print(
+
+            "[ORDER SEND]",
+
+            side,
+
+            qty
+
+        )
+
+
+
+
+
+
+
+        # =============================
+        # TEST MODE
+        # =============================
+
+
+        if not LIVE_ORDER:
+
+
+            result = {
 
 
                 "retCode":
@@ -135,7 +219,7 @@ class OrderManager:
 
                 "retMsg":
 
-                    "TEST ORDER",
+                    "LOCAL TEST ORDER",
 
 
                 "side":
@@ -145,12 +229,7 @@ class OrderManager:
 
                 "qty":
 
-                    qty,
-
-
-                "price":
-
-                    price
+                    qty
 
 
             }
@@ -161,15 +240,16 @@ class OrderManager:
 
 
 
-        # =================================================
-        # LIVE MODE
-        # =================================================
+        # =============================
+        # BYBIT ORDER
+        # =============================
 
 
         else:
 
 
-            order_result = self.api.place_order(
+
+            result = self.api.place_order(
 
                 side,
 
@@ -181,24 +261,71 @@ class OrderManager:
 
 
 
+        if not result:
 
 
-            if not order_result:
+            print(
+
+                "[ORDER FAILED]"
+
+            )
 
 
-                print(
-
-                    "[ORDER FAILED]"
-
-                )
-
-
-                return None
-
+            return None
 
 
 
 
+
+
+
+        if result.get(
+
+            "retCode",
+
+            0
+
+        ) != 0:
+
+
+            print(
+
+                "[BYBIT ORDER ERROR]",
+
+                result
+
+            )
+
+
+            return None
+
+
+
+
+
+
+
+        print(
+
+            "[ORDER SUCCESS]",
+
+            result
+
+        )
+
+
+
+        risk_manager.record_trade()
+
+
+
+
+
+
+
+        # =============================
+        # TP / SL
+        # =============================
 
 
         tp, sl = self.calculate_tp_sl(
@@ -212,34 +339,10 @@ class OrderManager:
 
 
 
-        print(
-
-            "[TP]",
-
-            tp
-
-        )
+        if LIVE_ORDER:
 
 
-        print(
-
-            "[SL]",
-
-            sl
-
-        )
-
-
-
-
-
-
-        # LIVE에서만 등록
-
-        if LIVE:
-
-
-            self.set_tp_sl(
+            self.api.set_trading_stop(
 
                 tp,
 
@@ -250,14 +353,7 @@ class OrderManager:
 
 
 
-
-
         return {
-
-
-            "order":
-
-                order_result,
 
 
             "side":
@@ -265,20 +361,29 @@ class OrderManager:
                 side,
 
 
+            "qty":
+
+                qty,
+
+
             "entry":
 
                 price,
 
 
-            "take_profit":
+            "tp":
 
                 tp,
 
 
-            "stop_loss":
+            "sl":
 
-                sl
+                sl,
 
+
+            "response":
+
+                result
 
         }
 
@@ -323,7 +428,6 @@ class OrderManager:
             )
 
 
-
         else:
 
 
@@ -346,6 +450,7 @@ class OrderManager:
 
 
 
+
         return (
 
             round(tp,2),
@@ -361,99 +466,10 @@ class OrderManager:
 
 
 
-    # =====================================================
-    # SET TP SL
-    # =====================================================
-
-
-    def set_tp_sl(
-        self,
-        tp,
-        sl
-    ):
-
-
-        try:
-
-
-            result = self.api.request(
-
-                "POST",
-
-                "/v5/position/trading-stop",
-
-                {
-
-
-                    "category":
-
-                        CATEGORY,
-
-
-                    "symbol":
-
-                        DEFAULT_SYMBOL,
-
-
-                    "takeProfit":
-
-                        str(tp),
-
-
-                    "stopLoss":
-
-                        str(sl),
-
-
-                    "tpslMode":
-
-                        "Full"
-
-                }
-
-            )
-
-
-
-            print(
-
-                "[TP SL SET]",
-
-                result
-
-            )
-
-
-
-            return result
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[TP SL ERROR]",
-
-                e
-
-            )
-
-
-            return None
-
-
-
-
-
-
-
 # =====================================================
-# SINGLETON
+# INSTANCE
 # =====================================================
+
 
 from api.bybit_api import bybit_api
 
