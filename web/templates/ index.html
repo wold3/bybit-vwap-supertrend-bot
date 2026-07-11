@@ -1,86 +1,644 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
+
 <head>
-<title>VWAP SUPERTREND BOT</title>
+
+<meta charset="UTF-8">
+
+<title>
+VWAP SUPERTREND BOT
+</title>
+
 
 <style>
 
 body{
-    background:#111;
+
+    background:#101010;
+
     color:white;
-    font-family:Arial;
+
+    font-family:Arial, sans-serif;
+
     padding:30px;
+
 }
 
-.card{
-    background:#222;
-    padding:20px;
-    border-radius:10px;
+
+
+h1{
+
+    color:#00ff99;
+
 }
+
+
+
+.card{
+
+    background:#1e1e1e;
+
+    padding:20px;
+
+    margin-bottom:20px;
+
+    border-radius:15px;
+
+    box-shadow:0 0 15px #000;
+
+}
+
+
+
+button{
+
+    padding:12px 20px;
+
+    margin:5px;
+
+    border:none;
+
+    border-radius:8px;
+
+    font-weight:bold;
+
+    cursor:pointer;
+
+}
+
+
+
+.demo{
+
+    background:#3498db;
+
+    color:white;
+
+}
+
+
+
+.live{
+
+    background:#e74c3c;
+
+    color:white;
+
+}
+
+
+
+.start{
+
+    background:#2ecc71;
+
+}
+
+
+
+.stop{
+
+    background:#f39c12;
+
+}
+
+
+
+.close{
+
+    background:#c0392b;
+
+    color:white;
+
+}
+
+
+
+.reset{
+
+    background:#555;
+
+    color:white;
+
+}
+
+
+
+.value{
+
+    font-size:22px;
+
+    color:#00ff99;
+
+}
+
+
+
+#logs{
+
+    background:#000;
+
+    height:250px;
+
+    overflow:auto;
+
+    padding:10px;
+
+    font-size:13px;
+
+}
+
+
 
 </style>
 
 </head>
 
 
+
 <body>
 
 
+
 <h1>
-VWAP SUPERTREND BOT DASHBOARD
+VWAP SUPERTREND AUTO BOT
 </h1>
+
+
 
 
 <div class="card">
 
-<h2>Status</h2>
 
-<pre id="status">
-Loading...
-</pre>
+<h2>
+CONTROL
+</h2>
+
+
+<button class="demo"
+onclick="changeMode('DEMO')">
+
+DEMO
+
+</button>
+
+
+<button class="live"
+onclick="changeMode('LIVE')">
+
+LIVE
+
+</button>
+
+
+<br>
+
+
+<button class="start"
+onclick="startBot()">
+
+START
+
+</button>
+
+
+<button class="stop"
+onclick="stopBot()">
+
+STOP
+
+</button>
+
+
+<button class="close"
+onclick="closePosition()">
+
+CLOSE POSITION
+
+</button>
+
+
+<button class="reset"
+onclick="resetBot()">
+
+RESET
+
+</button>
+
+
 
 </div>
 
 
 
+
+
+<div class="card">
+
+
+<h2>
+STATUS
+</h2>
+
+
+
+<p>
+
+MODE :
+
+<span class="value" id="mode">
+
+-
+
+</span>
+
+
+</p>
+
+
+
+<p>
+
+BOT :
+
+<span class="value" id="bot">
+
+-
+
+</span>
+
+
+</p>
+
+
+
+<p>
+
+POSITION :
+
+<span id="position">
+
+-
+
+</span>
+
+
+</p>
+
+
+
+<p>
+
+SIZE :
+
+<span id="size">
+
+-
+
+</span>
+
+
+</p>
+
+
+
+<p>
+
+ENTRY :
+
+<span id="entry">
+
+-
+
+</span>
+
+
+</p>
+
+
+
+<p>
+
+PNL :
+
+<span id="pnl">
+
+-
+
+</span>
+
+
+</p>
+
+
+
+</div>
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+LOG
+</h2>
+
+
+<div id="logs">
+
+</div>
+
+
+</div>
+
+
+
+
+
+
 <script>
 
-function update(){
-
-fetch("/api/status")
-
-.then(r=>r.json())
-
-.then(data=>{
 
 
-document.getElementById(
-"status"
-).textContent =
-JSON.stringify(
-data,
-null,
-2
+function post(url,data={}){
+
+
+return fetch(
+
+url,
+
+{
+
+method:"POST",
+
+headers:{
+
+"Content-Type":
+
+"application/json"
+
+},
+
+body:
+
+JSON.stringify(data)
+
+}
+
 );
 
-
-});
 
 
 }
 
 
-setInterval(
-update,
-2000
+
+
+function changeMode(mode){
+
+
+post(
+
+"/api/mode",
+
+{
+
+mode:mode
+
+}
+
+)
+
+.then(update);
+
+
+
+}
+
+
+
+
+function startBot(){
+
+
+post(
+
+"/api/start"
+
+)
+
+.then(update);
+
+
+}
+
+
+
+
+function stopBot(){
+
+
+post(
+
+"/api/stop"
+
+)
+
+.then(update);
+
+
+}
+
+
+
+
+function closePosition(){
+
+
+if(confirm("포지션 종료?")){
+
+
+post(
+
+"/api/close"
+
+)
+
+.then(update);
+
+
+}
+
+
+}
+
+
+
+
+
+function resetBot(){
+
+
+post(
+
+"/api/reset"
+
+)
+
+.then(update);
+
+
+}
+
+
+
+
+
+
+function update(){
+
+
+fetch(
+
+"/api/status"
+
+)
+
+
+.then(
+
+r=>r.json()
+
+)
+
+
+.then(
+
+data=>{
+
+
+let s=data.status;
+
+
+
+document.getElementById(
+
+"mode"
+
+).innerHTML=s.mode;
+
+
+
+document.getElementById(
+
+"bot"
+
+).innerHTML=s.bot;
+
+
+
+document.getElementById(
+
+"position"
+
+).innerHTML=s.position;
+
+
+
+document.getElementById(
+
+"size"
+
+).innerHTML=s.position_size;
+
+
+
+document.getElementById(
+
+"entry"
+
+).innerHTML=s.entry_price;
+
+
+
+document.getElementById(
+
+"pnl"
+
+).innerHTML=s.pnl;
+
+
+
+
+
+let html="";
+
+
+
+data.logs.forEach(
+
+x=>{
+
+
+html += x+"<br>";
+
+}
+
 );
+
+
+
+document.getElementById(
+
+"logs"
+
+).innerHTML=html;
+
+
+
+let box=document.getElementById(
+
+"logs"
+
+);
+
+
+
+box.scrollTop=box.scrollHeight;
+
+
+
+}
+
+);
+
+
+}
+
+
+
+
+setInterval(
+
+update,
+
+2000
+
+);
+
 
 
 update();
 
 
+
 </script>
 
 
+
+
 </body>
+
 </html>
