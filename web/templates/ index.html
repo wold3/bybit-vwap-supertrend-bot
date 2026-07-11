@@ -5,7 +5,8 @@
 
 <meta charset="UTF-8">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
 
 <title>
 VWAP SUPERTREND BOT
@@ -13,11 +14,6 @@ VWAP SUPERTREND BOT
 
 
 <style>
-
-*{
-    box-sizing:border-box;
-}
-
 
 body{
 
@@ -30,29 +26,15 @@ body{
     color:white;
 
     font-family:
-    "Segoe UI",
     Arial,
     sans-serif;
 
 }
 
 
-
 h1{
 
     text-align:center;
-
-    color:#00ff99;
-
-}
-
-
-
-.container{
-
-    max-width:1100px;
-
-    margin:auto;
 
 }
 
@@ -60,7 +42,7 @@ h1{
 
 .card{
 
-    background:#151b22;
+    background:#151b23;
 
     border-radius:15px;
 
@@ -69,31 +51,7 @@ h1{
     margin-bottom:20px;
 
     box-shadow:
-    0 0 15px #000;
-
-}
-
-
-
-.grid{
-
-    display:grid;
-
-    grid-template-columns:
-    repeat(auto-fit,minmax(220px,1fr));
-
-    gap:15px;
-
-}
-
-
-
-
-.value{
-
-    font-size:25px;
-
-    color:#00ff99;
+    0 0 20px #000;
 
 }
 
@@ -103,7 +61,7 @@ button{
 
     border:0;
 
-    padding:12px 25px;
+    padding:15px 25px;
 
     margin:5px;
 
@@ -113,25 +71,27 @@ button{
 
     font-weight:bold;
 
-    transition:.3s;
+    font-size:15px;
 
 }
 
 
 
-button:hover{
+.start{
 
-    transform:scale(1.05);
+    background:#00c853;
+
+    color:white;
 
 }
 
 
 
+.stop{
 
-.active{
+    background:#ff1744;
 
-    box-shadow:
-    0 0 20px white;
+    color:white;
 
 }
 
@@ -139,7 +99,7 @@ button:hover{
 
 .demo{
 
-    background:#3498db;
+    background:#2979ff;
 
     color:white;
 
@@ -149,7 +109,7 @@ button:hover{
 
 .live{
 
-    background:#e74c3c;
+    background:#ff6d00;
 
     color:white;
 
@@ -157,25 +117,9 @@ button:hover{
 
 
 
-.start{
-
-    background:#2ecc71;
-
-}
-
-
-
-.stop{
-
-    background:#f39c12;
-
-}
-
-
-
 .close{
 
-    background:#c0392b;
+    background:#9c27b0;
 
     color:white;
 
@@ -195,7 +139,15 @@ select{
 
     color:white;
 
-    font-size:16px;
+}
+
+
+
+.value{
+
+    color:#00ff99;
+
+    font-size:20px;
 
 }
 
@@ -203,11 +155,11 @@ select{
 
 #logs{
 
-    height:300px;
+    background:#000;
+
+    height:250px;
 
     overflow:auto;
-
-    background:#000;
 
     padding:15px;
 
@@ -219,23 +171,19 @@ select{
 
 
 
-.action{
+.switch{
 
-    color:#ffd700;
+    display:flex;
 
-    font-size:20px;
+    flex-wrap:wrap;
 
 }
 
 
 
-.badge{
+.item{
 
-    padding:8px 15px;
-
-    border-radius:20px;
-
-    background:#333;
+    margin:5px;
 
 }
 
@@ -243,24 +191,16 @@ select{
 
 </style>
 
-
 </head>
-
 
 
 
 <body>
 
 
-<div class="container">
-
-
-
 <h1>
-VWAP SUPERTREND AUTO BOT
+🚀 VWAP SUPERTREND BOT
 </h1>
-
-
 
 
 
@@ -272,46 +212,56 @@ CONTROL
 </h2>
 
 
+<div class="switch">
+
 
 <button class="demo"
-onclick="modeChange('DEMO',this)">
+onclick="modeChange('DEMO')">
+
 DEMO
+
 </button>
 
 
 <button class="live"
-onclick="modeChange('LIVE',this)">
+onclick="modeChange('LIVE')">
+
 LIVE
+
 </button>
-
-
-
-<br>
 
 
 
 <button class="start"
-onclick="command('start',this)">
-START
+onclick="startBot()">
+
+▶ START
+
 </button>
+
 
 
 <button class="stop"
-onclick="command('stop',this)">
-STOP
+onclick="stopBot()">
+
+■ STOP
+
 </button>
+
 
 
 <button class="close"
-onclick="command('close',this)">
-CLOSE POSITION
-</button>
+onclick="closePosition()">
 
+CLOSE
+
+</button>
 
 
 </div>
 
 
+</div>
 
 
 
@@ -325,9 +275,7 @@ SYMBOL
 </h2>
 
 
-
-<select id="symbol"
-onchange="changeSymbol()">
+<select id="symbol">
 
 
 <option>
@@ -341,12 +289,12 @@ ETHUSDT
 
 
 <option>
-SOLUSDT
+XRPUSDT
 </option>
 
 
 <option>
-XRPUSDT
+SOLUSDT
 </option>
 
 
@@ -354,37 +302,15 @@ XRPUSDT
 
 
 
-</div>
+<button onclick="changeSymbol()">
 
+CHANGE
 
+</button>
 
-
-
-
-
-
-
-<div class="card">
-
-
-<h2>
-LAST ACTION
-</h2>
-
-
-<div class="action"
-id="action">
-
-WAITING
-
-</div>
 
 
 </div>
-
-
-
-
 
 
 
@@ -398,119 +324,84 @@ STATUS
 </h2>
 
 
+<p>
 
-<div class="grid">
-
-
-<div>
-
-MODE
-
-<br>
+MODE :
 
 <span id="mode"
 class="value">
 -
 </span>
 
-
-</div>
-
+</p>
 
 
 
-<div>
+<p>
 
-BOT
-
-<br>
-
-<span id="bot"
-class="value">
--
-</span>
-
-
-</div>
-
-
-
-
-<div>
-
-SYMBOL
-
-<br>
+SYMBOL :
 
 <span id="symbol_view"
 class="value">
 -
 </span>
 
-
-</div>
-
+</p>
 
 
 
-<div>
+<p>
 
-POSITION
+BOT :
 
-<br>
+<span id="bot"
+class="value">
+-
+</span>
+
+</p>
+
+
+
+<p>
+
+POSITION :
 
 <span id="position"
 class="value">
 -
 </span>
 
-
-</div>
-
+</p>
 
 
 
-<div>
+<p>
 
-SIZE
-
-<br>
-
-<span id="size"
-class="value">
--
-</span>
-
-
-</div>
-
-
-
-
-<div>
-
-PNL
-
-<br>
+PNL :
 
 <span id="pnl"
 class="value">
 -
 </span>
 
+</p>
+
+
+
+<p>
+
+LAST ACTION :
+
+<span id="action"
+class="value">
+-
+</span>
+
+</p>
+
 
 </div>
-
-
-
-</div>
-
-
-
-</div>
-
-
-
 
 
 
@@ -521,7 +412,7 @@ class="value">
 
 
 <h2>
-SYSTEM LOG
+LOG
 </h2>
 
 
@@ -538,19 +429,11 @@ SYSTEM LOG
 
 
 
-</div>
-
-
-
-
-
-
-
 <script>
 
 
 
-function send(url,data={}){
+function post(url,data={}){
 
 
 return fetch(
@@ -574,21 +457,43 @@ JSON.stringify(data)
 
 }
 
-)
-
-.then(
-r=>r.json()
-)
+);
 
 }
 
 
 
 
-function modeChange(mode,btn){
+
+function startBot(){
 
 
-send(
+post(
+"/api/start"
+);
+
+
+}
+
+
+
+function stopBot(){
+
+
+post(
+"/api/stop"
+);
+
+
+}
+
+
+
+
+function modeChange(mode){
+
+
+post(
 
 "/api/mode",
 
@@ -598,83 +503,10 @@ mode:mode
 
 }
 
-)
-
-.then(()=>{
-
-
-document.getElementById(
-"action"
-).innerHTML=
-
-"MODE 변경 : "+mode;
-
-
-btn.classList.add(
-"active"
 );
-
-
-update();
-
-
-});
 
 
 }
-
-
-
-
-
-
-
-
-function command(cmd,btn){
-
-
-send(
-
-"/api/"+cmd
-
-)
-
-.then(()=>{
-
-
-document.getElementById(
-"action"
-).innerHTML=
-
-"실행 : "+cmd.toUpperCase();
-
-
-btn.classList.add(
-"active"
-);
-
-
-setTimeout(()=>{
-
-btn.classList.remove(
-"active"
-);
-
-},1000);
-
-
-
-update();
-
-
-
-});
-
-
-}
-
-
-
 
 
 
@@ -683,15 +515,15 @@ update();
 function changeSymbol(){
 
 
-let s=
+let s=document.getElementById(
 
-document.getElementById(
 "symbol"
+
 ).value;
 
 
 
-send(
+post(
 
 "/api/symbol",
 
@@ -701,24 +533,30 @@ symbol:s
 
 }
 
-)
-
-.then(()=>{
+);
 
 
-document.getElementById(
-"action"
-).innerHTML=
-
-"심볼 변경 : "+s;
+}
 
 
 
-update();
+
+function closePosition(){
 
 
+if(confirm(
 
-});
+"포지션 종료?"
+
+)){
+
+
+post(
+"/api/close"
+);
+
+
+}
 
 
 }
@@ -735,12 +573,12 @@ function update(){
 
 
 fetch(
+
 "/api/status"
+
 )
 
-.then(
-r=>r.json()
-)
+.then(r=>r.json())
 
 .then(data=>{
 
@@ -750,41 +588,52 @@ let s=data.status;
 
 
 document.getElementById(
+
 "mode"
+
 ).innerHTML=s.mode;
 
 
-document.getElementById(
-"bot"
-).innerHTML=s.bot;
-
 
 document.getElementById(
+
 "symbol_view"
+
 ).innerHTML=s.symbol;
 
 
+
 document.getElementById(
+
+"bot"
+
+).innerHTML=s.bot;
+
+
+
+document.getElementById(
+
 "position"
+
 ).innerHTML=s.position;
 
 
-document.getElementById(
-"size"
-).innerHTML=s.position_size;
-
 
 document.getElementById(
+
 "pnl"
+
 ).innerHTML=s.pnl;
 
 
 
 document.getElementById(
-"action"
-).innerHTML=
 
-s.last_action;
+"action"
+
+).innerHTML=s.last_action;
+
+
 
 
 
@@ -796,7 +645,9 @@ data.logs.forEach(
 
 x=>{
 
-html += x+"<br>";
+
+html+=x+"<br>";
+
 
 }
 
@@ -804,26 +655,29 @@ html += x+"<br>";
 
 
 
-let box=document.getElementById(
+document.getElementById(
+
 "logs"
+
+).innerHTML=html;
+
+
+
+let box=document.getElementById(
+
+"logs"
+
 );
 
 
-
-box.innerHTML=html;
-
-
-box.scrollTop=
-box.scrollHeight;
+box.scrollTop=box.scrollHeight;
 
 
 
 });
 
 
-
 }
-
 
 
 
