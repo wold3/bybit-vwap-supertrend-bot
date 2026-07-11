@@ -3,15 +3,23 @@
 # Position Management System
 # =====================================================
 
-from config import (
-    DEFAULT_SYMBOL
-)
+import threading
+
+
+
+
+
+from api.bybit_api import bybit_api
 
 
 from web.server import (
     update_status,
     add_log
 )
+
+
+
+
 
 
 
@@ -24,11 +32,6 @@ class PositionManager:
 
 
         self.position = {
-
-
-            "symbol":
-
-                DEFAULT_SYMBOL,
 
 
             "side":
@@ -46,17 +49,15 @@ class PositionManager:
                 0,
 
 
-            "mark":
-
-                0,
-
-
             "pnl":
 
                 0
 
 
         }
+
+
+        self.lock = threading.Lock()
 
 
 
@@ -75,15 +76,10 @@ class PositionManager:
 
 
     # =====================================================
-    # SYNC FROM API
+    # SYNC REST
     # =====================================================
 
-
     def sync(self):
-
-
-        from api.bybit_api import bybit_api
-
 
 
         try:
@@ -102,7 +98,7 @@ class PositionManager:
             if not result:
 
 
-                return False
+                return
 
 
 
@@ -137,15 +133,12 @@ class PositionManager:
             if rows:
 
 
-                self.update_from_ws(
+                self.update_position(
 
                     rows[0]
 
                 )
 
-
-
-            return True
 
 
 
@@ -164,9 +157,6 @@ class PositionManager:
             )
 
 
-            return False
-
-
 
 
 
@@ -178,7 +168,6 @@ class PositionManager:
     # UPDATE FROM WS
     # =====================================================
 
-
     def update_from_ws(
         self,
         data
@@ -186,6 +175,56 @@ class PositionManager:
 
 
         try:
+
+
+            self.update_position(
+
+                data
+
+            )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[WS POSITION ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # UPDATE
+    # =====================================================
+
+    def update_position(
+        self,
+        data
+    ):
+
+
+        try:
+
+
+            side = data.get(
+
+                "side",
+
+                ""
+
+            )
+
 
 
             size = float(
@@ -202,13 +241,29 @@ class PositionManager:
 
 
 
+            entry = float(
+
+                data.get(
+
+                    "avgPrice",
+
+                    0
+
+                )
+
+            )
 
 
-            side = data.get(
 
-                "side",
+            pnl = float(
 
-                ""
+                data.get(
+
+                    "unrealisedPnl",
+
+                    0
+
+                )
 
             )
 
@@ -216,39 +271,25 @@ class PositionManager:
 
 
 
-            if size == 0:
 
 
-                self.position.update({
+            if size <= 0:
 
 
-                    "side":
-
-                        "NONE",
-
-
-                    "size":
-
-                        0,
-
-
-                    "entry":
-
-                        0,
-
-
-                    "pnl":
-
-                        0
-
-                })
+                side = "NONE"
 
 
 
-            else:
 
 
-                self.position.update({
+
+
+
+
+            with self.lock:
+
+
+                self.position = {
 
 
                     "side":
@@ -263,49 +304,15 @@ class PositionManager:
 
                     "entry":
 
-                        float(
-
-                            data.get(
-
-                                "avgPrice",
-
-                                0
-
-                            )
-
-                        ),
-
-
-                    "mark":
-
-                        float(
-
-                            data.get(
-
-                                "markPrice",
-
-                                0
-
-                            )
-
-                        ),
+                        entry,
 
 
                     "pnl":
 
-                        float(
+                        pnl
 
-                            data.get(
 
-                                "unrealisedPnl",
-
-                                0
-
-                            )
-
-                        )
-
-                })
+                }
 
 
 
@@ -314,21 +321,39 @@ class PositionManager:
 
 
 
-            self.dashboard_update()
+
+            update_status({
+
+
+                "position":
+
+                    side,
+
+
+                "size":
+
+                    size,
+
+
+                "entry":
+
+                    entry,
+
+
+                "pnl":
+
+                    pnl
+
+
+            })
 
 
 
-            print(
+            add_log(
 
-                "[POSITION UPDATED]",
-
-                self.position
+                f"POSITION {side} {size}"
 
             )
-
-
-
-            return True
 
 
 
@@ -348,9 +373,6 @@ class PositionManager:
             )
 
 
-            return False
-
-
 
 
 
@@ -359,14 +381,17 @@ class PositionManager:
 
 
     # =====================================================
-    # GET POSITION
+    # GET
     # =====================================================
-
 
     def get_position(self):
 
 
-        return self.position
+        with self.lock:
+
+
+            return self.position.copy()
+
 
 
 
@@ -377,120 +402,45 @@ class PositionManager:
 
 
     # =====================================================
-    # CHECK OPEN
+    # HAS POSITION
     # =====================================================
-
 
     def has_position(self):
 
 
-        return (
-
-            self.position["side"]
-
-            !=
-
-            "NONE"
-
-        )
+        with self.lock:
 
 
+            return (
 
+                self.position["size"]
 
-
-
-
-
-
-    # =====================================================
-    # DASHBOARD UPDATE
-    # =====================================================
-
-
-    def dashboard_update(self):
-
-
-        update_status({
-
-
-            "position":
-
-                self.position["side"],
-
-
-            "entry":
-
-                self.position["entry"],
-
-
-            "size":
-
-                self.position["size"],
-
-
-            "pnl":
-
-                self.position["pnl"]
-
-        })
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # RESET
-    # =====================================================
-
-
-    def reset(self):
-
-
-        self.position = {
-
-
-            "symbol":
-
-                DEFAULT_SYMBOL,
-
-
-            "side":
-
-                "NONE",
-
-
-            "size":
-
-                0,
-
-
-            "entry":
-
-                0,
-
-
-            "mark":
-
-                0,
-
-
-            "pnl":
+                >
 
                 0
 
-        }
+            )
 
 
 
-        add_log(
 
-            "POSITION RESET"
 
-        )
+
+
+
+
+    # =====================================================
+    # SIDE
+    # =====================================================
+
+    def get_side(self):
+
+
+        with self.lock:
+
+
+            return self.position["side"]
+
 
 
 
@@ -503,6 +453,5 @@ class PositionManager:
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 position_manager = PositionManager()
