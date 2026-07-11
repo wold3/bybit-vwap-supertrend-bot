@@ -31,18 +31,16 @@ from web.server import (
 class RiskManager:
 
 
-
     def __init__(self):
 
 
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
 
         self.enabled = True
 
 
         self.kill_switch = False
-
 
 
         self.daily_pnl = 0.0
@@ -52,7 +50,7 @@ class RiskManager:
 
 
 
-        # Daily limits
+        # risk limit
 
         self.max_daily_loss = -5.0
 
@@ -76,7 +74,7 @@ class RiskManager:
 
 
     # =====================================================
-    # DAILY RESET
+    # DAILY RESET CHECK
     # =====================================================
 
     def reset_check(self):
@@ -108,6 +106,16 @@ class RiskManager:
 
             )
 
+
+            update_status({
+
+                "daily_pnl":0,
+
+                "loss_count":0,
+
+                "kill_switch":False
+
+            })
 
 
 
@@ -141,7 +149,6 @@ class RiskManager:
 
 
 
-
             if self.kill_switch:
 
 
@@ -157,23 +164,22 @@ class RiskManager:
 
 
 
-
             try:
+
 
                 qty = float(qty)
 
 
-            except:
+            except Exception:
 
 
                 add_log(
 
-                    "INVALID ORDER QTY"
+                    "INVALID QTY"
 
                 )
 
                 return False
-
 
 
 
@@ -199,12 +205,11 @@ class RiskManager:
 
                 add_log(
 
-                    "MAX POSITION SIZE LIMIT"
+                    "MAX POSITION LIMIT"
 
                 )
 
                 return False
-
 
 
 
@@ -225,7 +230,6 @@ class RiskManager:
 
 
 
-
             if self.loss_count >= self.max_loss_count:
 
 
@@ -241,17 +245,14 @@ class RiskManager:
 
 
 
-
             return True
 
 
 
 
 
-
-
     # =====================================================
-    # PNL UPDATE
+    # UPDATE PNL
     # =====================================================
 
     def update_pnl(self, pnl):
@@ -262,10 +263,11 @@ class RiskManager:
 
             try:
 
+
                 pnl = float(pnl)
 
 
-            except:
+            except Exception:
 
 
                 return False
@@ -275,6 +277,7 @@ class RiskManager:
 
 
             self.daily_pnl += pnl
+
 
 
 
@@ -290,7 +293,6 @@ class RiskManager:
 
             update_status({
 
-
                 "daily_pnl":
 
                     self.daily_pnl,
@@ -305,9 +307,31 @@ class RiskManager:
 
 
 
+            # 자동 보호
+
+            if self.daily_pnl <= self.max_daily_loss:
+
+
+                self.activate_kill(
+
+                    "AUTO DAILY LOSS"
+
+                )
+
+
+
+            if self.loss_count >= self.max_loss_count:
+
+
+                self.activate_kill(
+
+                    "AUTO LOSS COUNT"
+
+                )
+
+
+
             return True
-
-
 
 
 
@@ -334,14 +358,16 @@ class RiskManager:
 
         update_status({
 
-
             "bot":
 
-                "KILLED"
+                "KILLED",
 
+
+            "kill_switch":
+
+                True
 
         })
-
 
 
 
@@ -371,11 +397,9 @@ class RiskManager:
 
             update_status({
 
+                "kill_switch":
 
-                "bot":
-
-                    "STOPPED"
-
+                    False
 
             })
 
@@ -383,10 +407,8 @@ class RiskManager:
 
 
 
-
-
     # =====================================================
-    # ENABLE / DISABLE
+    # ENABLE
     # =====================================================
 
     def enable(self):
@@ -408,6 +430,9 @@ class RiskManager:
 
 
 
+    # =====================================================
+    # DISABLE
+    # =====================================================
 
     def disable(self):
 
@@ -423,7 +448,6 @@ class RiskManager:
                 "RISK DISABLE"
 
             )
-
 
 
 
@@ -468,7 +492,6 @@ class RiskManager:
 
 
             }
-
 
 
 
