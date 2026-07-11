@@ -6,71 +6,70 @@
 <meta charset="UTF-8">
 
 <title>
-VWAP SuperTrend Bot Dashboard
+VWAP SUPERTREND BOT
 </title>
-
-
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js">
-</script>
 
 
 <style>
 
 body {
 
+    font-family: Arial, sans-serif;
+
     background:#111;
 
     color:#eee;
-
-    font-family:Arial;
 
     margin:20px;
 
 }
 
 
-.card {
-
-    background:#1e1e1e;
-
-    padding:15px;
-
-    margin-bottom:15px;
-
-    border-radius:10px;
-
-}
-
-
-.title {
-
-    font-size:24px;
-
-    font-weight:bold;
-
-}
-
-
-.value {
-
-    font-size:20px;
+h1 {
 
     color:#00ff99;
 
 }
 
 
-#chart {
+.card {
 
-    height:400px;
+    background:#1c1c1c;
+
+    border-radius:10px;
+
+    padding:20px;
+
+    margin-bottom:15px;
 
 }
 
 
+.value {
+
+    font-size:28px;
+
+    font-weight:bold;
+
+}
+
+
+.grid {
+
+    display:grid;
+
+    grid-template-columns:
+
+    repeat(3, 1fr);
+
+    gap:15px;
+
+}
+
 
 .log {
 
-    height:200px;
+    height:250px;
 
     overflow:auto;
 
@@ -78,8 +77,23 @@ body {
 
     padding:10px;
 
+    font-size:14px;
+
 }
 
+
+.green {
+
+    color:#00ff99;
+
+}
+
+
+.red {
+
+    color:#ff5555;
+
+}
 
 
 </style>
@@ -88,15 +102,27 @@ body {
 </head>
 
 
+
 <body>
 
 
+<h1>
+VWAP-SUPERTREND BOT
+</h1>
+
+
+
+
 <div class="card">
 
+<h3>
+BOT STATUS
+</h3>
 
-<div class="title">
 
-VWAP SuperTrend Trading Bot
+<div id="bot" class="value">
+
+-
 
 </div>
 
@@ -107,34 +133,101 @@ VWAP SuperTrend Trading Bot
 
 
 
+
+<div class="grid">
+
+
+
 <div class="card">
 
+<h3>
+PRICE
+</h3>
 
-<h3>Status</h3>
-
-
-<p>
-BOT :
-<span id="bot" class="value">
+<div id="price" class="value">
 -
-</span>
-</p>
+</div>
+
+</div>
 
 
-<p>
-Symbol :
-<span id="symbol">
+
+
+
+<div class="card">
+
+<h3>
+VWAP
+</h3>
+
+<div id="vwap" class="value">
 -
-</span>
-</p>
+</div>
+
+</div>
 
 
-<p>
-Position :
-<span id="position">
+
+
+
+<div class="card">
+
+<h3>
+TREND
+</h3>
+
+<div id="trend" class="value">
 -
-</span>
-</p>
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+<h3>
+VOLUME
+</h3>
+
+<div id="volume" class="value">
+-
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
+<h3>
+SIGNAL
+</h3>
+
+<div id="signal" class="value">
+-
+</div>
+
+</div>
+
+
+
+
+
+<div class="card">
+
+<h3>
+POSITION
+</h3>
+
+<div id="position" class="value">
+-
+</div>
+
+</div>
 
 
 
@@ -145,86 +238,12 @@ Position :
 
 
 
-
 <div class="card">
 
 
-<h3>Market</h3>
-
-
-<p>
-PRICE :
-<span id="price" class="value">
--
-</span>
-</p>
-
-
-<p>
-VWAP :
-<span id="vwap">
--
-</span>
-</p>
-
-
-
-<p>
-TREND :
-<span id="trend">
--
-</span>
-</p>
-
-
-
-<p>
-VOLUME :
-<span id="volume">
--
-</span>
-</p>
-
-
-
-<p>
-SIGNAL :
-<span id="signal">
--
-</span>
-</p>
-
-
-</div>
-
-
-
-
-
-
-
-
-<div class="card">
-
-
-<h3>Candle Chart</h3>
-
-
-<div id="chart"></div>
-
-
-</div>
-
-
-
-
-
-
-
-<div class="card">
-
-
-<h3>BOT LOG</h3>
+<h3>
+LIVE LOG
+</h3>
 
 
 <div id="logs" class="log">
@@ -239,366 +258,142 @@ SIGNAL :
 
 
 
-
-
-
 <script>
 
 
-const chart =
+async function updateDashboard(){
 
-LightweightCharts.createChart(
 
-document.getElementById("chart"),
+    try{
 
-{
 
-layout:{
+        const res = await fetch(
+            "/api/status"
+        );
 
-background:{
 
-color:"#111"
+        const data = await res.json();
 
-},
 
-textColor:"#eee"
 
-}
+        const s = data.status;
 
-}
 
-);
 
+        document.getElementById(
+            "bot"
+        ).innerHTML =
+            s.bot || "-";
 
 
 
+        document.getElementById(
+            "price"
+        ).innerHTML =
+            Number(
+                s.price || 0
+            ).toFixed(2);
 
-const candleSeries =
 
-chart.addCandlestickSeries();
 
 
+        document.getElementById(
+            "vwap"
+        ).innerHTML =
+            Number(
+                s.vwap || 0
+            ).toFixed(2);
 
 
 
 
+        document.getElementById(
+            "trend"
+        ).innerHTML =
+            s.trend || "-";
 
 
 
-async function updateStatus(){
 
+        document.getElementById(
+            "volume"
+        ).innerHTML =
+            s.volume
+            ? "OK"
+            :
+            "LOW";
 
 
-try{
 
 
-let r = await fetch(
+        document.getElementById(
+            "signal"
+        ).innerHTML =
+            s.signal || "-";
 
-"/api/status"
 
-);
 
 
-let d = await r.json();
+        document.getElementById(
+            "position"
+        ).innerHTML =
+            s.position || "NONE";
 
 
 
-document.getElementById(
 
-"bot"
 
-).innerHTML=d.bot;
+        let html="";
 
 
 
-document.getElementById(
+        data.logs.forEach(
 
-"symbol"
+            function(log){
 
-).innerHTML=d.symbol;
+                html += log + "<br>";
 
+            }
 
+        );
 
-document.getElementById(
 
-"position"
 
-).innerHTML=d.position;
+        document.getElementById(
+            "logs"
+        ).innerHTML = html;
 
 
 
-document.getElementById(
+    }
 
-"price"
 
-).innerHTML=
+    catch(e){
 
-Number(d.price).toFixed(2);
 
+        console.log(e);
 
 
-document.getElementById(
-
-"vwap"
-
-).innerHTML=
-
-Number(d.vwap).toFixed(2);
-
-
-
-document.getElementById(
-
-"trend"
-
-).innerHTML=d.trend;
-
-
-
-document.getElementById(
-
-"volume"
-
-).innerHTML=d.volume;
-
-
-
-document.getElementById(
-
-"signal"
-
-).innerHTML=d.signal;
-
-
-
-}
-
-catch(e){
-
-
-
-console.log(e);
-
+    }
 
 
 }
 
 
-
-}
-
-
-
-
-
-
-
-
-
-async function updateChart(){
-
-
-
-try{
-
-
-
-let r = await fetch(
-
-"/api/chart"
-
-);
-
-
-
-let data = await r.json();
-
-
-
-let candles=[];
-
-
-
-for(let c of data){
-
-
-candles.push({
-
-time:
-
-Math.floor(c.time/1000),
-
-
-open:
-
-c.open,
-
-
-high:
-
-c.high,
-
-
-low:
-
-c.low,
-
-
-close:
-
-c.close
-
-
-});
-
-
-}
-
-
-
-candleSeries.setData(
-
-candles
-
-);
-
-
-
-}
-
-catch(e){
-
-
-
-console.log(e);
-
-
-
-}
-
-
-}
-
-
-
-
-
-
-
-
-
-async function updateLogs(){
-
-
-
-try{
-
-
-let r = await fetch(
-
-"/api/logs"
-
-);
-
-
-let data = await r.json();
-
-
-
-let box =
-
-document.getElementById(
-
-"logs"
-
-);
-
-
-
-box.innerHTML="";
-
-
-
-for(let l of data){
-
-
-
-box.innerHTML +=
-
-
-l.time +
-
-" : " +
-
-l.message +
-
-"<br>";
-
-
-
-}
-
-
-
-box.scrollTop =
-
-box.scrollHeight;
-
-
-
-}
-
-catch(e){
-
-
-
-console.log(e);
-
-
-
-}
-
-
-
-}
-
-
-
-
-
-
-
-
-
-function refresh(){
-
-
-
-updateStatus();
-
-
-updateChart();
-
-
-updateLogs();
-
-
-
-}
 
 
 
 setInterval(
 
-refresh,
+    updateDashboard,
 
-2000
+    3000
 
 );
 
 
 
-refresh();
+updateDashboard();
 
 
 
