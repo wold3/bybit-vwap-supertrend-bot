@@ -3,13 +3,14 @@
 # VWAP SUPERTREND BOT MAIN
 # =====================================================
 
-import time
-import signal
+
 import threading
-import traceback
+import time
+
 
 
 from app import TradingApp
+
 
 
 from web.server import (
@@ -24,71 +25,23 @@ from web.server import (
 
 
 
-app = None
+from watchdog.watchdog import watchdog
 
-shutdown_event = threading.Event()
 
 
 
 
 
 # =====================================================
-# CTRL+C HANDLER
+# START WEB
 # =====================================================
 
-def shutdown_handler(
-
-    signum,
-
-    frame
-
-):
+def start_web():
 
 
-    print()
-
-    print("====================")
-
-    print("[SYSTEM SHUTDOWN]")
-
-    print("====================")
+    run_server()
 
 
-
-    try:
-
-
-        if app:
-
-
-            app.stop()
-
-
-
-    except Exception as e:
-
-
-        print(
-
-            "[STOP ERROR]",
-
-            e
-
-        )
-
-
-        traceback.print_exc()
-
-
-
-    add_log(
-
-        "SYSTEM SHUTDOWN"
-
-    )
-
-
-    shutdown_event.set()
 
 
 
@@ -98,58 +51,34 @@ def shutdown_handler(
 # MAIN
 # =====================================================
 
-def main():
-
-
-    global app
+if __name__ == "__main__":
 
 
 
     print()
 
-    print("================================")
+    print("==============================")
 
-    print(" VWAP SUPERTREND TRADING BOT ")
+    print(" VWAP SUPERTREND BOT ")
 
-    print("================================")
+    print("==============================")
 
-
-
-
-    # CTRL+C
-
-    signal.signal(
-
-        signal.SIGINT,
-
-        shutdown_handler
-
-    )
-
-
-    signal.signal(
-
-        signal.SIGTERM,
-
-        shutdown_handler
-
-    )
+    print()
 
 
 
 
 
-    # ---------------------------------
+    # -----------------------------
     # WEB SERVER
-    # ---------------------------------
+    # -----------------------------
+
 
     web_thread = threading.Thread(
 
-        target=run_server,
+        target=start_web,
 
-        daemon=True,
-
-        name="WebServer"
+        daemon=True
 
     )
 
@@ -158,56 +87,9 @@ def main():
 
 
 
-    time.sleep(1)
 
 
-
-
-
-    # ---------------------------------
-    # BOT START
-    # ---------------------------------
-
-    try:
-
-
-        app = TradingApp()
-
-
-        app.start()
-
-
-
-        add_log(
-
-            "AUTO START COMPLETE"
-
-        )
-
-
-
-        print()
-
-        print("[RUNNING]")
-
-
-
-    except Exception as e:
-
-
-        print(
-
-            "[START ERROR]",
-
-            e
-
-        )
-
-
-        traceback.print_exc()
-
-
-        return
+    time.sleep(2)
 
 
 
@@ -215,50 +97,86 @@ def main():
 
 
 
-    # ---------------------------------
-    # MAIN WAIT LOOP
-    # ---------------------------------
+    # -----------------------------
+    # BOT
+    # -----------------------------
+
+
+    bot = TradingApp()
+
+
+
+    add_log(
+
+        "AUTO START"
+
+    )
+
+
+
+    bot.start()
+
+
+
+
+
+
+    # -----------------------------
+    # WATCHDOG
+    # -----------------------------
+
+
+    watchdog.start()
+
+
+
+
+
+
+
+    add_log(
+
+        "AUTO START COMPLETE"
+
+    )
+
+
+
+
+
 
     try:
 
 
-        while not shutdown_event.is_set():
+        while True:
 
 
             time.sleep(1)
 
 
 
+
     except KeyboardInterrupt:
 
 
-        shutdown_handler(
 
-            None,
+        add_log(
 
-            None
+            "MANUAL STOP"
 
         )
 
 
 
+        watchdog.stop()
 
 
-    print()
-
-    print("[EXIT COMPLETE]")
-
-
+        bot.stop()
 
 
 
+        print(
 
+            "BOT CLOSED"
 
-# =====================================================
-# START
-# =====================================================
-
-if __name__ == "__main__":
-
-
-    main()
+        )
