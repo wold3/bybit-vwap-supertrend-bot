@@ -1,525 +1,1075 @@
-# =======================================================
-# app.py
-# VWAP SuperTrend Trading Bot Core
-# =======================================================
+# =====================================================
+# web/server.py
+# VWAP SUPERTREND BOT DASHBOARD SERVER
+# =====================================================
 
-import time
+from flask import (
+    Flask,
+    render_template,
+    jsonify,
+    request
+)
+
 import threading
-import traceback
+import time
 
 
-import config
-
-
-from api.bybit_api import bybit_api
-
-from services.private_ws import private_ws
-
-from portfolio.position_manager import position_manager
-
-from order.order_manager import order_manager
-
-
-from web.server import (
-
-    update_status,
-    add_log
-
+from config import (
+    WEB_HOST,
+    WEB_PORT
 )
 
 
 
 
 
-class TradingApp:
+app = Flask(
+    __name__,
+    template_folder="templates"
+)
 
 
-    def __init__(self):
-
-        self.running = False
-
-        self.market_thread = None
-
-        self.stop_lock = threading.Lock()
 
 
-        print(
-            "[TRADING APP READY]"
+
+# =====================================================
+# GLOBAL
+# =====================================================
+
+bot_instance = None
+
+
+server_started = False
+
+_server_thread = None
+
+
+
+MAX_LOGS = 500
+
+
+
+status_lock = threading.Lock()
+
+log_lock = threading.Lock()
+
+chart_lock = threading.Lock()
+
+
+
+
+
+status = {
+
+
+    "mode":
+        "DEMO",
+
+
+    "bot":
+        "STOPPED",
+
+
+    "position":
+        "NONE",
+
+
+    "position_size":
+        0,
+
+
+    "entry_price":
+        0,
+
+
+    "pnl":
+        0,
+
+
+    "price":
+        0,
+
+
+    "balance":
+        0,
+
+
+    "equity":
+        0,
+
+
+    "vwap":
+        0,
+
+
+    "trend":
+        "NONE",
+
+
+    "signal":
+        "NONE",
+
+
+    "volume":
+        0,
+
+
+    "watchdog":
+        "OFF"
+
+}
+
+
+
+
+logs = []
+
+
+chart_data = []
+
+
+
+
+
+# =====================================================
+# LOG
+# =====================================================
+
+def add_log(message):
+
+
+    text = (
+
+        "["
+
+        +
+
+        time.strftime("%H:%M:%S")
+
+        +
+
+        "] "
+
+        +
+
+        str(message)
+
+    )
+
+
+    print(text)
+
+
+
+    with log_lock:
+
+
+        logs.append(text)
+
+
+
+        if len(logs) > MAX_LOGS:
+
+            logs.pop(0)
+
+
+
+
+
+
+
+
+# =====================================================
+# STATUS
+# =====================================================
+
+def update_status(data):
+
+
+    if not data:
+
+        return
+
+
+
+    with status_lock:
+
+
+        status.update(data)
+
+
+
+
+
+def get_status():
+
+
+    with status_lock:
+
+
+        return status.copy()
+
+
+
+
+
+# =====================================================
+# BOT INSTANCE
+# =====================================================
+
+def set_bot_instance(bot):
+
+
+    global bot_instance
+
+
+    bot_instance = bot
+
+
+
+    add_log(
+
+        "BOT INSTANCE CONNECTED"
+
+    )
+
+
+
+
+
+
+
+# =====================================================
+# MODE
+# =====================================================
+
+def get_trading_mode():
+
+
+    with status_lock:
+
+
+        return status["mode"]
+
+
+
+
+
+
+
+# =====================================================
+# HOME
+# =====================================================
+
+@app.route("/")
+
+def index():
+
+
+    return render_template(
+
+        "index.html"
+
+    )
+
+
+
+
+
+
+
+# =====================================================
+# STATUS API
+# =====================================================
+
+@app.route("/api/status")
+
+def api_status():
+
+
+    with log_lock:
+
+        log_copy = logs[-100:]
+
+
+
+    return jsonify({
+
+
+        "status":
+
+            get_status(),
+
+
+        "logs":
+
+            log_copy
+
+
+    })
+
+
+
+
+
+
+
+
+@app.route("/api/logs")
+
+def api_logs():
+
+
+    with log_lock:
+
+
+        return jsonify({
+
+
+            "logs":
+
+                logs.copy()
+
+
+        })
+
+
+
+
+
+
+
+
+# =====================================================
+# CHART
+# =====================================================
+
+@app.route("/api/chart")
+
+def api_chart():
+
+
+    with chart_lock:
+
+
+        return jsonify(
+
+            chart_data.copy()
+
         )
 
 
 
 
 
-    # =====================================================
-    # START
-    # =====================================================
 
-    def start(self):
+def update_chart(data):
 
 
-        if self.running:
+    with chart_lock:
 
-            return
 
+        chart_data.clear()
 
 
-        print()
-        print("====================")
-        print("[BOT START]")
-        print("====================")
+        chart_data.extend(data)
 
 
 
-        self.running = True
 
 
 
-        # BALANCE
 
-        try:
 
-            balance = bybit_api.get_balance()
+# =====================================================
+# START
+# =====================================================
 
+@app.route(
+    "/api/start",
+    methods=["POST"]
+)
 
-            if balance:
+def api_start():
 
-                print(
-                    "[BALANCE OK]"
-                )
 
-            else:
+    try:
 
-                print(
-                    "[BALANCE CHECK FAILED]"
-                )
 
+        if bot_instance is None:
 
-        except Exception as e:
 
-            add_log(
-                f"BALANCE ERROR {e}"
-            )
+            return jsonify({
 
 
+                "success":
+                    False,
 
 
+                "error":
+                    "BOT NOT READY"
 
-        # PRIVATE WS
 
-        try:
+            })
 
-            private_ws.start()
 
 
-        except Exception as e:
-
-            add_log(
-                f"PRIVATE WS ERROR {e}"
-            )
-
-
-
-
-
-        # POSITION SYNC
-
-        try:
-
-            position_manager.refresh()
-
-
-        except Exception as e:
-
-            add_log(
-                f"POSITION SYNC ERROR {e}"
-            )
-
-
-
-
-
-        # WATCHDOG
-
-        try:
-
-            from services.watchdog import watchdog
-
-            watchdog.start()
-
-
-        except Exception as e:
-
-            add_log(
-                f"WATCHDOG ERROR {e}"
-            )
-
-
-
-
-
-        # MARKET LOOP
-
-
-        self.market_thread = threading.Thread(
-
-            target=self.market_loop,
-
-            daemon=True,
-
-            name="MarketLoop"
-
-        )
-
-
-        self.market_thread.start()
+        bot_instance.start()
 
 
 
         update_status({
 
             "bot":
-            "RUNNING"
+                "RUNNING"
 
         })
 
 
+
         add_log(
-            "BOT START"
+
+            "MANUAL START"
+
         )
 
 
 
-        print(
-            "[BOT READY]"
+        return jsonify({
+
+            "success":
+                True
+
+        })
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"START ERROR {e}"
+
         )
 
 
+        return jsonify({
 
+            "success":
+                False
 
+        })
 
 
 
-    # =====================================================
-    # MARKET LOOP
-    # =====================================================
 
-    def market_loop(self):
 
 
-        from market.market_data import market_data
 
-        from strategy.vwap_supertrend import strategy
 
+# =====================================================
+# STOP
+# =====================================================
 
+@app.route(
+    "/api/stop",
+    methods=["POST"]
+)
 
-        print(
-            "[MARKET LOOP START]"
-        )
+def api_stop():
 
 
+    try:
 
-        while self.running:
 
+        if bot_instance:
 
 
-            try:
+            bot_instance.stop()
 
 
-                df = market_data.get_candles(
 
-                    interval=config.CANDLE_INTERVAL,
+        update_status({
 
-                    limit=config.MAX_HISTORY
-
-                )
-
-
-
-                if df is None:
-
-
-                    time.sleep(30)
-
-                    continue
-
-
-
-
-
-                signal = strategy.generate_signal(
-
-                    df
-
-                )
-
-
-
-
-                # STATUS UPDATE
-
-                try:
-
-                    price = market_data.price()
-
-
-                    update_status({
-
-                        "price":
-                        price
-
-                    })
-
-
-                except:
-
-                    pass
-
-
-
-
-
-
-                if signal:
-
-
-
-                    add_log(
-
-                        f"SIGNAL {signal}"
-
-                    )
-
-
-
-                    position = position_manager.get_position()
-
-
-
-                    side = position.get(
-
-                        "side",
-
-                        "NONE"
-
-                    )
-
-
-                    size = float(
-
-                        position.get(
-
-                            "size",
-
-                            0
-
-                        )
-
-                    )
-
-
-
-
-
-                    # 현재 포지션 없음
-
-                    if size <= 0:
-
-
-
-                        result = order_manager.open_position(
-
-                            signal,
-
-                            config.MAX_POSITION_SIZE
-
-                        )
-
-
-                        if result:
-
-                            add_log(
-                                f"ORDER SUCCESS {signal}"
-                            )
-
-
-
-                    # 같은 방향
-
-                    elif side == signal:
-
-
-                        add_log(
-
-                            "EXIST POSITION SKIP"
-
-                        )
-
-
-
-                    # 반대 방향
-
-                    else:
-
-
-                        add_log(
-
-                            "REVERSAL SIGNAL"
-
-                        )
-
-
-                        order_manager.close_position()
-
-
-                        time.sleep(2)
-
-
-
-                        order_manager.open_position(
-
-                            signal,
-
-                            config.MAX_POSITION_SIZE
-
-                        )
-
-
-
-
-
-
-
-                time.sleep(30)
-
-
-
-
-
-            except Exception as e:
-
-
-
-                traceback.print_exc()
-
-
-                add_log(
-
-                    f"MARKET LOOP ERROR {e}"
-
-                )
-
-
-                time.sleep(10)
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # STOP
-    # =====================================================
-
-    def stop(self):
-
-
-        with self.stop_lock:
-
-
-            if not self.running:
-
-                return
-
-
-
-            print()
-
-            print("====================")
-            print("[BOT STOP]")
-            print("====================")
-
-
-
-            self.running=False
-
-
-
-
-            # WS
-
-            try:
-
-                private_ws.stop()
-
-
-            except Exception as e:
-
-                add_log(
-                    f"WS STOP ERROR {e}"
-                )
-
-
-
-
-
-            # WATCHDOG
-
-            try:
-
-                from services.watchdog import watchdog
-
-                watchdog.stop()
-
-
-            except:
-
-                pass
-
-
-
-
-
-            # THREAD
-
-            if self.market_thread:
-
-
-                if self.market_thread.is_alive():
-
-                    self.market_thread.join(
-
-                        timeout=5
-
-                    )
-
-
-            self.market_thread=None
-
-
-
-
-
-            update_status({
-
-                "bot":
+            "bot":
                 "STOPPED"
+
+        })
+
+
+
+        add_log(
+
+            "MANUAL STOP"
+
+        )
+
+
+
+        return jsonify({
+
+            "success":
+                True
+
+        })
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"STOP ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "success":
+                False
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# MODE
+# =====================================================
+
+@app.route(
+    "/api/mode",
+    methods=["POST"]
+)
+
+def api_mode():
+
+
+    data = request.get_json(
+
+        silent=True
+
+    ) or {}
+
+
+
+    mode = data.get(
+
+        "mode",
+
+        "DEMO"
+
+    ).upper()
+
+
+
+    if mode not in (
+
+        "DEMO",
+
+        "LIVE"
+
+    ):
+
+
+        return jsonify({
+
+            "success":
+                False
+
+        })
+
+
+
+
+    update_status({
+
+        "mode":
+            mode
+
+    })
+
+
+
+    add_log(
+
+        f"MODE CHANGE {mode}"
+
+    )
+
+
+
+    try:
+
+
+        from api.bybit_api import bybit_api
+
+        from services.private_ws import private_ws
+
+
+
+        bybit_api.change_session(
+
+            mode
+
+        )
+
+
+
+        if private_ws.running:
+
+
+            private_ws.restart()
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"MODE ERROR {e}"
+
+        )
+
+
+
+
+    return jsonify({
+
+        "success":
+            True,
+
+        "mode":
+            mode
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# CLOSE POSITION
+# =====================================================
+
+@app.route(
+    "/api/close",
+    methods=["POST"]
+)
+
+def api_close():
+
+
+    try:
+
+
+        from order.order_manager import order_manager
+
+
+
+        result = order_manager.close_position()
+
+
+
+        add_log(
+
+            "MANUAL CLOSE"
+
+        )
+
+
+
+        return jsonify({
+
+            "success":
+                bool(result)
+
+        })
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"CLOSE ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "success":
+                False
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# REVERSE POSITION
+# =====================================================
+
+@app.route(
+    "/api/reverse",
+    methods=["POST"]
+)
+
+def api_reverse():
+
+
+    try:
+
+
+        from order.order_manager import order_manager
+
+        from portfolio.position_manager import position_manager
+
+
+
+        pos = position_manager.get_position()
+
+
+
+        side = pos.get(
+
+            "side",
+
+            "NONE"
+
+        )
+
+
+
+        if side == "Buy":
+
+
+            new_side = "Sell"
+
+
+
+        elif side == "Sell":
+
+
+            new_side = "Buy"
+
+
+
+        else:
+
+
+            return jsonify({
+
+                "success":
+                    False,
+
+                "error":
+                    "NO POSITION"
 
             })
 
 
-            add_log(
-
-                "BOT STOP COMPLETE"
-
-            )
 
 
-            print(
 
-                "[BOT STOP COMPLETE]"
+        add_log(
 
-            )
+            f"REVERSE {side}->{new_side}"
+
+        )
+
+
+
+        result = order_manager.reverse_position(
+
+            new_side
+
+        )
+
+
+
+        return jsonify({
+
+            "success":
+                bool(result)
+
+        })
+
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"REVERSE ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "success":
+                False
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# PING
+# =====================================================
+
+@app.route("/api/ping")
+
+def api_ping():
+
+
+    return jsonify({
+
+        "success":
+            True,
+
+        "server":
+            "running",
+
+        "time":
+            int(time.time())
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SERVER START
+# =====================================================
+
+def run_server():
+
+
+    global server_started
+
+    global _server_thread
+
+
+
+    if server_started:
+
+        return
+
+
+
+    server_started=True
+
+
+
+
+    def _run():
+
+
+        app.run(
+
+            host=WEB_HOST,
+
+            port=WEB_PORT,
+
+            debug=False,
+
+            use_reloader=False,
+
+            threaded=True
+
+        )
+
+
+
+
+
+    _server_thread = threading.Thread(
+
+        target=_run,
+
+        daemon=True,
+
+        name="WebServer"
+
+    )
+
+
+
+    _server_thread.start()
+
+
+
+    print(
+
+        f"[WEB SERVER START] http://{WEB_HOST}:{WEB_PORT}"
+
+    )
+
+
+
+    add_log(
+
+        "WEB SERVER READY"
+
+    )
+
+
+
+
+
+
+
+
+# =====================================================
+# STOP SERVER
+# =====================================================
+
+def stop_server():
+
+
+    global server_started
+
+
+    server_started=False
+
+
+    add_log(
+
+        "WEB SERVER STOP"
+
+    )
+
+
+
+
+
+
+
+
+# =====================================================
+# RESET
+# =====================================================
+
+def reset_status():
+
+
+    with status_lock:
+
+
+        mode = status["mode"]
+
+
+        status.clear()
+
+
+
+        status.update({
+
+            "mode":
+                mode,
+
+            "bot":
+                "STOPPED",
+
+            "position":
+                "NONE",
+
+            "position_size":
+                0,
+
+            "entry_price":
+                0,
+
+            "pnl":
+                0
+
+        })
+
+
+
+    add_log(
+
+        "STATUS RESET"
+
+    )
+
+
+
+
+
+
+
+
+__all__=[
+
+
+    "app",
+
+    "run_server",
+
+    "stop_server",
+
+    "set_bot_instance",
+
+    "update_status",
+
+    "get_status",
+
+    "add_log",
+
+    "get_trading_mode",
+
+    "update_chart"
+
+
+]
+
+
+
+
+
+if __name__=="__main__":
+
+
+    run_server()
+
+
+    while True:
+
+
+        time.sleep(1)
