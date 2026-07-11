@@ -1,9 +1,15 @@
 # =====================================================
 # web/server.py
 # VWAP SUPERTREND BOT WEB SERVER
+# BYBIT V5
 # =====================================================
 
-from flask import Flask, jsonify, request, send_file
+from flask import (
+    Flask,
+    jsonify,
+    request,
+    send_file
+)
 
 import threading
 import time
@@ -14,7 +20,7 @@ app = Flask(__name__)
 
 
 # =====================================================
-# GLOBAL
+# GLOBAL STATE
 # =====================================================
 
 logs = []
@@ -22,11 +28,15 @@ logs = []
 
 status = {
 
+    "api": "OK",
+
     "bot": "STOPPED",
 
     "mode": "DEMO",
 
     "symbol": "BTCUSDT",
+
+    "price": 0,
 
     "position": "NONE",
 
@@ -34,9 +44,15 @@ status = {
 
     "entry_price": 0,
 
+    "mark_price": 0,
+
+    "liq_price": 0,
+
     "pnl": 0,
 
-    "last_action": ""
+    "last_action": "",
+
+    "watchdog": "OFF"
 
 }
 
@@ -106,6 +122,7 @@ def get_status():
 
 
 
+
 # =====================================================
 # BOT
 # =====================================================
@@ -156,6 +173,7 @@ def get_trading_mode():
 
 
 
+
 def set_trading_mode(mode):
 
     global trading_mode
@@ -164,7 +182,13 @@ def set_trading_mode(mode):
     mode = str(mode).upper()
 
 
-    if mode in ["DEMO", "LIVE"]:
+    if mode in [
+
+        "DEMO",
+
+        "LIVE"
+
+    ]:
 
 
         trading_mode = mode
@@ -192,7 +216,6 @@ def set_trading_mode(mode):
 
 
 
-
 # =====================================================
 # SYMBOL
 # =====================================================
@@ -200,7 +223,6 @@ def set_trading_mode(mode):
 def get_trading_symbol():
 
     return trading_symbol
-
 
 
 
@@ -233,7 +255,7 @@ def set_trading_symbol(symbol):
 
 
 # =====================================================
-# PAGE
+# HOME
 # =====================================================
 
 @app.route("/")
@@ -265,6 +287,7 @@ def index():
 
 
 
+
 # =====================================================
 # STATUS API
 # =====================================================
@@ -273,11 +296,17 @@ def index():
 
 def api_status():
 
+
     return jsonify({
 
-        "status": status,
+        "status":
 
-        "logs": logs[-100:]
+            status,
+
+
+        "logs":
+
+            logs[-100:]
 
     })
 
@@ -286,9 +315,16 @@ def api_status():
 
 
 
+
+
+# =====================================================
+# LOG API
+# =====================================================
+
 @app.route("/api/logs")
 
 def api_logs():
+
 
     return jsonify(logs)
 
@@ -301,7 +337,56 @@ def api_logs():
 
 
 # =====================================================
-# ORDER
+# CANDLE API
+# =====================================================
+
+@app.route("/api/candles")
+
+def api_candles():
+
+
+    try:
+
+
+        from api.bybit_api import bybit_api
+
+
+
+        result = bybit_api.get_kline(
+
+            interval="5",
+
+            limit=100
+
+        )
+
+
+        return jsonify(result)
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"CANDLE ERROR {e}"
+
+        )
+
+
+        return jsonify({})
+
+
+
+
+
+
+
+
+
+# =====================================================
+# ORDER API
 # =====================================================
 
 @app.route(
@@ -321,7 +406,11 @@ def api_order():
         data = request.json
 
 
-        side = data.get("side")
+        side = data.get(
+
+            "side"
+
+        )
 
 
         qty = data.get(
@@ -358,6 +447,8 @@ def api_order():
 
 
 
+
+
     except Exception as e:
 
 
@@ -383,9 +474,8 @@ def api_order():
 
 
 
-
 # =====================================================
-# CLOSE
+# CLOSE API
 # =====================================================
 
 @app.route(
@@ -405,7 +495,9 @@ def api_close():
         from order.order_manager import order_manager
 
 
+
         result = order_manager.close_position()
+
 
 
         return jsonify({
@@ -442,9 +534,8 @@ def api_close():
 
 
 
-
 # =====================================================
-# SERVER START
+# SERVER
 # =====================================================
 
 def run_server():
@@ -461,6 +552,8 @@ def run_server():
         use_reloader=False
 
     )
+
+
 
 
 
