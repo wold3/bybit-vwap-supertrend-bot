@@ -1,14 +1,26 @@
 # =====================================================
 # config.py
-# VWAP SUPERTREND BOT CONFIGURATION
+# VWAP SUPERTREND BOT CONFIG
 # =====================================================
+
 
 import os
 
-from dotenv import load_dotenv
 
 
-load_dotenv()
+# =====================================================
+# MODE
+# =====================================================
+
+# DEMO : 모의투자
+# LIVE : 실거래
+
+DEFAULT_MODE = "DEMO"
+
+
+
+LIVE = False
+
 
 
 
@@ -19,39 +31,23 @@ load_dotenv()
 # =====================================================
 
 BYBIT_API_KEY = os.getenv(
+
     "BYBIT_API_KEY",
-    ""
+
+    "YOUR_API_KEY"
+
 )
 
 
 BYBIT_API_SECRET = os.getenv(
+
     "BYBIT_API_SECRET",
-    ""
-)
 
-
-
-
-
-# =====================================================
-# TRADING MODE
-# =====================================================
-
-# 초기 실행 모드
-# DEMO / LIVE
-
-DEFAULT_MODE = os.getenv(
-    "DEFAULT_MODE",
-    "DEMO"
-).upper()
-
-
-
-LIVE = (
-
-    DEFAULT_MODE == "LIVE"
+    "YOUR_API_SECRET"
 
 )
+
+
 
 
 
@@ -61,24 +57,67 @@ LIVE = (
 # MARKET
 # =====================================================
 
-CATEGORY = os.getenv(
-    "CATEGORY",
-    "linear"
-)
+CATEGORY = "linear"
 
 
-SYMBOL = os.getenv(
-    "SYMBOL",
-    "BTCUSDT"
-)
+SYMBOL = "BTCUSDT"
 
 
-LEVERAGE = int(
-    os.getenv(
-        "LEVERAGE",
-        "3"
-    )
-)
+SETTLE_COIN = "USDT"
+
+
+
+
+
+# =====================================================
+# TRADE
+# =====================================================
+
+LEVERAGE = 3
+
+
+
+POSITION_MODE = "ONE_WAY"
+
+
+
+MARGIN_TYPE = "ISOLATED"
+
+
+
+
+
+
+
+
+# =====================================================
+# ORDER
+# =====================================================
+
+# BTCUSDT 최소 주문 단위에 맞게 조정
+
+MAX_POSITION_SIZE = 0.001
+
+
+
+ORDER_COOLDOWN = 30
+
+
+
+
+
+
+# =====================================================
+# TAKE PROFIT / STOP LOSS
+# =====================================================
+
+TAKE_PROFIT_PERCENT = 1.0
+
+
+
+STOP_LOSS_PERCENT = 0.5
+
+
 
 
 
@@ -88,45 +127,16 @@ LEVERAGE = int(
 # RISK MANAGEMENT
 # =====================================================
 
-RISK_PER_TRADE_PERCENT = float(
-
-    os.getenv(
-        "RISK_PER_TRADE_PERCENT",
-        "0.5"
-    )
-
-)
-
-
-STOP_LOSS_PERCENT = float(
-
-    os.getenv(
-        "STOP_LOSS_PERCENT",
-        "1.0"
-    )
-
-)
-
-
-TAKE_PROFIT_PERCENT = float(
-
-    os.getenv(
-        "TAKE_PROFIT_PERCENT",
-        "2.0"
-    )
-
-)
+RISK_PER_TRADE_PERCENT = 1.0
 
 
 
-MAX_POSITION_SIZE = float(
+MAX_DAILY_LOSS_PERCENT = 5.0
 
-    os.getenv(
-        "MAX_POSITION_SIZE",
-        "0.001"
-    )
 
-)
+
+MAX_LOSS_COUNT = 5
+
 
 
 
@@ -136,80 +146,31 @@ MAX_POSITION_SIZE = float(
 # STRATEGY
 # =====================================================
 
-ATR_PERIOD = int(
-
-    os.getenv(
-        "ATR_PERIOD",
-        "10"
-    )
-
-)
+TIMEFRAME = "5"
 
 
 
-SUPERTREND_MULTIPLIER = float(
-
-    os.getenv(
-        "SUPERTREND_MULTIPLIER",
-        "3"
-    )
-
-)
+ATR_PERIOD = 10
 
 
 
+SUPERTREND_MULTIPLIER = 3
 
-
-USE_VOLUME_FILTER = (
-
-    os.getenv(
-        "USE_VOLUME_FILTER",
-        "True"
-    ).lower()
-
-    ==
-
-    "true"
-
-)
-
-
-
-VOLUME_PERIOD = int(
-
-    os.getenv(
-        "VOLUME_PERIOD",
-        "20"
-    )
-
-)
-
-
-
-MIN_VOLUME_MULTIPLIER = float(
-
-    os.getenv(
-        "MIN_VOLUME_MULTIPLIER",
-        "1.2"
-    )
-
-)
 
 
 
 
 
 # =====================================================
-# DATABASE
+# MARKET LOOP
 # =====================================================
 
-DB_FILE = os.getenv(
+CANDLE_LIMIT = 200
 
-    "DB_FILE",
 
-    "bot.db"
 
-)
+LOOP_INTERVAL = 10
+
 
 
 
@@ -219,22 +180,30 @@ DB_FILE = os.getenv(
 # TELEGRAM
 # =====================================================
 
-TELEGRAM_TOKEN = os.getenv(
-
-    "TELEGRAM_TOKEN",
-
-    ""
-
-)
+TELEGRAM_ENABLE = False
 
 
-TELEGRAM_CHAT_ID = os.getenv(
 
-    "TELEGRAM_CHAT_ID",
+TELEGRAM_TOKEN = ""
 
-    ""
 
-)
+
+TELEGRAM_CHAT_ID = ""
+
+
+
+
+
+
+
+
+# =====================================================
+# DATABASE
+# =====================================================
+
+DATABASE_FILE = "bot.db"
+
+
 
 
 
@@ -244,70 +213,88 @@ TELEGRAM_CHAT_ID = os.getenv(
 # WEB
 # =====================================================
 
-WEB_PORT = int(
+WEB_HOST = "0.0.0.0"
 
-    os.getenv(
-        "WEB_PORT",
-        "8000"
-    )
 
-)
+WEB_PORT = 8000
+
+
 
 
 
 
 
 # =====================================================
-# PRINT CONFIG
+# DEBUG
 # =====================================================
 
-print(
-    "=============================="
-)
+DEBUG = False
+
+
+
+
+
+
+print("==============================")
+
+print("[CONFIG LOADED]")
+
+print("==============================")
 
 print(
-    "[CONFIG LOADED]"
-)
 
-print(
-    "=============================="
-)
-
-print(
     "LIVE :",
+
     LIVE
+
 )
 
 print(
+
     "DEFAULT MODE :",
+
     DEFAULT_MODE
+
 )
 
 print(
+
     "CATEGORY :",
+
     CATEGORY
+
 )
 
 print(
+
     "SYMBOL :",
+
     SYMBOL
+
 )
 
 print(
+
     "LEVERAGE :",
+
     LEVERAGE
+
 )
 
 print(
+
     "API KEY LENGTH :",
+
     len(BYBIT_API_KEY)
+
 )
 
 print(
+
     "SECRET LENGTH :",
+
     len(BYBIT_API_SECRET)
+
 )
 
-print(
-    "=============================="
-)
+print("==============================")
