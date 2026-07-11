@@ -1,17 +1,14 @@
 <!DOCTYPE html>
 
-<html>
+<html lang="ko">
 
 <head>
 
 <meta charset="UTF-8">
 
 <title>
-VWAP SUPERTREND BOT
+VWAP SUPERTREND AUTO BOT
 </title>
-
-
-<script src="https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 
 
 <style>
@@ -20,30 +17,11 @@ body {
 
     background:#111;
 
-    color:white;
+    color:#eee;
 
     font-family:Arial, sans-serif;
 
-    margin:20px;
-
-}
-
-
-h1 {
-
-    color:#00ff99;
-
-}
-
-
-
-.grid {
-
-    display:grid;
-
-    grid-template-columns:repeat(4,1fr);
-
-    gap:10px;
+    padding:30px;
 
 }
 
@@ -51,13 +29,21 @@ h1 {
 
 .card {
 
-    background:#1e1e1e;
+    background:#222;
 
-    padding:15px;
+    padding:20px;
 
-    border-radius:10px;
+    margin-bottom:15px;
 
-    margin-bottom:10px;
+    border-radius:12px;
+
+}
+
+
+
+h1 {
+
+    color:#00e676;
 
 }
 
@@ -65,27 +51,7 @@ h1 {
 
 .value {
 
-    font-size:25px;
-
-    color:#00ff99;
-
-    margin-top:10px;
-
-}
-
-
-
-button {
-
-    padding:10px 20px;
-
-    margin:5px;
-
-    border:none;
-
-    border-radius:5px;
-
-    cursor:pointer;
+    font-size:28px;
 
     font-weight:bold;
 
@@ -93,9 +59,27 @@ button {
 
 
 
+button {
+
+    padding:12px 20px;
+
+    margin:5px;
+
+    border:none;
+
+    border-radius:8px;
+
+    cursor:pointer;
+
+    font-size:16px;
+
+}
+
+
+
 .demo {
 
-    background:#0066ff;
+    background:#1976d2;
 
     color:white;
 
@@ -105,7 +89,7 @@ button {
 
 .live {
 
-    background:#ff3333;
+    background:#c62828;
 
     color:white;
 
@@ -113,35 +97,43 @@ button {
 
 
 
-#chart {
+.stop {
 
-    height:400px;
+    background:#ff9800;
+
+    color:white;
 
 }
 
 
 
-.log {
+.close {
+
+    background:#8e24aa;
+
+    color:white;
+
+}
+
+
+
+pre {
 
     background:#000;
 
-    height:220px;
+    padding:15px;
+
+    height:250px;
 
     overflow:auto;
 
-    padding:10px;
-
-    font-size:13px;
-
 }
-
 
 
 </style>
 
+
 </head>
-
-
 
 
 
@@ -157,13 +149,12 @@ button {
 
 
 
-<div class="grid">
-
-
-
 <div class="card">
 
+<h2>
 TRADING MODE
+</h2>
+
 
 <div class="value" id="mode">
 
@@ -172,18 +163,20 @@ TRADING MODE
 </div>
 
 
+
 <button class="demo"
 onclick="changeMode('DEMO')">
 
-DEMO
+DEMO MODE
 
 </button>
+
 
 
 <button class="live"
 onclick="changeMode('LIVE')">
 
-LIVE
+LIVE MODE
 
 </button>
 
@@ -194,9 +187,15 @@ LIVE
 
 
 
+
+
 <div class="card">
 
+
+<h2>
 BOT STATUS
+</h2>
+
 
 <div class="value" id="bot">
 
@@ -204,181 +203,8 @@ BOT STATUS
 
 </div>
 
-</div>
-
-
-
-
-
-<div class="card">
-
-PRICE
-
-<div class="value" id="price">
-
--
 
 </div>
-
-</div>
-
-
-
-
-
-<div class="card">
-
-VWAP
-
-<div class="value" id="vwap">
-
--
-
-</div>
-
-</div>
-
-
-
-</div>
-
-
-
-
-
-
-
-
-
-<div class="grid">
-
-
-
-<div class="card">
-
-TREND
-
-<div class="value" id="trend">
-
--
-
-</div>
-
-</div>
-
-
-
-
-
-<div class="card">
-
-SIGNAL
-
-<div class="value" id="signal">
-
--
-
-</div>
-
-</div>
-
-
-
-
-
-<div class="card">
-
-POSITION
-
-<div class="value" id="position">
-
--
-
-</div>
-
-</div>
-
-
-
-
-
-<div class="card">
-
-PNL
-
-<div class="value" id="pnl">
-
--
-
-</div>
-
-</div>
-
-
-
-</div>
-
-
-
-
-
-
-
-
-
-<div class="grid">
-
-
-
-<div class="card">
-
-ENTRY
-
-<div class="value" id="entry">
-
--
-
-</div>
-
-</div>
-
-
-
-
-
-<div class="card">
-
-SIZE
-
-<div class="value" id="size">
-
--
-
-</div>
-
-</div>
-
-
-
-
-
-<div class="card">
-
-WATCHDOG
-
-<div class="value" id="watchdog">
-
--
-
-</div>
-
-</div>
-
-
-
-</div>
-
-
 
 
 
@@ -390,18 +216,26 @@ WATCHDOG
 
 
 <h2>
-
-BTCUSDT CHART
+POSITION
 
 </h2>
 
 
-<div id="chart"></div>
+<p id="position">
+
+-
+
+</p>
+
+
+<p id="pnl">
+
+-
+
+</p>
 
 
 </div>
-
-
 
 
 
@@ -413,19 +247,54 @@ BTCUSDT CHART
 
 
 <h2>
+CONTROL
 
+</h2>
+
+
+
+<button class="stop"
+onclick="stopBot()">
+
+🛑 BOT STOP
+
+</button>
+
+
+
+
+<button class="close"
+onclick="closePosition()">
+
+⚠️ CLOSE POSITION
+
+</button>
+
+
+
+</div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<h2>
 SYSTEM LOG
 
 </h2>
 
 
-<div class="log" id="logs">
+<pre id="logs">
+
+</pre>
+
 
 </div>
-
-
-</div>
-
 
 
 
@@ -437,73 +306,29 @@ SYSTEM LOG
 <script>
 
 
-// =====================================
-// CHART
-// =====================================
+// ===========================
+// LOAD STATUS
+// ===========================
 
 
-const chart = LightweightCharts.createChart(
-
-    document.getElementById("chart"),
-
-    {
-
-        layout:{
-
-            background:{
-
-                color:"#111"
-
-            },
-
-
-            textColor:"#fff"
-
-        }
-
-    }
-
-);
-
-
-
-const candleSeries = chart.addCandlestickSeries();
-
-
-
-
-
-
-
-
-
-// =====================================
-// STATUS UPDATE
-// =====================================
-
-
-async function updateStatus(){
+async function loadStatus(){
 
 
     try{
 
 
-        const res = await fetch(
+        let res = await fetch(
 
             "/api/status"
 
         );
 
 
-        const data = await res.json();
+        let data = await res.json();
 
 
 
-
-
-        const s = data.status;
-
-
+        let s = data.status;
 
 
 
@@ -511,9 +336,7 @@ async function updateStatus(){
 
             "mode"
 
-        ).innerHTML = data.mode;
-
-
+        ).innerHTML = s.mode;
 
 
 
@@ -525,75 +348,21 @@ async function updateStatus(){
 
 
 
-
-
-        document.getElementById(
-
-            "price"
-
-        ).innerHTML = s.price;
-
-
-
-
-
-        document.getElementById(
-
-            "vwap"
-
-        ).innerHTML = s.vwap;
-
-
-
-
-
-        document.getElementById(
-
-            "trend"
-
-        ).innerHTML = s.trend;
-
-
-
-
-
-        document.getElementById(
-
-            "signal"
-
-        ).innerHTML = s.signal;
-
-
-
-
-
         document.getElementById(
 
             "position"
 
-        ).innerHTML = s.position;
+        ).innerHTML =
 
+            s.position +
 
+            " / SIZE : " +
 
+            s.position_size +
 
+            "<br>ENTRY : " +
 
-        document.getElementById(
-
-            "entry"
-
-        ).innerHTML = s.entry;
-
-
-
-
-
-        document.getElementById(
-
-            "size"
-
-        ).innerHTML = s.size;
-
-
+            s.entry_price;
 
 
 
@@ -601,38 +370,11 @@ async function updateStatus(){
 
             "pnl"
 
-        ).innerHTML = s.pnl;
+        ).innerHTML =
 
+            "PNL : " +
 
-
-
-
-        document.getElementById(
-
-            "watchdog"
-
-        ).innerHTML = s.watchdog;
-
-
-
-
-
-
-
-        let html="";
-
-
-
-        data.logs.reverse().forEach(
-
-            function(log){
-
-
-                html += log + "<br>";
-
-            }
-
-        );
+            s.pnl;
 
 
 
@@ -640,9 +382,13 @@ async function updateStatus(){
 
             "logs"
 
-        ).innerHTML = html;
+        ).innerHTML =
 
+            data.logs.join(
 
+                "\n"
+
+            );
 
 
 
@@ -653,6 +399,7 @@ async function updateStatus(){
 
 
         console.log(e);
+
 
     }
 
@@ -667,27 +414,25 @@ async function updateStatus(){
 
 
 
-// =====================================
+// ===========================
 // MODE CHANGE
-// =====================================
+// ===========================
 
 
 async function changeMode(mode){
 
 
-
-    if(mode==="LIVE"){
+    if(mode === "LIVE"){
 
 
         let ok = confirm(
 
-            "실거래 모드로 전환합니다.\n계속하시겠습니까?"
+            "실거래 모드로 변경합니다.\n\n실제 주문이 발생할 수 있습니다.\n계속하시겠습니까?"
 
         );
 
 
         if(!ok){
-
 
             return;
 
@@ -695,8 +440,6 @@ async function changeMode(mode){
 
 
     }
-
-
 
 
 
@@ -729,15 +472,13 @@ async function changeMode(mode){
 
             })
 
-
         }
-
 
     );
 
 
 
-    updateStatus();
+    loadStatus();
 
 
 }
@@ -750,48 +491,87 @@ async function changeMode(mode){
 
 
 
-// =====================================
-// CHART UPDATE
-// =====================================
+// ===========================
+// STOP
+// ===========================
 
 
-async function updateChart(){
+async function stopBot(){
 
 
-    try{
+    let ok = confirm(
 
+        "봇을 중지하시겠습니까?"
 
-        const res = await fetch(
-
-            "/api/chart"
-
-        );
-
-
-        const data = await res.json();
+    );
 
 
 
+    if(!ok){
 
-
-        candleSeries.setData(
-
-            data
-
-        );
-
-
+        return;
 
     }
 
 
-    catch(e){
+
+    await fetch(
+
+        "/api/stop",
+
+        {
+
+            method:"POST"
+
+        }
+
+    );
 
 
-        console.log(e);
+}
 
+
+
+
+
+
+
+
+
+// ===========================
+// CLOSE POSITION
+// ===========================
+
+
+async function closePosition(){
+
+
+    let ok = confirm(
+
+        "현재 포지션을 시장가 청산합니다."
+
+    );
+
+
+    if(!ok){
+
+        return;
 
     }
+
+
+
+    await fetch(
+
+        "/api/close",
+
+        {
+
+            method:"POST"
+
+        }
+
+    );
 
 
 }
@@ -806,7 +586,7 @@ async function updateChart(){
 
 setInterval(
 
-    updateStatus,
+    loadStatus,
 
     3000
 
@@ -814,19 +594,7 @@ setInterval(
 
 
 
-setInterval(
-
-    updateChart,
-
-    5000
-
-);
-
-
-
-updateStatus();
-
-updateChart();
+loadStatus();
 
 
 
@@ -835,6 +603,5 @@ updateChart();
 
 
 </body>
-
 
 </html>
