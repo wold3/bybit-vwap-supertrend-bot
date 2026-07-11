@@ -3,11 +3,21 @@
 # Risk Management System
 # =====================================================
 
+from api.bybit_api import bybit_api
+
+
 from config import (
+
     RISK_PER_TRADE_PERCENT,
+
     STOP_LOSS_PERCENT,
+
     TAKE_PROFIT_PERCENT,
-    MAX_POSITION_SIZE
+
+    MAX_POSITION_SIZE,
+
+    LEVERAGE
+
 )
 
 
@@ -18,9 +28,6 @@ class RiskManager:
 
 
     def __init__(self):
-
-
-        self.equity = 0
 
 
         print(
@@ -38,30 +45,134 @@ class RiskManager:
 
 
     # =====================================================
-    # UPDATE EQUITY
+    # BALANCE
     # =====================================================
 
-
-    def update_equity(
-        self,
-        equity
-    ):
+    def get_balance(self):
 
 
-        self.equity = float(
-
-            equity
-
-        )
+        try:
 
 
-        print(
+            data = (
 
-            "[EQUITY UPDATED]",
+                bybit_api
 
-            self.equity
+                .get_balance()
 
-        )
+            )
+
+
+
+            if not data:
+
+
+                return 0
+
+
+
+
+
+
+
+            account = (
+
+                data
+
+                .get(
+
+                    "result",
+
+                    {}
+
+                )
+
+                .get(
+
+                    "list",
+
+                    []
+
+                )
+
+            )
+
+
+
+
+
+            if not account:
+
+
+                return 0
+
+
+
+
+
+
+
+            coin = (
+
+                account[0]
+
+                .get(
+
+                    "coin",
+
+                    []
+
+                )
+
+            )
+
+
+
+
+
+            if not coin:
+
+
+                return 0
+
+
+
+
+
+            return float(
+
+                coin[0]
+
+                .get(
+
+                    "walletBalance",
+
+                    0
+
+                )
+
+            )
+
+
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[BALANCE ERROR]",
+
+                e
+
+            )
+
+
+            return 0
+
 
 
 
@@ -75,28 +186,32 @@ class RiskManager:
     # POSITION SIZE
     # =====================================================
 
-
-    def calculate_position_size(
-        self,
-        price
-    ):
+    def calculate_position_size(self):
 
 
         try:
 
 
-            if self.equity <= 0:
-
-
-                return 0
+            balance = self.get_balance()
 
 
 
 
 
-            risk_money = (
+            if balance <= 0:
 
-                self.equity
+
+                # Demo 초기 오류 방어
+
+                return MAX_POSITION_SIZE
+
+
+
+
+
+            risk_amount = (
+
+                balance
 
                 *
 
@@ -112,42 +227,21 @@ class RiskManager:
 
 
 
-            stop_distance = (
+            qty = (
 
-                price
+                risk_amount
 
                 *
 
-                STOP_LOSS_PERCENT
+                LEVERAGE
 
                 /
 
-                100
+                100000
 
             )
 
 
-
-
-
-            if stop_distance <= 0:
-
-
-                return 0
-
-
-
-
-
-            qty = (
-
-                risk_money
-
-                /
-
-                stop_distance
-
-            )
 
 
 
@@ -169,6 +263,7 @@ class RiskManager:
                 6
 
             )
+
 
 
 
@@ -197,20 +292,210 @@ class RiskManager:
 
 
 
+
+    # =====================================================
+    # TP / SL
+    # =====================================================
+
+    def calculate_tp_sl(
+
+        self,
+
+        price,
+
+        side
+
+    ):
+
+
+        try:
+
+
+            price = float(price)
+
+
+
+
+
+            if side == "BUY":
+
+
+
+                stop_loss = (
+
+                    price
+
+                    *
+
+                    (
+
+                    1
+
+                    -
+
+                    STOP_LOSS_PERCENT
+
+                    /
+
+                    100
+
+                    )
+
+                )
+
+
+
+                take_profit = (
+
+                    price
+
+                    *
+
+                    (
+
+                    1
+
+                    +
+
+                    TAKE_PROFIT_PERCENT
+
+                    /
+
+                    100
+
+                    )
+
+                )
+
+
+
+
+
+
+            else:
+
+
+
+                stop_loss = (
+
+                    price
+
+                    *
+
+                    (
+
+                    1
+
+                    +
+
+                    STOP_LOSS_PERCENT
+
+                    /
+
+                    100
+
+                    )
+
+                )
+
+
+
+                take_profit = (
+
+                    price
+
+                    *
+
+                    (
+
+                    1
+
+                    -
+
+                    TAKE_PROFIT_PERCENT
+
+                    /
+
+                    100
+
+                    )
+
+                )
+
+
+
+
+
+
+
+
+            return (
+
+                round(
+
+                    take_profit,
+
+                    2
+
+                ),
+
+
+                round(
+
+                    stop_loss,
+
+                    2
+
+                )
+
+            )
+
+
+
+
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[TP SL CALC ERROR]",
+
+                e
+
+            )
+
+
+            return (
+
+                0,
+
+                0
+
+            )
+
+
+
+
+
+
+
+
+
     # =====================================================
     # RISK CHECK
     # =====================================================
 
-
-    def check(
-        self,
-        price
-    ):
+    def check_trade(self):
 
 
-        qty = self.calculate_position_size(
+        qty = (
 
-            price
+            self.calculate_position_size()
 
         )
 
@@ -219,228 +504,7 @@ class RiskManager:
         if qty <= 0:
 
 
-            print(
-
-                "[RISK BLOCK]"
-
-            )
-
-
-            return None
-
-
-
-
-
-        return {
-
-
-            "qty":
-
-                qty,
-
-
-            "risk":
-
-                RISK_PER_TRADE_PERCENT
-
-
-        }
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # TP / SL
-    # =====================================================
-
-
-    def calculate_tp_sl(
-        self,
-        side,
-        price
-    ):
-
-
-        if side == "Buy":
-
-
-            tp = (
-
-                price
-
-                *
-
-                (
-
-                    1
-
-                    +
-
-                    TAKE_PROFIT_PERCENT
-
-                    /
-
-                    100
-
-                )
-
-            )
-
-
-            sl = (
-
-                price
-
-                *
-
-                (
-
-                    1
-
-                    -
-
-                    STOP_LOSS_PERCENT
-
-                    /
-
-                    100
-
-                )
-
-            )
-
-
-
-
-
-        else:
-
-
-            tp = (
-
-                price
-
-                *
-
-                (
-
-                    1
-
-                    -
-
-                    TAKE_PROFIT_PERCENT
-
-                    /
-
-                    100
-
-                )
-
-            )
-
-
-            sl = (
-
-                price
-
-                *
-
-                (
-
-                    1
-
-                    +
-
-                    STOP_LOSS_PERCENT
-
-                    /
-
-                    100
-
-                )
-
-            )
-
-
-
-
-
-        return {
-
-
-            "tp":
-
-                round(
-
-                    tp,
-
-                    2
-
-                ),
-
-
-            "sl":
-
-                round(
-
-                    sl,
-
-                    2
-
-                )
-
-        }
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # DAILY LOSS PROTECTION
-    # =====================================================
-
-
-    def daily_loss_check(
-        self,
-        loss
-    ):
-
-
-        max_loss = (
-
-            self.equity
-
-            *
-
-            0.05
-
-        )
-
-
-
-        if loss >= max_loss:
-
-
-            print(
-
-                "[DAILY LOSS LIMIT]"
-
-            )
-
-
             return False
-
-
 
 
 
@@ -452,9 +516,11 @@ class RiskManager:
 
 
 
+
+
+
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 risk_manager = RiskManager()
