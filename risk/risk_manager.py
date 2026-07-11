@@ -1,26 +1,31 @@
 # =====================================================
 # risk/risk_manager.py
-# VWAP SUPERTREND BOT RISK MANAGER
+# VWAP SUPERTREND BOT
+# RISK MANAGER
 # =====================================================
 
-import threading
-import datetime
+
+import time
+
 
 
 from config import (
 
-    RISK_PERCENT,
+    MAX_POSITION_SIZE,
 
-    MAX_POSITION_SIZE
+    MAX_DAILY_LOSS,
+
+    MAX_OPEN_POSITION
 
 )
 
 
+
 from web.server import (
 
-    update_status,
+    add_log,
 
-    add_log
+    update_status
 
 )
 
@@ -31,35 +36,17 @@ from web.server import (
 class RiskManager:
 
 
+
     def __init__(self):
 
 
-        self.lock = threading.RLock()
+        self.daily_loss = 0
 
 
-        self.enabled = True
+        self.order_count = 0
 
 
-        self.kill_switch = False
-
-
-        self.daily_pnl = 0.0
-
-
-        self.loss_count = 0
-
-
-
-        # risk limit
-
-        self.max_daily_loss = -5.0
-
-
-        self.max_loss_count = 5
-
-
-
-        self.today = datetime.date.today()
+        self.last_reset = time.time()
 
 
 
@@ -73,30 +60,33 @@ class RiskManager:
 
 
 
+
+
+
+
     # =====================================================
-    # DAILY RESET CHECK
+    # DAILY RESET
     # =====================================================
 
     def reset_check(self):
 
 
-        today = datetime.date.today()
+        now = time.time()
 
 
 
-        if today != self.today:
+        # 24시간 초기화
+
+        if now - self.last_reset > 86400:
 
 
-            self.today = today
+            self.daily_loss = 0
 
 
-            self.daily_pnl = 0.0
+            self.order_count = 0
 
 
-            self.loss_count = 0
-
-
-            self.kill_switch = False
+            self.last_reset = now
 
 
 
@@ -107,107 +97,46 @@ class RiskManager:
             )
 
 
-            update_status({
 
-                "daily_pnl":0,
-
-                "loss_count":0,
-
-                "kill_switch":False
-
-            })
 
 
 
 
 
     # =====================================================
-    # ORDER PERMISSION
+    # ORDER CHECK
     # =====================================================
 
     def allow_order(self, qty):
 
 
-        with self.lock:
+        try:
 
 
             self.reset_check()
 
 
 
-            if not self.enabled:
-
-
-                add_log(
-
-                    "RISK DISABLED"
-
-                )
-
-                return False
 
 
 
-
-            if self.kill_switch:
-
-
-                add_log(
-
-                    "KILL SWITCH ACTIVE"
-
-                )
-
-                return False
+            qty = float(qty)
 
 
 
 
 
-            try:
-
-
-                qty = float(qty)
-
-
-            except Exception:
-
-
-                add_log(
-
-                    "INVALID QTY"
-
-                )
-
-                return False
-
-
-
-
-
-            if qty <= 0:
-
-
-                add_log(
-
-                    "ZERO QTY BLOCK"
-
-                )
-
-                return False
-
-
-
-
+            # 수량 제한
 
             if qty > MAX_POSITION_SIZE:
 
 
                 add_log(
 
-                    "MAX POSITION LIMIT"
+                    f"RISK BLOCK SIZE {qty}"
 
                 )
+
 
                 return False
 
@@ -215,14 +144,19 @@ class RiskManager:
 
 
 
-            if self.daily_pnl <= self.max_daily_loss:
 
 
-                self.activate_kill(
+            # 포지션 개수 제한
 
-                    "DAILY LOSS LIMIT"
+            if self.order_count >= MAX_OPEN_POSITION:
+
+
+                add_log(
+
+                    "RISK BLOCK MAX POSITION"
 
                 )
+
 
                 return False
 
@@ -230,18 +164,46 @@ class RiskManager:
 
 
 
-            if self.loss_count >= self.max_loss_count:
+
+            # 손실 제한
+
+            if self.daily_loss >= MAX_DAILY_LOSS:
 
 
-                self.activate_kill(
+                add_log(
 
-                    "LOSS COUNT LIMIT"
+                    "RISK BLOCK DAILY LOSS"
 
                 )
+
 
                 return False
 
 
+
+
+
+
+
+
+            self.order_count += 1
+
+
+
+            update_status({
+
+
+                "risk":
+
+                    "OK",
+
+
+                "order_count":
+
+                    self.order_count
+
+
+            })
 
 
 
@@ -251,41 +213,45 @@ class RiskManager:
 
 
 
+
+        except Exception as e:
+
+
+            add_log(
+
+                f"RISK ERROR {e}"
+
+            )
+
+
+            return False
+
+
+
+
+
+
+
+
+
     # =====================================================
-    # UPDATE PNL
+    # PNL UPDATE
     # =====================================================
 
     def update_pnl(self, pnl):
 
 
-        with self.lock:
+        try:
 
 
-            try:
-
-
-                pnl = float(pnl)
-
-
-            except Exception:
-
-
-                return False
-
-
-
-
-
-            self.daily_pnl += pnl
-
-
+            pnl=float(pnl)
 
 
 
             if pnl < 0:
 
 
-                self.loss_count += 1
+                self.daily_loss += abs(pnl)
 
 
 
@@ -293,161 +259,28 @@ class RiskManager:
 
             update_status({
 
-                "daily_pnl":
 
-                    self.daily_pnl,
+                "daily_loss":
 
-
-                "loss_count":
-
-                    self.loss_count
+                    self.daily_loss
 
 
             })
 
 
 
-            # 자동 보호
 
-            if self.daily_pnl <= self.max_daily_loss:
-
-
-                self.activate_kill(
-
-                    "AUTO DAILY LOSS"
-
-                )
-
-
-
-            if self.loss_count >= self.max_loss_count:
-
-
-                self.activate_kill(
-
-                    "AUTO LOSS COUNT"
-
-                )
-
-
-
-            return True
-
-
-
-
-
-    # =====================================================
-    # KILL SWITCH
-    # =====================================================
-
-    def activate_kill(self, reason):
-
-
-        self.kill_switch = True
-
-
-
-        add_log(
-
-            f"KILL SWITCH : {reason}"
-
-        )
-
-
-
-        update_status({
-
-            "bot":
-
-                "KILLED",
-
-
-            "kill_switch":
-
-                True
-
-        })
-
-
-
-
-
-    # =====================================================
-    # RESET KILL
-    # =====================================================
-
-    def reset_kill(self):
-
-
-        with self.lock:
-
-
-            self.kill_switch = False
-
+        except Exception as e:
 
 
             add_log(
 
-                "KILL SWITCH RESET"
+                f"PNL UPDATE ERROR {e}"
 
             )
 
 
 
-            update_status({
-
-                "kill_switch":
-
-                    False
-
-            })
-
-
-
-
-
-    # =====================================================
-    # ENABLE
-    # =====================================================
-
-    def enable(self):
-
-
-        with self.lock:
-
-
-            self.enabled = True
-
-
-            add_log(
-
-                "RISK ENABLE"
-
-            )
-
-
-
-
-
-    # =====================================================
-    # DISABLE
-    # =====================================================
-
-    def disable(self):
-
-
-        with self.lock:
-
-
-            self.enabled = False
-
-
-            add_log(
-
-                "RISK DISABLE"
-
-            )
 
 
 
@@ -460,38 +293,47 @@ class RiskManager:
     def status(self):
 
 
-        with self.lock:
+        return {
 
 
-            return {
+            "daily_loss":
+
+                self.daily_loss,
 
 
-                "enabled":
+            "order_count":
 
-                    self.enabled,
+                self.order_count
 
-
-                "kill_switch":
-
-                    self.kill_switch,
+        }
 
 
-                "risk_percent":
-
-                    RISK_PERCENT,
 
 
-                "daily_pnl":
-
-                    self.daily_pnl,
 
 
-                "loss_count":
-
-                    self.loss_count
 
 
-            }
+    # =====================================================
+    # RESET
+    # =====================================================
+
+    def reset(self):
+
+
+        self.daily_loss = 0
+
+
+        self.order_count = 0
+
+
+        add_log(
+
+            "RISK RESET"
+
+        )
+
+
 
 
 
