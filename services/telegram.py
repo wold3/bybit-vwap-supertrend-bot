@@ -6,11 +6,18 @@
 import requests
 
 
+
+
+
 from config import (
-    TELEGRAM_ENABLE,
+
     TELEGRAM_TOKEN,
+
     TELEGRAM_CHAT_ID
+
 )
+
+
 
 
 
@@ -19,7 +26,27 @@ from config import (
 class Telegram:
 
 
+
     def __init__(self):
+
+
+        self.enabled = False
+
+
+
+        if (
+
+            TELEGRAM_TOKEN
+
+            and
+
+            TELEGRAM_CHAT_ID
+
+        ):
+
+
+            self.enabled = True
+
 
 
         print(
@@ -40,45 +67,25 @@ class Telegram:
     # SEND MESSAGE
     # =====================================================
 
-
     def send(
+
         self,
+
         message
+
     ):
 
 
+        if not self.enabled:
+
+
+            return False
+
+
+
+
+
         try:
-
-
-            if not TELEGRAM_ENABLE:
-
-
-                return False
-
-
-
-
-
-
-            if not TELEGRAM_TOKEN:
-
-
-                return False
-
-
-
-
-
-
-            if not TELEGRAM_CHAT_ID:
-
-
-                return False
-
-
-
-
-
 
 
             url = (
@@ -111,33 +118,36 @@ class Telegram:
 
                     message
 
+
             }
 
 
 
 
 
-
-
-            r = requests.post(
+            response = requests.post(
 
                 url,
 
-                data=data,
+                json=data,
 
-                timeout=5
+                timeout=10
 
             )
+
+
 
 
 
             return (
 
-                r.status_code == 200
+                response.status_code
+
+                ==
+
+                200
 
             )
-
-
 
 
 
@@ -164,10 +174,12 @@ class Telegram:
 
 
 
+
+
+
     # =====================================================
     # BOT START
     # =====================================================
-
 
     def bot_start(self):
 
@@ -176,13 +188,11 @@ class Telegram:
 
             """
 
-🚀 VWAP SUPERTREND BOT START
+🚀 BOT START
 
-Mode:
-Running
+VWAP SUPERTREND BOT
 
-System:
-ONLINE
+Status : RUNNING
 
 """
 
@@ -200,7 +210,6 @@ ONLINE
     # BOT STOP
     # =====================================================
 
-
     def bot_stop(self):
 
 
@@ -208,10 +217,11 @@ ONLINE
 
             """
 
-🛑 VWAP SUPERTREND BOT STOPPED
+🛑 BOT STOP
 
-System:
-OFFLINE
+VWAP SUPERTREND BOT
+
+Status : STOPPED
 
 """
 
@@ -229,32 +239,77 @@ OFFLINE
     # ORDER
     # =====================================================
 
-
     def order(
+
         self,
+
         side,
+
         symbol,
+
         qty,
+
         price
+
     ):
 
 
         self.send(
 
-f"""
+            f"""
+
 📌 ORDER EXECUTED
 
-Symbol:
-{symbol}
 
-Side:
-{side}
+Side : {side}
 
-Qty:
-{qty}
+Symbol : {symbol}
 
-Price:
-{price}
+Qty : {qty}
+
+Price : {price}
+
+"""
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # POSITION
+    # =====================================================
+
+    def position(
+
+        self,
+
+        side,
+
+        size,
+
+        pnl
+
+    ):
+
+
+        self.send(
+
+            f"""
+
+📊 POSITION UPDATE
+
+
+Side : {side}
+
+Size : {size}
+
+PNL : {pnl}
 
 """
 
@@ -272,54 +327,23 @@ Price:
     # ERROR
     # =====================================================
 
-
     def error(
+
         self,
-        error
+
+        message
+
     ):
 
 
         self.send(
 
-f"""
+            f"""
+
 ⚠️ BOT ERROR
 
-{error}
 
-"""
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # TP SL
-    # =====================================================
-
-
-    def tp_sl(
-        self,
-        tp,
-        sl
-    ):
-
-
-        self.send(
-
-f"""
-🎯 TP / SL SET
-
-TP:
-{tp}
-
-SL:
-{sl}
+{message}
 
 """
 
@@ -336,6 +360,5 @@ SL:
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 telegram = Telegram()
