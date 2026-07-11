@@ -3,7 +3,6 @@
 # VWAP SUPERTREND BOT DASHBOARD SERVER
 # =====================================================
 
-
 from flask import (
     Flask,
     render_template,
@@ -15,18 +14,19 @@ import threading
 import time
 
 
-
 from config import (
-
     WEB_HOST,
-
-    WEB_PORT
-
+    WEB_PORT,
+    SYMBOL
 )
 
 
 
 
+
+# =====================================================
+# FLASK
+# =====================================================
 
 app = Flask(
 
@@ -69,45 +69,88 @@ chart_lock = threading.Lock()
 
 
 
+
+# =====================================================
+# STATUS
+# =====================================================
+
+
 status = {
 
 
-    "mode":"DEMO",
+    "mode":
 
-    "bot":"STOPPED",
-
-
-    "symbol":"BTCUSDT",
+        "DEMO",
 
 
-    "position":"NONE",
+    "symbol":
 
-    "position_size":0,
-
-
-    "entry_price":0,
+        SYMBOL,
 
 
-    "pnl":0,
+    "bot":
+
+        "STOPPED",
 
 
-    "price":0,
+    "position":
+
+        "NONE",
 
 
-    "balance":0,
+    "position_size":
+
+        0,
 
 
-    "vwap":0,
+    "entry_price":
+
+        0,
 
 
-    "trend":"NONE",
+    "pnl":
+
+        0,
 
 
-    "signal":"NONE",
+    "price":
+
+        0,
 
 
-    "watchdog":"OFF"
+    "balance":
 
+        0,
+
+
+    "equity":
+
+        0,
+
+
+    "vwap":
+
+        0,
+
+
+    "trend":
+
+        "NONE",
+
+
+    "signal":
+
+        "NONE",
+
+
+    "watchdog":
+
+        "OFF",
+
+
+    "last_action":
+
+        "NONE"
 
 }
 
@@ -115,12 +158,12 @@ status = {
 
 
 
-logs = []
 
 
-chart_data = []
+logs=[]
 
 
+chart_data=[]
 
 
 
@@ -140,11 +183,17 @@ def add_log(message):
 
         "["
 
-        + time.strftime("%H:%M:%S")
+        +
 
-        + "] "
+        time.strftime("%H:%M:%S")
 
-        + str(message)
+        +
+
+        "] "
+
+        +
+
+        str(message)
 
     )
 
@@ -165,10 +214,6 @@ def add_log(message):
 
 
             logs.pop(0)
-
-
-
-
 
 
 
@@ -200,8 +245,6 @@ def update_status(data):
 
 
 
-
-
 def get_status():
 
 
@@ -209,6 +252,25 @@ def get_status():
 
 
         return status.copy()
+
+
+
+
+
+
+
+# =====================================================
+# SYMBOL
+# =====================================================
+
+
+def get_trading_symbol():
+
+
+    with status_lock:
+
+
+        return status["symbol"]
 
 
 
@@ -266,30 +328,12 @@ def get_trading_mode():
 
 
 # =====================================================
-# SYMBOL
-# =====================================================
-
-
-def get_trading_symbol():
-
-
-    with status_lock:
-
-
-        return status["symbol"]
-
-
-
-
-
-
-
-# =====================================================
 # HOME
 # =====================================================
 
 
 @app.route("/")
+
 
 def index():
 
@@ -307,7 +351,6 @@ def index():
 
 
 
-
 # =====================================================
 # STATUS API
 # =====================================================
@@ -315,13 +358,14 @@ def index():
 
 @app.route("/api/status")
 
+
 def api_status():
 
 
     with log_lock:
 
 
-        copy = logs[-100:]
+        log_copy = logs[-100:]
 
 
 
@@ -333,100 +377,14 @@ def api_status():
             get_status(),
 
 
-
         "logs":
 
-            copy
+            log_copy
 
 
 
     })
 
-
-
-
-
-
-
-
-
-
-
-# =====================================================
-# PRICE API
-# =====================================================
-
-
-@app.route("/api/price")
-
-def api_price():
-
-
-    try:
-
-
-        from api.bybit_api import bybit_api
-
-
-
-        price = bybit_api.get_price()
-
-
-
-        update_status({
-
-
-            "price":
-
-                price
-
-
-        })
-
-
-
-        return jsonify({
-
-
-            "success":True,
-
-
-            "symbol":
-
-                get_trading_symbol(),
-
-
-            "price":
-
-                price,
-
-
-            "time":
-
-                time.strftime("%H:%M:%S")
-
-
-
-        })
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"PRICE API ERROR {e}"
-
-        )
-
-
-
-        return jsonify({
-
-            "success":False
-
-        })
 
 
 
@@ -449,10 +407,11 @@ def api_price():
 
 )
 
+
 def api_symbol():
 
 
-    data = request.get_json(
+    data=request.get_json(
 
         silent=True
 
@@ -460,11 +419,11 @@ def api_symbol():
 
 
 
-    symbol = data.get(
+    symbol=data.get(
 
         "symbol",
 
-        "BTCUSDT"
+        SYMBOL
 
     ).upper()
 
@@ -477,25 +436,64 @@ def api_symbol():
 
         "symbol":
 
-            symbol
+            symbol,
+
+
+        "last_action":
+
+            f"SYMBOL {symbol}"
+
 
 
     })
 
 
 
+
+
     add_log(
 
-        f"SYMBOL CHANGE : {symbol}"
+        f"SYMBOL CHANGE {symbol}"
 
     )
+
+
+
+
+
+    try:
+
+
+        from api.bybit_api import bybit_api
+
+
+
+        bybit_api.change_symbol(
+
+            symbol
+
+        )
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"SYMBOL ERROR {e}"
+
+        )
+
 
 
 
     return jsonify({
 
 
-        "success":True,
+        "success":
+
+            True,
 
 
         "symbol":
@@ -527,10 +525,11 @@ def api_symbol():
 
 )
 
+
 def api_mode():
 
 
-    data = request.get_json(
+    data=request.get_json(
 
         silent=True
 
@@ -538,15 +537,13 @@ def api_mode():
 
 
 
-    mode = data.get(
+    mode=data.get(
 
         "mode",
 
         "DEMO"
 
     ).upper()
-
-
 
 
 
@@ -561,7 +558,9 @@ def api_mode():
 
         return jsonify({
 
-            "success":False
+            "success":
+
+                False
 
         })
 
@@ -569,24 +568,28 @@ def api_mode():
 
 
 
-
     update_status({
-
 
         "mode":
 
-            mode
+            mode,
 
+
+        "last_action":
+
+            f"MODE {mode}"
 
     })
 
 
 
+
     add_log(
 
-        f"MODE CHANGE : {mode}"
+        f"MODE CHANGE {mode}"
 
     )
+
 
 
 
@@ -617,16 +620,18 @@ def api_mode():
 
 
 
+
     return jsonify({
 
 
-        "success":True,
+        "success":
+
+            True,
 
 
         "mode":
 
             mode
-
 
 
     })
@@ -652,6 +657,7 @@ def api_mode():
 
 )
 
+
 def api_start():
 
 
@@ -667,10 +673,15 @@ def api_start():
 
         update_status({
 
-
             "bot":
 
-                "RUNNING"
+                "RUNNING",
+
+
+            "last_action":
+
+                "START"
+
 
 
         })
@@ -679,7 +690,7 @@ def api_start():
 
         add_log(
 
-            "BOT START BUTTON"
+            "START BUTTON"
 
         )
 
@@ -687,7 +698,9 @@ def api_start():
 
         return jsonify({
 
-            "success":True
+            "success":
+
+                True
 
         })
 
@@ -703,13 +716,13 @@ def api_start():
         )
 
 
-
         return jsonify({
 
-            "success":False
+            "success":
+
+                False
 
         })
-
 
 
 
@@ -733,6 +746,7 @@ def api_start():
 
 )
 
+
 def api_stop():
 
 
@@ -751,7 +765,12 @@ def api_stop():
 
             "bot":
 
-                "STOPPED"
+                "STOPPED",
+
+
+            "last_action":
+
+                "STOP"
 
 
         })
@@ -760,7 +779,7 @@ def api_stop():
 
         add_log(
 
-            "BOT STOP BUTTON"
+            "STOP BUTTON"
 
         )
 
@@ -768,7 +787,9 @@ def api_stop():
 
         return jsonify({
 
-            "success":True
+            "success":
+
+                True
 
         })
 
@@ -784,10 +805,11 @@ def api_stop():
         )
 
 
-
         return jsonify({
 
-            "success":False
+            "success":
+
+                False
 
         })
 
@@ -799,10 +821,8 @@ def api_stop():
 
 
 
-
-
 # =====================================================
-# CLOSE POSITION
+# CLOSE
 # =====================================================
 
 
@@ -813,6 +833,7 @@ def api_stop():
     methods=["POST"]
 
 )
+
 
 def api_close():
 
@@ -828,9 +849,19 @@ def api_close():
 
 
 
+        update_status({
+
+            "last_action":
+
+                "CLOSE POSITION"
+
+        })
+
+
+
         add_log(
 
-            "MANUAL CLOSE"
+            "CLOSE BUTTON"
 
         )
 
@@ -838,11 +869,9 @@ def api_close():
 
         return jsonify({
 
-
             "success":
 
                 bool(result)
-
 
         })
 
@@ -858,10 +887,11 @@ def api_close():
         )
 
 
-
         return jsonify({
 
-            "success":False
+            "success":
+
+                False
 
         })
 
@@ -874,11 +904,12 @@ def api_close():
 
 
 # =====================================================
-# CHART DATA
+# CHART
 # =====================================================
 
 
 @app.route("/api/chart")
+
 
 def api_chart():
 
@@ -891,6 +922,7 @@ def api_chart():
             chart_data.copy()
 
         )
+
 
 
 
@@ -926,20 +958,18 @@ def run_server():
 
     global server_started
 
+
     global _server_thread
 
 
 
     if server_started:
 
-
         return
 
 
 
-
     server_started=True
-
 
 
 
@@ -965,14 +995,13 @@ def run_server():
             threaded=True
 
 
-
         )
 
 
 
 
 
-    _server_thread = threading.Thread(
+    _server_thread=threading.Thread(
 
 
         target=run,
@@ -992,7 +1021,7 @@ def run_server():
 
     print(
 
-        "[WEB SERVER START]"
+        "[WEB SERVER READY]"
 
     )
 
@@ -1013,7 +1042,6 @@ def run_server():
 
 
 
-
 # =====================================================
 # EXPORT
 # =====================================================
@@ -1024,23 +1052,30 @@ __all__=[
 
     "app",
 
+
     "run_server",
+
 
     "set_bot_instance",
 
+
     "update_status",
+
 
     "get_status",
 
+
     "add_log",
+
 
     "get_trading_mode",
 
+
     "get_trading_symbol",
+
 
     "update_chart"
 
 
+
 ]
-
-
