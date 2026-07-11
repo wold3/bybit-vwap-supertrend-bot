@@ -3,34 +3,42 @@
 # =====================================================
 
 
-# Bybit API
-pybit==5.7.0
+# Bybit V5 API
+pybit>=5.8.0
 
-
-# HTTP
-requests==2.32.3
-
-
-# Web Server
-Flask==3.0.3
-
-
-# WebSocket
-websocket-client==1.8.0
-
-
-# Data Analysis
-pandas==2.2.2
-numpy==2.0.1
 
 
 # Environment
-python-dotenv==1.0.1
+python-dotenv>=1.0.0
 
 
-# Database
-# SQLite included in Python
+
+# Web Dashboard
+Flask>=3.0.0
 
 
-# Time / Utility
-pytz==2024.1
+
+# HTTP Request
+requests>=2.31.0
+
+
+
+# WebSocket
+websocket-client>=1.7.0
+
+
+
+# Data Analysis
+pandas>=2.1.0
+
+numpy>=1.26.0
+
+
+
+# Timezone / Date
+pytz>=2024.1
+
+
+
+# Optional Performance
+orjson>=3.10.0
