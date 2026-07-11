@@ -1,141 +1,277 @@
 <!DOCTYPE html>
-
 <html lang="ko">
 
 <head>
 
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>
-VWAP SUPERTREND BOT
-</title>
-
+<title>VWAP SUPERTREND BOT</title>
 
 <style>
 
-body {
+*{
+    box-sizing:border-box;
+}
 
-    background:#111;
+body{
 
-    color:#eee;
+    margin:0;
+    padding:30px;
 
-    font-family:Arial, sans-serif;
+    background:
+    radial-gradient(circle at top,#243b55,#000);
 
-    padding:20px;
+    color:#fff;
+
+    font-family:
+    "Segoe UI",
+    Arial,
+    sans-serif;
 
 }
 
 
-.card {
+h1{
 
-    background:#222;
+    text-align:center;
 
-    padding:20px;
+    font-size:38px;
 
-    margin-bottom:15px;
+    margin-bottom:30px;
 
-    border-radius:10px;
+    letter-spacing:2px;
 
 }
 
 
-button {
 
-    padding:12px 20px;
+.container{
 
-    margin:5px;
+    max-width:1200px;
 
-    border:0;
+    margin:auto;
 
-    border-radius:8px;
+}
 
-    cursor:pointer;
+
+
+.grid{
+
+    display:grid;
+
+    grid-template-columns:
+    repeat(auto-fit,minmax(280px,1fr));
+
+    gap:20px;
+
+}
+
+
+
+.card{
+
+    background:
+
+    rgba(255,255,255,0.08);
+
+    backdrop-filter:blur(15px);
+
+    border:
+
+    1px solid rgba(255,255,255,.15);
+
+
+    border-radius:20px;
+
+    padding:25px;
+
+    box-shadow:
+
+    0 15px 40px rgba(0,0,0,.4);
+
+}
+
+
+
+.card h2{
+
+    margin-top:0;
+
+    color:#00ffcc;
+
+}
+
+
+
+.value{
+
+    font-size:28px;
 
     font-weight:bold;
 
-}
-
-
-.demo {
-
-    background:#3498db;
-
-    color:white;
+    color:#fff;
 
 }
 
 
-.live {
 
-    background:#e74c3c;
+.status{
 
-    color:white;
+    display:flex;
 
-}
+    justify-content:space-between;
 
+    padding:10px 0;
 
-.start {
+    border-bottom:
 
-    background:#2ecc71;
-
-}
-
-
-.stop {
-
-    background:#f39c12;
+    1px solid rgba(255,255,255,.1);
 
 }
 
 
-.close {
 
-    background:#c0392b;
+button{
 
-    color:white;
+    border:0;
+
+    padding:14px 25px;
+
+    margin:5px;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+    font-size:15px;
+
+    font-weight:bold;
+
+    transition:.3s;
+
+}
+
+
+
+button:hover{
+
+    transform:translateY(-3px);
 
 }
 
 
-.value {
 
-    font-size:22px;
+.demo{
 
-    color:#00ff99;
+background:#3498db;
+color:white;
+
+}
+
+
+.live{
+
+background:#e74c3c;
+color:white;
 
 }
 
 
-#logs {
+.start{
 
-    height:250px;
-
-    overflow:auto;
-
-    background:#000;
-
-    padding:10px;
-
-    font-size:13px;
+background:#2ecc71;
+color:white;
 
 }
+
+
+.stop{
+
+background:#f39c12;
+color:white;
+
+}
+
+
+.close{
+
+background:#8e44ad;
+color:white;
+
+}
+
+
+
+
+#logs{
+
+
+height:300px;
+
+overflow:auto;
+
+background:#050505;
+
+border-radius:15px;
+
+padding:15px;
+
+font-family:
+Consolas,
+monospace;
+
+font-size:14px;
+
+color:#00ff99;
+
+
+}
+
+
+
+
+.badge{
+
+padding:8px 15px;
+
+border-radius:20px;
+
+background:#111;
+
+display:inline-block;
+
+}
+
+
+
+.footer{
+
+text-align:center;
+
+margin-top:30px;
+
+opacity:.5;
+
+}
+
 
 
 </style>
 
-
 </head>
+
 
 
 <body>
 
 
+<div class="container">
+
 
 <h1>
-VWAP SUPERTREND AUTO BOT
+⚡ VWAP SUPERTREND AUTO BOT
 </h1>
-
-
 
 
 
@@ -143,24 +279,45 @@ VWAP SUPERTREND AUTO BOT
 
 
 <h2>
-BOT CONTROL
+🎮 BOT CONTROL
 </h2>
 
 
 <button class="demo"
 onclick="changeMode('DEMO')">
-
 DEMO
-
 </button>
 
 
 <button class="live"
 onclick="changeMode('LIVE')">
-
 LIVE
-
 </button>
+
+
+<br>
+
+
+<button class="start"
+onclick="botStart()">
+▶ START
+</button>
+
+
+<button class="stop"
+onclick="botStop()">
+⏹ STOP
+</button>
+
+
+<button class="close"
+onclick="closePosition()">
+✖ CLOSE
+</button>
+
+
+</div>
+
 
 
 
@@ -168,81 +325,34 @@ LIVE
 
 
 
-<button class="start"
-onclick="botStart()">
-
-START
-
-</button>
-
-
-
-<button class="stop"
-onclick="botStop()">
-
-STOP
-
-</button>
-
-
-
-<button class="close"
-onclick="closePosition()">
-
-CLOSE POSITION
-
-</button>
-
-
-
-</div>
-
-
-
-
+<div class="grid">
 
 
 
 <div class="card">
 
-
 <h2>
-SYSTEM STATUS
+SYSTEM
 </h2>
 
 
-<p>
-
-MODE :
-
+<div class="status">
+MODE
 <span class="value" id="mode">
-
 -
-
 </span>
-
-</p>
-
-
-
-<p>
-
-BOT :
-
-<span class="value" id="bot">
-
--
-
-</span>
-
-</p>
-
-
-
 </div>
 
 
+<div class="status">
+BOT
+<span class="value" id="bot">
+-
+</span>
+</div>
 
+
+</div>
 
 
 
@@ -256,66 +366,39 @@ POSITION
 </h2>
 
 
-<p>
-
-SIDE :
-
-<span id="side">
-
+<div class="status">
+SIDE
+<span class="value" id="side">
 -
-
 </span>
-
-</p>
-
-
-
-<p>
-
-SIZE :
-
-<span id="size">
-
--
-
-</span>
-
-</p>
-
-
-
-<p>
-
-ENTRY :
-
-<span id="entry">
-
--
-
-</span>
-
-</p>
-
-
-
-<p>
-
-PNL :
-
-<span id="pnl">
-
--
-
-</span>
-
-</p>
-
-
-
 </div>
 
 
+<div class="status">
+SIZE
+<span class="value" id="size">
+-
+</span>
+</div>
 
+
+<div class="status">
+ENTRY
+<span class="value" id="entry">
+-
+</span>
+</div>
+
+
+<div class="status">
+PNL
+<span class="value" id="pnl">
+-
+</span>
+</div>
+
+
+</div>
 
 
 
@@ -326,8 +409,61 @@ PNL :
 
 
 <h2>
-LOG
+MARKET
+</h2>
 
+
+<div class="status">
+PRICE
+<span class="value" id="price">
+-
+</span>
+</div>
+
+
+<div class="status">
+VWAP
+<span class="value" id="vwap">
+-
+</span>
+</div>
+
+
+<div class="status">
+TREND
+<span class="value" id="trend">
+-
+</span>
+</div>
+
+
+<div class="status">
+SIGNAL
+<span class="value" id="signal">
+-
+</span>
+</div>
+
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+<br>
+
+
+
+<div class="card">
+
+
+<h2>
+📜 LIVE LOG
 </h2>
 
 
@@ -341,6 +477,15 @@ LOG
 
 
 
+<div class="footer">
+
+VWAP SuperTrend Trading System
+
+</div>
+
+
+
+</div>
 
 
 
@@ -350,105 +495,58 @@ LOG
 <script>
 
 
-function changeMode(mode){
+function post(url,data={}){
 
-
-fetch(
-
-"/api/mode",
-
+return fetch(
+url,
 {
-
 method:"POST",
-
 headers:{
-
-"Content-Type":"application/json"
-
+"Content-Type":
+"application/json"
 },
-
-body:JSON.stringify({
-
-mode:mode
-
-})
-
+body:
+JSON.stringify(data)
 }
-
 )
 
-.then(()=>{
-
-update();
-
-});
-
-
 }
 
 
 
+function changeMode(mode){
 
+post(
+"/api/mode",
+{
+mode:mode
+}
+)
+.then(update);
+
+}
 
 
 
 function botStart(){
 
-
-fetch(
-
-"/api/start",
-
-{
-
-method:"POST"
-
-}
-
+post(
+"/api/start"
 )
-
-.then(()=>{
-
-update();
-
-});
-
+.then(update);
 
 }
-
-
-
-
 
 
 
 function botStop(){
 
-
-fetch(
-
-"/api/stop",
-
-{
-
-method:"POST"
-
-}
-
+post(
+"/api/stop"
 )
-
-.then(()=>{
-
-update();
-
-});
-
+.then(update);
 
 }
-
-
-
-
 
 
 
@@ -456,44 +554,19 @@ update();
 function closePosition(){
 
 
-if(
+if(confirm(
+"포지션 종료?"
+)){
 
-confirm(
-
-"포지션을 종료합니까?"
-
+post(
+"/api/close"
 )
-
-){
-
-
-fetch(
-
-"/api/close",
-
-{
-
-method:"POST"
-
-}
-
-)
-
-.then(()=>{
-
-update();
-
-});
-
+.then(update);
 
 }
 
 
 }
-
-
-
-
 
 
 
@@ -503,114 +576,61 @@ function update(){
 
 
 fetch(
-
 "/api/status"
-
 )
 
 .then(
-
 r=>r.json()
-
 )
 
 .then(
-
 data=>{
 
 
 let s=data.status;
 
 
+mode.innerHTML=s.mode;
 
-document.getElementById(
-
-"mode"
-
-).innerHTML=s.mode;
+bot.innerHTML=s.bot;
 
 
+side.innerHTML=s.position;
 
-document.getElementById(
+size.innerHTML=s.position_size;
 
-"bot"
+entry.innerHTML=s.entry_price;
 
-).innerHTML=s.bot;
-
-
-
-document.getElementById(
-
-"side"
-
-).innerHTML=s.position;
+pnl.innerHTML=s.pnl;
 
 
+price.innerHTML=s.price;
 
-document.getElementById(
+vwap.innerHTML=s.vwap;
 
-"size"
+trend.innerHTML=s.trend;
 
-).innerHTML=s.position_size;
+signal.innerHTML=s.signal;
 
 
 
-document.getElementById(
-
-"entry"
-
-).innerHTML=s.entry_price;
-
-
-
-document.getElementById(
-
-"pnl"
-
-).innerHTML=s.pnl;
-
-
-
-
-
-
-
-let log="";
-
+let text="";
 
 
 data.logs.forEach(
-
 x=>{
 
-
-log += x+"<br>";
+text += x+"<br>";
 
 }
-
 );
 
 
-
-document.getElementById(
-
-"logs"
-
-).innerHTML=log;
+logs.innerHTML=text;
 
 
-
-document.getElementById(
-
-"logs"
-
-).scrollTop=
-
-document.getElementById(
-
-"logs"
-
-).scrollHeight;
+logs.scrollTop=
+logs.scrollHeight;
 
 
 
@@ -620,33 +640,21 @@ document.getElementById(
 
 
 }
-
-
-
-
 
 
 
 setInterval(
-
 update,
-
 3000
-
 );
-
 
 
 update();
 
 
-
 </script>
 
 
-
-
 </body>
-
 
 </html>
