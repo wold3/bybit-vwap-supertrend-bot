@@ -20,18 +20,50 @@ class Database:
     def __init__(self):
 
 
-        folder = os.path.dirname(
+        self.conn = None
 
-            DATABASE_FILE
+        self.cursor = None
 
+
+        self.connect()
+
+
+        self.create_tables()
+
+
+        print(
+            "[DATABASE READY]"
         )
 
 
 
-        if folder and not os.path.exists(folder):
 
 
-            os.makedirs(folder)
+
+
+    # =====================================================
+    # CONNECT
+    # =====================================================
+
+
+    def connect(self):
+
+
+        folder = os.path.dirname(
+            DATABASE_FILE
+        )
+
+
+        if folder:
+
+
+            os.makedirs(
+
+                folder,
+
+                exist_ok=True
+
+            )
 
 
 
@@ -48,15 +80,30 @@ class Database:
 
 
 
-        self.create_tables()
 
 
 
-        print(
 
-            "[DATABASE READY]"
+    # =====================================================
+    # CHECK CONNECTION
+    # =====================================================
 
-        )
+
+    def ensure_connection(self):
+
+
+        try:
+
+
+            self.cursor.execute(
+                "SELECT 1"
+            )
+
+
+        except:
+
+
+            self.connect()
 
 
 
@@ -65,15 +112,18 @@ class Database:
 
 
     # =====================================================
-    # TABLE CREATE
+    # CREATE TABLE
     # =====================================================
 
 
     def create_tables(self):
 
 
-        self.cursor.execute(
+        self.ensure_connection()
 
+
+
+        self.cursor.execute(
         """
 
         CREATE TABLE IF NOT EXISTS errors
@@ -89,15 +139,12 @@ class Database:
         )
 
         """
-
         )
 
 
 
 
-
         self.cursor.execute(
-
         """
 
         CREATE TABLE IF NOT EXISTS trades
@@ -106,26 +153,37 @@ class Database:
 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
 
+
             time TEXT,
+
 
             symbol TEXT,
 
+
             side TEXT,
+
 
             qty REAL,
 
+
             entry REAL,
+
 
             tp REAL,
 
+
             sl REAL,
 
-            result TEXT
+
+            result TEXT,
+
+
+            pnl REAL DEFAULT 0
+
 
         )
 
         """
-
         )
 
 
@@ -133,7 +191,6 @@ class Database:
 
 
         self.cursor.execute(
-
         """
 
         CREATE TABLE IF NOT EXISTS logs
@@ -142,14 +199,16 @@ class Database:
 
             id INTEGER PRIMARY KEY AUTOINCREMENT,
 
+
             time TEXT,
 
+
             message TEXT
+
 
         )
 
         """
-
         )
 
 
@@ -176,29 +235,38 @@ class Database:
         try:
 
 
+            self.ensure_connection()
+
+
+
             self.cursor.execute(
 
             """
 
             INSERT INTO errors
 
-            VALUES(NULL,?,?)
+            (
+
+            time,
+
+            error
+
+            )
+
+            VALUES (?,?)
 
             """,
 
             (
 
-                time.strftime(
-
-                    "%Y-%m-%d %H:%M:%S"
-
-                ),
+                self.now(),
 
                 str(error)
 
             )
 
             )
+
 
 
             self.conn.commit()
@@ -222,7 +290,6 @@ class Database:
 
 
 
-
     # =====================================================
     # TRADE SAVE
     # =====================================================
@@ -237,106 +304,109 @@ class Database:
         try:
 
 
+            self.ensure_connection()
+
+
+
             self.cursor.execute(
 
             """
 
             INSERT INTO trades
 
-            VALUES(NULL,?,?,?,?,?,?,?,?)
+            (
+
+            time,
+
+            symbol,
+
+            side,
+
+            qty,
+
+            entry,
+
+            tp,
+
+            sl,
+
+            result,
+
+            pnl
+
+            )
+
+            VALUES (?,?,?,?,?,?,?,?,?)
 
             """,
 
             (
 
-                time.strftime(
-
-                    "%Y-%m-%d %H:%M:%S"
-
-                ),
+                self.now(),
 
 
                 trade.get(
-
                     "symbol",
-
-                    ""
-
+                    "BTCUSDT"
                 ),
 
 
                 trade.get(
-
                     "side",
-
                     ""
-
                 ),
 
 
                 float(
-
                     trade.get(
-
                         "qty",
-
                         0
-
                     )
-
                 ),
 
 
                 float(
-
                     trade.get(
-
                         "entry",
-
                         0
-
                     )
-
                 ),
 
 
                 float(
-
                     trade.get(
-
                         "tp",
-
                         0
-
                     )
-
                 ),
 
 
                 float(
-
                     trade.get(
-
                         "sl",
-
                         0
-
                     )
-
                 ),
 
 
                 trade.get(
-
                     "result",
+                    "OPEN"
+                ),
 
-                    ""
 
+                float(
+                    trade.get(
+                        "pnl",
+                        0
+                    )
                 )
 
+
             )
 
             )
+
 
 
             self.conn.commit()
@@ -351,13 +421,84 @@ class Database:
 
 
 
+        except Exception as e:
+
+
+            print(
+
+                "[TRADE SAVE ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+    # =====================================================
+    # UPDATE TRADE RESULT
+    # =====================================================
+
+
+    def update_trade_result(
+        self,
+        trade_id,
+        result,
+        pnl
+    ):
+
+
+        try:
+
+
+            self.ensure_connection()
+
+
+
+            self.cursor.execute(
+
+            """
+
+            UPDATE trades
+
+            SET
+
+            result=?,
+
+            pnl=?
+
+            WHERE id=?
+
+            """,
+
+            (
+
+                result,
+
+                pnl,
+
+                trade_id
+
+            )
+
+            )
+
+
+
+            self.conn.commit()
+
+
 
         except Exception as e:
 
 
             print(
 
-                "[DB TRADE ERROR]",
+                "[TRADE UPDATE ERROR]",
 
                 e
 
@@ -385,23 +526,31 @@ class Database:
         try:
 
 
+            self.ensure_connection()
+
+
+
             self.cursor.execute(
 
             """
 
             INSERT INTO logs
 
-            VALUES(NULL,?,?)
+            (
+
+            time,
+
+            message
+
+            )
+
+            VALUES (?,?)
 
             """,
 
             (
 
-                time.strftime(
-
-                    "%Y-%m-%d %H:%M:%S"
-
-                ),
+                self.now(),
 
                 str(message)
 
@@ -427,6 +576,293 @@ class Database:
 
 
     # =====================================================
+    # TRADE STATISTICS
+    # =====================================================
+
+
+    def get_trade_stats(self):
+
+
+        try:
+
+
+            self.ensure_connection()
+
+
+
+            self.cursor.execute(
+
+            """
+
+            SELECT COUNT(*)
+
+            FROM trades
+
+            """
+
+            )
+
+
+            total = (
+
+                self.cursor
+
+                .fetchone()[0]
+
+            )
+
+
+
+            self.cursor.execute(
+
+            """
+
+            SELECT COUNT(*)
+
+            FROM trades
+
+            WHERE result='WIN'
+
+            """
+
+            )
+
+
+            win = (
+
+                self.cursor
+
+                .fetchone()[0]
+
+            )
+
+
+
+            self.cursor.execute(
+
+            """
+
+            SELECT COUNT(*)
+
+            FROM trades
+
+            WHERE result='LOSS'
+
+            """
+
+            )
+
+
+            loss = (
+
+                self.cursor
+
+                .fetchone()[0]
+
+            )
+
+
+
+            self.cursor.execute(
+
+            """
+
+            SELECT SUM(pnl)
+
+            FROM trades
+
+            """
+
+            )
+
+
+            pnl = (
+
+                self.cursor
+
+                .fetchone()[0]
+
+            )
+
+
+
+            if pnl is None:
+
+                pnl = 0
+
+
+
+
+
+            winrate = 0
+
+
+
+            if total > 0:
+
+
+                winrate = (
+
+                    win /
+
+                    total *
+
+                    100
+
+                )
+
+
+
+
+
+            return {
+
+
+                "total":
+
+                    total,
+
+
+                "win":
+
+                    win,
+
+
+                "loss":
+
+                    loss,
+
+
+                "winrate":
+
+                    round(
+                        winrate,
+                        2
+                    ),
+
+
+                "pnl":
+
+                    round(
+                        pnl,
+                        4
+                    )
+
+            }
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[STAT ERROR]",
+
+                e
+
+            )
+
+
+            return {}
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # RECENT TRADES
+    # =====================================================
+
+
+    def get_recent_trades(
+        self,
+        limit=20
+    ):
+
+
+        try:
+
+
+            self.ensure_connection()
+
+
+
+            self.cursor.execute(
+
+            """
+
+            SELECT *
+
+            FROM trades
+
+            ORDER BY id DESC
+
+            LIMIT ?
+
+            """,
+
+            (
+
+                limit,
+
+            )
+
+            )
+
+
+            return (
+
+                self.cursor
+
+                .fetchall()
+
+            )
+
+
+
+        except:
+
+
+            return []
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # TIME
+    # =====================================================
+
+
+    def now(self):
+
+
+        return time.strftime(
+
+            "%Y-%m-%d %H:%M:%S"
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
     # CLOSE
     # =====================================================
 
@@ -437,21 +873,40 @@ class Database:
         try:
 
 
-            self.conn.close()
+            if self.conn:
+
+
+                self.conn.close()
+
+
+
+                self.conn = None
+
+
+                self.cursor = None
+
+
+
+                print(
+
+                    "[DATABASE CLOSED]"
+
+                )
+
+
+
+        except Exception as e:
 
 
             print(
 
-                "[DATABASE CLOSED]"
+                "[DB CLOSE ERROR]",
+
+                e
 
             )
 
 
-
-        except:
-
-
-            pass
 
 
 
