@@ -10,7 +10,13 @@ import time
 from api.bybit_api import bybit_api
 
 
-from web.server import add_log
+from web.server import (
+
+    add_log,
+
+    get_trading_symbol
+
+)
 
 
 
@@ -21,14 +27,18 @@ class MarketData:
 
         self.last_data = None
 
+        self.last_symbol = None
+
+
         print(
             "[MARKET DATA READY]"
         )
 
 
 
+
     # =====================================================
-    # GET CANDLE DATA
+    # GET CANDLES
     # =====================================================
 
     def get_candles(
@@ -43,6 +53,33 @@ class MarketData:
 
 
         try:
+
+
+            symbol = get_trading_symbol()
+
+
+
+            # ---------------------------------
+            # SYMBOL CHANGE DETECT
+            # ---------------------------------
+
+            if symbol != self.last_symbol:
+
+
+                self.last_data = None
+
+
+                self.last_symbol = symbol
+
+
+                add_log(
+
+                    f"MARKET SYMBOL SWITCH {symbol}"
+
+                )
+
+
+
 
 
             response = bybit_api.get_kline(
@@ -61,20 +98,20 @@ class MarketData:
 
 
 
-            # =================================================
-            # BYBIT V5 RESPONSE NORMALIZE
-            # =================================================
 
-            rows = []
+
+            rows=[]
 
 
 
-            # response = dict
+            # ---------------------------------
+            # BYBIT V5 NORMALIZE
+            # ---------------------------------
 
-            if isinstance(response, dict):
+            if isinstance(response,dict):
 
 
-                result = response.get(
+                result=response.get(
 
                     "result",
 
@@ -83,10 +120,10 @@ class MarketData:
                 )
 
 
-                if isinstance(result, dict):
+                if isinstance(result,dict):
 
 
-                    rows = result.get(
+                    rows=result.get(
 
                         "list",
 
@@ -96,21 +133,11 @@ class MarketData:
 
 
 
-                elif isinstance(result, list):
+            elif isinstance(response,list):
 
 
-                    rows = result
+                rows=response
 
-
-
-
-
-            # response = list
-
-            elif isinstance(response, list):
-
-
-                rows = response
 
 
 
@@ -131,16 +158,13 @@ class MarketData:
 
 
 
-            # =================================================
-            # DATAFRAME
-            # =================================================
+            df=pd.DataFrame(rows)
 
-            df = pd.DataFrame(rows)
+
 
 
 
             if df.empty:
-
 
                 return None
 
@@ -148,16 +172,12 @@ class MarketData:
 
 
 
-            # =================================================
-            # COLUMN CHECK
-            # =================================================
-
-            if len(df.columns) < 7:
+            if len(df.columns)<7:
 
 
                 add_log(
 
-                    f"INVALID KLINE COLUMNS {df.columns}"
+                    "INVALID KLINE"
 
                 )
 
@@ -167,11 +187,13 @@ class MarketData:
 
 
 
-            df = df.iloc[:,0:7]
+
+            df=df.iloc[:,0:7]
 
 
 
-            df.columns = [
+            df.columns=[
+
 
                 "timestamp",
 
@@ -187,17 +209,18 @@ class MarketData:
 
                 "turnover"
 
+
             ]
 
 
 
 
 
-            # =================================================
-            # SORT OLD -> NEW
-            # =================================================
 
-            df = df.iloc[::-1].reset_index(
+            # OLD -> NEW
+
+
+            df=df.iloc[::-1].reset_index(
 
                 drop=True
 
@@ -207,11 +230,10 @@ class MarketData:
 
 
 
-            # =================================================
-            # NUMERIC
-            # =================================================
 
-            numeric_columns = [
+
+            numeric=[
+
 
                 "open",
 
@@ -225,14 +247,17 @@ class MarketData:
 
                 "turnover"
 
+
             ]
 
 
 
-            for col in numeric_columns:
 
 
-                df[col] = pd.to_numeric(
+            for col in numeric:
+
+
+                df[col]=pd.to_numeric(
 
                     df[col],
 
@@ -244,7 +269,7 @@ class MarketData:
 
 
 
-            df["timestamp"] = pd.to_numeric(
+            df["timestamp"]=pd.to_numeric(
 
                 df["timestamp"],
 
@@ -266,12 +291,13 @@ class MarketData:
 
 
 
-            if len(df) < 50:
+
+            if len(df)<50:
 
 
                 add_log(
 
-                    f"NOT ENOUGH CANDLE {len(df)}"
+                    f"NOT ENOUGH DATA {len(df)}"
 
                 )
 
@@ -282,7 +308,8 @@ class MarketData:
 
 
 
-            self.last_data = df
+
+            self.last_data=df
 
 
 
@@ -308,9 +335,14 @@ class MarketData:
 
 
 
+
+
+
+
     # =====================================================
-    # CURRENT PRICE
+    # PRICE
     # =====================================================
+
 
     def price(self):
 
@@ -338,9 +370,12 @@ class MarketData:
 
 
 
+
+
     # =====================================================
     # WAIT
     # =====================================================
+
 
     def wait(
 
@@ -356,8 +391,14 @@ class MarketData:
 
 
 
+
+
+
+
+
 # =====================================================
 # INSTANCE
 # =====================================================
+
 
 market_data = MarketData()
