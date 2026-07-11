@@ -5,10 +5,10 @@
 
 <meta charset="UTF-8">
 
-<title>
-VWAP SUPERTREND BOT
-</title>
+<title>VWAP SUPERTREND BOT</title>
 
+
+<!-- Chart.js -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -19,32 +19,25 @@ VWAP SUPERTREND BOT
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial/dist/chartjs-chart-financial.min.js"></script>
 
 
+
 <style>
 
 
 *{
-
-box-sizing:border-box;
-
+    box-sizing:border-box;
 }
 
 
 
 body{
 
+    margin:0;
 
-margin:0;
+    background:#0b0f14;
 
-background:#0d1117;
+    color:#e6edf3;
 
-color:#e6edf3;
-
-font-family:
-
-Arial,
-
-sans-serif;
-
+    font-family:Arial,sans-serif;
 
 }
 
@@ -52,15 +45,11 @@ sans-serif;
 
 header{
 
+    background:#161b22;
 
-background:#161b22;
+    padding:20px;
 
-padding:20px;
-
-border-bottom:
-
-1px solid #30363d;
-
+    border-bottom:1px solid #30363d;
 
 }
 
@@ -68,11 +57,9 @@ border-bottom:
 
 header h1{
 
+    margin:0;
 
-margin:0;
-
-font-size:28px;
-
+    font-size:28px;
 
 }
 
@@ -81,147 +68,99 @@ font-size:28px;
 
 .container{
 
+    padding:20px;
 
-padding:20px;
+    display:grid;
 
-display:grid;
+    grid-template-columns:
+    repeat(auto-fit,minmax(260px,1fr));
 
-grid-template-columns:
-
-repeat(auto-fit,minmax(260px,1fr));
-
-gap:20px;
-
+    gap:20px;
 
 }
-
-
 
 
 
 .card{
 
+    background:#161b22;
 
-background:#161b22;
+    border:1px solid #30363d;
 
-border:
+    border-radius:12px;
 
-1px solid #30363d;
-
-border-radius:12px;
-
-padding:20px;
-
+    padding:20px;
 
 }
-
 
 
 
 .full{
 
-
-grid-column:
-
-1 / -1;
-
+    grid-column:1/-1;
 
 }
-
 
 
 
 .title{
 
+    color:#8b949e;
 
-color:#8b949e;
+    font-size:14px;
 
-font-size:14px;
-
-margin-bottom:10px;
-
+    margin-bottom:10px;
 
 }
-
 
 
 
 .value{
 
+    font-size:30px;
 
-font-size:30px;
-
-font-weight:bold;
-
+    font-weight:bold;
 
 }
-
 
 
 
 .price{
 
+    font-size:40px;
 
-font-size:42px;
-
-font-weight:bold;
-
+    font-weight:bold;
 
 }
-
-
-
-
-.green{
-
-
-color:#3fb950;
-
-}
-
-
-
-.red{
-
-
-color:#f85149;
-
-}
-
 
 
 
 
 button{
 
+    width:120px;
 
-width:120px;
+    height:45px;
 
-height:45px;
+    border:0;
 
-border:0;
+    border-radius:8px;
 
-border-radius:8px;
+    margin:5px;
 
-margin:5px;
+    color:white;
 
-color:white;
+    font-size:17px;
 
-font-size:17px;
-
-cursor:pointer;
-
+    cursor:pointer;
 
 }
 
 
 
-
 .buy{
 
-
-background:#238636;
-
+    background:#238636;
 
 }
 
@@ -229,9 +168,7 @@ background:#238636;
 
 .sell{
 
-
-background:#da3633;
-
+    background:#da3633;
 
 }
 
@@ -239,9 +176,7 @@ background:#da3633;
 
 .close{
 
-
-background:#57606a;
-
+    background:#57606a;
 
 }
 
@@ -251,36 +186,28 @@ background:#57606a;
 
 .chart-card{
 
-
-height:700px;
-
+    height:700px;
 
 }
-
 
 
 
 .chart-area{
 
+    height:600px;
 
-height:600px;
-
-width:100%;
-
+    width:100%;
 
 }
-
 
 
 
 
 canvas{
 
+    width:100%!important;
 
-width:100%!important;
-
-height:100%!important;
-
+    height:100%!important;
 
 }
 
@@ -289,21 +216,17 @@ height:100%!important;
 
 #logs{
 
+    height:300px;
 
-height:300px;
+    overflow:auto;
 
-background:#000;
+    background:#000;
 
-overflow:auto;
+    padding:15px;
 
-padding:15px;
+    font-family:monospace;
 
-font-family:
-
-monospace;
-
-font-size:13px;
-
+    font-size:13px;
 
 }
 
@@ -311,8 +234,8 @@ font-size:13px;
 
 </style>
 
-
 </head>
+
 
 
 
@@ -323,13 +246,13 @@ font-size:13px;
 
 <header>
 
-
 <h1>
 VWAP SUPERTREND BOT
 </h1>
 
-
 </header>
+
+
 
 
 
@@ -343,22 +266,13 @@ VWAP SUPERTREND BOT
 
 <div class="card">
 
-
 <div class="title">
-
 BOT STATUS
-
 </div>
 
-
-<div id="bot"
-
-class="value">
-
+<div id="bot" class="value">
 -
-
 </div>
-
 
 </div>
 
@@ -370,22 +284,13 @@ class="value">
 
 <div class="card">
 
-
 <div class="title">
-
 MODE
-
 </div>
 
-
-<div id="mode"
-
-class="value">
-
+<div id="mode" class="value">
 -
-
 </div>
-
 
 </div>
 
@@ -397,25 +302,15 @@ class="value">
 
 <div class="card">
 
-
 <div class="title">
-
 SYMBOL
-
 </div>
 
-
-<div id="symbol"
-
-class="value">
-
+<div id="symbol" class="value">
 -
-
 </div>
 
-
 </div>
-
 
 
 
@@ -425,25 +320,15 @@ class="value">
 
 <div class="card">
 
-
 <div class="title">
-
 PRICE
-
 </div>
 
-
-<div id="price"
-
-class="price">
-
+<div id="price" class="price">
 -
-
 </div>
 
-
 </div>
-
 
 
 
@@ -453,69 +338,38 @@ class="price">
 
 <div class="card">
 
-
 <div class="title">
-
 POSITION
-
 </div>
 
 
-<div id="position"
-
-class="value">
-
+<div id="position" class="value">
 -
-
 </div>
 
 
 <br>
-
 
 SIZE :
-
-<span id="size">
-
--
-
-</span>
+<span id="size">-</span>
 
 
 <br>
-
 
 ENTRY :
-
-<span id="entry">
-
--
-
-</span>
+<span id="entry">-</span>
 
 
 <br>
-
 
 MARK :
-
-<span id="mark">
-
--
-
-</span>
+<span id="mark">-</span>
 
 
 <br>
 
-
 LIQ :
-
-<span id="liq">
-
--
-
-</span>
+<span id="liq">-</span>
 
 
 </div>
@@ -526,29 +380,19 @@ LIQ :
 
 
 
-
 <div class="card">
 
-
 <div class="title">
-
 PNL
-
 </div>
 
 
-<div id="pnl"
-
-class="price">
-
+<div id="pnl" class="price">
 -
-
 </div>
 
 
 </div>
-
-
 
 
 
@@ -560,18 +404,13 @@ class="price">
 
 
 <div class="title">
-
 MANUAL ORDER
-
 </div>
 
 
 
-<button
-
-class="buy"
-
-onclick="order('Buy')">
+<button class="buy"
+onclick="sendOrder('Buy')">
 
 BUY
 
@@ -579,11 +418,8 @@ BUY
 
 
 
-<button
-
-class="sell"
-
-onclick="order('Sell')">
+<button class="sell"
+onclick="sendOrder('Sell')">
 
 SELL
 
@@ -591,10 +427,7 @@ SELL
 
 
 
-<button
-
-class="close"
-
+<button class="close"
 onclick="closeOrder()">
 
 CLOSE
@@ -620,14 +453,9 @@ BTCUSDT 5M CANDLE CHART
 </div>
 
 
-
 <div class="chart-area">
 
-
-<canvas id="chart">
-
-</canvas>
-
+<canvas id="chart"></canvas>
 
 </div>
 
@@ -650,9 +478,7 @@ SYSTEM LOG
 </div>
 
 
-<div id="logs">
-
-</div>
+<div id="logs"></div>
 
 
 </div>
@@ -682,56 +508,59 @@ async function updateStatus(){
 try{
 
 
-let res=
-
-await fetch(
-
-"/api/status"
-
-);
+const res =
+await fetch("/api/status");
 
 
 
-let data=
-
+const data =
 await res.json();
 
 
 
-let s=data.status;
+const s =
+data.status;
 
 
 
-bot.innerHTML=s.bot;
+document.getElementById("bot").innerHTML =
+s.bot;
 
 
-mode.innerHTML=s.mode;
+document.getElementById("mode").innerHTML =
+s.mode;
 
 
-symbol.innerHTML=s.symbol;
+document.getElementById("symbol").innerHTML =
+s.symbol;
 
 
-price.innerHTML=s.price;
+document.getElementById("price").innerHTML =
+s.price;
 
 
-position.innerHTML=s.position;
+document.getElementById("position").innerHTML =
+s.position;
 
 
-size.innerHTML=s.position_size;
+document.getElementById("size").innerHTML =
+s.position_size;
 
 
-entry.innerHTML=s.entry_price;
+document.getElementById("entry").innerHTML =
+s.entry_price;
 
 
-mark.innerHTML=s.mark_price;
+document.getElementById("mark").innerHTML =
+s.mark_price;
 
 
-liq.innerHTML=s.liq_price;
+document.getElementById("liq").innerHTML =
+s.liq_price;
 
 
-pnl.innerHTML=s.pnl;
-
-
+document.getElementById("pnl").innerHTML =
+s.pnl;
 
 
 
@@ -739,33 +568,25 @@ pnl.innerHTML=s.pnl;
 let html="";
 
 
+data.logs.forEach(x=>{
 
-data.logs.forEach(
+html += x+"<br>";
 
-l=>{
-
-
-html+=l+"<br>";
-
-}
-
-
-);
+});
 
 
 
-logs.innerHTML=html;
+document.getElementById("logs").innerHTML =
+html;
 
 
 
-logs.scrollTop=
-
-logs.scrollHeight;
+document.getElementById("logs").scrollTop =
+document.getElementById("logs").scrollHeight;
 
 
 
 }
-
 
 
 catch(e){
@@ -777,7 +598,6 @@ console.log(e);
 }
 
 
-
 }
 
 
@@ -786,17 +606,10 @@ console.log(e);
 
 
 
+function sendOrder(side){
 
 
-function order(side){
-
-
-
-fetch(
-
-"/api/order",
-
-{
+fetch("/api/order",{
 
 
 method:"POST",
@@ -805,9 +618,7 @@ method:"POST",
 headers:{
 
 
-"Content-Type":
-
-"application/json"
+"Content-Type":"application/json"
 
 
 },
@@ -818,23 +629,16 @@ body:JSON.stringify({
 
 side:side,
 
-
 qty:0.001
 
 
 })
 
 
-}
-
-
-
-);
-
+});
 
 
 }
-
 
 
 
@@ -844,22 +648,13 @@ qty:0.001
 function closeOrder(){
 
 
-
-fetch(
-
-"/api/close",
-
-{
+fetch("/api/close",{
 
 
 method:"POST"
 
 
-}
-
-
-);
-
+});
 
 
 }
@@ -883,19 +678,18 @@ updateStatus,
 updateStatus();
 
 
-
 </script>
 
 
 
 
 
+<!-- Candle Chart -->
 
 <script src="/chart.js"></script>
 
 
 
 </body>
-
 
 </html>
