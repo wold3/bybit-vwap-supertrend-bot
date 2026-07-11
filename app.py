@@ -1,16 +1,18 @@
 # =====================================================
 # app.py
-# Trading Application Core
+# VWAP SUPERTREND BOT APPLICATION
 # =====================================================
 
 import time
 import threading
 
 
-from config import DEFAULT_SYMBOL
 
 
-from api.bybit_api import bybit_api
+
+from api.bybit_api import (
+    bybit_api
+)
 
 
 from strategy.vwap_supertrend_strategy import (
@@ -25,11 +27,6 @@ from execution.order_manager import (
 
 from portfolio.position_manager import (
     position_manager
-)
-
-
-from risk.risk_manager import (
-    risk_manager
 )
 
 
@@ -49,14 +46,8 @@ from database.database import (
 
 
 from web.server import (
-    start_dashboard,
     update_status,
     add_log
-)
-
-
-from web.chart_data import (
-    add_candle
 )
 
 
@@ -68,14 +59,21 @@ class TradingApp:
 
     def __init__(self):
 
+
         self.running = False
 
-        self.market_thread = None
+
+        self.thread = None
+
 
 
         print(
+
             "[TRADING APP READY]"
+
         )
+
+
 
 
 
@@ -90,299 +88,95 @@ class TradingApp:
 
     def start(self):
 
-        try:
 
+        if self.running:
 
-            print("====================")
-            print("[BOT START]")
-            print("====================")
 
+            return
 
 
-            start_dashboard()
 
+        print("====================")
 
+        print("[BOT START]")
 
-            update_status({
+        print("====================")
 
-                "bot":
 
-                    "STARTING",
 
-                "symbol":
+        self.running = True
 
-                    DEFAULT_SYMBOL
 
-            })
 
 
 
 
+        # Private WS
 
-            # =========================
-            # WALLET CHECK
-            # =========================
+        private_ws.start()
 
 
-            wallet = bybit_api.get_wallet_balance()
 
 
 
-            if not wallet:
+        # Watchdog
 
-                raise Exception(
-                    "WALLET ERROR"
-                )
+        watchdog.start()
 
 
 
-            if wallet.get("retCode") != 0:
 
-                raise Exception(
 
-                    wallet.get(
 
-                        "retMsg",
 
-                        "WALLET ERROR"
+        # Position Sync
 
-                    )
+        position_manager.sync()
 
-                )
 
 
 
-            equity = float(
 
-                wallet["result"]
-                ["list"][0]
-                ["totalEquity"]
 
-            )
 
 
+        # Market Thread
 
-            print(
 
-                "[EQUITY]",
+        self.thread = threading.Thread(
 
-                equity
+            target=self.market_loop,
 
-            )
+            daemon=True
 
+        )
 
 
-            add_log(
+        self.thread.start()
 
-                f"EQUITY {equity}"
 
-            )
 
 
 
-            risk_manager.update_equity(
 
-                equity
 
-            )
+        add_log(
 
+            "BOT START"
 
+        )
 
 
 
+        update_status({
 
+            "bot":
 
-            # =========================
-            # POSITION SYNC
-            # =========================
+                "RUNNING"
 
+        })
 
-            try:
 
-
-                position_manager.sync()
-
-
-                print(
-
-                    "[POSITION SYNC OK]"
-
-                )
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "[POSITION SYNC ERROR]",
-
-                    e
-
-                )
-
-
-
-
-
-
-
-
-
-            # =========================
-            # LEVERAGE
-            # =========================
-
-
-            try:
-
-
-                bybit_api.set_leverage()
-
-
-                print(
-
-                    "[LEVERAGE SET]"
-
-                )
-
-
-            except Exception as e:
-
-
-                print(
-
-                    "[LEVERAGE ERROR]",
-
-                    e
-
-                )
-
-
-
-
-
-
-
-            # =========================
-            # WATCHDOG
-            # =========================
-
-
-            watchdog.start()
-
-
-            print(
-
-                "[WATCHDOG START]"
-
-            )
-
-
-
-
-
-
-
-            # =========================
-            # PRIVATE WS
-            # =========================
-
-
-            print(
-
-                "[PRIVATE WS CONNECTING]"
-
-            )
-
-
-            private_ws.start()
-
-
-
-
-
-
-
-            # =========================
-            # MARKET THREAD
-            # =========================
-
-
-            self.running = True
-
-
-
-            self.market_thread = threading.Thread(
-
-                target=self.market_loop,
-
-                daemon=True
-
-            )
-
-
-            self.market_thread.start()
-
-
-
-
-
-            update_status({
-
-                "bot":
-
-                    "RUNNING"
-
-            })
-
-
-
-            add_log(
-
-                "BOT READY"
-
-            )
-
-
-
-            print(
-
-                "[BOT READY]"
-
-            )
-
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[START ERROR]",
-
-                e
-
-            )
-
-
-            try:
-
-                database.save_error(e)
-
-            except:
-
-                pass
-
-
-
-            self.stop()
-
-
-            raise e
 
 
 
@@ -413,7 +207,21 @@ class TradingApp:
 
 
 
-                candles = bybit_api.get_kline()
+                watchdog.heartbeat()
+
+
+
+
+
+                candles = (
+
+                    bybit_api
+
+                    .get_kline()
+
+                )
+
+
 
 
 
@@ -421,28 +229,24 @@ class TradingApp:
 
 
 
-                    print(
-
-                        "[KLINE]",
-
-                        len(candles)
-
-                    )
 
 
+                    # Bybit candle 변환
 
-                    data = []
+
+                    formatted = []
 
 
 
                     for c in candles:
 
 
-                        data.append({
+                        formatted.append({
 
-                            "timestamp":
 
-                                int(c[0]),
+                            "time":
+
+                                int(c[0]) // 1000,
 
 
                             "open":
@@ -476,56 +280,13 @@ class TradingApp:
 
 
 
-
-                    last = data[-1]
-
-
-
-
-
-                    add_candle({
-
-                        "time":
-
-                            last["timestamp"],
-
-
-                        "open":
-
-                            last["open"],
-
-
-                        "high":
-
-                            last["high"],
-
-
-                        "low":
-
-                            last["low"],
-
-
-                        "close":
-
-                            last["close"]
-
-                    })
-
-
-
-
-
-
-
-
-
                     signal = (
 
                         vwap_supertrend_strategy
 
                         .analyze(
 
-                            data
+                            formatted
 
                         )
 
@@ -536,31 +297,13 @@ class TradingApp:
 
 
 
-                    indicator = getattr(
+                    indicator = (
 
-                        vwap_supertrend_strategy,
+                        vwap_supertrend_strategy
 
-                        "last_indicator",
-
-                        {}
+                        .last_indicator
 
                     )
-
-
-
-
-
-
-                    position = (
-
-                        position_manager
-
-                        .get_position()
-
-                    )
-
-
-
 
 
 
@@ -568,9 +311,10 @@ class TradingApp:
 
                     update_status({
 
+
                         "price":
 
-                            last["close"],
+                            formatted[-1]["close"],
 
 
                         "vwap":
@@ -590,62 +334,7 @@ class TradingApp:
 
                                 "trend",
 
-                                "NONE"
-
-                            ),
-
-
-                        "volume":
-
-                            indicator.get(
-
-                                "volume",
-
-                                False
-
-                            ),
-
-
-                        "position":
-
-                            position.get(
-
-                                "side",
-
-                                "NONE"
-
-                            ),
-
-
-                        "size":
-
-                            position.get(
-
-                                "size",
-
-                                0
-
-                            ),
-
-
-                        "entry":
-
-                            position.get(
-
-                                "entry",
-
-                                0
-
-                            ),
-
-
-                        "pnl":
-
-                            position.get(
-
-                                "pnl",
-
-                                0
+                                "-"
 
                             )
 
@@ -661,7 +350,6 @@ class TradingApp:
                     if signal:
 
 
-
                         print(
 
                             "[SIGNAL]",
@@ -671,56 +359,20 @@ class TradingApp:
                         )
 
 
-                        add_log(
 
-                            str(signal)
+                        update_status({
 
-                        )
+                            "signal":
 
+                                signal["signal"]
 
-
-
-
-                        result = order_manager.execute(
-
-                            signal,
-
-                            last["close"]
-
-                        )
+                        })
 
 
 
+                        order_manager.execute(
 
-
-                        if result:
-
-
-                            print(
-
-                                "[ORDER RESULT]",
-
-                                result
-
-                            )
-
-
-                            add_log(
-
-                                str(result)
-
-                            )
-
-
-
-
-
-                    else:
-
-
-                        print(
-
-                            "[NO SIGNAL]"
+                            signal
 
                         )
 
@@ -729,14 +381,15 @@ class TradingApp:
 
 
 
+                time.sleep(5)
 
-                watchdog.heartbeat()
 
 
 
 
 
             except Exception as e:
+
 
 
                 print(
@@ -748,19 +401,15 @@ class TradingApp:
                 )
 
 
-                try:
+                database.save_error(
 
-                    database.save_error(e)
+                    e
 
-                except:
-
-                    pass
+                )
 
 
 
-
-
-            time.sleep(10)
+                time.sleep(5)
 
 
 
@@ -792,66 +441,36 @@ class TradingApp:
 
 
 
-        try:
+        private_ws.stop()
 
-            private_ws.stop()
 
-        except:
-
-            pass
+        watchdog.stop()
 
 
 
 
 
-        try:
-
-            watchdog.stop()
-
-        except:
-
-            pass
+        database.close()
 
 
 
 
 
-        try:
+        update_status({
 
-            database.close()
+            "bot":
 
-        except:
+                "STOPPED"
 
-            pass
-
-
+        })
 
 
 
-        try:
+        add_log(
 
+            "BOT STOPPED"
 
-            update_status({
-
-                "bot":
-
-                    "STOPPED"
-
-            })
-
-
-            add_log(
-
-                "BOT STOPPED"
-
-            )
-
-
-        except:
-
-            pass
-
-
+        )
 
 
 
@@ -860,6 +479,7 @@ class TradingApp:
             "[BOT STOP COMPLETE]"
 
         )
+
 
 
 
