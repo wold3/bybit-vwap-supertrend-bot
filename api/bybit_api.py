@@ -1,15 +1,10 @@
 # =====================================================
 # api/bybit_api.py
-# Bybit V5 API Manager
+# Bybit V5 API Wrapper
 # Demo / Live Support
 # =====================================================
 
-import time
-import hmac
-import hashlib
-import requests
-import json
-
+from pybit.unified_trading import HTTP
 
 
 from config import (
@@ -18,7 +13,7 @@ from config import (
     LIVE,
     CATEGORY,
     DEFAULT_SYMBOL,
-    INTERVAL
+    LEVERAGE
 )
 
 
@@ -31,32 +26,15 @@ class BybitAPI:
     def __init__(self):
 
 
-        if LIVE:
+        self.session = HTTP(
 
-            self.base_url = (
-                "https://api.bybit.com"
-            )
+            testnet=False,
 
-            self.ws_url = (
-                "wss://stream.bybit.com/v5/private"
-            )
+            demo=not LIVE,
 
+            api_key=BYBIT_API_KEY,
 
-        else:
-
-            self.base_url = (
-                "https://api-demo.bybit.com"
-            )
-
-            self.ws_url = (
-                "wss://stream-demo.bybit.com/v5/private"
-            )
-
-
-
-        print(
-
-            "[BYBIT API READY]"
+            api_secret=BYBIT_API_SECRET
 
         )
 
@@ -64,281 +42,9 @@ class BybitAPI:
 
         print(
 
-            "[MODE]",
+            "[BYBIT API READY]",
 
             "LIVE" if LIVE else "DEMO"
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # SIGN
-    # =====================================================
-
-
-    def sign(
-        self,
-        timestamp,
-        body=""
-    ):
-
-
-        recv_window = "5000"
-
-
-        param = (
-
-            str(timestamp)
-
-            +
-
-            BYBIT_API_KEY
-
-            +
-
-            recv_window
-
-            +
-
-            body
-
-        )
-
-
-
-        return hmac.new(
-
-            BYBIT_API_SECRET.encode(),
-
-            param.encode(),
-
-            hashlib.sha256
-
-        ).hexdigest()
-
-
-
-
-
-
-
-    # =====================================================
-    # REQUEST
-    # =====================================================
-
-
-    def request(
-        self,
-        method,
-        path,
-        params=None
-    ):
-
-
-        try:
-
-
-            timestamp = str(
-
-                int(
-
-                    time.time()*1000
-
-                )
-
-            )
-
-
-
-            body = ""
-
-
-
-            if method == "POST":
-
-
-                body = json.dumps(
-
-                    params
-
-                )
-
-
-
-
-
-            headers = {
-
-
-                "X-BAPI-API-KEY":
-
-                    BYBIT_API_KEY,
-
-
-                "X-BAPI-TIMESTAMP":
-
-                    timestamp,
-
-
-                "X-BAPI-SIGN":
-
-                    self.sign(
-
-                        timestamp,
-
-                        body
-
-                    ),
-
-
-                "X-BAPI-RECV-WINDOW":
-
-                    "5000",
-
-
-                "Content-Type":
-
-                    "application/json"
-
-            }
-
-
-
-
-
-
-
-            url = (
-
-                self.base_url
-
-                +
-
-                path
-
-            )
-
-
-
-
-
-            if method == "GET":
-
-
-                r = requests.get(
-
-                    url,
-
-                    headers=headers,
-
-                    params=params,
-
-                    timeout=10
-
-                )
-
-
-            else:
-
-
-                r = requests.post(
-
-                    url,
-
-                    headers=headers,
-
-                    data=body,
-
-                    timeout=10
-
-                )
-
-
-
-
-
-            data = r.json()
-
-
-
-            print(
-
-                "[BYBIT STATUS]",
-
-                r.status_code
-
-            )
-
-
-
-            if data.get("retCode") != 0:
-
-
-                print(
-
-                    "[BYBIT ERROR]",
-
-                    data
-
-                )
-
-
-
-            return data
-
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[BYBIT REQUEST ERROR]",
-
-                e
-
-            )
-
-
-            return None
-
-
-
-
-
-
-
-    # =====================================================
-    # WALLET
-    # =====================================================
-
-
-    def get_wallet_balance(self):
-
-
-        return self.request(
-
-            "GET",
-
-            "/v5/account/wallet-balance",
-
-            {
-
-                "accountType":
-
-                    "UNIFIED"
-
-            }
 
         )
 
@@ -355,56 +61,55 @@ class BybitAPI:
     # =====================================================
 
 
-    def get_kline(self):
-
-
-        data = self.request(
-
-            "GET",
-
-            "/v5/market/kline",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL,
-
-
-                "interval":
-
-                    INTERVAL,
-
-
-                "limit":
-
-                    200
-
-            }
-
-        )
-
-
-
-        if not data:
-
-
-            return []
-
+    def get_kline(
+        self,
+        limit=200
+    ):
 
 
         try:
 
 
+            result = self.session.get_kline(
+
+
+                category=CATEGORY,
+
+
+                symbol=DEFAULT_SYMBOL,
+
+
+                interval="5",
+
+
+                limit=limit
+
+
+            )
+
+
+
+            if result.get("retCode") != 0:
+
+
+                print(
+
+                    "[KLINE ERROR]",
+
+                    result
+
+                )
+
+
+                return []
+
+
+
+
+
             return (
 
-                data
+                result
 
                 ["result"]
 
@@ -414,10 +119,102 @@ class BybitAPI:
 
 
 
-        except:
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[KLINE EXCEPTION]",
+
+                e
+
+            )
 
 
             return []
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # MARKET ORDER
+    # =====================================================
+
+
+    def place_order(
+        self,
+        side,
+        qty
+    ):
+
+
+        try:
+
+
+            result = self.session.place_order(
+
+
+                category=CATEGORY,
+
+
+                symbol=DEFAULT_SYMBOL,
+
+
+                side=side,
+
+
+                orderType="Market",
+
+
+                qty=str(qty),
+
+
+                leverage=str(LEVERAGE)
+
+
+            )
+
+
+
+            print(
+
+                "[ORDER RESULT]",
+
+                result
+
+            )
+
+
+
+            return result
+
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[ORDER ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
 
 
 
@@ -435,89 +232,38 @@ class BybitAPI:
     def get_position(self):
 
 
-        return self.request(
-
-            "GET",
-
-            "/v5/position/list",
-
-            {
+        try:
 
 
-                "category":
-
-                    CATEGORY,
+            return self.session.get_positions(
 
 
-                "symbol":
+                category=CATEGORY,
 
-                    DEFAULT_SYMBOL
 
-            }
+                symbol=DEFAULT_SYMBOL
 
-        )
+
+            )
 
 
 
 
 
+        except Exception as e:
 
 
+            print(
+
+                "[POSITION ERROR]",
+
+                e
+
+            )
 
 
-    # =====================================================
-    # ORDER
-    # =====================================================
+            return None
 
-
-    def place_order(
-        self,
-        side,
-        qty
-    ):
-
-
-        return self.request(
-
-            "POST",
-
-            "/v5/order/create",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL,
-
-
-                "side":
-
-                    side,
-
-
-                "orderType":
-
-                    "Market",
-
-
-                "qty":
-
-                    str(qty),
-
-
-                "timeInForce":
-
-                    "IOC"
-
-            }
-
-        )
 
 
 
@@ -528,7 +274,7 @@ class BybitAPI:
 
 
     # =====================================================
-    # TP SL
+    # TP / SL
     # =====================================================
 
 
@@ -539,42 +285,108 @@ class BybitAPI:
     ):
 
 
-        return self.request(
-
-            "POST",
-
-            "/v5/position/trading-stop",
-
-            {
+        try:
 
 
-                "category":
-
-                    CATEGORY,
+            result = self.session.set_trading_stop(
 
 
-                "symbol":
-
-                    DEFAULT_SYMBOL,
+                category=CATEGORY,
 
 
-                "takeProfit":
-
-                    str(tp),
+                symbol=DEFAULT_SYMBOL,
 
 
-                "stopLoss":
-
-                    str(sl),
+                takeProfit=str(tp),
 
 
-                "tpslMode":
+                stopLoss=str(sl)
 
-                    "Full"
 
-            }
+            )
 
-        )
+
+
+            print(
+
+                "[TP SL RESULT]",
+
+                result
+
+            )
+
+
+
+            return result
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[TP SL ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # WALLET
+    # =====================================================
+
+
+    def get_balance(self):
+
+
+        try:
+
+
+            result = self.session.get_wallet_balance(
+
+
+                accountType="UNIFIED"
+
+
+            )
+
+
+
+            return result
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[BALANCE ERROR]",
+
+                e
+
+            )
+
+
+            return None
+
 
 
 
