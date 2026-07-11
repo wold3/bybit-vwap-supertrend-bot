@@ -17,9 +17,9 @@ DEMO_MODE = True
 # BYBIT API KEY
 # =====================================================
 
-DEMO_API_KEY = "YOUR_DEMO_API_KEY"
+DEMO_API_KEY = "9NmwC3yjKEYq15h0FF"
 
-DEMO_API_SECRET = "YOUR_DEMO_API_SECRET"
+DEMO_API_SECRET = "lQ82iPwnqHUIIpqc3hIZMwVmrbjDf8scRARJ"
 
 
 
