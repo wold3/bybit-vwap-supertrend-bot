@@ -82,13 +82,16 @@ class TradingApp:
 
 
 
+
     # =====================================================
     # START
     # =====================================================
 
+
     def start(self):
 
         try:
+
 
             print("====================")
             print("[BOT START]")
@@ -103,9 +106,11 @@ class TradingApp:
             update_status({
 
                 "bot":
+
                     "STARTING",
 
                 "symbol":
+
                     DEFAULT_SYMBOL
 
             })
@@ -115,7 +120,7 @@ class TradingApp:
 
 
             # =========================
-            # WALLET
+            # WALLET CHECK
             # =========================
 
 
@@ -147,35 +152,24 @@ class TradingApp:
 
 
 
+            equity = float(
 
+                wallet["result"]
+                ["list"][0]
+                ["totalEquity"]
 
-            try:
-
-
-                equity = float(
-
-                    wallet["result"]
-                    ["list"][0]
-                    ["totalEquity"]
-
-                )
-
-
-            except Exception:
-
-
-                raise Exception(
-                    "WALLET DATA ERROR"
-                )
-
-
+            )
 
 
 
             print(
+
                 "[EQUITY]",
+
                 equity
+
             )
+
 
 
             add_log(
@@ -183,6 +177,7 @@ class TradingApp:
                 f"EQUITY {equity}"
 
             )
+
 
 
             risk_manager.update_equity(
@@ -227,6 +222,41 @@ class TradingApp:
                 )
 
 
+
+
+
+
+
+
+
+            # =========================
+            # LEVERAGE
+            # =========================
+
+
+            try:
+
+
+                bybit_api.set_leverage()
+
+
+                print(
+
+                    "[LEVERAGE SET]"
+
+                )
+
+
+            except Exception as e:
+
+
+                print(
+
+                    "[LEVERAGE ERROR]",
+
+                    e
+
+                )
 
 
 
@@ -315,12 +345,12 @@ class TradingApp:
             )
 
 
+
             print(
 
                 "[BOT READY]"
 
             )
-
 
 
 
@@ -337,7 +367,6 @@ class TradingApp:
                 e
 
             )
-
 
 
             try:
@@ -446,21 +475,9 @@ class TradingApp:
 
 
 
-                    print(
-
-                        "[CANDLE RECEIVED]",
-
-                        len(data)
-
-                    )
-
-
-
 
 
                     last = data[-1]
-
-
 
 
 
@@ -519,7 +536,6 @@ class TradingApp:
 
 
 
-
                     indicator = getattr(
 
                         vwap_supertrend_strategy,
@@ -529,6 +545,22 @@ class TradingApp:
                         {}
 
                     )
+
+
+
+
+
+
+                    position = (
+
+                        position_manager
+
+                        .get_position()
+
+                    )
+
+
+
 
 
 
@@ -571,10 +603,53 @@ class TradingApp:
 
                                 False
 
+                            ),
+
+
+                        "position":
+
+                            position.get(
+
+                                "side",
+
+                                "NONE"
+
+                            ),
+
+
+                        "size":
+
+                            position.get(
+
+                                "size",
+
+                                0
+
+                            ),
+
+
+                        "entry":
+
+                            position.get(
+
+                                "entry",
+
+                                0
+
+                            ),
+
+
+                        "pnl":
+
+                            position.get(
+
+                                "pnl",
+
+                                0
+
                             )
 
                     })
-
 
 
 
@@ -604,17 +679,17 @@ class TradingApp:
 
 
 
-                        result = (
 
-                            order_manager.execute(
 
-                                signal,
+                        result = order_manager.execute(
 
-                                last["close"]
+                            signal,
 
-                            )
+                            last["close"]
 
                         )
+
+
 
 
 
@@ -635,6 +710,8 @@ class TradingApp:
                                 str(result)
 
                             )
+
+
 
 
 
@@ -678,17 +755,6 @@ class TradingApp:
                 except:
 
                     pass
-
-
-
-                try:
-
-                    add_log(str(e))
-
-                except:
-
-                    pass
-
 
 
 
