@@ -6,21 +6,33 @@
 import threading
 import time
 
+
 from api.bybit_api import bybit_api
 
+
 from web.server import (
+
     add_log,
+
     update_status
+
 )
+
+
 
 
 class PositionManager:
 
+
     def __init__(self):
+
 
         self.lock = threading.Lock()
 
+
+
         self.position = {
+
 
             "symbol": "",
 
@@ -34,11 +46,14 @@ class PositionManager:
 
             "liq_price": 0.0,
 
-            "unrealised_pnl": 0.0,
+            "pnl": 0.0,
 
             "updated": 0
 
+
         }
+
+
 
         print(
 
@@ -46,55 +61,72 @@ class PositionManager:
 
         )
 
+
+
+
+
     # =====================================================
-    # UPDATE FROM API
+    # REFRESH FROM BYBIT
     # =====================================================
 
     def refresh(self):
 
+
         try:
 
-            data = bybit_api.get_position()
 
-            if not data:
+            result = bybit_api.get_position()
+
+
+
+            if not result:
+
 
                 return False
 
-            rows = data["result"]["list"]
+
+
+            rows = result.get(
+
+                "result",
+
+                {}
+
+            ).get(
+
+                "list",
+
+                []
+
+            )
+
+
 
             if not rows:
 
-                return False
+
+                self.reset()
+
+                return True
+
+
+
 
             p = rows[0]
 
-            with self.lock:
 
-                self.position["symbol"] = p["symbol"]
 
-                self.position["side"] = p["side"] if p["side"] else "NONE"
+            self.update(p)
 
-                self.position["size"] = float(p["size"])
 
-                self.position["entry_price"] = float(p["avgPrice"] or 0)
-
-                self.position["mark_price"] = float(p["markPrice"] or 0)
-
-                self.position["liq_price"] = float(p["liqPrice"] or 0)
-
-                self.position["unrealised_pnl"] = float(
-
-                    p["unrealisedPnl"] or 0
-
-                )
-
-                self.position["updated"] = time.time()
-
-            update_status(self.position)
 
             return True
 
+
+
+
         except Exception as e:
+
 
             add_log(
 
@@ -102,7 +134,208 @@ class PositionManager:
 
             )
 
+
             return False
+
+
+
+
+
+    # =====================================================
+    # UPDATE POSITION
+    # =====================================================
+
+    def update(self, p):
+
+
+        try:
+
+
+            with self.lock:
+
+
+                size = float(
+
+                    p.get(
+
+                        "size",
+
+                        0
+
+                    )
+
+                )
+
+
+
+                side = p.get(
+
+                    "side"
+
+                )
+
+
+
+                if size <= 0:
+
+
+                    side = "NONE"
+
+
+
+                self.position.update({
+
+
+                    "symbol":
+
+                        p.get(
+
+                            "symbol",
+
+                            ""
+
+                        ),
+
+
+
+                    "side":
+
+                        side,
+
+
+
+                    "size":
+
+                        size,
+
+
+
+                    "entry_price":
+
+                        float(
+
+                            p.get(
+
+                                "avgPrice",
+
+                                0
+
+                            )
+
+                            or 0
+
+                        ),
+
+
+
+                    "mark_price":
+
+                        float(
+
+                            p.get(
+
+                                "markPrice",
+
+                                0
+
+                            )
+
+                            or 0
+
+                        ),
+
+
+
+                    "liq_price":
+
+                        float(
+
+                            p.get(
+
+                                "liqPrice",
+
+                                0
+
+                            )
+
+                            or 0
+
+                        ),
+
+
+
+                    "pnl":
+
+                        float(
+
+                            p.get(
+
+                                "unrealisedPnl",
+
+                                0
+
+                            )
+
+                            or 0
+
+                        ),
+
+
+
+                    "updated":
+
+                        time.time()
+
+
+                })
+
+
+
+            update_status({
+
+                "position":
+
+                    self.position["side"],
+
+
+                "position_size":
+
+                    self.position["size"],
+
+
+                "entry_price":
+
+                    self.position["entry_price"],
+
+
+                "pnl":
+
+                    self.position["pnl"]
+
+            })
+
+
+
+            return True
+
+
+
+
+        except Exception as e:
+
+
+            add_log(
+
+                f"POSITION UPDATE ERROR {e}"
+
+            )
+
+
+            return False
+
+
+
+
 
     # =====================================================
     # GET POSITION
@@ -110,9 +343,15 @@ class PositionManager:
 
     def get_position(self):
 
+
         with self.lock:
 
+
             return self.position.copy()
+
+
+
+
 
     # =====================================================
     # HAS POSITION
@@ -120,19 +359,25 @@ class PositionManager:
 
     def has_position(self):
 
+
         with self.lock:
+
 
             return self.position["size"] > 0
 
 
 
+
+
     # =====================================================
-    # IS LONG
+    # LONG CHECK
     # =====================================================
 
     def is_long(self):
 
+
         with self.lock:
+
 
             return (
 
@@ -146,13 +391,17 @@ class PositionManager:
 
 
 
+
+
     # =====================================================
-    # IS SHORT
+    # SHORT CHECK
     # =====================================================
 
     def is_short(self):
 
+
         with self.lock:
+
 
             return (
 
@@ -166,42 +415,6 @@ class PositionManager:
 
 
 
-    # =====================================================
-    # UPDATE FROM REST API
-    # =====================================================
-
-    def refresh(self):
-
-        try:
-
-            from api.bybit_api import bybit_api
-
-            result = bybit_api.get_position()
-
-            if not result:
-
-                return False
-
-            rows = result["result"]["list"]
-
-            if not rows:
-
-                return False
-
-            self.update(rows)
-
-            return True
-
-        except Exception as e:
-
-            add_log(
-
-                f"POSITION REFRESH ERROR {e}"
-
-            )
-
-            return False
-
 
 
     # =====================================================
@@ -210,27 +423,13 @@ class PositionManager:
 
     def status(self):
 
+
         with self.lock:
 
-            return {
 
-                "side":
+            return self.position.copy()
 
-                    self.position["side"],
 
-                "size":
-
-                    self.position["size"],
-
-                "entry_price":
-
-                    self.position["entry_price"],
-
-                "pnl":
-
-                    self.position["pnl"]
-
-            }
 
 
 
@@ -240,9 +439,14 @@ class PositionManager:
 
     def reset(self):
 
+
         with self.lock:
 
+
             self.position = {
+
+
+                "symbol": "",
 
                 "side": "NONE",
 
@@ -250,21 +454,43 @@ class PositionManager:
 
                 "entry_price": 0.0,
 
-                "pnl": 0.0
+                "mark_price": 0.0,
+
+                "liq_price": 0.0,
+
+                "pnl": 0.0,
+
+                "updated": time.time()
+
 
             }
 
+
+
         update_status({
 
-            "position": "NONE",
+            "position":
 
-            "position_size": 0,
+                "NONE",
 
-            "entry_price": 0,
 
-            "pnl": 0
+            "position_size":
+
+                0,
+
+
+            "entry_price":
+
+                0,
+
+
+            "pnl":
+
+                0
 
         })
+
+
 
         add_log(
 
@@ -274,15 +500,20 @@ class PositionManager:
 
 
 
+
+
     # =====================================================
     # CLOSE
     # =====================================================
 
     def close(self):
 
+
         try:
 
+
             self.reset()
+
 
             print(
 
@@ -290,7 +521,10 @@ class PositionManager:
 
             )
 
+
+
         except Exception as e:
+
 
             print(
 
@@ -299,6 +533,9 @@ class PositionManager:
                 e
 
             )
+
+
+
 
 
 # =====================================================
