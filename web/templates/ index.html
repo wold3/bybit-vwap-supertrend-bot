@@ -5,6 +5,8 @@
 
 <meta charset="UTF-8">
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>
 VWAP SUPERTREND BOT
 </title>
@@ -12,9 +14,16 @@ VWAP SUPERTREND BOT
 
 <style>
 
+*{
+    box-sizing:border-box;
+}
+
+
 body{
 
     margin:0;
+
+    padding:20px;
 
     background:#0b0f14;
 
@@ -28,17 +37,39 @@ body{
 }
 
 
-.container{
 
-    padding:25px;
+h1{
+
+    text-align:center;
+
+    color:#00ff99;
 
 }
 
 
 
-h1{
+.container{
 
-    color:#00ff99;
+    max-width:1100px;
+
+    margin:auto;
+
+}
+
+
+
+.card{
+
+    background:#151b22;
+
+    border-radius:15px;
+
+    padding:20px;
+
+    margin-bottom:20px;
+
+    box-shadow:
+    0 0 15px #000;
 
 }
 
@@ -49,49 +80,22 @@ h1{
     display:grid;
 
     grid-template-columns:
-    repeat(auto-fit,minmax(300px,1fr));
+    repeat(auto-fit,minmax(220px,1fr));
 
-    gap:20px;
-
-}
-
-
-
-.card{
-
-    background:#151b24;
-
-    padding:20px;
-
-    border-radius:15px;
-
-    box-shadow:
-    0 0 20px #000;
+    gap:15px;
 
 }
 
-
-
-.title{
-
-    color:#aaa;
-
-    font-size:14px;
-
-}
 
 
 
 .value{
 
-    font-size:28px;
+    font-size:25px;
 
     color:#00ff99;
 
-    margin-top:10px;
-
 }
-
 
 
 
@@ -99,7 +103,7 @@ button{
 
     border:0;
 
-    padding:14px 25px;
+    padding:12px 25px;
 
     margin:5px;
 
@@ -109,7 +113,7 @@ button{
 
     font-weight:bold;
 
-    font-size:15px;
+    transition:.3s;
 
 }
 
@@ -123,9 +127,19 @@ button:hover{
 
 
 
+
+.active{
+
+    box-shadow:
+    0 0 20px white;
+
+}
+
+
+
 .demo{
 
-    background:#2980b9;
+    background:#3498db;
 
     color:white;
 
@@ -135,7 +149,7 @@ button:hover{
 
 .live{
 
-    background:#c0392b;
+    background:#e74c3c;
 
     color:white;
 
@@ -145,9 +159,7 @@ button:hover{
 
 .start{
 
-    background:#27ae60;
-
-    color:white;
+    background:#2ecc71;
 
 }
 
@@ -157,15 +169,13 @@ button:hover{
 
     background:#f39c12;
 
-    color:white;
-
 }
 
 
 
 .close{
 
-    background:#8e44ad;
+    background:#c0392b;
 
     color:white;
 
@@ -175,54 +185,23 @@ button:hover{
 
 select{
 
+    width:200px;
 
-    width:100%;
-
-    padding:14px;
+    padding:12px;
 
     border-radius:10px;
 
-    background:#111;
+    background:#222;
 
-    color:#00ff99;
+    color:white;
 
-    font-size:18px;
-
-    border:1px solid #00ff99;
-
-}
-
-
-
-.switch{
-
-    display:flex;
-
-    gap:10px;
-
-}
-
-
-
-
-.status-on{
-
-    color:#00ff99;
-
-}
-
-
-
-.status-off{
-
-    color:#ff5555;
+    font-size:16px;
 
 }
 
 
 
 #logs{
-
 
     height:300px;
 
@@ -242,10 +221,21 @@ select{
 
 .action{
 
+    color:#ffd700;
 
-    margin-top:10px;
+    font-size:20px;
 
-    color:#ffff00;
+}
+
+
+
+.badge{
+
+    padding:8px 15px;
+
+    border-radius:20px;
+
+    background:#333;
 
 }
 
@@ -253,7 +243,9 @@ select{
 
 </style>
 
+
 </head>
+
 
 
 
@@ -265,16 +257,12 @@ select{
 
 
 <h1>
-🚀 VWAP SUPERTREND AUTO BOT
+VWAP SUPERTREND AUTO BOT
 </h1>
 
 
 
-<div class="grid">
 
-
-
-<!-- CONTROL -->
 
 <div class="card">
 
@@ -285,15 +273,61 @@ CONTROL
 
 
 
-<div class="title">
-FUTURES SYMBOL
+<button class="demo"
+onclick="modeChange('DEMO',this)">
+DEMO
+</button>
+
+
+<button class="live"
+onclick="modeChange('LIVE',this)">
+LIVE
+</button>
+
+
+
+<br>
+
+
+
+<button class="start"
+onclick="command('start',this)">
+START
+</button>
+
+
+<button class="stop"
+onclick="command('stop',this)">
+STOP
+</button>
+
+
+<button class="close"
+onclick="command('close',this)">
+CLOSE POSITION
+</button>
+
+
+
 </div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<h2>
+SYMBOL
+</h2>
 
 
 
 <select id="symbol"
 onchange="changeSymbol()">
-
 
 
 <option>
@@ -316,136 +350,102 @@ XRPUSDT
 </option>
 
 
-<option>
-DOGEUSDT
-</option>
-
-
 </select>
 
 
 
-
-<br><br>
-
-
-
-<button class="demo"
-onclick="changeMode('DEMO')">
-
-DEMO
-
-</button>
-
-
-<button class="live"
-onclick="changeMode('LIVE')">
-
-LIVE
-
-</button>
-
-
-<br>
+</div>
 
 
 
-<button class="start"
-onclick="botStart()">
-
-▶ START
-
-</button>
 
 
 
-<button class="stop"
-onclick="botStop()">
-
-■ STOP
-
-</button>
 
 
 
-<button class="close"
-onclick="closePosition()">
-
-✖ CLOSE
-
-</button>
+<div class="card">
 
 
+<h2>
+LAST ACTION
+</h2>
 
 
 <div class="action"
 id="action">
 
-대기중
+WAITING
+
+</div>
+
 
 </div>
 
 
 
-</div>
 
 
 
 
 
-
-
-<!-- STATUS -->
 
 <div class="card">
 
 
 <h2>
-SYSTEM
+STATUS
 </h2>
 
 
 
-<p>
+<div class="grid">
+
+
+<div>
+
 MODE
-</p>
 
-<div id="mode"
+<br>
+
+<span id="mode"
 class="value">
-
 -
+</span>
+
 
 </div>
 
 
 
 
-<p>
+<div>
+
 BOT
-</p>
 
+<br>
 
-<div id="bot"
+<span id="bot"
 class="value">
-
 -
+</span>
+
 
 </div>
 
 
 
-<p>
+
+<div>
+
 SYMBOL
-</p>
 
+<br>
 
-<div id="symbolView"
+<span id="symbol_view"
 class="value">
-
 -
-
-</div>
-
+</span>
 
 
 </div>
@@ -453,69 +453,55 @@ class="value">
 
 
 
+<div>
 
-
-
-<!-- POSITION -->
-
-
-<div class="card">
-
-
-<h2>
 POSITION
-</h2>
 
+<br>
 
-<p>
-SIDE
-</p>
-
-<div id="side"
+<span id="position"
 class="value">
-
 -
+</span>
+
 
 </div>
 
 
 
-<p>
+
+<div>
+
 SIZE
-</p>
 
-<div id="size"
+<br>
+
+<span id="size"
 class="value">
+-
+</span>
 
-0
 
 </div>
 
 
 
 
-<p>
-ENTRY
-</p>
+<div>
 
-<div id="entry"
-class="value">
-
-0
-
-</div>
-
-
-
-
-<p>
 PNL
-</p>
 
-<div id="pnl"
+<br>
+
+<span id="pnl"
 class="value">
+-
+</span>
 
-0
+
+</div>
+
+
 
 </div>
 
@@ -528,14 +514,14 @@ class="value">
 
 
 
-<!-- LOG -->
+
 
 
 <div class="card">
 
 
 <h2>
-EVENT LOG
+SYSTEM LOG
 </h2>
 
 
@@ -544,15 +530,16 @@ EVENT LOG
 </div>
 
 
-
 </div>
 
 
 
-</div>
+
+
 
 
 </div>
+
 
 
 
@@ -562,13 +549,130 @@ EVENT LOG
 <script>
 
 
-function action(msg){
+
+function send(url,data={}){
+
+
+return fetch(
+
+url,
+
+{
+
+method:"POST",
+
+headers:{
+
+"Content-Type":
+"application/json"
+
+},
+
+body:
+
+JSON.stringify(data)
+
+}
+
+)
+
+.then(
+r=>r.json()
+)
+
+}
+
+
+
+
+function modeChange(mode,btn){
+
+
+send(
+
+"/api/mode",
+
+{
+
+mode:mode
+
+}
+
+)
+
+.then(()=>{
+
 
 document.getElementById(
 "action"
-).innerHTML = msg;
+).innerHTML=
+
+"MODE 변경 : "+mode;
+
+
+btn.classList.add(
+"active"
+);
+
+
+update();
+
+
+});
+
 
 }
+
+
+
+
+
+
+
+
+function command(cmd,btn){
+
+
+send(
+
+"/api/"+cmd
+
+)
+
+.then(()=>{
+
+
+document.getElementById(
+"action"
+).innerHTML=
+
+"실행 : "+cmd.toUpperCase();
+
+
+btn.classList.add(
+"active"
+);
+
+
+setTimeout(()=>{
+
+btn.classList.remove(
+"active"
+);
+
+},1000);
+
+
+
+update();
+
+
+
+});
+
+
+}
+
 
 
 
@@ -579,110 +683,21 @@ document.getElementById(
 function changeSymbol(){
 
 
-let s=document.getElementById(
+let s=
+
+document.getElementById(
 "symbol"
 ).value;
 
 
 
-action(
-"실행 : SYMBOL 변경 "+s
-);
-
-
-
-fetch(
+send(
 
 "/api/symbol",
 
 {
 
-method:"POST",
-
-headers:{
-
-"Content-Type":
-"application/json"
-
-},
-
-body:
-
-JSON.stringify({
-
 symbol:s
-
-})
-
-}
-
-)
-
-.then(r=>r.json())
-
-.then(data=>{
-
-
-if(data.success){
-
-action(
-"완료 : "+data.symbol
-);
-
-}
-
-else{
-
-action(
-"실패 : "+data.error
-);
-
-}
-
-
-});
-
-
-}
-
-
-
-
-
-
-
-function changeMode(mode){
-
-
-
-action(
-"실행 : MODE "+mode
-);
-
-
-
-fetch(
-
-"/api/mode",
-
-{
-
-method:"POST",
-
-headers:{
-
-"Content-Type":
-"application/json"
-
-},
-
-body:
-
-JSON.stringify({
-
-mode:mode
-
-})
 
 }
 
@@ -690,153 +705,23 @@ mode:mode
 
 .then(()=>{
 
-action(
-"완료 : "+mode
-);
+
+document.getElementById(
+"action"
+).innerHTML=
+
+"심볼 변경 : "+s;
+
+
 
 update();
 
-});
-
-
-}
-
-
-
-
-
-
-
-
-function botStart(){
-
-
-action(
-"실행 : BOT START"
-);
-
-
-
-fetch(
-
-"/api/start",
-
-{
-
-method:"POST"
-
-}
-
-)
-
-.then(()=>{
-
-
-action(
-"완료 : BOT RUNNING"
-);
 
 
 });
 
 
 }
-
-
-
-
-
-
-
-
-function botStop(){
-
-
-
-action(
-"실행 : BOT STOP"
-);
-
-
-
-fetch(
-
-"/api/stop",
-
-{
-
-method:"POST"
-
-}
-
-)
-
-.then(()=>{
-
-
-action(
-"완료 : BOT STOPPED"
-);
-
-
-});
-
-
-}
-
-
-
-
-
-
-
-
-function closePosition(){
-
-
-
-if(confirm(
-"포지션 종료?"
-)){
-
-
-
-action(
-"실행 : CLOSE POSITION"
-);
-
-
-
-fetch(
-
-"/api/close",
-
-{
-
-method:"POST"
-
-}
-
-)
-
-.then(()=>{
-
-
-action(
-"완료 : CLOSE"
-);
-
-
-});
-
-
-
-}
-
-
-}
-
-
 
 
 
@@ -850,14 +735,12 @@ function update(){
 
 
 fetch(
-
 "/api/status"
-
 )
 
-
-.then(r=>r.json())
-
+.then(
+r=>r.json()
+)
 
 .then(data=>{
 
@@ -866,33 +749,42 @@ let s=data.status;
 
 
 
-mode.innerHTML=s.mode;
+document.getElementById(
+"mode"
+).innerHTML=s.mode;
+
+
+document.getElementById(
+"bot"
+).innerHTML=s.bot;
+
+
+document.getElementById(
+"symbol_view"
+).innerHTML=s.symbol;
+
+
+document.getElementById(
+"position"
+).innerHTML=s.position;
+
+
+document.getElementById(
+"size"
+).innerHTML=s.position_size;
+
+
+document.getElementById(
+"pnl"
+).innerHTML=s.pnl;
 
 
 
-bot.innerHTML=s.bot;
+document.getElementById(
+"action"
+).innerHTML=
 
-
-
-symbolView.innerHTML=s.symbol;
-
-
-
-side.innerHTML=s.position;
-
-
-
-size.innerHTML=s.position_size;
-
-
-
-entry.innerHTML=s.entry_price;
-
-
-
-pnl.innerHTML=s.pnl;
-
-
+s.last_action;
 
 
 
@@ -902,10 +794,9 @@ let html="";
 
 data.logs.forEach(
 
-l=>{
+x=>{
 
-
-html += l+"<br>";
+html += x+"<br>";
 
 }
 
@@ -913,16 +804,22 @@ html += l+"<br>";
 
 
 
-logs.innerHTML=html;
+let box=document.getElementById(
+"logs"
+);
 
 
 
-logs.scrollTop=
-logs.scrollHeight;
+box.innerHTML=html;
+
+
+box.scrollTop=
+box.scrollHeight;
 
 
 
 });
+
 
 
 }
