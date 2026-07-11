@@ -1,78 +1,31 @@
 # =====================================================
 # web/chart_data.py
-# Chart Data Manager
+# Realtime Chart Data Manager
 # =====================================================
-
 
 import threading
 
 
 
 
-
-# 최근 캔들 저장
-
-CANDLES = []
+class ChartData:
 
 
-
-MAX_CANDLES = 200
-
+    def __init__(self):
 
 
-LOCK = threading.Lock()
+        self.candles = []
 
 
+        self.lock = threading.Lock()
 
+
+        self.max_candles = 500
 
 
 
-
-# =====================================================
-# ADD CANDLE
-# =====================================================
-
-
-def add_candle(candle):
-
-
-    with LOCK:
-
-
-        CANDLES.append(
-
-            candle
-
-        )
-
-
-
-        if len(CANDLES) > MAX_CANDLES:
-
-
-            CANDLES.pop(0)
-
-
-
-
-
-
-
-# =====================================================
-# GET CANDLES
-# =====================================================
-
-
-def get_candles():
-
-
-    with LOCK:
-
-
-        return list(
-
-            CANDLES
-
+        print(
+            "[CHART DATA READY]"
         )
 
 
@@ -81,15 +34,118 @@ def get_candles():
 
 
 
+    # =====================================================
+    # ADD CANDLE
+    # =====================================================
+
+
+    def add(
+        self,
+        candle
+    ):
+
+
+        try:
+
+
+            with self.lock:
+
+
+                self.candles.append(
+
+                    candle
+
+                )
+
+
+
+                if len(self.candles) > self.max_candles:
+
+
+                    self.candles = (
+
+                        self.candles[-self.max_candles:]
+
+                    )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[CHART ADD ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+    # =====================================================
+    # GET DATA
+    # =====================================================
+
+
+    def get(self):
+
+
+        try:
+
+
+            with self.lock:
+
+
+                return list(
+
+                    self.candles
+
+                )
+
+
+
+        except:
+
+
+            return []
+
+
+
+
+
+
+
+
+
 # =====================================================
-# CLEAR
+# INSTANCE
 # =====================================================
 
 
-def clear_chart():
+chart_data = ChartData()
 
 
-    with LOCK:
 
 
-        CANDLES.clear()
+
+
+# =====================================================
+# COMPATIBILITY FUNCTION
+# =====================================================
+
+
+def add_candle(
+    candle
+):
+
+
+    chart_data.add(
+
+        candle
+
+    )
