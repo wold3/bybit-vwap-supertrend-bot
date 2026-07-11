@@ -16,13 +16,13 @@ from web.server import (
 
     run_server,
 
-    stop_server,
-
     set_bot_instance,
 
     add_log,
 
-    update_status
+    update_status,
+
+    reset_status
 
 )
 
@@ -38,19 +38,16 @@ running = True
 
 
 
+
+
 # =======================================================
-# SHUTDOWN
+# SHUTDOWN HANDLER
 # =======================================================
 
-def shutdown_handler(
-
-    signum,
-
-    frame
-
-):
+def shutdown_handler(signum, frame):
 
     global running
+    global bot
 
 
     print()
@@ -72,6 +69,7 @@ def shutdown_handler(
 
         if bot:
 
+
             bot.stop()
 
 
@@ -89,34 +87,14 @@ def shutdown_handler(
 
 
 
-
-    try:
-
-
-        stop_server()
-
-
-
-    except Exception as e:
-
-
-        print(
-
-            "[SERVER STOP ERROR]",
-
-            e
-
-        )
-
-
-
-
     add_log(
 
         "SYSTEM SHUTDOWN COMPLETE"
 
     )
 
+
+    time.sleep(1)
 
 
     sys.exit(0)
@@ -125,8 +103,10 @@ def shutdown_handler(
 
 
 
+
+
 # =======================================================
-# START
+# BOT START
 # =======================================================
 
 def start():
@@ -134,20 +114,24 @@ def start():
     global bot
 
 
-
     print()
 
-    print("======================")
+    print("==============================")
 
-    print(" VWAP SUPERTREND BOT ")
+    print(" VWAP SUPERTREND AUTO BOT ")
 
-    print("======================")
-
-
+    print("==============================")
 
 
 
     try:
+
+
+        # ---------------------------------
+        # RESET STATUS
+        # ---------------------------------
+
+        reset_status()
 
 
 
@@ -159,7 +143,15 @@ def start():
 
 
 
-        time.sleep(1)
+        time.sleep(2)
+
+
+
+        add_log(
+
+            "WEB SERVER READY"
+
+        )
 
 
 
@@ -186,8 +178,6 @@ def start():
             "BOT INSTANCE CREATED"
 
         )
-
-
 
 
 
@@ -232,7 +222,7 @@ def start():
 
 
         # ---------------------------------
-        # MAIN LOOP
+        # MAIN PROCESS LOOP
         # ---------------------------------
 
         while running:
@@ -262,14 +252,13 @@ def start():
     except Exception as e:
 
 
-
         traceback.print_exc()
 
 
 
         add_log(
 
-            f"MAIN ERROR {e}"
+            f"MAIN FATAL ERROR {e}"
 
         )
 
@@ -279,6 +268,7 @@ def start():
 
 
             if bot:
+
 
                 bot.stop()
 
@@ -292,8 +282,34 @@ def start():
 
 
 
+
+        time.sleep(5)
+
+
+
+        # 재시작 대기
+
+        if running:
+
+
+            add_log(
+
+                "MAIN RESTART"
+
+            )
+
+
+            start()
+
+
+
+
+
+
+
+
 # =======================================================
-# ENTRY
+# ENTRY POINT
 # =======================================================
 
 if __name__ == "__main__":
