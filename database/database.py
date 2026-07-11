@@ -6,12 +6,11 @@
 import sqlite3
 import threading
 import os
-import time
+from datetime import datetime
 
 
-from config import (
-    DATABASE_FILE
-)
+
+from config import DATABASE_PATH
 
 
 
@@ -23,16 +22,18 @@ class Database:
     def __init__(self):
 
 
-        self.conn = None
-
-
         self.lock = threading.Lock()
+
+
+        self.connection = None
+
 
 
         self.connect()
 
 
         self.create_tables()
+
 
 
         print(
@@ -53,74 +54,44 @@ class Database:
     # CONNECT
     # =====================================================
 
-
     def connect(self):
 
 
-        try:
+        folder = os.path.dirname(
+
+            DATABASE_PATH
+
+        )
 
 
-            folder = os.path.dirname(
 
-                DATABASE_FILE
-
-            )
+        if folder and not os.path.exists(folder):
 
 
-            if folder:
-
-
-                os.makedirs(
-
-                    folder,
-
-                    exist_ok=True
-
-                )
+            os.makedirs(folder)
 
 
 
 
 
-            self.conn = sqlite3.connect(
-
-                DATABASE_FILE,
-
-                check_same_thread=False
-
-            )
+        self.connection = sqlite3.connect(
 
 
-
-            self.conn.row_factory = sqlite3.Row
-
+            DATABASE_PATH,
 
 
+            check_same_thread=False
 
 
-        except Exception as e:
-
-
-            print(
-
-                "[DATABASE CONNECT ERROR]",
-
-                e
-
-            )
-
-
-
-
+        )
 
 
 
 
 
     # =====================================================
-    # TABLES
+    # TABLE
     # =====================================================
-
 
     def create_tables(self):
 
@@ -128,74 +99,62 @@ class Database:
         with self.lock:
 
 
-            cursor = self.conn.cursor()
+            cursor = self.connection.cursor()
 
 
 
-            cursor.execute(
 
-                """
 
-                CREATE TABLE IF NOT EXISTS trades
+            cursor.execute("""
 
-                (
 
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+            CREATE TABLE IF NOT EXISTS trades (
 
-                    time TEXT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                    symbol TEXT,
+                time TEXT,
 
-                    side TEXT,
+                symbol TEXT,
 
-                    qty REAL,
+                side TEXT,
 
-                    entry REAL,
+                qty REAL,
 
-                    tp REAL,
+                price REAL,
 
-                    sl REAL,
-
-                    result TEXT
-
-                )
-
-                """
+                pnl REAL
 
             )
 
 
+            """)
 
 
 
 
 
-            cursor.execute(
 
-                """
+            cursor.execute("""
 
-                CREATE TABLE IF NOT EXISTS errors
 
-                (
+            CREATE TABLE IF NOT EXISTS errors (
 
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-                    time TEXT,
+                time TEXT,
 
-                    error TEXT
-
-                )
-
-                """
+                message TEXT
 
             )
 
 
+            """)
 
 
 
 
-            self.conn.commit()
+
+            self.connection.commit()
 
 
 
@@ -207,10 +166,20 @@ class Database:
     # SAVE TRADE
     # =====================================================
 
-
     def save_trade(
+
         self,
-        data
+
+        symbol,
+
+        side,
+
+        qty,
+
+        price,
+
+        pnl=0
+
     ):
 
 
@@ -220,19 +189,43 @@ class Database:
             with self.lock:
 
 
-                cursor = self.conn.cursor()
+                cursor = self.connection.cursor()
 
 
 
-                cursor.execute(
+                cursor.execute("""
 
-                    """
 
-                    INSERT INTO trades
+                INSERT INTO trades
 
-                    (
+                (
 
-                    time,
+                time,
+
+                symbol,
+
+                side,
+
+                qty,
+
+                price,
+
+                pnl
+
+                )
+
+                VALUES (?,?,?,?,?,?)
+
+
+                """,
+
+                (
+
+                    datetime.now().strftime(
+
+                        "%Y-%m-%d %H:%M:%S"
+
+                    ),
 
                     symbol,
 
@@ -240,95 +233,15 @@ class Database:
 
                     qty,
 
-                    entry,
+                    price,
 
-                    tp,
+                    pnl
 
-                    sl,
-
-                    result
-
-                    )
-
-                    VALUES (?,?,?,?,?,?,?,?)
-
-                    """,
-
-
-                    (
-
-                    time.strftime(
-
-                        "%Y-%m-%d %H:%M:%S"
-
-                    ),
-
-
-                    data.get(
-
-                        "symbol"
-
-                    ),
-
-
-                    data.get(
-
-                        "side"
-
-                    ),
-
-
-                    data.get(
-
-                        "qty"
-
-                    ),
-
-
-                    data.get(
-
-                        "entry"
-
-                    ),
-
-
-                    data.get(
-
-                        "tp"
-
-                    ),
-
-
-                    data.get(
-
-                        "sl"
-
-                    ),
-
-
-                    data.get(
-
-                        "result"
-
-                    )
-
-                    )
-
-                )
+                ))
 
 
 
-                self.conn.commit()
-
-
-
-
-
-                print(
-
-                    "[TRADE SAVED]"
-
-                )
+                self.connection.commit()
 
 
 
@@ -358,60 +271,67 @@ class Database:
     # SAVE ERROR
     # =====================================================
 
-
     def save_error(
+
         self,
+
         error
+
     ):
 
 
         try:
 
 
+            if self.connection is None:
+
+
+                return
+
+
+
+
+
             with self.lock:
 
 
-                cursor = self.conn.cursor()
+                cursor = self.connection.cursor()
 
 
 
-                cursor.execute(
-
-                    """
-
-                    INSERT INTO errors
-
-                    (
-
-                    time,
-
-                    error
-
-                    )
-
-                    VALUES (?,?)
-
-                    """,
+                cursor.execute("""
 
 
-                    (
+                INSERT INTO errors
 
-                    time.strftime(
+                (
+
+                time,
+
+                message
+
+                )
+
+                VALUES (?,?)
+
+
+                """,
+
+                (
+
+                    datetime.now().strftime(
 
                         "%Y-%m-%d %H:%M:%S"
 
                     ),
 
-
                     str(error)
 
-                    )
-
-                )
+                ))
 
 
 
-                self.conn.commit()
+                self.connection.commit()
 
 
 
@@ -437,26 +357,30 @@ class Database:
 
 
     # =====================================================
-    # GET RECENT TRADES
+    # GET TRADES
     # =====================================================
 
-
     def get_trades(
+
         self,
-        limit=50
+
+        limit=100
+
     ):
 
 
         try:
 
 
-            cursor = self.conn.cursor()
+            with self.lock:
+
+
+                cursor = self.connection.cursor()
 
 
 
-            cursor.execute(
+                cursor.execute("""
 
-                """
 
                 SELECT *
 
@@ -466,20 +390,18 @@ class Database:
 
                 LIMIT ?
 
+
                 """,
 
                 (
 
                     limit,
 
-                )
-
-            )
+                ))
 
 
 
-            return cursor.fetchall()
-
+                return cursor.fetchall()
 
 
 
@@ -511,32 +433,43 @@ class Database:
     # CLOSE
     # =====================================================
 
-
     def close(self):
 
 
         try:
 
 
-            if self.conn:
+            if self.connection:
 
 
-                self.conn.close()
-
-
-
-                print(
-
-                    "[DATABASE CLOSED]"
-
-                )
+                self.connection.close()
 
 
 
-        except:
+                self.connection = None
 
 
-            pass
+
+            print(
+
+                "[DATABASE CLOSED]"
+
+            )
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[DATABASE CLOSE ERROR]",
+
+                e
+
+            )
 
 
 
@@ -549,6 +482,5 @@ class Database:
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 database = Database()
