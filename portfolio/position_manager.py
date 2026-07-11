@@ -34,25 +34,13 @@ class PositionManager:
         self.position = {
 
 
-            "side":
+            "side": "NONE",
 
-                "NONE",
+            "size": 0,
 
+            "entry": 0,
 
-            "size":
-
-                0,
-
-
-            "entry":
-
-                0,
-
-
-            "pnl":
-
-                0
-
+            "pnl": 0
 
         }
 
@@ -62,9 +50,7 @@ class PositionManager:
 
 
         print(
-
             "[POSITION MANAGER READY]"
-
         )
 
 
@@ -76,7 +62,53 @@ class PositionManager:
 
 
     # =====================================================
-    # SYNC REST
+    # SAFE FLOAT
+    # =====================================================
+
+    def safe_float(
+        self,
+        value
+    ):
+
+
+        try:
+
+
+            if value in (
+
+                "",
+
+                None
+
+            ):
+
+
+                return 0
+
+
+
+            return float(value)
+
+
+
+
+
+        except Exception:
+
+
+            return 0
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # REST SYNC
     # =====================================================
 
     def sync(self):
@@ -165,7 +197,7 @@ class PositionManager:
 
 
     # =====================================================
-    # UPDATE FROM WS
+    # UPDATE FROM WEBSOCKET
     # =====================================================
 
     def update_from_ws(
@@ -177,11 +209,34 @@ class PositionManager:
         try:
 
 
+            if isinstance(
+
+                data,
+
+                list
+
+            ):
+
+
+                if len(data) == 0:
+
+
+                    return
+
+
+                data = data[0]
+
+
+
+
+
             self.update_position(
 
                 data
 
             )
+
+
 
 
 
@@ -205,7 +260,7 @@ class PositionManager:
 
 
     # =====================================================
-    # UPDATE
+    # UPDATE POSITION
     # =====================================================
 
     def update_position(
@@ -215,6 +270,15 @@ class PositionManager:
 
 
         try:
+
+
+            if not data:
+
+
+                return
+
+
+
 
 
             side = data.get(
@@ -227,13 +291,11 @@ class PositionManager:
 
 
 
-            size = float(
+            size = self.safe_float(
 
                 data.get(
 
-                    "size",
-
-                    0
+                    "size"
 
                 )
 
@@ -241,13 +303,11 @@ class PositionManager:
 
 
 
-            entry = float(
+            entry = self.safe_float(
 
                 data.get(
 
-                    "avgPrice",
-
-                    0
+                    "avgPrice"
 
                 )
 
@@ -255,19 +315,15 @@ class PositionManager:
 
 
 
-            pnl = float(
+            pnl = self.safe_float(
 
                 data.get(
 
-                    "unrealisedPnl",
-
-                    0
+                    "unrealisedPnl"
 
                 )
 
             )
-
-
 
 
 
@@ -278,6 +334,11 @@ class PositionManager:
 
                 side = "NONE"
 
+                size = 0
+
+                entry = 0
+
+                pnl = 0
 
 
 
@@ -285,47 +346,10 @@ class PositionManager:
 
 
 
-
-            with self.lock:
-
-
-                self.position = {
+            position = {
 
 
-                    "side":
-
-                        side,
-
-
-                    "size":
-
-                        size,
-
-
-                    "entry":
-
-                        entry,
-
-
-                    "pnl":
-
-                        pnl
-
-
-                }
-
-
-
-
-
-
-
-
-
-            update_status({
-
-
-                "position":
+                "side":
 
                     side,
 
@@ -345,13 +369,58 @@ class PositionManager:
                     pnl
 
 
+            }
+
+
+
+
+
+
+
+
+            with self.lock:
+
+
+                self.position = position.copy()
+
+
+
+
+
+
+
+            update_status({
+
+
+                "position":
+
+                    side,
+
+
+                "position_size":
+
+                    size,
+
+
+                "entry_price":
+
+                    entry,
+
+
+                "pnl":
+
+                    pnl
+
+
             })
+
+
 
 
 
             add_log(
 
-                f"POSITION {side} {size}"
+                f"POSITION {side} SIZE {size}"
 
             )
 
@@ -381,7 +450,7 @@ class PositionManager:
 
 
     # =====================================================
-    # GET
+    # GET POSITION
     # =====================================================
 
     def get_position(self):
@@ -402,7 +471,7 @@ class PositionManager:
 
 
     # =====================================================
-    # HAS POSITION
+    # CHECK POSITION
     # =====================================================
 
     def has_position(self):
@@ -439,8 +508,108 @@ class PositionManager:
         with self.lock:
 
 
-            return self.position["side"]
+            return (
 
+                self.position["side"]
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # SIZE
+    # =====================================================
+
+    def get_size(self):
+
+
+        with self.lock:
+
+
+            return (
+
+                self.position["size"]
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # RESET
+    # =====================================================
+
+    def reset(self):
+
+
+        with self.lock:
+
+
+            self.position = {
+
+
+                "side":
+
+                    "NONE",
+
+
+                "size":
+
+                    0,
+
+
+                "entry":
+
+                    0,
+
+
+                "pnl":
+
+                    0
+
+
+            }
+
+
+
+
+
+
+        update_status({
+
+
+            "position":
+
+                "NONE",
+
+
+            "position_size":
+
+                0,
+
+
+            "entry_price":
+
+                0,
+
+
+            "pnl":
+
+                0
+
+
+        })
 
 
 
