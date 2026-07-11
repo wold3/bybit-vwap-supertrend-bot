@@ -7,64 +7,96 @@ import os
 
 
 
+
+
 # =====================================================
-# BYBIT API
+# BYBIT ACCOUNT MODE
 # =====================================================
 
-# 우선순위:
-# 1. Windows 환경변수
-# 2. 직접 입력값
+# demo   : Bybit Demo Trading
+# test   : Bybit Testnet
+# live   : Real Trading
+
+TRADING_MODE = "demo"
 
 
-BYBIT_API_KEY = (
 
-    os.getenv(
-        "BYBIT_API_KEY"
-    )
 
-    or
 
-    "FHy9sykYKuB5qcPKP6"
+# =====================================================
+# API KEY
+# =====================================================
 
+BYBIT_API_KEY = os.getenv(
+    "BYBIT_API_KEY",
+    ""
+)
+
+
+BYBIT_API_SECRET = os.getenv(
+    "BYBIT_API_SECRET",
+    ""
 )
 
 
 
-BYBIT_API_SECRET = (
 
-    os.getenv(
-        "BYBIT_API_SECRET"
+
+
+
+# =====================================================
+# BYBIT URL
+# =====================================================
+
+
+if TRADING_MODE == "demo":
+
+
+    BYBIT_BASE_URL = (
+        "https://api-demo.bybit.com"
     )
 
-    or
 
-    "BO0OB5ZlDg2KX9jLxUMp6OtISk4Mmh3RyXB1"
+    BYBIT_WS_URL = (
+        "wss://stream-demo.bybit.com"
+    )
 
-)
+
+
+elif TRADING_MODE == "live":
+
+
+    BYBIT_BASE_URL = (
+        "https://api.bybit.com"
+    )
+
+
+    BYBIT_WS_URL = (
+        "wss://stream.bybit.com"
+    )
+
+
+
+else:
+
+
+    BYBIT_BASE_URL = (
+        "https://api-testnet.bybit.com"
+    )
+
+
+    BYBIT_WS_URL = (
+        "wss://stream-testnet.bybit.com"
+    )
+
+
 
 
 
 
 
 # =====================================================
-# TRADING MODE
-# =====================================================
-
-
-# False = 테스트 주문
-# True  = 실제 주문
-
-
-LIVE = False
-
-
-
-
-
-
-
-# =====================================================
-# MARKET
+# TRADING
 # =====================================================
 
 
@@ -85,6 +117,34 @@ LEVERAGE = 3
 
 
 
+# True:
+# API 주문 실행
+#
+# False:
+# 내부 테스트 주문
+
+LIVE_ORDER = True
+
+
+
+
+
+
+# =====================================================
+# ORDER
+# =====================================================
+
+
+DEFAULT_ORDER_QTY = 0.001
+
+
+ORDER_TYPE = "Market"
+
+
+TIME_IN_FORCE = "IOC"
+
+
+
 
 
 # =====================================================
@@ -99,7 +159,6 @@ STOP_LOSS_PERCENT = 1.0
 
 
 TAKE_PROFIT_PERCENT = 2.0
-
 
 
 MAX_POSITION_SIZE = 1.0
@@ -122,9 +181,6 @@ SUPERTREND_MULTIPLIER = 3
 
 
 
-VWAP_PERIOD = 0
-
-
 
 VOLUME_PERIOD = 20
 
@@ -133,27 +189,6 @@ MIN_VOLUME_MULTIPLIER = 1.2
 
 
 USE_VOLUME_FILTER = True
-
-
-
-
-
-
-
-# =====================================================
-# ORDER
-# =====================================================
-
-
-ORDER_TYPE = "Market"
-
-
-TIME_IN_FORCE = "IOC"
-
-
-
-
-DEFAULT_ORDER_QTY = 0.001
 
 
 
@@ -234,7 +269,7 @@ BOT_NAME = (
 
 
 # =====================================================
-# CONFIG CHECK
+# START LOG
 # =====================================================
 
 
@@ -242,61 +277,24 @@ print("==============================")
 
 print("[CONFIG LOADED]")
 
+print("MODE :", TRADING_MODE)
 
-print(
-    "LIVE :",
-    LIVE
-)
+print("BASE URL :", BYBIT_BASE_URL)
 
+print("CATEGORY :", CATEGORY)
 
-print(
-    "CATEGORY :",
-    CATEGORY
-)
+print("SYMBOL :", DEFAULT_SYMBOL)
 
-
-print(
-    "SYMBOL :",
-    DEFAULT_SYMBOL
-)
-
-
-print(
-    "LEVERAGE :",
-    LEVERAGE
-)
-
+print("LEVERAGE :", LEVERAGE)
 
 print(
     "API KEY LENGTH :",
     len(BYBIT_API_KEY)
 )
 
-
 print(
     "SECRET LENGTH :",
     len(BYBIT_API_SECRET)
 )
 
-
 print("==============================")
-
-
-
-
-
-if BYBIT_API_KEY == "YOUR_API_KEY":
-
-
-    print(
-        "[WARNING] BYBIT API KEY NOT SET"
-    )
-
-
-
-if BYBIT_API_SECRET == "YOUR_API_SECRET":
-
-
-    print(
-        "[WARNING] BYBIT API SECRET NOT SET"
-    )
