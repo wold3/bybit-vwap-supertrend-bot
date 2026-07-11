@@ -3,7 +3,6 @@
 # Position Manager
 # =====================================================
 
-
 from config import (
     CATEGORY,
     DEFAULT_SYMBOL
@@ -23,28 +22,17 @@ class PositionManager:
 
         self.position = {
 
-            "side":
+            "side":"NONE",
 
-                "NONE",
+            "size":0,
 
-            "size":
+            "entry":0,
 
-                0,
+            "mark":0,
 
-            "entry":
-
-                0,
-
-            "mark":
-
-                0,
-
-            "pnl":
-
-                0
+            "pnl":0
 
         }
-
 
 
         print(
@@ -57,71 +45,38 @@ class PositionManager:
 
 
 
+
     # =====================================================
-    # SYNC POSITION
+    # REST SYNC
     # =====================================================
 
 
     def sync(self):
 
 
-        result = self.api.request(
-
-            "GET",
-
-            "/v5/position/list",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL
-
-            }
-
-        )
-
+        result = self.api.get_position()
 
 
 
         if not result:
 
-
-            raise Exception(
-
-                "POSITION API ERROR"
-
-            )
+            return self.position
 
 
 
 
 
+        if result.get("retCode") != 0:
 
-        if result.get(
+            print(
 
-            "retCode"
+                "[POSITION ERROR]",
 
-        ) != 0:
-
-
-            raise Exception(
-
-                result.get(
-
-                    "retMsg",
-
-                    "POSITION ERROR"
-
-                )
+                result
 
             )
+
+            return self.position
 
 
 
@@ -132,32 +87,7 @@ class PositionManager:
         try:
 
 
-            data = (
-
-                result
-
-                ["result"]
-
-                ["list"]
-
-            )
-
-
-
-            if not data:
-
-
-                self.clear()
-
-                return self.position
-
-
-
-
-
-
-
-            pos = data[0]
+            pos = result["result"]["list"][0]
 
 
 
@@ -175,12 +105,7 @@ class PositionManager:
 
 
 
-
-
-
-
             if size == 0:
-
 
 
                 self.clear()
@@ -188,7 +113,6 @@ class PositionManager:
 
 
             else:
-
 
 
                 self.position = {
@@ -260,13 +184,6 @@ class PositionManager:
 
 
 
-
-            return self.position
-
-
-
-
-
         except Exception as e:
 
 
@@ -279,10 +196,156 @@ class PositionManager:
             )
 
 
-            self.clear()
+
+        return self.position
 
 
-            return self.position
+
+
+
+
+
+    # =====================================================
+    # WEBSOCKET UPDATE
+    # =====================================================
+
+
+    def update_ws(
+        self,
+        data
+    ):
+
+
+        try:
+
+
+            if not data:
+
+                return
+
+
+
+            pos = data[0]
+
+
+
+            size = float(
+
+                pos.get(
+
+                    "size",
+
+                    0
+
+                )
+
+            )
+
+
+
+            if size == 0:
+
+
+                self.clear()
+
+
+                return
+
+
+
+
+
+            self.position = {
+
+
+                "side":
+
+                    pos.get(
+
+                        "side",
+
+                        "NONE"
+
+                    ),
+
+
+                "size":
+
+                    size,
+
+
+                "entry":
+
+                    float(
+
+                        pos.get(
+
+                            "entryPrice",
+
+                            0
+
+                        )
+
+                    ),
+
+
+                "mark":
+
+                    float(
+
+                        pos.get(
+
+                            "markPrice",
+
+                            0
+
+                        )
+
+                    ),
+
+
+                "pnl":
+
+                    float(
+
+                        pos.get(
+
+                            "unrealisedPnl",
+
+                            0
+
+                        )
+
+                    )
+
+            }
+
+
+
+            print(
+
+                "[POSITION WS UPDATE]",
+
+                self.position
+
+            )
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[POSITION WS ERROR]",
+
+                e
+
+            )
+
+
 
 
 
@@ -300,30 +363,15 @@ class PositionManager:
 
         self.position = {
 
+            "side":"NONE",
 
-            "side":
+            "size":0,
 
-                "NONE",
+            "entry":0,
 
+            "mark":0,
 
-            "size":
-
-                0,
-
-
-            "entry":
-
-                0,
-
-
-            "mark":
-
-                0,
-
-
-            "pnl":
-
-                0
+            "pnl":0
 
         }
 
@@ -331,11 +379,6 @@ class PositionManager:
 
 
 
-
-
-    # =====================================================
-    # GET
-    # =====================================================
 
 
     def get_position(self):
@@ -348,35 +391,8 @@ class PositionManager:
 
 
 
-
-
-    # =====================================================
-    # HAS POSITION
-    # =====================================================
-
-
-    def has_position(self):
-
-
-        return (
-
-            self.position["size"]
-
-            >
-
-            0
-
-        )
-
-
-
-
-
-
-
-
 # =====================================================
-# SINGLETON
+# INSTANCE
 # =====================================================
 
 
