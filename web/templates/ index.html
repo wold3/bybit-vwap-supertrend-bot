@@ -6,19 +6,31 @@
 <meta charset="UTF-8">
 
 <title>
-VWAP SUPERTREND AUTO BOT
+VWAP SUPERTREND BOT
 </title>
 
 
 <style>
 
-
 body{
 
-    background:#0b0e13;
+    margin:0;
+
+    background:#0b0f14;
+
     color:white;
-    font-family:"Segoe UI",Arial,sans-serif;
-    padding:30px;
+
+    font-family:
+    "Segoe UI",
+    Arial,
+    sans-serif;
+
+}
+
+
+.container{
+
+    padding:25px;
 
 }
 
@@ -26,184 +38,10 @@ body{
 
 h1{
 
-    text-align:center;
-    color:#00ff99;
-    margin-bottom:30px;
-
-}
-
-
-
-.card{
-
-    background:#171b22;
-    padding:25px;
-    margin-bottom:20px;
-    border-radius:18px;
-    box-shadow:
-    0 0 20px rgba(0,0,0,0.5);
-
-}
-
-
-
-h2{
-
     color:#00ff99;
 
 }
 
-
-
-
-/* =========================
-   SWITCH
-========================= */
-
-
-.switch-area{
-
-    display:flex;
-    gap:15px;
-    flex-wrap:wrap;
-
-}
-
-
-
-.switch{
-
-    position:relative;
-    display:inline-block;
-    width:150px;
-    height:55px;
-
-}
-
-
-
-.switch input{
-
-    display:none;
-
-}
-
-
-
-.slider{
-
-    position:absolute;
-
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
-
-    background:#333;
-
-    border-radius:30px;
-
-    cursor:pointer;
-
-    border:2px solid #555;
-
-    transition:0.3s;
-
-}
-
-
-
-.slider:before{
-
-    content:"";
-
-    position:absolute;
-
-    width:45px;
-    height:45px;
-
-    left:4px;
-    bottom:3px;
-
-    background:white;
-
-    border-radius:50%;
-
-    transition:0.3s;
-
-}
-
-
-
-.slider span{
-
-    position:absolute;
-
-    width:100%;
-
-    text-align:center;
-
-    line-height:55px;
-
-    font-weight:bold;
-
-}
-
-
-
-input:checked + .slider:before{
-
-    transform:translateX(95px);
-
-}
-
-
-
-.demo input:checked + .slider{
-
-    background:#2980b9;
-
-}
-
-
-
-.live input:checked + .slider{
-
-    background:#e74c3c;
-
-}
-
-
-
-.start input:checked + .slider{
-
-    background:#27ae60;
-
-}
-
-
-
-.stop input:checked + .slider{
-
-    background:#f39c12;
-
-}
-
-
-
-.close input:checked + .slider{
-
-    background:#8e44ad;
-
-}
-
-
-
-
-
-/* =========================
- STATUS
-========================= */
 
 
 .grid{
@@ -211,21 +49,34 @@ input:checked + .slider:before{
     display:grid;
 
     grid-template-columns:
-    repeat(3,1fr);
+    repeat(auto-fit,minmax(300px,1fr));
 
-    gap:15px;
+    gap:20px;
 
 }
 
 
 
-.item{
+.card{
 
-    background:#0d1015;
+    background:#151b24;
 
     padding:20px;
 
-    border-radius:12px;
+    border-radius:15px;
+
+    box-shadow:
+    0 0 20px #000;
+
+}
+
+
+
+.title{
+
+    color:#aaa;
+
+    font-size:14px;
 
 }
 
@@ -233,40 +84,145 @@ input:checked + .slider:before{
 
 .value{
 
-    display:block;
-
-    margin-top:10px;
-
-    font-size:22px;
+    font-size:28px;
 
     color:#00ff99;
+
+    margin-top:10px;
 
 }
 
 
 
 
-.action{
+button{
+
+    border:0;
+
+    padding:14px 25px;
+
+    margin:5px;
+
+    border-radius:30px;
+
+    cursor:pointer;
+
+    font-weight:bold;
+
+    font-size:15px;
+
+}
 
 
-    background:#000;
 
-    padding:15px;
+button:hover{
+
+    transform:scale(1.05);
+
+}
+
+
+
+.demo{
+
+    background:#2980b9;
+
+    color:white;
+
+}
+
+
+
+.live{
+
+    background:#c0392b;
+
+    color:white;
+
+}
+
+
+
+.start{
+
+    background:#27ae60;
+
+    color:white;
+
+}
+
+
+
+.stop{
+
+    background:#f39c12;
+
+    color:white;
+
+}
+
+
+
+.close{
+
+    background:#8e44ad;
+
+    color:white;
+
+}
+
+
+
+select{
+
+
+    width:100%;
+
+    padding:14px;
 
     border-radius:10px;
 
-    border:1px solid #00ff99;
+    background:#111;
 
     color:#00ff99;
 
     font-size:18px;
 
+    border:1px solid #00ff99;
+
+}
+
+
+
+.switch{
+
+    display:flex;
+
+    gap:10px;
+
 }
 
 
 
 
+.status-on{
+
+    color:#00ff99;
+
+}
+
+
+
+.status-off{
+
+    color:#ff5555;
+
+}
+
+
+
 #logs{
+
 
     height:300px;
 
@@ -278,13 +234,20 @@ input:checked + .slider:before{
 
     border-radius:10px;
 
-    color:#00ff99;
-
     font-size:13px;
 
 }
 
 
+
+.action{
+
+
+    margin-top:10px;
+
+    color:#ffff00;
+
+}
 
 
 
@@ -294,18 +257,24 @@ input:checked + .slider:before{
 
 
 
-
 <body>
+
+
+<div class="container">
 
 
 
 <h1>
-VWAP SUPERTREND AUTO BOT
+🚀 VWAP SUPERTREND AUTO BOT
 </h1>
 
 
 
+<div class="grid">
 
+
+
+<!-- CONTROL -->
 
 <div class="card">
 
@@ -316,127 +285,103 @@ CONTROL
 
 
 
-<div id="action"
-class="action">
-
-READY
-
+<div class="title">
+FUTURES SYMBOL
 </div>
+
+
+
+<select id="symbol"
+onchange="changeSymbol()">
+
+
+
+<option>
+BTCUSDT
+</option>
+
+
+<option>
+ETHUSDT
+</option>
+
+
+<option>
+SOLUSDT
+</option>
+
+
+<option>
+XRPUSDT
+</option>
+
+
+<option>
+DOGEUSDT
+</option>
+
+
+</select>
+
+
+
+
+<br><br>
+
+
+
+<button class="demo"
+onclick="changeMode('DEMO')">
+
+DEMO
+
+</button>
+
+
+<button class="live"
+onclick="changeMode('LIVE')">
+
+LIVE
+
+</button>
 
 
 <br>
 
 
 
-<div class="switch-area">
+<button class="start"
+onclick="botStart()">
+
+▶ START
+
+</button>
 
 
 
-<label class="switch demo">
+<button class="stop"
+onclick="botStop()">
 
-<input 
-type="checkbox"
-onclick="changeMode('DEMO')">
+■ STOP
 
-
-<span class="slider">
-
-<span>
-DEMO
-</span>
-
-</span>
-
-</label>
+</button>
 
 
 
-
-<label class="switch live">
-
-<input 
-type="checkbox"
-onclick="changeMode('LIVE')">
-
-
-<span class="slider">
-
-<span>
-LIVE
-</span>
-
-</span>
-
-</label>
-
-
-
-
-
-<label class="switch start">
-
-<input 
-type="checkbox"
-onclick="startBot()">
-
-
-
-<span class="slider">
-
-<span>
-START
-</span>
-
-</span>
-
-</label>
-
-
-
-
-
-<label class="switch stop">
-
-<input 
-type="checkbox"
-onclick="stopBot()">
-
-
-
-<span class="slider">
-
-<span>
-STOP
-</span>
-
-</span>
-
-</label>
-
-
-
-
-
-<label class="switch close">
-
-<input 
-type="checkbox"
+<button class="close"
 onclick="closePosition()">
 
+✖ CLOSE
 
-
-<span class="slider">
-
-<span>
-CLOSE
-</span>
-
-</span>
-
-</label>
+</button>
 
 
 
+
+<div class="action"
+id="action">
+
+대기중
 
 </div>
 
@@ -450,116 +395,127 @@ CLOSE
 
 
 
+<!-- STATUS -->
+
+<div class="card">
+
+
+<h2>
+SYSTEM
+</h2>
+
+
+
+<p>
+MODE
+</p>
+
+<div id="mode"
+class="value">
+
+-
+
+</div>
+
+
+
+
+<p>
+BOT
+</p>
+
+
+<div id="bot"
+class="value">
+
+-
+
+</div>
+
+
+
+<p>
+SYMBOL
+</p>
+
+
+<div id="symbolView"
+class="value">
+
+-
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+<!-- POSITION -->
 
 
 <div class="card">
 
 
 <h2>
-STATUS
+POSITION
 </h2>
 
 
+<p>
+SIDE
+</p>
 
-<div class="grid">
-
-
-
-<div class="item">
-
-MODE
-
-<span id="mode"
+<div id="side"
 class="value">
 
 -
-
-</span>
 
 </div>
 
 
 
-
-
-<div class="item">
-
-BOT
-
-<span id="bot"
-class="value">
-
--
-
-</span>
-
-</div>
-
-
-
-
-
-<div class="item">
-
-POSITION
-
-<span id="position"
-class="value">
-
--
-
-</span>
-
-</div>
-
-
-
-
-
-<div class="item">
-
+<p>
 SIZE
+</p>
 
-<span id="size"
+<div id="size"
 class="value">
 
--
-
-</span>
+0
 
 </div>
 
 
 
 
-
-<div class="item">
-
+<p>
 ENTRY
+</p>
 
-<span id="entry"
+<div id="entry"
 class="value">
 
--
-
-</span>
+0
 
 </div>
 
 
 
 
-
-<div class="item">
-
+<p>
 PNL
+</p>
 
-<span id="pnl"
+<div id="pnl"
 class="value">
 
--
-
-</span>
+0
 
 </div>
 
@@ -568,12 +524,11 @@ class="value">
 </div>
 
 
-</div>
 
 
 
 
-
+<!-- LOG -->
 
 
 <div class="card">
@@ -589,10 +544,15 @@ EVENT LOG
 </div>
 
 
+
 </div>
 
 
 
+</div>
+
+
+</div>
 
 
 
@@ -602,24 +562,38 @@ EVENT LOG
 <script>
 
 
+function action(msg){
 
-function showAction(text){
-
-    document.getElementById(
-        "action"
-    ).innerHTML=text;
+document.getElementById(
+"action"
+).innerHTML = msg;
 
 }
 
 
 
 
-function post(url,data={}){
 
 
-return fetch(
 
-url,
+function changeSymbol(){
+
+
+let s=document.getElementById(
+"symbol"
+).value;
+
+
+
+action(
+"실행 : SYMBOL 변경 "+s
+);
+
+
+
+fetch(
+
+"/api/symbol",
 
 {
 
@@ -627,23 +601,50 @@ method:"POST",
 
 headers:{
 
-
 "Content-Type":
 "application/json"
-
 
 },
 
 body:
 
-JSON.stringify(data)
+JSON.stringify({
+
+symbol:s
+
+})
 
 }
 
+)
+
+.then(r=>r.json())
+
+.then(data=>{
+
+
+if(data.success){
+
+action(
+"완료 : "+data.symbol
 );
 
+}
+
+else{
+
+action(
+"실패 : "+data.error
+);
 
 }
+
+
+});
+
+
+}
+
 
 
 
@@ -653,44 +654,47 @@ JSON.stringify(data)
 function changeMode(mode){
 
 
-showAction(
-"실행 : MODE 변경 → "+mode
+
+action(
+"실행 : MODE "+mode
 );
 
 
 
-post(
+fetch(
 
 "/api/mode",
 
 {
 
+method:"POST",
+
+headers:{
+
+"Content-Type":
+"application/json"
+
+},
+
+body:
+
+JSON.stringify({
+
 mode:mode
+
+})
 
 }
 
 )
 
-.then(r=>r.json())
+.then(()=>{
 
-.then(data=>{
-
-
-if(data.success)
-
-showAction(
+action(
 "완료 : "+mode
 );
 
-else
-
-showAction(
-"실패 : MODE"
-);
-
-
 update();
-
 
 });
 
@@ -703,39 +707,34 @@ update();
 
 
 
-function startBot(){
+
+function botStart(){
 
 
-showAction(
-"실행 : START"
+action(
+"실행 : BOT START"
 );
 
 
 
-post(
-"/api/start"
+fetch(
+
+"/api/start",
+
+{
+
+method:"POST"
+
+}
+
 )
 
-.then(r=>r.json())
-
-.then(data=>{
+.then(()=>{
 
 
-showAction(
-
-data.success ?
-
-"완료 : BOT START"
-
-:
-
-"실패 : START"
-
+action(
+"완료 : BOT RUNNING"
 );
-
-
-
-update();
 
 
 });
@@ -750,39 +749,34 @@ update();
 
 
 
-function stopBot(){
+function botStop(){
 
 
-showAction(
-"실행 : STOP"
+
+action(
+"실행 : BOT STOP"
 );
 
 
 
-post(
-"/api/stop"
+fetch(
+
+"/api/stop",
+
+{
+
+method:"POST"
+
+}
+
 )
 
-.then(r=>r.json())
-
-.then(data=>{
+.then(()=>{
 
 
-showAction(
-
-data.success ?
-
-"완료 : BOT STOP"
-
-:
-
-"실패 : STOP"
-
+action(
+"완료 : BOT STOPPED"
 );
-
-
-
-update();
 
 
 });
@@ -800,50 +794,48 @@ update();
 function closePosition(){
 
 
-if(!confirm(
+
+if(confirm(
 "포지션 종료?"
-))
-
-return;
+)){
 
 
 
-showAction(
-"실행 : CLOSE"
+action(
+"실행 : CLOSE POSITION"
 );
 
 
 
-post(
-"/api/close"
+fetch(
+
+"/api/close",
+
+{
+
+method:"POST"
+
+}
+
 )
 
-.then(r=>r.json())
-
-.then(data=>{
+.then(()=>{
 
 
-showAction(
-
-data.success ?
-
-"완료 : CLOSED"
-
-:
-
-"실패 : CLOSE"
-
+action(
+"완료 : CLOSE"
 );
-
-
-
-update();
 
 
 });
 
 
+
 }
+
+
+}
+
 
 
 
@@ -858,10 +850,14 @@ function update(){
 
 
 fetch(
+
 "/api/status"
+
 )
 
+
 .then(r=>r.json())
+
 
 .then(data=>{
 
@@ -872,26 +868,56 @@ let s=data.status;
 
 mode.innerHTML=s.mode;
 
+
+
 bot.innerHTML=s.bot;
 
-position.innerHTML=s.position;
+
+
+symbolView.innerHTML=s.symbol;
+
+
+
+side.innerHTML=s.position;
+
+
 
 size.innerHTML=s.position_size;
 
+
+
 entry.innerHTML=s.entry_price;
+
+
 
 pnl.innerHTML=s.pnl;
 
 
 
-logs.innerHTML=
 
-data.logs.join("<br>");
+
+let html="";
+
+
+
+data.logs.forEach(
+
+l=>{
+
+
+html += l+"<br>";
+
+}
+
+);
+
+
+
+logs.innerHTML=html;
 
 
 
 logs.scrollTop=
-
 logs.scrollHeight;
 
 
@@ -900,7 +926,6 @@ logs.scrollHeight;
 
 
 }
-
 
 
 
