@@ -8,19 +8,19 @@ import threading
 import time
 
 
-
 from api.bybit_api import bybit_api
 
 
 import config
 
 
-
 from web.server import (
 
     add_log,
 
-    update_status
+    update_status,
+
+    get_trading_symbol
 
 )
 
@@ -55,14 +55,9 @@ class PositionManager:
 
 
 
-
-
-
-
     # =====================================================
     # DEFAULT
     # =====================================================
-
 
     def default_position(self):
 
@@ -109,7 +104,6 @@ class PositionManager:
 
                 time.time()
 
-
         }
 
 
@@ -117,29 +111,22 @@ class PositionManager:
 
 
 
-
-
-
     # =====================================================
-    # SYMBOL
+    # CURRENT SYMBOL
     # =====================================================
-
 
     def current_symbol(self):
 
 
-        return getattr(
+        try:
 
-            config,
-
-            "SYMBOL",
-
-            "BTCUSDT"
-
-        )
+            return get_trading_symbol()
 
 
+        except Exception:
 
+
+            return config.SYMBOL
 
 
 
@@ -147,9 +134,8 @@ class PositionManager:
 
 
     # =====================================================
-    # REFRESH
+    # REFRESH FROM BYBIT
     # =====================================================
-
 
     def refresh(self):
 
@@ -163,36 +149,47 @@ class PositionManager:
 
             if not result:
 
-
                 return False
 
 
 
 
 
-            rows=[]
+            rows = []
 
 
 
-            if isinstance(result,dict):
+            if isinstance(result, dict):
 
 
-                rows=(
+                rows = (
 
                     result
 
-                    .get("result",{})
+                    .get(
 
-                    .get("list",[])
+                        "result",
+
+                        {}
+
+                    )
+
+                    .get(
+
+                        "list",
+
+                        []
+
+                    )
 
                 )
 
 
 
-            elif isinstance(result,list):
+            elif isinstance(result, list):
 
 
-                rows=result
+                rows = result
 
 
 
@@ -211,20 +208,14 @@ class PositionManager:
 
 
 
-            symbol=self.current_symbol()
-
-
+            symbol = self.current_symbol()
 
 
 
             for row in rows:
 
 
-                if row.get(
-
-                    "symbol"
-
-                ) == symbol:
+                if row.get("symbol") == symbol:
 
 
                     self.update(row)
@@ -236,13 +227,10 @@ class PositionManager:
 
 
 
-
             self.reset()
 
 
-
             return True
-
 
 
 
@@ -266,29 +254,23 @@ class PositionManager:
 
 
 
-
-
-
     # =====================================================
-    # UPDATE
+    # UPDATE POSITION
     # =====================================================
 
-
-    def update(self,data):
+    def update(self, data):
 
 
         try:
 
 
 
-            if isinstance(data,list):
+            if isinstance(data, list):
 
 
                 for row in data:
 
-
                     self.update(row)
-
 
 
                 return True
@@ -297,8 +279,7 @@ class PositionManager:
 
 
 
-
-            if not isinstance(data,dict):
+            if not isinstance(data, dict):
 
 
                 return False
@@ -307,16 +288,13 @@ class PositionManager:
 
 
 
-
-
-            symbol=data.get(
+            symbol = data.get(
 
                 "symbol",
 
                 self.current_symbol()
 
             )
-
 
 
 
@@ -330,8 +308,7 @@ class PositionManager:
 
 
 
-
-            size=float(
+            size = float(
 
                 data.get(
 
@@ -349,9 +326,7 @@ class PositionManager:
 
 
 
-
-
-            side=data.get(
+            side = data.get(
 
                 "side",
 
@@ -361,21 +336,34 @@ class PositionManager:
 
 
 
+            if side not in [
+
+                "Buy",
+
+                "Sell"
+
+            ]:
+
+
+                side = "NONE"
+
+
+
 
 
             if size <= 0:
 
 
-                side="NONE"
+                size = 0
+
+                side = "NONE"
 
 
 
 
 
 
-
-            position={
-
+            position = {
 
 
                 "symbol":
@@ -480,16 +468,15 @@ class PositionManager:
 
 
 
-
             with self.lock:
 
 
-                self.position=position
+                self.position = position
 
 
 
 
-            self.last_sync=time.time()
+            self.last_sync = time.time()
 
 
 
@@ -497,6 +484,12 @@ class PositionManager:
 
 
             update_status({
+
+
+
+                "symbol":
+
+                    position["symbol"],
 
 
 
@@ -518,9 +511,27 @@ class PositionManager:
 
 
 
+                "mark_price":
+
+                    position["mark_price"],
+
+
+
+                "liq_price":
+
+                    position["liq_price"],
+
+
+
                 "pnl":
 
                     position["pnl"],
+
+
+
+                "updated":
+
+                    position["updated"],
 
 
 
@@ -528,18 +539,13 @@ class PositionManager:
 
                     "POSITION SYNC"
 
-
-
             })
 
 
 
 
 
-
-
             return True
-
 
 
 
@@ -563,13 +569,9 @@ class PositionManager:
 
 
 
-
-
-
     # =====================================================
     # GET
     # =====================================================
-
 
     def get_position(self):
 
@@ -585,12 +587,9 @@ class PositionManager:
 
 
 
-
-
     # =====================================================
     # CHECK
     # =====================================================
-
 
     def has_position(self):
 
@@ -599,10 +598,6 @@ class PositionManager:
 
 
             return self.position["size"] > 0
-
-
-
-
 
 
 
@@ -627,9 +622,6 @@ class PositionManager:
                 self.position["size"] > 0
 
             )
-
-
-
 
 
 
@@ -661,14 +653,17 @@ class PositionManager:
 
 
 
-
-
     # =====================================================
-    # STALE
+    # STALE CHECK
     # =====================================================
 
+    def is_stale(
 
-    def is_stale(self,timeout=60):
+        self,
+
+        timeout=60
+
+    ):
 
 
         return (
@@ -691,12 +686,9 @@ class PositionManager:
 
 
 
-
-
     # =====================================================
     # STATUS
     # =====================================================
-
 
     def status(self):
 
@@ -709,13 +701,9 @@ class PositionManager:
 
 
 
-
-
-
     # =====================================================
     # RESET
     # =====================================================
-
 
     def reset(self):
 
@@ -723,7 +711,9 @@ class PositionManager:
         with self.lock:
 
 
-            self.position=self.default_position()
+            self.position = self.default_position()
+
+
 
 
 
@@ -749,6 +739,18 @@ class PositionManager:
 
 
 
+            "mark_price":
+
+                0,
+
+
+
+            "liq_price":
+
+                0,
+
+
+
             "pnl":
 
                 0,
@@ -759,8 +761,8 @@ class PositionManager:
 
                 "POSITION RESET"
 
-
         })
+
 
 
 
@@ -778,11 +780,9 @@ class PositionManager:
 
 
 
-
     # =====================================================
     # CLOSE
     # =====================================================
-
 
     def close(self):
 
@@ -803,11 +803,8 @@ class PositionManager:
 
 
 
-
-
 # =====================================================
 # INSTANCE
 # =====================================================
-
 
 position_manager = PositionManager()
