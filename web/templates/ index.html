@@ -6,26 +6,29 @@
 <meta charset="UTF-8">
 
 <title>
-VWAP SUPERTREND BOT
+VWAP SUPERTREND AUTO BOT
 </title>
 
 
 <style>
 
+
 body{
 
-    background:#0f1115;
+    background:#0b0e13;
     color:white;
-    font-family:"Segoe UI",Arial;
+    font-family:"Segoe UI",Arial,sans-serif;
     padding:30px;
 
 }
+
 
 
 h1{
 
     text-align:center;
     color:#00ff99;
+    margin-bottom:30px;
 
 }
 
@@ -33,107 +36,184 @@ h1{
 
 .card{
 
-    background:#1b1f27;
+    background:#171b22;
     padding:25px;
     margin-bottom:20px;
-    border-radius:15px;
-    box-shadow:0 0 20px #000;
+    border-radius:18px;
+    box-shadow:
+    0 0 20px rgba(0,0,0,0.5);
 
 }
 
 
 
-button{
+h2{
 
-    padding:14px 25px;
-    margin:5px;
-    border:none;
-    border-radius:10px;
+    color:#00ff99;
+
+}
+
+
+
+
+/* =========================
+   SWITCH
+========================= */
+
+
+.switch-area{
+
+    display:flex;
+    gap:15px;
+    flex-wrap:wrap;
+
+}
+
+
+
+.switch{
+
+    position:relative;
+    display:inline-block;
+    width:150px;
+    height:55px;
+
+}
+
+
+
+.switch input{
+
+    display:none;
+
+}
+
+
+
+.slider{
+
+    position:absolute;
+
+    top:0;
+    left:0;
+    right:0;
+    bottom:0;
+
+    background:#333;
+
+    border-radius:30px;
+
     cursor:pointer;
-    font-size:15px;
+
+    border:2px solid #555;
+
+    transition:0.3s;
+
+}
+
+
+
+.slider:before{
+
+    content:"";
+
+    position:absolute;
+
+    width:45px;
+    height:45px;
+
+    left:4px;
+    bottom:3px;
+
+    background:white;
+
+    border-radius:50%;
+
+    transition:0.3s;
+
+}
+
+
+
+.slider span{
+
+    position:absolute;
+
+    width:100%;
+
+    text-align:center;
+
+    line-height:55px;
+
     font-weight:bold;
 
 }
 
 
-button:hover{
 
-    transform:scale(1.05);
+input:checked + .slider:before{
+
+    transform:translateX(95px);
 
 }
 
 
 
-.demo{
+.demo input:checked + .slider{
 
     background:#2980b9;
-    color:white;
 
 }
 
 
-.live{
+
+.live input:checked + .slider{
 
     background:#e74c3c;
-    color:white;
 
 }
 
 
-.start{
+
+.start input:checked + .slider{
 
     background:#27ae60;
-    color:white;
 
 }
 
 
-.stop{
+
+.stop input:checked + .slider{
 
     background:#f39c12;
-    color:white;
 
 }
 
 
-.close{
+
+.close input:checked + .slider{
 
     background:#8e44ad;
-    color:white;
 
 }
 
 
 
-.value{
-
-    font-size:22px;
-    color:#00ff99;
-
-}
 
 
-
-.action{
-
-
-    background:#000;
-    border:1px solid #00ff99;
-    padding:15px;
-    border-radius:10px;
-    color:#00ff99;
-    font-size:18px;
-
-}
+/* =========================
+ STATUS
+========================= */
 
 
-
-.status-grid{
-
+.grid{
 
     display:grid;
-    grid-template-columns:repeat(2,1fr);
-    gap:10px;
+
+    grid-template-columns:
+    repeat(3,1fr);
+
+    gap:15px;
 
 }
 
@@ -141,25 +221,71 @@ button:hover{
 
 .item{
 
-    background:#111;
-    padding:15px;
-    border-radius:10px;
+    background:#0d1015;
+
+    padding:20px;
+
+    border-radius:12px;
 
 }
+
+
+
+.value{
+
+    display:block;
+
+    margin-top:10px;
+
+    font-size:22px;
+
+    color:#00ff99;
+
+}
+
+
+
+
+.action{
+
+
+    background:#000;
+
+    padding:15px;
+
+    border-radius:10px;
+
+    border:1px solid #00ff99;
+
+    color:#00ff99;
+
+    font-size:18px;
+
+}
+
 
 
 
 #logs{
 
     height:300px;
+
     overflow:auto;
+
     background:#000;
+
     padding:15px;
+
     border-radius:10px;
+
     color:#00ff99;
+
     font-size:13px;
 
 }
+
+
+
 
 
 </style>
@@ -168,12 +294,16 @@ button:hover{
 
 
 
+
 <body>
+
 
 
 <h1>
 VWAP SUPERTREND AUTO BOT
 </h1>
+
+
 
 
 
@@ -185,6 +315,7 @@ CONTROL
 </h2>
 
 
+
 <div id="action"
 class="action">
 
@@ -193,58 +324,129 @@ READY
 </div>
 
 
-
 <br>
 
 
 
-<button class="demo"
+<div class="switch-area">
+
+
+
+<label class="switch demo">
+
+<input 
+type="checkbox"
 onclick="changeMode('DEMO')">
 
-DEMO MODE
 
-</button>
+<span class="slider">
+
+<span>
+DEMO
+</span>
+
+</span>
+
+</label>
 
 
 
-<button class="live"
+
+<label class="switch live">
+
+<input 
+type="checkbox"
 onclick="changeMode('LIVE')">
 
-LIVE MODE
 
-</button>
+<span class="slider">
+
+<span>
+LIVE
+</span>
+
+</span>
+
+</label>
 
 
-<br>
 
 
-<button class="start"
+
+<label class="switch start">
+
+<input 
+type="checkbox"
 onclick="startBot()">
 
-▶ START
-
-</button>
 
 
-<button class="stop"
+<span class="slider">
+
+<span>
+START
+</span>
+
+</span>
+
+</label>
+
+
+
+
+
+<label class="switch stop">
+
+<input 
+type="checkbox"
 onclick="stopBot()">
 
-■ STOP
-
-</button>
 
 
+<span class="slider">
 
-<button class="close"
+<span>
+STOP
+</span>
+
+</span>
+
+</label>
+
+
+
+
+
+<label class="switch close">
+
+<input 
+type="checkbox"
 onclick="closePosition()">
 
-✖ CLOSE POSITION
 
-</button>
+
+<span class="slider">
+
+<span>
+CLOSE
+</span>
+
+</span>
+
+</label>
+
 
 
 
 </div>
+
+
+
+</div>
+
+
+
+
 
 
 
@@ -254,18 +456,18 @@ onclick="closePosition()">
 
 
 <h2>
-SYSTEM STATUS
+STATUS
 </h2>
 
 
-<div class="status-grid">
+
+<div class="grid">
+
 
 
 <div class="item">
 
 MODE
-
-<br>
 
 <span id="mode"
 class="value">
@@ -278,11 +480,11 @@ class="value">
 
 
 
+
+
 <div class="item">
 
 BOT
-
-<br>
 
 <span id="bot"
 class="value">
@@ -295,11 +497,11 @@ class="value">
 
 
 
+
+
 <div class="item">
 
 POSITION
-
-<br>
 
 <span id="position"
 class="value">
@@ -312,11 +514,11 @@ class="value">
 
 
 
+
+
 <div class="item">
 
 SIZE
-
-<br>
 
 <span id="size"
 class="value">
@@ -329,11 +531,11 @@ class="value">
 
 
 
+
+
 <div class="item">
 
 ENTRY
-
-<br>
 
 <span id="entry"
 class="value">
@@ -346,11 +548,11 @@ class="value">
 
 
 
+
+
 <div class="item">
 
 PNL
-
-<br>
 
 <span id="pnl"
 class="value">
@@ -367,6 +569,8 @@ class="value">
 
 
 </div>
+
+
 
 
 
@@ -391,7 +595,12 @@ EVENT LOG
 
 
 
+
+
+
+
 <script>
+
 
 
 function showAction(text){
@@ -418,11 +627,16 @@ method:"POST",
 
 headers:{
 
-"Content-Type":"application/json"
+
+"Content-Type":
+"application/json"
+
 
 },
 
-body:JSON.stringify(data)
+body:
+
+JSON.stringify(data)
 
 }
 
@@ -462,21 +676,17 @@ mode:mode
 .then(data=>{
 
 
-if(data.success){
+if(data.success)
 
 showAction(
-"완료 : "+mode+" MODE"
+"완료 : "+mode
 );
 
-}
-
-else{
+else
 
 showAction(
-"실패 : MODE 변경"
+"실패 : MODE"
 );
-
-}
 
 
 update();
@@ -497,15 +707,13 @@ function startBot(){
 
 
 showAction(
-"실행 : START 버튼"
+"실행 : START"
 );
 
 
 
 post(
-
 "/api/start"
-
 )
 
 .then(r=>r.json())
@@ -513,21 +721,18 @@ post(
 .then(data=>{
 
 
-if(data.success){
-
 showAction(
+
+data.success ?
+
 "완료 : BOT START"
+
+:
+
+"실패 : START"
+
 );
 
-}
-
-else{
-
-showAction(
-"실패 : BOT START"
-);
-
-}
 
 
 update();
@@ -549,15 +754,13 @@ function stopBot(){
 
 
 showAction(
-"실행 : STOP 버튼"
+"실행 : STOP"
 );
 
 
 
 post(
-
 "/api/stop"
-
 )
 
 .then(r=>r.json())
@@ -565,21 +768,18 @@ post(
 .then(data=>{
 
 
-if(data.success){
-
 showAction(
+
+data.success ?
+
 "완료 : BOT STOP"
+
+:
+
+"실패 : STOP"
+
 );
 
-}
-
-else{
-
-showAction(
-"실패 : BOT STOP"
-);
-
-}
 
 
 update();
@@ -601,25 +801,21 @@ function closePosition(){
 
 
 if(!confirm(
-"포지션을 종료하시겠습니까?"
-)){
+"포지션 종료?"
+))
 
 return;
-
-}
 
 
 
 showAction(
-"실행 : CLOSE POSITION"
+"실행 : CLOSE"
 );
 
 
 
 post(
-
 "/api/close"
-
 )
 
 .then(r=>r.json())
@@ -627,21 +823,18 @@ post(
 .then(data=>{
 
 
-if(data.success){
-
 showAction(
-"완료 : POSITION CLOSED"
+
+data.success ?
+
+"완료 : CLOSED"
+
+:
+
+"실패 : CLOSE"
+
 );
 
-}
-
-else{
-
-showAction(
-"실패 : CLOSE POSITION"
-);
-
-}
 
 
 update();
@@ -658,13 +851,14 @@ update();
 
 
 
+
+
 function update(){
 
 
+
 fetch(
-
 "/api/status"
-
 )
 
 .then(r=>r.json())
@@ -676,74 +870,37 @@ let s=data.status;
 
 
 
-document.getElementById(
-"mode"
-).innerHTML=s.mode;
+mode.innerHTML=s.mode;
+
+bot.innerHTML=s.bot;
+
+position.innerHTML=s.position;
+
+size.innerHTML=s.position_size;
+
+entry.innerHTML=s.entry_price;
+
+pnl.innerHTML=s.pnl;
 
 
 
-document.getElementById(
-"bot"
-).innerHTML=s.bot;
-
-
-
-document.getElementById(
-"position"
-).innerHTML=s.position;
-
-
-
-document.getElementById(
-"size"
-).innerHTML=s.position_size;
-
-
-
-document.getElementById(
-"entry"
-).innerHTML=s.entry_price;
-
-
-
-document.getElementById(
-"pnl"
-).innerHTML=s.pnl;
-
-
-
-document.getElementById(
-"logs"
-).innerHTML=
+logs.innerHTML=
 
 data.logs.join("<br>");
 
 
 
-let logBox=document.getElementById(
-"logs"
-);
+logs.scrollTop=
 
+logs.scrollHeight;
 
-logBox.scrollTop=
-logBox.scrollHeight;
-
-
-
-})
-
-.catch(e=>{
-
-
-showAction(
-"STATUS ERROR"
-);
 
 
 });
 
 
 }
+
 
 
 
@@ -765,6 +922,7 @@ update();
 
 
 </script>
+
 
 
 </body>
