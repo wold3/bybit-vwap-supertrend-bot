@@ -1,32 +1,22 @@
 # =====================================================
 # api/bybit_api.py
-# Bybit V5 API Manager
+# Bybit V5 API Wrapper
 # =====================================================
 
 import time
 import hmac
 import hashlib
-import json
 import requests
 
 
-
 from config import (
-
     BYBIT_API_KEY,
-
     BYBIT_API_SECRET,
-
     BYBIT_BASE_URL,
-
     CATEGORY,
-
     DEFAULT_SYMBOL,
-
     INTERVAL,
-
     LEVERAGE
-
 )
 
 
@@ -36,7 +26,6 @@ from config import (
 class BybitAPI:
 
 
-
     def __init__(self):
 
 
@@ -44,7 +33,9 @@ class BybitAPI:
 
         self.secret = BYBIT_API_SECRET
 
+
         self.base = BYBIT_BASE_URL
+
 
 
         print(
@@ -64,15 +55,37 @@ class BybitAPI:
 
     def sign(
         self,
-        payload
+        timestamp,
+        recv_window,
+        body
     ):
+
+
+        param = (
+
+            str(timestamp)
+
+            +
+
+            self.key
+
+            +
+
+            str(recv_window)
+
+            +
+
+            body
+
+        )
+
 
 
         return hmac.new(
 
             self.secret.encode(),
 
-            payload.encode(),
+            param.encode(),
 
             hashlib.sha256
 
@@ -97,19 +110,9 @@ class BybitAPI:
     ):
 
 
-        if params is None:
-
-            params = {}
-
-
-
         timestamp = str(
 
-            int(
-
-                time.time()*1000
-
-            )
+            int(time.time()*1000)
 
         )
 
@@ -118,85 +121,155 @@ class BybitAPI:
 
 
 
-
-
         if method == "GET":
 
 
-            query = "&".join(
+            body = ""
 
-                f"{k}={v}"
 
-                for k,v in params.items()
+            url = (
+
+                self.base
+
+                +
+
+                endpoint
 
             )
 
 
-            payload = query
+            response = requests.get(
 
+                url,
 
+                params=params,
 
-        else:
+                headers=self.headers(
 
+                    timestamp,
 
-            payload = json.dumps(
+                    recv_window,
 
-                params,
+                    body
 
-                separators=(
-                    ",",
-                    ":"
                 )
 
             )
 
 
 
+        else:
 
 
-        sign_string = (
+            import json
 
-            timestamp
 
-            +
+            body = json.dumps(
 
-            self.key
+                params
 
-            +
+            )
 
-            recv_window
 
-            +
+            url = (
 
-            payload
+                self.base
+
+                +
+
+                endpoint
+
+            )
+
+
+            response = requests.post(
+
+                url,
+
+                data=body,
+
+                headers=self.headers(
+
+                    timestamp,
+
+                    recv_window,
+
+                    body
+
+                )
+
+            )
+
+
+
+        try:
+
+
+            data = response.json()
+
+
+        except:
+
+
+            print(
+
+                "[BYBIT RAW]",
+
+                response.text
+
+            )
+
+
+            return None
+
+
+
+
+        print(
+
+            "[BYBIT STATUS]",
+
+            response.status_code
 
         )
 
 
 
-        signature = self.sign(
-
-            sign_string
-
-        )
+        if data.get("retCode") != 0:
 
 
+            print(
+
+                "[BYBIT ERROR]",
+
+                data
+
+            )
+
+
+
+        return data
 
 
 
 
 
-        headers = {
+
+
+    def headers(
+        self,
+        timestamp,
+        recv_window,
+        body
+    ):
+
+
+        return {
 
 
             "X-BAPI-API-KEY":
 
                 self.key,
-
-
-            "X-BAPI-SIGN":
-
-                signature,
 
 
             "X-BAPI-TIMESTAMP":
@@ -209,6 +282,19 @@ class BybitAPI:
                 recv_window,
 
 
+            "X-BAPI-SIGN":
+
+                self.sign(
+
+                    timestamp,
+
+                    recv_window,
+
+                    body
+
+                ),
+
+
             "Content-Type":
 
                 "application/json"
@@ -216,105 +302,6 @@ class BybitAPI:
         }
 
 
-
-
-
-
-        url = self.base + endpoint
-
-
-
-
-
-
-        try:
-
-
-            if method == "GET":
-
-
-                r = requests.get(
-
-                    url,
-
-                    headers=headers,
-
-                    params=params,
-
-                    timeout=10
-
-                )
-
-
-            else:
-
-
-                r = requests.post(
-
-                    url,
-
-                    headers=headers,
-
-                    json=params,
-
-                    timeout=10
-
-                )
-
-
-
-
-
-            print(
-
-                "[BYBIT STATUS]",
-
-                r.status_code
-
-            )
-
-
-
-            data = r.json()
-
-
-
-            if data.get(
-
-                "retCode"
-
-            ) != 0:
-
-
-                print(
-
-                    "[BYBIT ERROR]",
-
-                    data
-
-                )
-
-
-
-            return data
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[REQUEST ERROR]",
-
-                e
-
-            )
-
-
-            return None
 
 
 
@@ -338,7 +325,6 @@ class BybitAPI:
 
             {
 
-
                 "accountType":
 
                     "UNIFIED"
@@ -346,6 +332,7 @@ class BybitAPI:
             }
 
         )
+
 
 
 
@@ -369,7 +356,6 @@ class BybitAPI:
             "/v5/market/kline",
 
             {
-
 
                 "category":
 
@@ -430,6 +416,92 @@ class BybitAPI:
 
 
     # =====================================================
+    # POSITION
+    # =====================================================
+
+
+    def get_position(self):
+
+
+        return self.request(
+
+            "GET",
+
+            "/v5/position/list",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL
+
+            }
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # LEVERAGE
+    # =====================================================
+
+
+    def set_leverage(self):
+
+
+        return self.request(
+
+            "POST",
+
+            "/v5/position/set-leverage",
+
+            {
+
+
+                "category":
+
+                    CATEGORY,
+
+
+                "symbol":
+
+                    DEFAULT_SYMBOL,
+
+
+                "buyLeverage":
+
+                    str(LEVERAGE),
+
+
+                "sellLeverage":
+
+                    str(LEVERAGE)
+
+            }
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
     # ORDER
     # =====================================================
 
@@ -439,7 +511,6 @@ class BybitAPI:
         side,
         qty
     ):
-
 
 
         return self.request(
@@ -493,44 +564,7 @@ class BybitAPI:
 
 
     # =====================================================
-    # POSITION
-    # =====================================================
-
-
-    def get_position(self):
-
-
-        return self.request(
-
-            "GET",
-
-            "/v5/position/list",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL
-
-            }
-
-        )
-
-
-
-
-
-
-
-
-    # =====================================================
-    # SET TP SL
+    # TP SL
     # =====================================================
 
 
@@ -567,63 +601,13 @@ class BybitAPI:
 
                 "stopLoss":
 
-                    str(sl),
-
-
-                "tpslMode":
-
-                    "Full"
+                    str(sl)
 
             }
 
         )
 
 
-
-
-
-
-
-
-    # =====================================================
-    # LEVERAGE
-    # =====================================================
-
-
-    def set_leverage(self):
-
-
-        return self.request(
-
-            "POST",
-
-            "/v5/position/set-leverage",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL,
-
-
-                "buyLeverage":
-
-                    str(LEVERAGE),
-
-
-                "sellLeverage":
-
-                    str(LEVERAGE)
-
-            }
-
-        )
 
 
 
