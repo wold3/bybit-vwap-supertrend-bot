@@ -43,14 +43,6 @@ MAX_LOGS = 500
 
 
 
-status_lock = threading.Lock()
-
-log_lock = threading.Lock()
-
-chart_lock = threading.Lock()
-
-
-
 status = {
 
     "mode": "DEMO",
@@ -87,8 +79,15 @@ status = {
 
 logs = []
 
-
 chart_data = []
+
+
+
+status_lock = threading.Lock()
+
+log_lock = threading.Lock()
+
+chart_lock = threading.Lock()
 
 
 
@@ -100,9 +99,7 @@ def add_log(message):
 
     now = time.strftime("%H:%M:%S")
 
-
     text = f"[{now}] {message}"
-
 
     print(text)
 
@@ -151,7 +148,6 @@ def get_status():
 def set_bot_instance(bot):
 
     global bot_instance
-
 
     bot_instance = bot
 
@@ -233,7 +229,7 @@ def api_logs():
 
 
 # =====================================================
-# CHART
+# CHART API
 # =====================================================
 
 @app.route("/api/chart")
@@ -280,10 +276,10 @@ def api_start():
 
                 "success":False,
 
-                "error":
-                    "BOT NOT READY"
+                "error":"BOT NOT READY"
 
             })
+
 
 
         bot_instance.start()
@@ -291,8 +287,7 @@ def api_start():
 
         update_status({
 
-            "bot":
-                "RUNNING"
+            "bot":"RUNNING"
 
         })
 
@@ -304,11 +299,9 @@ def api_start():
 
         return jsonify({
 
-            "success":
-                True
+            "success":True
 
         })
-
 
 
     except Exception as e:
@@ -323,8 +316,7 @@ def api_start():
 
         return jsonify({
 
-            "success":
-                False
+            "success":False
 
         })
 
@@ -343,6 +335,7 @@ def api_stop():
 
     try:
 
+
         if bot_instance:
 
             bot_instance.stop()
@@ -351,8 +344,7 @@ def api_stop():
 
         update_status({
 
-            "bot":
-                "STOPPED"
+            "bot":"STOPPED"
 
         })
 
@@ -364,11 +356,9 @@ def api_stop():
 
         return jsonify({
 
-            "success":
-                True
+            "success":True
 
         })
-
 
 
     except Exception as e:
@@ -383,8 +373,7 @@ def api_stop():
 
         return jsonify({
 
-            "success":
-                False
+            "success":False
 
         })
 
@@ -403,14 +392,12 @@ def api_restart():
 
     try:
 
-        if bot_instance:
 
+        if bot_instance:
 
             bot_instance.stop()
 
-
             time.sleep(1)
-
 
             bot_instance.start()
 
@@ -418,8 +405,7 @@ def api_restart():
 
         update_status({
 
-            "bot":
-                "RUNNING"
+            "bot":"RUNNING"
 
         })
 
@@ -431,11 +417,9 @@ def api_restart():
 
         return jsonify({
 
-            "success":
-                True
+            "success":True
 
         })
-
 
 
     except Exception as e:
@@ -450,8 +434,7 @@ def api_restart():
 
         return jsonify({
 
-            "success":
-                False
+            "success":False
 
         })
 
@@ -493,14 +476,11 @@ def api_mode():
 
     ):
 
-
         return jsonify({
 
-            "success":
-                False,
+            "success":False,
 
-            "error":
-                "INVALID MODE"
+            "error":"INVALID MODE"
 
         })
 
@@ -508,15 +488,15 @@ def api_mode():
 
     update_status({
 
-        "mode":
-            mode
+        "mode":mode
 
     })
 
 
+
     add_log(
 
-        f"MODE CHANGE : {mode}"
+        f"MODE CHANGE {mode}"
 
     )
 
@@ -524,12 +504,7 @@ def api_mode():
 
     try:
 
-
         from api.bybit_api import bybit_api
-
-        from services.private_ws import private_ws
-
-
 
         bybit_api.change_session(
 
@@ -537,6 +512,8 @@ def api_mode():
 
         )
 
+
+        from services.private_ws import private_ws
 
 
         if private_ws.running:
@@ -558,11 +535,9 @@ def api_mode():
 
     return jsonify({
 
-        "success":
-            True,
+        "success":True,
 
-        "mode":
-            mode
+        "mode":mode
 
     })
 
@@ -585,9 +560,7 @@ def api_close():
         from order.order_manager import order_manager
 
 
-
         result = order_manager.close_position()
-
 
 
         add_log(
@@ -618,8 +591,7 @@ def api_close():
 
         return jsonify({
 
-            "success":
-                False
+            "success":False
 
         })
 
@@ -636,20 +608,15 @@ def api_close():
 
 def api_reset():
 
-
     update_status({
 
-        "position":
-            "NONE",
+        "position":"NONE",
 
-        "position_size":
-            0,
+        "position_size":0,
 
-        "entry_price":
-            0,
+        "entry_price":0,
 
-        "pnl":
-            0
+        "pnl":0
 
     })
 
@@ -663,8 +630,7 @@ def api_reset():
 
     return jsonify({
 
-        "success":
-            True
+        "success":True
 
     })
 
@@ -680,14 +646,11 @@ def api_ping():
 
     return jsonify({
 
-        "success":
-            True,
+        "success":True,
 
-        "server":
-            "running",
+        "server":"running",
 
-        "time":
-            int(time.time())
+        "time":int(time.time())
 
     })
 
@@ -750,14 +713,14 @@ def run_server():
 
     print(
 
-        f"[WEB SERVER START] http://{WEB_HOST}:{WEB_PORT}"
+        f"[WEB SERVER READY] http://{WEB_HOST}:{WEB_PORT}"
 
     )
 
 
     add_log(
 
-        "WEB SERVER STARTED"
+        "WEB SERVER READY"
 
     )
 
@@ -771,8 +734,7 @@ def stop_server():
 
     global server_started
 
-
-    server_started = False
+    server_started=False
 
 
     add_log(
@@ -794,7 +756,6 @@ def clear_logs():
         logs.clear()
 
 
-
     add_log(
 
         "LOG CLEARED"
@@ -809,9 +770,7 @@ def clear_logs():
 
 def reset_status():
 
-
     with status_lock:
-
 
         mode = status["mode"]
 
@@ -821,47 +780,33 @@ def reset_status():
 
         status.update({
 
-            "mode":
-                mode,
+            "mode":mode,
 
-            "bot":
-                "STOPPED",
+            "bot":"STOPPED",
 
-            "position":
-                "NONE",
+            "position":"NONE",
 
-            "position_size":
-                0,
+            "position_size":0,
 
-            "entry_price":
-                0,
+            "entry_price":0,
 
-            "pnl":
-                0,
+            "pnl":0,
 
-            "price":
-                0,
+            "price":0,
 
-            "balance":
-                0,
+            "balance":0,
 
-            "equity":
-                0,
+            "equity":0,
 
-            "vwap":
-                0,
+            "vwap":0,
 
-            "trend":
-                "NONE",
+            "trend":"NONE",
 
-            "volume":
-                0,
+            "volume":0,
 
-            "signal":
-                "NONE",
+            "signal":"NONE",
 
-            "watchdog":
-                "OFF"
+            "watchdog":"OFF"
 
         })
 
@@ -911,7 +856,6 @@ __all__ = [
 # =====================================================
 
 if __name__ == "__main__":
-
 
     run_server()
 
