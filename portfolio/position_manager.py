@@ -1,6 +1,6 @@
 # =====================================================
 # portfolio/position_manager.py
-# POSITION MANAGER
+# BYBIT V5 POSITION MANAGER
 # =====================================================
 
 import threading
@@ -20,19 +20,15 @@ from web.server import (
 
 
 
-
 class PositionManager:
 
 
     def __init__(self):
 
-
         self.lock = threading.Lock()
 
 
-
         self.position = {
-
 
             "symbol": "",
 
@@ -50,53 +46,39 @@ class PositionManager:
 
             "updated": 0
 
-
         }
 
 
-
         print(
-
             "[POSITION MANAGER READY]"
-
         )
 
 
 
-
-
     # =====================================================
-    # REFRESH FROM BYBIT
+    # REFRESH REST API
     # =====================================================
 
     def refresh(self):
 
-
         try:
-
 
             result = bybit_api.get_position()
 
 
-
             if not result:
-
 
                 return False
 
 
 
-            rows = result.get(
+            rows = (
 
-                "result",
+                result
 
-                {}
+                .get("result", {})
 
-            ).get(
-
-                "list",
-
-                []
+                .get("list", [])
 
             )
 
@@ -104,24 +86,16 @@ class PositionManager:
 
             if not rows:
 
-
                 self.reset()
 
                 return True
 
 
 
-
-            p = rows[0]
-
-
-
-            self.update(p)
-
+            self.update(rows[0])
 
 
             return True
-
 
 
 
@@ -139,155 +113,159 @@ class PositionManager:
 
 
 
-
-
     # =====================================================
-    # UPDATE POSITION
+    # UPDATE FROM WS / REST
     # =====================================================
 
-    def update(self, p):
+    def update(self, data):
 
 
         try:
 
+            # WS가 list로 전달하는 경우
+
+            if isinstance(data, list):
+
+                if not data:
+
+                    return False
+
+                data = data[0]
+
+
+
+            size = float(
+
+                data.get(
+
+                    "size",
+
+                    0
+
+                ) or 0
+
+            )
+
+
+
+            side = data.get(
+
+                "side",
+
+                "NONE"
+
+            )
+
+
+            if size <= 0:
+
+                side = "NONE"
+
+
+
+            new_position = {
+
+
+                "symbol":
+
+                    data.get(
+
+                        "symbol",
+
+                        ""
+
+                    ),
+
+
+                "side":
+
+                    side,
+
+
+                "size":
+
+                    size,
+
+
+                "entry_price":
+
+                    float(
+
+                        data.get(
+
+                            "avgPrice",
+
+                            0
+
+                        ) or 0
+
+                    ),
+
+
+
+                "mark_price":
+
+                    float(
+
+                        data.get(
+
+                            "markPrice",
+
+                            0
+
+                        ) or 0
+
+                    ),
+
+
+
+                "liq_price":
+
+                    float(
+
+                        data.get(
+
+                            "liqPrice",
+
+                            0
+
+                        ) or 0
+
+                    ),
+
+
+
+                "pnl":
+
+                    float(
+
+                        data.get(
+
+                            "unrealisedPnl",
+
+                            0
+
+                        ) or 0
+
+                    ),
+
+
+
+                "updated":
+
+                    time.time()
+
+            }
+
+
 
             with self.lock:
 
+                self.position.update(
 
-                size = float(
-
-                    p.get(
-
-                        "size",
-
-                        0
-
-                    )
+                    new_position
 
                 )
-
-
-
-                side = p.get(
-
-                    "side"
-
-                )
-
-
-
-                if size <= 0:
-
-
-                    side = "NONE"
-
-
-
-                self.position.update({
-
-
-                    "symbol":
-
-                        p.get(
-
-                            "symbol",
-
-                            ""
-
-                        ),
-
-
-
-                    "side":
-
-                        side,
-
-
-
-                    "size":
-
-                        size,
-
-
-
-                    "entry_price":
-
-                        float(
-
-                            p.get(
-
-                                "avgPrice",
-
-                                0
-
-                            )
-
-                            or 0
-
-                        ),
-
-
-
-                    "mark_price":
-
-                        float(
-
-                            p.get(
-
-                                "markPrice",
-
-                                0
-
-                            )
-
-                            or 0
-
-                        ),
-
-
-
-                    "liq_price":
-
-                        float(
-
-                            p.get(
-
-                                "liqPrice",
-
-                                0
-
-                            )
-
-                            or 0
-
-                        ),
-
-
-
-                    "pnl":
-
-                        float(
-
-                            p.get(
-
-                                "unrealisedPnl",
-
-                                0
-
-                            )
-
-                            or 0
-
-                        ),
-
-
-
-                    "updated":
-
-                        time.time()
-
-
-                })
 
 
 
@@ -295,29 +273,28 @@ class PositionManager:
 
                 "position":
 
-                    self.position["side"],
+                    new_position["side"],
 
 
                 "position_size":
 
-                    self.position["size"],
+                    new_position["size"],
 
 
                 "entry_price":
 
-                    self.position["entry_price"],
+                    new_position["entry_price"],
 
 
                 "pnl":
 
-                    self.position["pnl"]
+                    new_position["pnl"]
 
             })
 
 
 
             return True
-
 
 
 
@@ -335,8 +312,6 @@ class PositionManager:
 
 
 
-
-
     # =====================================================
     # GET POSITION
     # =====================================================
@@ -346,15 +321,12 @@ class PositionManager:
 
         with self.lock:
 
-
             return self.position.copy()
 
 
 
-
-
     # =====================================================
-    # HAS POSITION
+    # POSITION CHECK
     # =====================================================
 
     def has_position(self):
@@ -362,22 +334,14 @@ class PositionManager:
 
         with self.lock:
 
-
             return self.position["size"] > 0
 
 
-
-
-
-    # =====================================================
-    # LONG CHECK
-    # =====================================================
 
     def is_long(self):
 
 
         with self.lock:
-
 
             return (
 
@@ -391,17 +355,10 @@ class PositionManager:
 
 
 
-
-
-    # =====================================================
-    # SHORT CHECK
-    # =====================================================
-
     def is_short(self):
 
 
         with self.lock:
-
 
             return (
 
@@ -415,8 +372,6 @@ class PositionManager:
 
 
 
-
-
     # =====================================================
     # STATUS
     # =====================================================
@@ -424,12 +379,7 @@ class PositionManager:
     def status(self):
 
 
-        with self.lock:
-
-
-            return self.position.copy()
-
-
+        return self.get_position()
 
 
 
@@ -462,34 +412,21 @@ class PositionManager:
 
                 "updated": time.time()
 
-
             }
 
 
 
         update_status({
 
-            "position":
+            "position":"NONE",
 
-                "NONE",
+            "position_size":0,
 
+            "entry_price":0,
 
-            "position_size":
-
-                0,
-
-
-            "entry_price":
-
-                0,
-
-
-            "pnl":
-
-                0
+            "pnl":0
 
         })
-
 
 
         add_log(
@@ -497,8 +434,6 @@ class PositionManager:
             "POSITION RESET"
 
         )
-
-
 
 
 
@@ -533,7 +468,6 @@ class PositionManager:
                 e
 
             )
-
 
 
 
