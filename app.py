@@ -1,6 +1,6 @@
 # =====================================================
 # app.py
-# VWAP SUPERTREND BOT APPLICATION
+# Trading Application Controller
 # =====================================================
 
 import time
@@ -10,9 +10,7 @@ import threading
 
 
 
-from api.bybit_api import (
-    bybit_api
-)
+from api.bybit_api import bybit_api
 
 
 from strategy.vwap_supertrend_strategy import (
@@ -47,8 +45,13 @@ from database.database import (
 
 from web.server import (
     update_status,
-    add_log
+    add_log,
+    get_trading_mode
 )
+
+
+
+
 
 
 
@@ -85,7 +88,6 @@ class TradingApp:
     # START
     # =====================================================
 
-
     def start(self):
 
 
@@ -93,6 +95,8 @@ class TradingApp:
 
 
             return
+
+
 
 
 
@@ -104,57 +108,9 @@ class TradingApp:
 
 
 
+
+
         self.running = True
-
-
-
-
-
-
-        # Private WS
-
-        private_ws.start()
-
-
-
-
-
-        # Watchdog
-
-        watchdog.start()
-
-
-
-
-
-
-
-        # Position Sync
-
-        position_manager.sync()
-
-
-
-
-
-
-
-
-        # Market Thread
-
-
-        self.thread = threading.Thread(
-
-            target=self.market_loop,
-
-            daemon=True
-
-        )
-
-
-        self.thread.start()
-
-
 
 
 
@@ -170,11 +126,217 @@ class TradingApp:
 
         update_status({
 
+
+            "bot":
+
+                "STARTING"
+
+        })
+
+
+
+
+
+
+
+
+
+        # -------------------------------
+        # Balance Check
+        # -------------------------------
+
+
+        try:
+
+
+            balance = (
+
+                bybit_api
+
+                .get_balance()
+
+            )
+
+
+
+            if balance:
+
+
+                print(
+
+                    "[BALANCE OK]"
+
+                )
+
+
+
+            else:
+
+
+                print(
+
+                    "[BALANCE SKIP]"
+
+                )
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[BALANCE WARNING]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+        # -------------------------------
+        # Private WS
+        # -------------------------------
+
+
+        try:
+
+
+            private_ws.start()
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[PRIVATE WS ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+        # -------------------------------
+        # Watchdog
+        # -------------------------------
+
+
+        try:
+
+
+            watchdog.start()
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[WATCHDOG ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+        # -------------------------------
+        # Position Sync
+        # -------------------------------
+
+
+        try:
+
+
+            position_manager.sync()
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[POSITION SYNC ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+        # -------------------------------
+        # Market Loop
+        # -------------------------------
+
+
+        self.thread = threading.Thread(
+
+
+            target=self.market_loop,
+
+
+            daemon=True
+
+
+        )
+
+
+        self.thread.start()
+
+
+
+
+
+
+
+
+
+        update_status({
+
+
             "bot":
 
                 "RUNNING"
 
+
         })
+
+
+
+        print(
+
+            "[BOT READY]"
+
+        )
 
 
 
@@ -188,13 +350,12 @@ class TradingApp:
     # MARKET LOOP
     # =====================================================
 
-
     def market_loop(self):
 
 
         print(
 
-            "[MARKET THREAD START]"
+            "[MARKET LOOP START]"
 
         )
 
@@ -203,11 +364,16 @@ class TradingApp:
         while self.running:
 
 
+
             try:
 
 
 
                 watchdog.heartbeat()
+
+
+
+
 
 
 
@@ -225,13 +391,11 @@ class TradingApp:
 
 
 
+
+
                 if candles:
 
 
-
-
-
-                    # Bybit candle 변환
 
 
                     formatted = []
@@ -246,7 +410,7 @@ class TradingApp:
 
                             "time":
 
-                                int(c[0]) // 1000,
+                                int(c[0])//1000,
 
 
                             "open":
@@ -273,7 +437,10 @@ class TradingApp:
 
                                 float(c[5])
 
+
                         })
+
+
 
 
 
@@ -297,15 +464,9 @@ class TradingApp:
 
 
 
-                    indicator = (
-
-                        vwap_supertrend_strategy
-
-                        .last_indicator
-
-                    )
 
 
+                    last = formatted[-1]
 
 
 
@@ -314,29 +475,17 @@ class TradingApp:
 
                         "price":
 
-                            formatted[-1]["close"],
+                            last["close"],
 
 
-                        "vwap":
+                        "signal":
 
-                            indicator.get(
+                            signal["signal"]
 
-                                "vwap",
+                            if signal
 
-                                0
+                            else "-"
 
-                            ),
-
-
-                        "trend":
-
-                            indicator.get(
-
-                                "trend",
-
-                                "-"
-
-                            )
 
                     })
 
@@ -350,6 +499,7 @@ class TradingApp:
                     if signal:
 
 
+
                         print(
 
                             "[SIGNAL]",
@@ -357,16 +507,6 @@ class TradingApp:
                             signal
 
                         )
-
-
-
-                        update_status({
-
-                            "signal":
-
-                                signal["signal"]
-
-                        })
 
 
 
@@ -381,7 +521,11 @@ class TradingApp:
 
 
 
+
                 time.sleep(5)
+
+
+
 
 
 
@@ -391,22 +535,20 @@ class TradingApp:
             except Exception as e:
 
 
-
                 print(
 
-                    "[MARKET LOOP ERROR]",
+                    "[MARKET ERROR]",
 
                     e
 
                 )
 
 
-                database.save_error(
+                add_log(
 
-                    e
+                    f"MARKET ERROR {e}"
 
                 )
-
 
 
                 time.sleep(5)
@@ -422,7 +564,6 @@ class TradingApp:
     # =====================================================
     # STOP
     # =====================================================
-
 
     def stop(self):
 
@@ -441,16 +582,49 @@ class TradingApp:
 
 
 
-        private_ws.stop()
+        try:
 
 
-        watchdog.stop()
-
-
+            private_ws.stop()
 
 
 
-        database.close()
+        except:
+
+
+            pass
+
+
+
+
+
+        try:
+
+
+            watchdog.stop()
+
+
+
+        except:
+
+
+            pass
+
+
+
+
+
+        try:
+
+
+            database.close()
+
+
+
+        except:
+
+
+            pass
 
 
 
@@ -458,9 +632,11 @@ class TradingApp:
 
         update_status({
 
+
             "bot":
 
                 "STOPPED"
+
 
         })
 
