@@ -1,39 +1,316 @@
-from api.bybit_api import bybit_api
+# =====================================================
+# test_order.py
+# Bybit Demo Manual Order Test
+# =====================================================
+
+import time
 
 
-print("==============================")
-print("DEMO ORDER TEST")
-print("==============================")
 
-
-price = bybit_api.get_price()
-
-print(
-    "CURRENT PRICE :",
-    price
+from api.bybit_api import (
+    bybit_api
 )
 
 
-tp = price * 1.01
+from risk.risk_manager import (
+    risk_manager
+)
 
-sl = price * 0.995
 
-
-
-result = bybit_api.create_order(
-
-    side="Buy",
-
-    qty=0.001,
-
-    take_profit=tp,
-
-    stop_loss=sl
-
+from config import (
+    DEFAULT_SYMBOL
 )
 
 
 
-print("==============================")
-print(result)
-print("==============================")
+
+
+def main():
+
+
+    print("====================")
+
+    print("[TEST ORDER START]")
+
+    print("====================")
+
+
+
+
+
+    # =====================================
+    # 현재 가격 확인
+    # =====================================
+
+
+    candles = (
+
+        bybit_api
+
+        .get_kline()
+
+    )
+
+
+
+    if not candles:
+
+
+        print(
+
+            "[NO MARKET DATA]"
+
+        )
+
+        return
+
+
+
+
+
+    price = float(
+
+        candles[-1][4]
+
+    )
+
+
+
+    print(
+
+        "[PRICE]",
+
+        price
+
+    )
+
+
+
+
+
+
+
+
+
+    # =====================================
+    # 테스트 Equity 설정
+    # =====================================
+
+
+    risk_manager.update_equity(
+
+        10000
+
+    )
+
+
+
+
+
+
+
+
+
+    # =====================================
+    # 수량 계산
+    # =====================================
+
+
+    risk = (
+
+        risk_manager
+
+        .check(
+
+            price
+
+        )
+
+    )
+
+
+
+    if not risk:
+
+
+        print(
+
+            "[RISK BLOCK]"
+
+        )
+
+
+        return
+
+
+
+
+
+
+
+    qty = risk["qty"]
+
+
+
+
+
+    print(
+
+        "[QTY]",
+
+        qty
+
+    )
+
+
+
+
+
+
+
+
+
+    # =====================================
+    # BUY TEST
+    # =====================================
+
+
+    print(
+
+        "[SEND BUY]"
+
+    )
+
+
+
+
+    result = (
+
+        bybit_api
+
+        .place_order(
+
+            "Buy",
+
+            qty
+
+        )
+
+    )
+
+
+
+
+
+    print(
+
+        result
+
+    )
+
+
+
+
+
+
+
+
+
+    time.sleep(3)
+
+
+
+
+
+
+
+    # =====================================
+    # TP SL TEST
+    # =====================================
+
+
+    tp_sl = (
+
+        risk_manager
+
+        .calculate_tp_sl(
+
+            "Buy",
+
+            price
+
+        )
+
+    )
+
+
+
+
+
+    print(
+
+        "[TP]",
+
+        tp_sl["tp"]
+
+    )
+
+
+    print(
+
+        "[SL]",
+
+        tp_sl["sl"]
+
+    )
+
+
+
+
+
+    stop = (
+
+        bybit_api
+
+        .set_trading_stop(
+
+            tp_sl["tp"],
+
+            tp_sl["sl"]
+
+        )
+
+    )
+
+
+
+
+
+    print(
+
+        stop
+
+    )
+
+
+
+
+
+    print("====================")
+
+    print("[TEST COMPLETE]")
+
+    print("====================")
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+
+
+    main()
