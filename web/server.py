@@ -3,7 +3,12 @@
 # Dashboard Web Server
 # =====================================================
 
-from flask import Flask, jsonify, render_template
+from flask import (
+    Flask,
+    jsonify,
+    render_template
+)
+
 import threading
 import time
 
@@ -12,6 +17,16 @@ import time
 from config import (
     WEB_HOST,
     WEB_PORT
+)
+
+
+from database.database import (
+    database
+)
+
+
+from web.chart_data import (
+    chart_data
 )
 
 
@@ -28,7 +43,7 @@ app = Flask(
 
 
 # =====================================================
-# STATUS STORAGE
+# STATUS MEMORY
 # =====================================================
 
 
@@ -42,7 +57,7 @@ status = {
 
     "symbol":
 
-        "",
+        "BTCUSDT",
 
 
     "price":
@@ -90,11 +105,6 @@ status = {
         0,
 
 
-    "order":
-
-        "NONE",
-
-
     "tp":
 
         0,
@@ -102,55 +112,23 @@ status = {
 
     "sl":
 
-        0
+        0,
+
+
+    "order":
+
+        "",
+
+
+    "stats":
+
+        {}
 
 }
 
 
 
-
-
-
 logs = []
-
-
-
-
-
-
-# =====================================================
-# CHART DATA
-# =====================================================
-
-
-chart_data = []
-
-
-
-
-
-
-
-def add_candle(data):
-
-
-    global chart_data
-
-
-    chart_data.append(
-
-        data
-
-    )
-
-
-    if len(chart_data) > 200:
-
-
-        chart_data.pop(0)
-
-
-
 
 
 
@@ -165,11 +143,28 @@ def add_candle(data):
 def update_status(data):
 
 
-    status.update(
+    try:
 
-        data
 
-    )
+        status.update(
+
+            data
+
+        )
+
+
+    except Exception as e:
+
+
+        print(
+
+            "[STATUS ERROR]",
+
+            e
+
+        )
+
+
 
 
 
@@ -185,24 +180,62 @@ def update_status(data):
 def add_log(message):
 
 
-    timestamp = time.strftime(
-
-        "%H:%M:%S"
-
-    )
+    try:
 
 
-    logs.append(
+        text = (
 
-        f"[{timestamp}] {message}"
+            time.strftime(
 
-    )
+                "%H:%M:%S"
+
+            )
+
+            +
+
+            " "
+
+            +
+
+            str(message)
+
+        )
 
 
-    if len(logs) > 100:
+        logs.append(
+
+            text
+
+        )
 
 
-        logs.pop(0)
+
+        if len(logs) > 200:
+
+
+            del logs[0]
+
+
+
+        database.save_log(
+
+            text
+
+        )
+
+
+
+    except Exception as e:
+
+
+        print(
+
+            "[LOG ERROR]",
+
+            e
+
+        )
+
 
 
 
@@ -212,19 +245,36 @@ def add_log(message):
 
 
 # =====================================================
-# PAGE
+# DASHBOARD
 # =====================================================
 
 
 @app.route("/")
-
 def index():
 
-    return render_template(
 
-        "dashboard.html"
+    try:
 
-    )
+
+        return render_template(
+
+            "dashboard.html"
+
+        )
+
+
+    except:
+
+
+        return """
+
+        <h1>VWAP SUPERTREND BOT</h1>
+
+        <p>Dashboard Running</p>
+
+        """
+
+
 
 
 
@@ -237,9 +287,21 @@ def index():
 # =====================================================
 
 
-@app.route("/api/status")
+@app.route(
+    "/api/status"
+)
 
 def api_status():
+
+
+    status["stats"] = (
+
+        database
+
+        .get_trade_stats()
+
+    )
+
 
 
     return jsonify({
@@ -252,8 +314,7 @@ def api_status():
 
         "logs":
 
-            logs
-
+            logs[-50:]
 
     })
 
@@ -270,14 +331,16 @@ def api_status():
 # =====================================================
 
 
-@app.route("/api/chart")
+@app.route(
+    "/api/chart"
+)
 
 def api_chart():
 
 
     return jsonify(
 
-        chart_data
+        chart_data.get()
 
     )
 
@@ -290,7 +353,35 @@ def api_chart():
 
 
 # =====================================================
-# SERVER START
+# TRADES API
+# =====================================================
+
+
+@app.route(
+    "/api/trades"
+)
+
+def api_trades():
+
+
+    return jsonify(
+
+        database
+
+        .get_recent_trades()
+
+    )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SERVER THREAD
 # =====================================================
 
 
@@ -299,15 +390,23 @@ def run_server():
 
     app.run(
 
-        host=WEB_HOST,
+        host=
 
-        port=WEB_PORT,
+            WEB_HOST,
+
+
+        port=
+
+            WEB_PORT,
+
 
         debug=False,
+
 
         use_reloader=False
 
     )
+
 
 
 
@@ -339,27 +438,3 @@ def start_dashboard():
         WEB_PORT
 
     )
-
-
-
-
-
-
-
-
-
-# =====================================================
-# TEST
-# =====================================================
-
-
-if __name__ == "__main__":
-
-
-    start_dashboard()
-
-
-    while True:
-
-
-        time.sleep(1)
