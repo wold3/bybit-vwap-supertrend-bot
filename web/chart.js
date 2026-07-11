@@ -1,16 +1,12 @@
-//////////////////////////////////////////////////////
+// =====================================================
 // VWAP SUPERTREND BOT
-// BYBIT V5 CANDLE CHART
-//////////////////////////////////////////////////////
+// BYBIT CANDLE CHART
+// =====================================================
 
 
 let candleChart = null;
 
 
-
-// ==================================================
-// LOAD DATA
-// ==================================================
 
 async function loadChart(){
 
@@ -18,37 +14,17 @@ async function loadChart(){
     try{
 
 
-        const res = await fetch(
-            "/api/candles"
-        );
+        const res =
+        await fetch("/api/candles");
 
 
-        const json = await res.json();
-
-
-
-        if(
-            !json.result ||
-            !json.result.list
-        ){
-
-            console.log(
-                "NO CANDLE DATA"
-            );
-
-            return;
-
-        }
-
+        const json =
+        await res.json();
 
 
 
         let list =
-            json.result.list;
-
-
-
-        let candles = [];
+        json.result.list;
 
 
 
@@ -56,38 +32,32 @@ async function loadChart(){
 
 
 
+        let data = [];
+
+
+
         list.forEach(c=>{
 
 
-            candles.push({
+            data.push({
 
 
-                x:
-                Number(c[0]),
+                x:Number(c[0]),
 
 
-
-                o:
-                Number(c[1]),
+                o:Number(c[1]),
 
 
-
-                h:
-                Number(c[2]),
+                h:Number(c[2]),
 
 
-
-                l:
-                Number(c[3]),
+                l:Number(c[3]),
 
 
-
-                c:
-                Number(c[4])
+                c:Number(c[4])
 
 
             });
-
 
 
         });
@@ -95,9 +65,7 @@ async function loadChart(){
 
 
 
-        drawCandleChart(
-            candles
-        );
+        drawChart(data);
 
 
 
@@ -108,11 +76,8 @@ async function loadChart(){
 
 
         console.log(
-
-            "CHART ERROR",
-
+            "CANDLE ERROR",
             e
-
         );
 
 
@@ -127,151 +92,104 @@ async function loadChart(){
 
 
 
-
-
-// ==================================================
-// DRAW CANDLE
-// ==================================================
-
-function drawCandleChart(data){
+function drawChart(data){
 
 
 
-    const canvas =
-
-        document.getElementById(
-            "chart"
-        );
-
+    const ctx =
+    document.getElementById(
+        "chart"
+    );
 
 
-    if(!canvas)
+
+    if(!ctx)
+
+    return;
+
+
+
+
+
+
+    if(candleChart){
+
+
+        candleChart.data.datasets[0].data=data;
+
+
+        candleChart.update();
+
 
         return;
 
 
-
-
-
-
-
-    if(candleChart === null){
-
-
-
-        candleChart = new Chart(
-
-            canvas,
-
-            {
-
-
-            type:
-
-            "candlestick",
-
-
-
-
-            data:{
-
-
-                datasets:[{
-
-
-                    label:
-
-                    "BTCUSDT",
-
-
-
-                    data:
-
-                    data
-
-
-
-                }]
-
-
-            },
+    }
 
 
 
 
 
 
-            options:{
+
+    candleChart = new Chart(
+
+        ctx,
 
 
-                responsive:true,
+        {
 
 
-                maintainAspectRatio:false,
-
-
-
-                animation:false,
+        type:"candlestick",
 
 
 
-                plugins:{
+        data:{
 
 
-                    legend:{
+            datasets:[{
 
 
-                        display:true
+                label:"BTCUSDT",
 
 
-                    }
+                data:data
+
+
+            }]
+
+
+        },
+
+
+
+        options:{
+
+
+            responsive:true,
+
+
+            maintainAspectRatio:false,
+
+
+
+            scales:{
+
+
+                x:{
+
+
+                    type:"time"
 
 
 
                 },
 
 
+                y:{
 
 
-
-                scales:{
-
-
-
-                    x:{
-
-
-                        type:
-
-                        "time",
-
-
-
-                        time:{
-
-
-                            unit:
-
-                            "minute"
-
-
-
-                        }
-
-
-
-                    },
-
-
-
-                    y:{
-
-
-                        beginAtZero:false
-
-
-
-                    }
+                    position:"right"
 
 
 
@@ -279,36 +197,34 @@ function drawCandleChart(data){
 
 
 
+            },
+
+
+
+            plugins:{
+
+
+                legend:{
+
+
+                    display:true
+
+
+                }
 
 
             }
 
 
-
-        });
-
-
-
-    }
+        }
 
 
 
-    else{
+        }
 
 
 
-        candleChart
-        .data
-        .datasets[0]
-        .data = data;
-
-
-
-        candleChart.update();
-
-
-
-    }
+    );
 
 
 
@@ -319,20 +235,11 @@ function drawCandleChart(data){
 
 
 
-
-
-
-
-// ==================================================
-// AUTO REFRESH
-// ==================================================
-
-
 setInterval(
 
-    loadChart,
+loadChart,
 
-    5000
+5000
 
 );
 
