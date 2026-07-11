@@ -1,6 +1,6 @@
 # =====================================================
 # config.py
-# VWAP SUPERTREND AUTO BOT CONFIG
+# VWAP SUPERTREND BOT CONFIGURATION
 # =====================================================
 
 import os
@@ -14,33 +14,19 @@ load_dotenv()
 
 
 
-print("==============================")
-print("[CONFIG LOADED]")
-print("==============================")
-
-
-
-
-
 # =====================================================
 # BYBIT API
 # =====================================================
 
 BYBIT_API_KEY = os.getenv(
-
     "BYBIT_API_KEY",
-
     ""
-
 )
 
 
 BYBIT_API_SECRET = os.getenv(
-
     "BYBIT_API_SECRET",
-
     ""
-
 )
 
 
@@ -50,18 +36,22 @@ BYBIT_API_SECRET = os.getenv(
 # =====================================================
 # TRADING MODE
 # =====================================================
-# 기본 실행 모드
-# DEMO : 모의투자
-# LIVE : 실거래
-#
-# Dashboard에서 변경 가능
 
-DEFAULT_MODE = "DEMO"
+# 초기 실행 모드
+# DEMO / LIVE
 
-
-LIVE = False
+DEFAULT_MODE = os.getenv(
+    "DEFAULT_MODE",
+    "DEMO"
+).upper()
 
 
+
+LIVE = (
+
+    DEFAULT_MODE == "LIVE"
+
+)
 
 
 
@@ -71,23 +61,24 @@ LIVE = False
 # MARKET
 # =====================================================
 
-CATEGORY = "linear"
+CATEGORY = os.getenv(
+    "CATEGORY",
+    "linear"
+)
 
 
-DEFAULT_SYMBOL = "BTCUSDT"
+SYMBOL = os.getenv(
+    "SYMBOL",
+    "BTCUSDT"
+)
 
 
-INTERVAL = "5"
-
-
-
-
-
-# =====================================================
-# LEVERAGE
-# =====================================================
-
-LEVERAGE = 3
+LEVERAGE = int(
+    os.getenv(
+        "LEVERAGE",
+        "3"
+    )
+)
 
 
 
@@ -97,27 +88,45 @@ LEVERAGE = 3
 # RISK MANAGEMENT
 # =====================================================
 
-# 1회 거래 위험률 (%)
+RISK_PER_TRADE_PERCENT = float(
 
-RISK_PER_TRADE_PERCENT = 0.5
+    os.getenv(
+        "RISK_PER_TRADE_PERCENT",
+        "0.5"
+    )
 
-
-
-# 손절 %
-
-STOP_LOSS_PERCENT = 1.0
-
+)
 
 
-# 익절 %
+STOP_LOSS_PERCENT = float(
 
-TAKE_PROFIT_PERCENT = 2.0
+    os.getenv(
+        "STOP_LOSS_PERCENT",
+        "1.0"
+    )
+
+)
+
+
+TAKE_PROFIT_PERCENT = float(
+
+    os.getenv(
+        "TAKE_PROFIT_PERCENT",
+        "2.0"
+    )
+
+)
 
 
 
-# 최대 주문 수량
+MAX_POSITION_SIZE = float(
 
-MAX_POSITION_SIZE = 0.001
+    os.getenv(
+        "MAX_POSITION_SIZE",
+        "0.001"
+    )
+
+)
 
 
 
@@ -127,29 +136,64 @@ MAX_POSITION_SIZE = 0.001
 # STRATEGY
 # =====================================================
 
-# ATR
+ATR_PERIOD = int(
 
-ATR_PERIOD = 14
+    os.getenv(
+        "ATR_PERIOD",
+        "10"
+    )
 
-
-
-# SuperTrend 배수
-
-SUPERTREND_MULTIPLIER = 3
-
+)
 
 
 
+SUPERTREND_MULTIPLIER = float(
 
-# 거래량 필터
+    os.getenv(
+        "SUPERTREND_MULTIPLIER",
+        "3"
+    )
 
-USE_VOLUME_FILTER = True
+)
 
 
-VOLUME_PERIOD = 20
 
 
-MIN_VOLUME_MULTIPLIER = 1.2
+
+USE_VOLUME_FILTER = (
+
+    os.getenv(
+        "USE_VOLUME_FILTER",
+        "True"
+    ).lower()
+
+    ==
+
+    "true"
+
+)
+
+
+
+VOLUME_PERIOD = int(
+
+    os.getenv(
+        "VOLUME_PERIOD",
+        "20"
+    )
+
+)
+
+
+
+MIN_VOLUME_MULTIPLIER = float(
+
+    os.getenv(
+        "MIN_VOLUME_MULTIPLIER",
+        "1.2"
+    )
+
+)
 
 
 
@@ -159,24 +203,13 @@ MIN_VOLUME_MULTIPLIER = 1.2
 # DATABASE
 # =====================================================
 
-DATABASE_PATH = (
+DB_FILE = os.getenv(
 
-    "database/trading.db"
+    "DB_FILE",
+
+    "bot.db"
 
 )
-
-
-
-
-
-# =====================================================
-# WEB DASHBOARD
-# =====================================================
-
-WEB_HOST = "0.0.0.0"
-
-
-WEB_PORT = 8000
 
 
 
@@ -208,100 +241,73 @@ TELEGRAM_CHAT_ID = os.getenv(
 
 
 # =====================================================
-# BOT CONTROL
+# WEB
 # =====================================================
 
-# 직접 실행 방식
+WEB_PORT = int(
 
-AUTO_START = True
+    os.getenv(
+        "WEB_PORT",
+        "8000"
+    )
 
-
-
-# 작업 스케줄러 사용 안 함
-
-USE_TASK_SCHEDULER = False
-
-
-
-
-
-# =====================================================
-# DEBUG
-# =====================================================
-
-DEBUG = True
-
-
+)
 
 
 
 
 
 # =====================================================
-# CONFIG CHECK
+# PRINT CONFIG
 # =====================================================
 
 print(
+    "=============================="
+)
 
+print(
+    "[CONFIG LOADED]"
+)
+
+print(
+    "=============================="
+)
+
+print(
     "LIVE :",
-
     LIVE
-
 )
 
-
 print(
-
     "DEFAULT MODE :",
-
     DEFAULT_MODE
-
 )
 
-
 print(
-
     "CATEGORY :",
-
     CATEGORY
-
 )
 
-
 print(
-
     "SYMBOL :",
-
-    DEFAULT_SYMBOL
-
+    SYMBOL
 )
 
-
 print(
-
     "LEVERAGE :",
-
     LEVERAGE
-
 )
 
-
 print(
-
     "API KEY LENGTH :",
-
     len(BYBIT_API_KEY)
-
 )
-
 
 print(
-
     "SECRET LENGTH :",
-
     len(BYBIT_API_SECRET)
-
 )
 
-
-print("==============================")
+print(
+    "=============================="
+)
