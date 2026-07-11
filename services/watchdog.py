@@ -8,17 +8,9 @@ import threading
 
 
 
-from web.server import (
-    add_log,
-    update_status
-)
-
-
-
 
 
 class Watchdog:
-
 
 
     def __init__(self):
@@ -49,11 +41,26 @@ class Watchdog:
 
 
 
+    # =====================================================
+    # HEARTBEAT
+    # =====================================================
+
+
+    def heartbeat(self):
+
+
+        self.last_heartbeat = time.time()
+
+
+
+
+
 
 
     # =====================================================
     # START
     # =====================================================
+
 
     def start(self):
 
@@ -78,22 +85,18 @@ class Watchdog:
         )
 
 
+
         self.thread.start()
 
 
 
+        print(
+
+            "[WATCHDOG RUNNING]"
+
+        )
 
 
-
-
-    # =====================================================
-    # HEARTBEAT
-    # =====================================================
-
-    def heartbeat(self):
-
-
-        self.last_heartbeat = time.time()
 
 
 
@@ -105,108 +108,48 @@ class Watchdog:
     # LOOP
     # =====================================================
 
+
     def loop(self):
-
-
-        print(
-
-            "[WATCHDOG RUNNING]"
-
-        )
-
 
 
         while self.running:
 
 
-
-            try:
-
-
-
-                diff = (
-
-                    time.time()
-
-                    -
-
-                    self.last_heartbeat
-
-                )
+            now = time.time()
 
 
 
+            diff = (
+
+                now -
+
+                self.last_heartbeat
+
+            )
 
 
 
-                if diff > self.timeout:
-
-
-
-                    print(
-
-                        "[WATCHDOG WARNING] MARKET THREAD STOP"
-
-                    )
-
-
-                    add_log(
-
-                        "WATCHDOG MARKET TIMEOUT"
-
-                    )
-
-
-
-                    update_status({
-
-                        "bot":
-
-                            "WARNING"
-
-                    })
-
-
-
-
-
-
-                else:
-
-
-
-                    update_status({
-
-                        "bot":
-
-                            "RUNNING"
-
-                    })
-
-
-
-
-
-
-            except Exception as e:
-
+            if diff > self.timeout:
 
 
                 print(
 
-                    "[WATCHDOG ERROR]",
+                    "[WATCHDOG WARNING]"
 
-                    e
+                )
+
+
+                print(
+
+                    "NO MARKET HEARTBEAT",
+
+                    diff
 
                 )
 
 
 
-                add_log(
-
-                    str(e)
-
-                )
+                self.recovery()
 
 
 
@@ -223,8 +166,39 @@ class Watchdog:
 
 
     # =====================================================
+    # RECOVERY
+    # =====================================================
+
+
+    def recovery(self):
+
+
+        print(
+
+            "[WATCHDOG RECOVERY]"
+
+        )
+
+
+
+        # 향후 추가 가능
+
+        # websocket reconnect
+
+        # market thread restart
+
+        # api reconnect
+
+
+
+
+
+
+
+    # =====================================================
     # STOP
     # =====================================================
+
 
     def stop(self):
 
@@ -245,10 +219,9 @@ class Watchdog:
 
 
 
-
-
 # =====================================================
-# SINGLETON
+# INSTANCE
 # =====================================================
+
 
 watchdog = Watchdog()
