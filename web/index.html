@@ -5,12 +5,8 @@
 
 <meta charset="UTF-8">
 
-<title>
-VWAP SUPERTREND BOT
-</title>
+<title>VWAP SUPERTREND BOT</title>
 
-
-<!-- Chart Library -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -18,12 +14,10 @@ VWAP SUPERTREND BOT
 
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial/dist/chartjs-chart-financial.min.js"></script>
 
 
 <style>
-
 
 body{
 
@@ -33,38 +27,27 @@ body{
 
     color:#e6edf3;
 
-    font-family:
-
-    Arial,
-    sans-serif;
+    font-family:Arial,sans-serif;
 
 }
 
 
-
-
 .header{
 
-    background:#161b22;
-
     padding:20px;
+
+    background:#161b22;
 
     border-bottom:1px solid #30363d;
 
 }
 
 
-
-
 .header h1{
 
     margin:0;
 
-    font-size:28px;
-
 }
-
-
 
 
 
@@ -84,9 +67,6 @@ body{
 
 
 
-
-
-
 .card{
 
     background:#161b22;
@@ -101,17 +81,11 @@ body{
 
 
 
-
-
 .full{
 
-    grid-column:
-
-    1 / -1;
+    grid-column:1/-1;
 
 }
-
-
 
 
 
@@ -121,28 +95,23 @@ body{
 
     margin-bottom:10px;
 
-    font-size:14px;
-
 }
-
 
 
 
 .value{
 
-    font-size:28px;
+    font-size:30px;
 
     font-weight:bold;
 
 }
-
-
 
 
 
 .price{
 
-    font-size:40px;
+    font-size:42px;
 
     font-weight:bold;
 
@@ -150,31 +119,7 @@ body{
 
 
 
-
-
-.green{
-
-    color:#3fb950;
-
-}
-
-
-
-
-.red{
-
-    color:#f85149;
-
-}
-
-
-
-
-
-
-
 button{
-
 
     width:120px;
 
@@ -192,9 +137,7 @@ button{
 
     cursor:pointer;
 
-
 }
-
 
 
 
@@ -205,13 +148,11 @@ button{
 }
 
 
-
 .sell{
 
     background:#da3633;
 
 }
-
 
 
 .close{
@@ -222,12 +163,29 @@ button{
 
 
 
+.chart-box{
+
+    height:650px;
+
+}
+
+
+
+.chart-container{
+
+    position:relative;
+
+    height:560px;
+
+    width:100%;
+
+}
+
 
 
 #logs{
 
-
-    height:280px;
+    height:300px;
 
     overflow:auto;
 
@@ -235,23 +193,19 @@ button{
 
     padding:15px;
 
-    font-family:
-
-    monospace;
-
+    font-family:monospace;
 
 }
-
-
 
 
 
 canvas{
 
-    background:#111;
+    width:100% !important;
+
+    height:100% !important;
 
 }
-
 
 
 </style>
@@ -261,25 +215,16 @@ canvas{
 
 
 
-
-
 <body>
-
 
 
 <div class="header">
 
-
 <h1>
-
 VWAP SUPERTREND BOT
-
 </h1>
 
-
 </div>
-
-
 
 
 
@@ -291,28 +236,17 @@ VWAP SUPERTREND BOT
 
 
 
-
 <div class="card">
 
 <div class="title">
-
 BOT STATUS
-
 </div>
 
-
-<div id="bot"
-
-class="value">
-
+<div id="bot" class="value">
 -
-
 </div>
 
-
 </div>
-
-
 
 
 
@@ -321,24 +255,14 @@ class="value">
 <div class="card">
 
 <div class="title">
-
 MODE
-
 </div>
 
-
-<div id="mode"
-
-class="value">
-
+<div id="mode" class="value">
 -
-
 </div>
 
-
 </div>
-
-
 
 
 
@@ -347,24 +271,14 @@ class="value">
 <div class="card">
 
 <div class="title">
-
 SYMBOL
-
 </div>
 
-
-<div id="symbol"
-
-class="value">
-
+<div id="symbol" class="value">
 -
-
 </div>
 
-
 </div>
-
-
 
 
 
@@ -372,26 +286,15 @@ class="value">
 
 <div class="card">
 
-
 <div class="title">
-
 PRICE
-
 </div>
 
-
-<div id="price"
-
-class="price">
-
+<div id="price" class="price">
 -
-
 </div>
 
-
 </div>
-
-
 
 
 
@@ -399,59 +302,28 @@ class="price">
 
 <div class="card">
 
-
 <div class="title">
-
 POSITION
-
 </div>
 
-
-
-<div id="position"
-
-class="value">
-
+<div id="position" class="value">
 -
-
 </div>
-
 
 <br>
-
 
 SIZE :
-
-<span id="size">
-
--
-
-</span>
-
+<span id="size">-</span>
 
 <br>
-
 
 ENTRY :
-
-<span id="entry">
-
--
-
-</span>
-
+<span id="entry">-</span>
 
 <br>
 
-
 MARK :
-
-<span id="mark">
-
--
-
-</span>
-
+<span id="mark">-</span>
 
 </div>
 
@@ -459,30 +331,17 @@ MARK :
 
 
 
-
-
 <div class="card">
 
-
 <div class="title">
-
 PNL
-
 </div>
 
-
-
-<div id="pnl"
-
-class="price">
-
+<div id="pnl" class="price">
 -
-
 </div>
 
-
 </div>
-
 
 
 
@@ -491,19 +350,12 @@ class="price">
 
 <div class="card">
 
-
 <div class="title">
-
 MANUAL ORDER
-
 </div>
 
 
-
-<button
-
-class="buy"
-
+<button class="buy"
 onclick="sendOrder('Buy')">
 
 BUY
@@ -511,11 +363,7 @@ BUY
 </button>
 
 
-
-<button
-
-class="sell"
-
+<button class="sell"
 onclick="sendOrder('Sell')">
 
 SELL
@@ -523,17 +371,12 @@ SELL
 </button>
 
 
-
-<button
-
-class="close"
-
+<button class="close"
 onclick="closeOrder()">
 
 CLOSE
 
 </button>
-
 
 
 </div>
@@ -544,9 +387,7 @@ CLOSE
 
 
 
-
-
-<div class="card full">
+<div class="card full chart-box">
 
 
 <div class="title">
@@ -556,16 +397,17 @@ BTCUSDT 5M CANDLE CHART
 </div>
 
 
+<div class="chart-container">
 
-<canvas id="chart"
 
-height="120">
-
-</canvas>
-
+<canvas id="chart"></canvas>
 
 
 </div>
+
+
+</div>
+
 
 
 
@@ -583,15 +425,10 @@ SYSTEM LOG
 </div>
 
 
-<div id="logs">
-
-</div>
-
+<div id="logs"></div>
 
 
 </div>
-
-
 
 
 
@@ -610,19 +447,13 @@ SYSTEM LOG
 <script>
 
 
-// ==========================
-// STATUS
-// ==========================
-
-
 function updateStatus(){
-
 
 
 fetch("/api/status")
 
 
-.then(response=>response.json())
+.then(r=>r.json())
 
 
 .then(data=>{
@@ -631,104 +462,46 @@ fetch("/api/status")
 let s=data.status;
 
 
+document.getElementById("bot").innerHTML=s.bot;
 
-document.getElementById("bot").innerHTML=
+document.getElementById("mode").innerHTML=s.mode;
 
-s.bot;
+document.getElementById("symbol").innerHTML=s.symbol;
 
+document.getElementById("price").innerHTML=s.price;
 
+document.getElementById("position").innerHTML=s.position;
 
-document.getElementById("mode").innerHTML=
+document.getElementById("size").innerHTML=s.position_size;
 
-s.mode;
+document.getElementById("entry").innerHTML=s.entry_price;
 
+document.getElementById("mark").innerHTML=s.mark_price;
 
-
-document.getElementById("symbol").innerHTML=
-
-s.symbol;
-
-
-
-document.getElementById("price").innerHTML=
-
-s.price;
-
-
-
-document.getElementById("position").innerHTML=
-
-s.position;
-
-
-
-document.getElementById("size").innerHTML=
-
-s.position_size;
-
-
-
-document.getElementById("entry").innerHTML=
-
-s.entry_price;
-
-
-
-document.getElementById("mark").innerHTML=
-
-s.mark_price;
-
-
-
-document.getElementById("pnl").innerHTML=
-
-s.pnl;
-
+document.getElementById("pnl").innerHTML=s.pnl;
 
 
 
 let html="";
 
 
-data.logs.forEach(log=>{
+data.logs.forEach(x=>{
 
-
-html += log+"<br>";
-
-
+html+=x+"<br>";
 
 });
 
 
-
-document.getElementById("logs").innerHTML=
-
-html;
-
-
-
-document.getElementById("logs").scrollTop=
-
-document.getElementById("logs").scrollHeight;
-
+document.getElementById("logs").innerHTML=html;
 
 
 });
-
 
 
 }
 
 
 
-
-
-
-
-
-// ==========================
-// ORDER
-// ==========================
 
 
 function sendOrder(side){
@@ -739,13 +512,10 @@ fetch("/api/order",{
 
 method:"POST",
 
-
 headers:{
 
 
-"Content-Type":
-
-"application/json"
+"Content-Type":"application/json"
 
 
 },
@@ -755,7 +525,6 @@ body:JSON.stringify({
 
 
 side:side,
-
 
 qty:0.001
 
@@ -773,15 +542,12 @@ qty:0.001
 
 
 
-
 function closeOrder(){
 
 
 fetch("/api/close",{
 
-
 method:"POST"
-
 
 });
 
@@ -791,21 +557,9 @@ method:"POST"
 
 
 
-
-
-
-setInterval(
-
-updateStatus,
-
-1000
-
-);
-
-
+setInterval(updateStatus,1000);
 
 updateStatus();
-
 
 
 </script>
@@ -814,13 +568,9 @@ updateStatus();
 
 
 
-<!-- Candle Chart -->
-
 <script src="/chart.js"></script>
 
 
-
 </body>
-
 
 </html>
