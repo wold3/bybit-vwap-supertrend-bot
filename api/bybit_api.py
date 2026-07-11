@@ -1,22 +1,22 @@
 # =====================================================
 # api/bybit_api.py
-# Bybit V5 API Wrapper
+# Bybit V5 API Manager
+# Demo / Live Trading
 # =====================================================
 
 import time
 import hmac
 import hashlib
 import requests
+import json
 
 
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
-    BYBIT_BASE_URL,
     CATEGORY,
     DEFAULT_SYMBOL,
-    INTERVAL,
-    LEVERAGE
+    LIVE
 )
 
 
@@ -29,17 +29,38 @@ class BybitAPI:
     def __init__(self):
 
 
-        self.key = BYBIT_API_KEY
-
-        self.secret = BYBIT_API_SECRET
+        if LIVE:
 
 
-        self.base = BYBIT_BASE_URL
+            self.base_url = (
+                "https://api.bybit.com"
+            )
+
+
+        else:
+
+
+            # Bybit Demo Trading API
+
+            self.base_url = (
+                "https://api-demo.bybit.com"
+            )
 
 
 
         print(
+
             "[BYBIT API READY]"
+
+        )
+
+
+        print(
+
+            "[MODE]",
+
+            "LIVE" if LIVE else "DEMO"
+
         )
 
 
@@ -55,41 +76,69 @@ class BybitAPI:
 
     def sign(
         self,
-        timestamp,
-        recv_window,
-        body
+        payload
     ):
 
 
-        param = (
+        timestamp = str(
 
-            str(timestamp)
+            int(
 
-            +
+                time.time()*1000
 
-            self.key
-
-            +
-
-            str(recv_window)
-
-            +
-
-            body
+            )
 
         )
 
 
 
-        return hmac.new(
+        recv_window = "5000"
 
-            self.secret.encode(),
+
+
+        param = (
+
+            timestamp
+
+            +
+
+            BYBIT_API_KEY
+
+            +
+
+            recv_window
+
+            +
+
+            payload
+
+        )
+
+
+
+        signature = hmac.new(
+
+            BYBIT_API_SECRET.encode(),
 
             param.encode(),
 
             hashlib.sha256
 
         ).hexdigest()
+
+
+
+        return (
+
+            timestamp,
+
+            recv_window,
+
+            signature
+
+        )
+
+
 
 
 
@@ -105,203 +154,196 @@ class BybitAPI:
     def request(
         self,
         method,
-        endpoint,
+        path,
         params=None
     ):
-
-
-        timestamp = str(
-
-            int(time.time()*1000)
-
-        )
-
-
-        recv_window = "5000"
-
-
-
-        if method == "GET":
-
-
-            body = ""
-
-
-            url = (
-
-                self.base
-
-                +
-
-                endpoint
-
-            )
-
-
-            response = requests.get(
-
-                url,
-
-                params=params,
-
-                headers=self.headers(
-
-                    timestamp,
-
-                    recv_window,
-
-                    body
-
-                )
-
-            )
-
-
-
-        else:
-
-
-            import json
-
-
-            body = json.dumps(
-
-                params
-
-            )
-
-
-            url = (
-
-                self.base
-
-                +
-
-                endpoint
-
-            )
-
-
-            response = requests.post(
-
-                url,
-
-                data=body,
-
-                headers=self.headers(
-
-                    timestamp,
-
-                    recv_window,
-
-                    body
-
-                )
-
-            )
-
 
 
         try:
 
 
-            data = response.json()
+            if params is None:
+
+                params = {}
 
 
-        except:
+
+            if method == "GET":
+
+
+                payload = (
+
+                    json.dumps(
+
+                        params,
+
+                        separators=(
+                            ",",
+                            ":"
+                        )
+
+                    )
+
+                )
+
+            else:
+
+
+                payload = json.dumps(
+
+                    params,
+
+                    separators=(
+                        ",",
+                        ":"
+                    )
+
+                )
+
+
+
+
+            timestamp, recv, signature = self.sign(
+
+                payload
+
+            )
+
+
+
+            headers = {
+
+
+                "X-BAPI-API-KEY":
+
+                    BYBIT_API_KEY,
+
+
+                "X-BAPI-SIGN":
+
+                    signature,
+
+
+                "X-BAPI-TIMESTAMP":
+
+                    timestamp,
+
+
+                "X-BAPI-RECV-WINDOW":
+
+                    recv,
+
+
+                "Content-Type":
+
+                    "application/json"
+
+            }
+
+
+
+
+
+            url = (
+
+                self.base_url
+
+                +
+
+                path
+
+            )
+
+
+
+
+            if method == "GET":
+
+
+                r = requests.get(
+
+                    url,
+
+                    headers=headers,
+
+                    params=params,
+
+                    timeout=10
+
+                )
+
+
+
+            else:
+
+
+                r = requests.post(
+
+                    url,
+
+                    headers=headers,
+
+                    json=params,
+
+                    timeout=10
+
+                )
+
+
+
+
 
 
             print(
 
-                "[BYBIT RAW]",
+                "[BYBIT STATUS]",
 
-                response.text
+                r.status_code
+
+            )
+
+
+
+            data = r.json()
+
+
+
+            if data.get(
+
+                "retCode"
+
+            ) != 0:
+
+
+                print(
+
+                    "[BYBIT ERROR]",
+
+                    data
+
+                )
+
+
+
+            return data
+
+
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[REQUEST ERROR]",
+
+                e
 
             )
 
 
             return None
-
-
-
-
-        print(
-
-            "[BYBIT STATUS]",
-
-            response.status_code
-
-        )
-
-
-
-        if data.get("retCode") != 0:
-
-
-            print(
-
-                "[BYBIT ERROR]",
-
-                data
-
-            )
-
-
-
-        return data
-
-
-
-
-
-
-
-    def headers(
-        self,
-        timestamp,
-        recv_window,
-        body
-    ):
-
-
-        return {
-
-
-            "X-BAPI-API-KEY":
-
-                self.key,
-
-
-            "X-BAPI-TIMESTAMP":
-
-                timestamp,
-
-
-            "X-BAPI-RECV-WINDOW":
-
-                recv_window,
-
-
-            "X-BAPI-SIGN":
-
-                self.sign(
-
-                    timestamp,
-
-                    recv_window,
-
-                    body
-
-                ),
-
-
-            "Content-Type":
-
-                "application/json"
-
-        }
-
-
 
 
 
@@ -325,9 +367,11 @@ class BybitAPI:
 
             {
 
+
                 "accountType":
 
                     "UNIFIED"
+
 
             }
 
@@ -346,7 +390,10 @@ class BybitAPI:
     # =====================================================
 
 
-    def get_kline(self):
+    def get_kline(
+        self,
+        limit=200
+    ):
 
 
         result = self.request(
@@ -356,6 +403,7 @@ class BybitAPI:
             "/v5/market/kline",
 
             {
+
 
                 "category":
 
@@ -369,12 +417,12 @@ class BybitAPI:
 
                 "interval":
 
-                    INTERVAL,
+                    "5",
 
 
                 "limit":
 
-                    200
+                    limit
 
             }
 
@@ -384,7 +432,10 @@ class BybitAPI:
 
         if not result:
 
+
             return []
+
+
 
 
 
@@ -400,6 +451,7 @@ class BybitAPI:
                 ["list"]
 
             )
+
 
 
         except:
@@ -440,54 +492,6 @@ class BybitAPI:
                 "symbol":
 
                     DEFAULT_SYMBOL
-
-            }
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # LEVERAGE
-    # =====================================================
-
-
-    def set_leverage(self):
-
-
-        return self.request(
-
-            "POST",
-
-            "/v5/position/set-leverage",
-
-            {
-
-
-                "category":
-
-                    CATEGORY,
-
-
-                "symbol":
-
-                    DEFAULT_SYMBOL,
-
-
-                "buyLeverage":
-
-                    str(LEVERAGE),
-
-
-                "sellLeverage":
-
-                    str(LEVERAGE)
 
             }
 
