@@ -1,6 +1,6 @@
 # =====================================================
 # web/server.py
-# Flask Dashboard Server
+# VWAP SUPERTREND BOT WEB SERVER
 # =====================================================
 
 from flask import (
@@ -22,15 +22,19 @@ app = Flask(
 
 
 
+
+
 # =====================================================
-# GLOBAL STATE
+# GLOBAL
 # =====================================================
 
 lock = threading.Lock()
 
 
-
 CURRENT_MODE = "DEMO"
+
+
+BOT_INSTANCE = None
 
 
 
@@ -67,19 +71,28 @@ LOGS = []
 
 
 # =====================================================
-# STATUS UPDATE
+# BOT CONNECT
+# =====================================================
+
+def set_bot_instance(bot):
+
+    global BOT_INSTANCE
+
+    BOT_INSTANCE = bot
+
+
+
+
+
+# =====================================================
+# STATUS
 # =====================================================
 
 def update_status(data):
 
-
     with lock:
 
-        STATUS.update(
-
-            data
-
-        )
+        STATUS.update(data)
 
 
 
@@ -88,31 +101,19 @@ def update_status(data):
 
 
 
-
-# =====================================================
-# LOG SYSTEM
-# =====================================================
 
 def add_log(message):
 
-
     with lock:
-
 
         LOGS.append(
 
-            f"{time.strftime('%H:%M:%S')} "
-
-            +
-
-            str(message)
+            f"{time.strftime('%H:%M:%S')} {message}"
 
         )
 
 
-
         if len(LOGS) > 100:
-
 
             LOGS.pop(0)
 
@@ -124,15 +125,9 @@ def add_log(message):
 
 
 
-# =====================================================
-# GET MODE
-# =====================================================
-
 def get_trading_mode():
 
-
     with lock:
-
 
         return CURRENT_MODE
 
@@ -144,16 +139,13 @@ def get_trading_mode():
 
 
 
-
 # =====================================================
-# CHANGE MODE
+# MODE CHANGE
 # =====================================================
 
 def change_mode(mode):
 
-
     global CURRENT_MODE
-
 
 
     mode = str(mode).upper()
@@ -168,7 +160,6 @@ def change_mode(mode):
 
     ]:
 
-
         return False
 
 
@@ -177,11 +168,10 @@ def change_mode(mode):
 
     with lock:
 
-
         CURRENT_MODE = mode
 
-
         STATUS["mode"] = mode
+
 
 
 
@@ -197,15 +187,11 @@ def change_mode(mode):
 
 
 
-    # -----------------------------
-    # BYBIT SESSION CHANGE
-    # -----------------------------
+    # Bybit session 변경
 
     try:
 
-
         from api.bybit_api import bybit_api
-
 
 
         bybit_api.change_session(
@@ -215,13 +201,11 @@ def change_mode(mode):
         )
 
 
-
         add_log(
 
             f"BYBIT SESSION : {mode}"
 
         )
-
 
 
     except Exception as e:
@@ -238,10 +222,7 @@ def change_mode(mode):
 
 
 
-
-    # -----------------------------
-    # PRIVATE WS RESTART
-    # -----------------------------
+    # Private WS 재연결
 
     try:
 
@@ -267,17 +248,14 @@ def change_mode(mode):
         )
 
 
-
     except Exception as e:
 
 
         add_log(
 
-            f"WS RESTART ERROR : {e}"
+            f"WS ERROR : {e}"
 
         )
-
-
 
 
 
@@ -301,7 +279,6 @@ def change_mode(mode):
 
 def index():
 
-
     return render_template(
 
         "dashboard.html"
@@ -320,11 +297,7 @@ def index():
 # STATUS API
 # =====================================================
 
-@app.route(
-
-    "/api/status"
-
-)
+@app.route("/api/status")
 
 def api_status():
 
@@ -333,7 +306,6 @@ def api_status():
 
 
         return jsonify({
-
 
             "status":
 
@@ -345,6 +317,36 @@ def api_status():
                 LOGS[-50:]
 
         })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# HEALTH
+# =====================================================
+
+@app.route("/api/health")
+
+def health():
+
+
+    return jsonify({
+
+        "server":
+
+            "OK",
+
+
+        "mode":
+
+            CURRENT_MODE
+
+    })
 
 
 
@@ -377,24 +379,15 @@ def api_mode():
 
 
 
-    mode = data.get(
-
-        "mode"
-
-    )
-
-
-
     result = change_mode(
 
-        mode
+        data.get("mode")
 
     )
 
 
 
     return jsonify({
-
 
         "success":
 
@@ -403,8 +396,7 @@ def api_mode():
 
         "mode":
 
-            get_trading_mode()
-
+            CURRENT_MODE
 
     })
 
@@ -417,32 +409,79 @@ def api_mode():
 
 
 # =====================================================
-# HEALTH CHECK
+# BOT STOP
 # =====================================================
 
 @app.route(
 
-    "/api/health"
+    "/api/stop",
+
+    methods=["POST"]
 
 )
 
-def health():
+def api_stop():
 
 
-    return jsonify({
+    try:
 
 
-        "server":
-
-            "OK",
+        if BOT_INSTANCE:
 
 
-        "mode":
-
-            get_trading_mode()
+            BOT_INSTANCE.stop()
 
 
-    })
+
+        update_status({
+
+            "bot":
+
+                "STOPPED"
+
+        })
+
+
+
+        add_log(
+
+            "BOT STOP COMMAND"
+
+        )
+
+
+
+        return jsonify({
+
+            "success":
+
+                True
+
+        })
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"STOP ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "success":
+
+                False,
+
+            "error":
+
+                str(e)
+
+        })
 
 
 
@@ -453,38 +492,72 @@ def health():
 
 
 # =====================================================
-# BOT STATUS
+# BOT START
 # =====================================================
 
-def bot_running():
+@app.route(
+
+    "/api/start",
+
+    methods=["POST"]
+
+)
+
+def api_start():
 
 
-    update_status({
-
-        "bot":
-
-            "RUNNING"
-
-    })
+    try:
 
 
+        if BOT_INSTANCE:
+
+
+            BOT_INSTANCE.start()
 
 
 
+        update_status({
+
+            "bot":
+
+                "RUNNING"
+
+        })
 
 
 
+        add_log(
 
-def bot_stopped():
+            "BOT START COMMAND"
+
+        )
 
 
-    update_status({
 
-        "bot":
+        return jsonify({
 
-            "STOPPED"
+            "success":
 
-    })
+                True
+
+        })
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+            "success":
+
+                False,
+
+            "error":
+
+                str(e)
+
+        })
 
 
 
@@ -495,7 +568,86 @@ def bot_stopped():
 
 
 # =====================================================
-# SERVER START
+# CLOSE POSITION
+# =====================================================
+
+@app.route(
+
+    "/api/close",
+
+    methods=["POST"]
+
+)
+
+def api_close():
+
+
+    try:
+
+
+        from api.bybit_api import bybit_api
+
+
+
+        result = bybit_api.close_position()
+
+
+
+        add_log(
+
+            "CLOSE POSITION COMMAND"
+
+        )
+
+
+
+        return jsonify({
+
+            "success":
+
+                True,
+
+
+            "result":
+
+                result
+
+        })
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"CLOSE ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "success":
+
+                False,
+
+            "error":
+
+                str(e)
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SERVER
 # =====================================================
 
 def start_server():
@@ -506,6 +658,7 @@ def start_server():
         "[WEB SERVER START] 8000"
 
     )
+
 
 
     app.run(
