@@ -4,8 +4,21 @@
 # =====================================================
 
 from config import (
-    CATEGORY,
-    DEFAULT_SYMBOL
+    DEFAULT_SYMBOL,
+    CATEGORY
+)
+
+
+
+from api.bybit_api import (
+    bybit_api
+)
+
+
+
+from web.server import (
+    update_status,
+    add_log
 )
 
 
@@ -15,28 +28,31 @@ from config import (
 class PositionManager:
 
 
-    def __init__(self, api):
-
-        self.api = api
+    def __init__(self):
 
 
         self.position = {
 
-            "side":"NONE",
+            "side":
+                "NONE",
 
-            "size":0,
+            "size":
+                0,
 
-            "entry":0,
+            "entry":
+                0,
 
-            "mark":0,
-
-            "pnl":0
+            "pnl":
+                0
 
         }
 
 
+
         print(
+
             "[POSITION MANAGER READY]"
+
         )
 
 
@@ -45,38 +61,99 @@ class PositionManager:
 
 
 
-
     # =====================================================
-    # REST SYNC
+    # SYNC POSITION
     # =====================================================
 
 
     def sync(self):
 
 
-        result = self.api.get_position()
+        try:
+
+
+            result = (
+
+                bybit_api
+
+                .get_position()
+
+            )
 
 
 
-        if not result:
-
-            return self.position
+            if not result:
 
 
+                return False
 
 
 
-        if result.get("retCode") != 0:
 
-            print(
 
-                "[POSITION ERROR]",
+            if result.get(
+
+                "retCode"
+
+            ) != 0:
+
+
+                print(
+
+                    "[POSITION ERROR]",
+
+                    result
+
+                )
+
+
+                return False
+
+
+
+
+
+
+
+            positions = (
 
                 result
 
+                .get(
+
+                    "result",
+
+                    {}
+
+                )
+
+                .get(
+
+                    "list",
+
+                    []
+
+                )
+
             )
 
-            return self.position
+
+
+            if not positions:
+
+
+                self.clear()
+
+
+
+                print(
+
+                    "[NO POSITION]"
+
+                )
+
+
+                return True
 
 
 
@@ -84,16 +161,15 @@ class PositionManager:
 
 
 
-        try:
+            p = positions[0]
 
 
-            pos = result["result"]["list"][0]
 
 
 
             size = float(
 
-                pos.get(
+                p.get(
 
                     "size",
 
@@ -105,6 +181,8 @@ class PositionManager:
 
 
 
+
+
             if size == 0:
 
 
@@ -112,144 +190,16 @@ class PositionManager:
 
 
 
-            else:
+                print(
 
-
-                self.position = {
-
-
-                    "side":
-
-                        pos.get(
-
-                            "side",
-
-                            "NONE"
-
-                        ),
-
-
-                    "size":
-
-                        size,
-
-
-                    "entry":
-
-                        float(
-
-                            pos.get(
-
-                                "avgPrice",
-
-                                0
-
-                            )
-
-                        ),
-
-
-                    "mark":
-
-                        float(
-
-                            pos.get(
-
-                                "markPrice",
-
-                                0
-
-                            )
-
-                        ),
-
-
-                    "pnl":
-
-                        float(
-
-                            pos.get(
-
-                                "unrealisedPnl",
-
-                                0
-
-                            )
-
-                        )
-
-                }
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[POSITION PARSE ERROR]",
-
-                e
-
-            )
-
-
-
-        return self.position
-
-
-
-
-
-
-
-    # =====================================================
-    # WEBSOCKET UPDATE
-    # =====================================================
-
-
-    def update_ws(
-        self,
-        data
-    ):
-
-
-        try:
-
-
-            if not data:
-
-                return
-
-
-
-            pos = data[0]
-
-
-
-            size = float(
-
-                pos.get(
-
-                    "size",
-
-                    0
+                    "[NO POSITION]"
 
                 )
 
-            )
+
+                return True
 
 
-
-            if size == 0:
-
-
-                self.clear()
-
-
-                return
 
 
 
@@ -260,7 +210,7 @@ class PositionManager:
 
                 "side":
 
-                    pos.get(
+                    p.get(
 
                         "side",
 
@@ -278,24 +228,9 @@ class PositionManager:
 
                     float(
 
-                        pos.get(
+                        p.get(
 
-                            "entryPrice",
-
-                            0
-
-                        )
-
-                    ),
-
-
-                "mark":
-
-                    float(
-
-                        pos.get(
-
-                            "markPrice",
+                            "avgPrice",
 
                             0
 
@@ -308,7 +243,7 @@ class PositionManager:
 
                     float(
 
-                        pos.get(
+                        p.get(
 
                             "unrealisedPnl",
 
@@ -322,13 +257,35 @@ class PositionManager:
 
 
 
+
+
+            self.update_dashboard()
+
+
+
             print(
 
-                "[POSITION WS UPDATE]",
+                "[POSITION SYNC]",
 
                 self.position
 
             )
+
+
+
+            add_log(
+
+                str(
+
+                    self.position
+
+                )
+
+            )
+
+
+
+            return True
 
 
 
@@ -339,13 +296,30 @@ class PositionManager:
 
             print(
 
-                "[POSITION WS ERROR]",
+                "[POSITION SYNC ERROR]",
 
                 e
 
             )
 
 
+            return False
+
+
+
+
+
+
+
+    # =====================================================
+    # GET POSITION
+    # =====================================================
+
+
+    def get_position(self):
+
+
+        return self.position
 
 
 
@@ -363,28 +337,171 @@ class PositionManager:
 
         self.position = {
 
-            "side":"NONE",
 
-            "size":0,
+            "side":
 
-            "entry":0,
+                "NONE",
 
-            "mark":0,
 
-            "pnl":0
+            "size":
+
+                0,
+
+
+            "entry":
+
+                0,
+
+
+            "pnl":
+
+                0
 
         }
 
 
 
+        self.update_dashboard()
 
 
 
 
-    def get_position(self):
 
 
-        return self.position
+
+    # =====================================================
+    # UPDATE FROM WS
+    # =====================================================
+
+
+    def update_from_ws(
+        self,
+        data
+    ):
+
+
+        try:
+
+
+            self.position = {
+
+
+                "side":
+
+                    data.get(
+
+                        "side",
+
+                        "NONE"
+
+                    ),
+
+
+                "size":
+
+                    float(
+
+                        data.get(
+
+                            "size",
+
+                            0
+
+                        )
+
+                    ),
+
+
+                "entry":
+
+                    float(
+
+                        data.get(
+
+                            "entryPrice",
+
+                            0
+
+                        )
+
+                    ),
+
+
+                "pnl":
+
+                    float(
+
+                        data.get(
+
+                            "unrealisedPnl",
+
+                            0
+
+                        )
+
+                    )
+
+            }
+
+
+
+            self.update_dashboard()
+
+
+
+        except Exception as e:
+
+
+            print(
+
+                "[WS POSITION ERROR]",
+
+                e
+
+            )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # DASHBOARD
+    # =====================================================
+
+
+    def update_dashboard(self):
+
+
+        update_status({
+
+
+            "position":
+
+                self.position["side"],
+
+
+            "size":
+
+                self.position["size"],
+
+
+            "entry":
+
+                self.position["entry"],
+
+
+            "pnl":
+
+                self.position["pnl"]
+
+        })
+
+
+
 
 
 
@@ -396,11 +513,4 @@ class PositionManager:
 # =====================================================
 
 
-from api.bybit_api import bybit_api
-
-
-position_manager = PositionManager(
-
-    bybit_api
-
-)
+position_manager = PositionManager()
