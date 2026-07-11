@@ -1,300 +1,197 @@
 # =====================================================
 # config.py
-# VWAP SUPERTREND BOT CONFIG
+# VWAP SUPERTREND AUTO BOT CONFIG
 # =====================================================
 
-
 import os
+from dotenv import load_dotenv
 
-
+load_dotenv()
 
 # =====================================================
 # MODE
 # =====================================================
 
-# DEMO : 모의투자
-# LIVE : 실거래
+# 기본 실행모드
+DEFAULT_MODE = os.getenv("DEFAULT_MODE", "DEMO").upper()
 
-DEFAULT_MODE = "DEMO"
-
-
-
-LIVE = False
-
-
-
-
-
+LIVE = DEFAULT_MODE == "LIVE"
 
 # =====================================================
-# BYBIT API
+# API
 # =====================================================
 
-BYBIT_API_KEY = os.getenv(
+# DEMO
+DEMO_API_KEY = os.getenv("DEMO_API_KEY", "")
+DEMO_API_SECRET = os.getenv("DEMO_API_SECRET", "")
 
-    "BYBIT_API_KEY",
+# LIVE
+LIVE_API_KEY = os.getenv("LIVE_API_KEY", "")
+LIVE_API_SECRET = os.getenv("LIVE_API_SECRET", "")
 
-    "9NmwC3yjKEYq15h0FF"
-
-)
-
-
-BYBIT_API_SECRET = os.getenv(
-
-    "BYBIT_API_SECRET",
-
-    "lQ82iPwnqHUIIpqc3hIZMwVmrbjDf8scRARJ"
-
-)
-
-
-
-
-
-
+# 호환성 유지
+BYBIT_API_KEY = LIVE_API_KEY if LIVE else DEMO_API_KEY
+BYBIT_API_SECRET = LIVE_API_SECRET if LIVE else DEMO_API_SECRET
 
 # =====================================================
 # MARKET
 # =====================================================
 
-CATEGORY = "linear"
-
-
-SYMBOL = "BTCUSDT"
-
-
-SETTLE_COIN = "USDT"
-
-
-
-
+CATEGORY = os.getenv("CATEGORY", "linear")
+SYMBOL = os.getenv("SYMBOL", "BTCUSDT")
 
 # =====================================================
-# TRADE
+# LEVERAGE
 # =====================================================
 
-LEVERAGE = 3
-
-
-
-POSITION_MODE = "ONE_WAY"
-
-
-
-MARGIN_TYPE = "ISOLATED"
-
-
-
-
-
-
-
+LEVERAGE = int(os.getenv("LEVERAGE", "3"))
 
 # =====================================================
-# ORDER
+# POSITION
 # =====================================================
 
-# BTCUSDT 최소 주문 단위에 맞게 조정
+MAX_POSITION_SIZE = float(
+    os.getenv("MAX_POSITION_SIZE", "0.001")
+)
 
-MAX_POSITION_SIZE = 0.001
-
-
-
-ORDER_COOLDOWN = 30
-
-
-
-
-
+MAX_OPEN_POSITION = int(
+    os.getenv("MAX_OPEN_POSITION", "1")
+)
 
 # =====================================================
-# TAKE PROFIT / STOP LOSS
+# RISK
 # =====================================================
 
-TAKE_PROFIT_PERCENT = 1.0
+RISK_PERCENT = float(
+    os.getenv("RISK_PERCENT", "1")
+)
 
+STOP_LOSS_PERCENT = float(
+    os.getenv("STOP_LOSS_PERCENT", "1.5")
+)
 
+TAKE_PROFIT_PERCENT = float(
+    os.getenv("TAKE_PROFIT_PERCENT", "3")
+)
 
-STOP_LOSS_PERCENT = 0.5
-
-
-
-
-
-
-
-# =====================================================
-# RISK MANAGEMENT
-# =====================================================
-
-RISK_PER_TRADE_PERCENT = 1.0
-
-
-
-MAX_DAILY_LOSS_PERCENT = 5.0
-
-
-
-MAX_LOSS_COUNT = 5
-
-
-
-
-
+TRAILING_STOP_PERCENT = float(
+    os.getenv("TRAILING_STOP_PERCENT", "1")
+)
 
 # =====================================================
-# STRATEGY
+# VWAP
 # =====================================================
 
-TIMEFRAME = "5"
-
-
-
-ATR_PERIOD = 10
-
-
-
-SUPERTREND_MULTIPLIER = 3
-
-
-
-
-
+VWAP_LENGTH = int(
+    os.getenv("VWAP_LENGTH", "20")
+)
 
 # =====================================================
-# MARKET LOOP
+# SUPERTREND
 # =====================================================
 
-CANDLE_LIMIT = 200
+ATR_PERIOD = int(
+    os.getenv("ATR_PERIOD", "10")
+)
 
+SUPERTREND_MULTIPLIER = float(
+    os.getenv("SUPERTREND_MULTIPLIER", "3")
+)
 
+# =====================================================
+# CANDLE
+# =====================================================
 
-LOOP_INTERVAL = 10
+CANDLE_INTERVAL = int(
+    os.getenv("CANDLE_INTERVAL", "60")
+)
 
-
-
-
-
+MAX_HISTORY = int(
+    os.getenv("MAX_HISTORY", "500")
+)
 
 # =====================================================
 # TELEGRAM
 # =====================================================
 
-TELEGRAM_ENABLE = False
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 
-
-
-TELEGRAM_TOKEN = ""
-
-
-
-TELEGRAM_CHAT_ID = ""
-
-
-
-
-
-
-
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # =====================================================
 # DATABASE
 # =====================================================
 
-DATABASE_FILE = "bot.db"
-
-
-
-
-
-
+DATABASE = os.getenv(
+    "DATABASE",
+    "bot.db"
+)
 
 # =====================================================
 # WEB
 # =====================================================
 
-WEB_HOST = "0.0.0.0"
+WEB_HOST = os.getenv(
+    "WEB_HOST",
+    "0.0.0.0"
+)
 
-
-WEB_PORT = 8000
-
-
-
-
-
-
+WEB_PORT = int(
+    os.getenv(
+        "WEB_PORT",
+        "8000"
+    )
+)
 
 # =====================================================
-# DEBUG
+# LOG
 # =====================================================
 
-DEBUG = False
+LOG_LEVEL = os.getenv(
+    "LOG_LEVEL",
+    "INFO"
+)
 
+# =====================================================
+# RETRY
+# =====================================================
 
+API_TIMEOUT = int(
+    os.getenv(
+        "API_TIMEOUT",
+        "10"
+    )
+)
 
+API_RETRY = int(
+    os.getenv(
+        "API_RETRY",
+        "3"
+    )
+)
 
+# =====================================================
+# PRINT
+# =====================================================
 
-
-print("==============================")
-
+print("=" * 30)
 print("[CONFIG LOADED]")
+print("=" * 30)
 
-print("==============================")
-
-print(
-
-    "LIVE :",
-
-    LIVE
-
-)
+print("DEFAULT MODE :", DEFAULT_MODE)
+print("LIVE :", LIVE)
+print("CATEGORY :", CATEGORY)
+print("SYMBOL :", SYMBOL)
+print("LEVERAGE :", LEVERAGE)
 
 print(
-
-    "DEFAULT MODE :",
-
-    DEFAULT_MODE
-
-)
-
-print(
-
-    "CATEGORY :",
-
-    CATEGORY
-
-)
-
-print(
-
-    "SYMBOL :",
-
-    SYMBOL
-
-)
-
-print(
-
-    "LEVERAGE :",
-
-    LEVERAGE
-
-)
-
-print(
-
     "API KEY LENGTH :",
-
     len(BYBIT_API_KEY)
-
 )
 
 print(
-
     "SECRET LENGTH :",
-
     len(BYBIT_API_SECRET)
-
 )
 
-print("==============================")
+print("=" * 30)
