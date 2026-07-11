@@ -1,50 +1,97 @@
 # =====================================================
-# order_manager.py
+# order/order_manager.py
 # VWAP SUPERTREND BOT ORDER MANAGER
 # =====================================================
 
 import time
 
+
 from api.bybit_api import bybit_api
+
 
 from risk.risk_manager import risk_manager
 
+
+from portfolio.position_manager import position_manager
+
+
 from config import (
+
     TAKE_PROFIT_PERCENT,
+
     STOP_LOSS_PERCENT
+
 )
 
+
 from web.server import (
+
     add_log,
+
     update_status,
+
     get_trading_mode
+
 )
+
+
+
 
 
 class OrderManager:
 
+
+
     def __init__(self):
 
+
         self.last_order_time = 0
+
+
         self.cooldown = 3
 
-        print("[ORDER MANAGER READY]")
+
+
+        print(
+
+            "[ORDER MANAGER READY]"
+
+        )
+
+
+
+
 
     # =====================================================
-    # ORDER CHECK
+    # ORDER COOLDOWN
     # =====================================================
 
     def can_order(self):
 
+
         now = time.time()
+
+
 
         if now - self.last_order_time < self.cooldown:
 
-            add_log("ORDER COOLDOWN")
+
+            add_log(
+
+                "ORDER COOLDOWN"
+
+            )
+
 
             return False
 
+
+
         return True
+
+
+
+
 
     # =====================================================
     # OPEN POSITION
@@ -60,13 +107,10 @@ class OrderManager:
 
     ):
 
-        mode = get_trading_mode()
 
         print(
 
-            "[OPEN ORDER]",
-
-            mode,
+            "[OPEN POSITION]",
 
             side,
 
@@ -74,9 +118,14 @@ class OrderManager:
 
         )
 
+
         if not self.can_order():
 
             return None
+
+
+
+
 
         # -----------------------------
         # Risk Check
@@ -84,24 +133,116 @@ class OrderManager:
 
         if not risk_manager.allow_order(qty):
 
+
             add_log(
 
                 "ORDER BLOCKED BY RISK"
 
             )
 
+
             return None
+
+
+
+
 
         try:
 
+
+            current = position_manager.get_position()
+
+
+
+            current_side = current.get(
+
+                "side",
+
+                "NONE"
+
+            )
+
+
+
+            current_size = float(
+
+                current.get(
+
+                    "size",
+
+                    0
+
+                )
+
+            )
+
+
+
+
+
             # -----------------------------
-            # Set Leverage
+            # Same Position Block
+            # -----------------------------
+
+            if current_size > 0 and current_side == side:
+
+
+                add_log(
+
+                    f"EXIST POSITION {side}"
+
+                )
+
+
+                return None
+
+
+
+
+
+            # -----------------------------
+            # Close Opposite
+            # -----------------------------
+
+            if current_size > 0 and current_side != side:
+
+
+                add_log(
+
+                    "CLOSE OPPOSITE POSITION"
+
+                )
+
+
+                close = self.close_position()
+
+
+
+                if not close:
+
+
+                    return None
+
+
+
+                time.sleep(1)
+
+
+
+
+
+            # -----------------------------
+            # Leverage
             # -----------------------------
 
             bybit_api.set_leverage()
 
+
+
+
+
             # -----------------------------
-            # Market Order
+            # MARKET ORDER
             # -----------------------------
 
             result = bybit_api.place_order(
@@ -114,17 +255,51 @@ class OrderManager:
 
             )
 
-            if not result or not result.get("result"):
+
+
+            if not result:
+
 
                 add_log(
 
-                    f"ORDER FAILED {side}"
+                    "ORDER RESULT EMPTY"
 
                 )
 
+
                 return None
 
+
+
+
+
+            if result.get(
+
+                "retCode",
+
+                -1
+
+            ) != 0:
+
+
+                add_log(
+
+                    f"ORDER FAILED {result}"
+
+                )
+
+
+                return None
+
+
+
+
+
             self.last_order_time = time.time()
+
+
+
+
 
             add_log(
 
@@ -132,34 +307,57 @@ class OrderManager:
 
             )
 
+
+
+
+
             update_status({
 
-                "position": side,
+                "position":
 
-                "position_size": qty
+                    side,
+
+
+                "position_size":
+
+                    qty
 
             })
 
-            # -----------------------------
-            # TP / SL
-            # -----------------------------
+
+
+
+
+            # TP SL
 
             self.set_tp_sl(side)
 
+
+
             return result
+
+
+
+
 
         except Exception as e:
 
+
             add_log(
 
-                f"ORDER ERROR {e}"
+                f"OPEN ORDER ERROR {e}"
 
             )
 
+
             return None
 
+
+
+
+
     # =====================================================
-    # TP / SL
+    # SET TP / SL
     # =====================================================
 
     def set_tp_sl(
@@ -170,115 +368,105 @@ class OrderManager:
 
     ):
 
+
         try:
+
 
             price = bybit_api.get_price()
 
-            if price is None:
 
-                add_log(
 
-                    "TP SL PRICE ERROR"
+            if not price:
 
-                )
 
                 return False
 
+
+
+
+
             if side == "Buy":
 
-                tp = round(
 
-                    price *
+                tp = price * (
 
-                    (
+                    1 +
 
-                        1 +
-
-                        TAKE_PROFIT_PERCENT / 100
-
-                    ),
-
-                    2
+                    TAKE_PROFIT_PERCENT / 100
 
                 )
 
-                sl = round(
 
-                    price *
+                sl = price * (
 
-                    (
+                    1 -
 
-                        1 -
-
-                        STOP_LOSS_PERCENT / 100
-
-                    ),
-
-                    2
+                    STOP_LOSS_PERCENT / 100
 
                 )
+
+
 
             else:
 
-                tp = round(
 
-                    price *
+                tp = price * (
 
-                    (
+                    1 -
 
-                        1 -
-
-                        TAKE_PROFIT_PERCENT / 100
-
-                    ),
-
-                    2
+                    TAKE_PROFIT_PERCENT / 100
 
                 )
 
-                sl = round(
 
-                    price *
+                sl = price * (
 
-                    (
+                    1 +
 
-                        1 +
-
-                        STOP_LOSS_PERCENT / 100
-
-                    ),
-
-                    2
+                    STOP_LOSS_PERCENT / 100
 
                 )
+
+
+
+
 
             result = bybit_api.set_trading_stop(
 
-                tp,
+                round(tp,2),
 
-                sl
+                round(sl,2)
 
             )
+
+
+
+
 
             if result:
 
+
                 add_log(
 
-                    f"TP={tp} SL={sl}"
+                    f"TP {tp:.2f} SL {sl:.2f}"
 
                 )
 
+
                 return True
 
-            add_log(
 
-                "TP SL FAILED"
 
-            )
+
 
             return False
 
+
+
+
+
         except Exception as e:
+
 
             add_log(
 
@@ -286,7 +474,10 @@ class OrderManager:
 
             )
 
+
             return False
+
+
 
 
 
@@ -296,37 +487,52 @@ class OrderManager:
 
     def close_position(self):
 
+
         try:
+
 
             result = bybit_api.close_position()
 
+
+
             if not result:
+
 
                 add_log(
 
-                    "POSITION CLOSE FAILED"
+                    "CLOSE FAILED"
 
                 )
 
+
                 return None
 
-            update_status(
 
-                {
 
-                    "position":
 
-                        "NONE",
 
-                    "position_size":
+            position_manager.reset()
 
-                        0
 
-                }
 
-            )
+            update_status({
+
+                "position":
+
+                    "NONE",
+
+
+                "position_size":
+
+                    0
+
+            })
+
+
 
             self.last_order_time = time.time()
+
+
 
             add_log(
 
@@ -334,9 +540,16 @@ class OrderManager:
 
             )
 
+
+
             return result
 
+
+
+
+
         except Exception as e:
+
 
             add_log(
 
@@ -344,15 +557,19 @@ class OrderManager:
 
             )
 
+
             return None
 
 
 
+
+
     # =====================================================
-    # FORCE CLOSE
+    # EMERGENCY CLOSE
     # =====================================================
 
     def emergency_close(self):
+
 
         add_log(
 
@@ -360,7 +577,10 @@ class OrderManager:
 
         )
 
+
         return self.close_position()
+
+
 
 
 
@@ -370,17 +590,24 @@ class OrderManager:
 
     def status(self):
 
+
         return {
+
 
             "cooldown":
 
                 self.cooldown,
 
+
             "last_order":
 
                 self.last_order_time
 
+
         }
+
+
+
 
 
 # =====================================================
