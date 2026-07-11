@@ -11,7 +11,9 @@ from config import (
 
     ATR_PERIOD,
 
-    SUPERTREND_MULTIPLIER
+    SUPERTREND_MULTIPLIER,
+
+    VWAP_LENGTH
 
 )
 
@@ -22,10 +24,13 @@ from config import (
 class VWAPSuperTrend:
 
 
+
     def __init__(self):
 
 
         self.last_signal = None
+
+        self.last_candle = None
 
 
         print(
@@ -42,44 +47,63 @@ class VWAPSuperTrend:
     # VWAP
     # =====================================================
 
-    def calculate_vwap(
 
-        self,
-
-        df
-
-    ):
+    def calculate_vwap(self, df):
 
 
         try:
 
 
-            price = df["close"]
+            price = (
+
+                df["high"]
+
+                +
+
+                df["low"]
+
+                +
+
+                df["close"]
+
+            ) / 3
+
+
 
             volume = df["volume"]
 
 
 
-            cumulative_volume = volume.cumsum()
-
-
-
-            if cumulative_volume.iloc[-1] == 0:
-
-
-                return None
+            pv = price * volume
 
 
 
             vwap = (
 
-                (price * volume)
 
-                .cumsum()
+                pv
+
+                .rolling(
+
+                    VWAP_LENGTH
+
+                )
+
+                .sum()
+
 
                 /
 
-                cumulative_volume
+
+                volume
+
+                .rolling(
+
+                    VWAP_LENGTH
+
+                )
+
+                .sum()
 
             )
 
@@ -107,17 +131,14 @@ class VWAPSuperTrend:
 
 
 
+
+
     # =====================================================
     # ATR
     # =====================================================
 
-    def calculate_atr(
 
-        self,
-
-        df
-
-    ):
+    def calculate_atr(self, df):
 
 
         try:
@@ -131,65 +152,36 @@ class VWAPSuperTrend:
 
 
 
-            tr1 = high - low
-
-
-            tr2 = (
-
-                high - close.shift()
-
-            ).abs()
-
-
-            tr3 = (
-
-                low - close.shift()
-
-            ).abs()
-
-
-
             tr = pd.concat(
 
                 [
 
-                    tr1,
+                    high - low,
 
-                    tr2,
 
-                    tr3
+                    (high - close.shift()).abs(),
+
+
+                    (low - close.shift()).abs()
+
 
                 ],
 
                 axis=1
 
-            ).max(
-
-                axis=1
-
-            )
+            ).max(axis=1)
 
 
 
-            atr = (
+            atr = tr.rolling(
 
-                tr
+                ATR_PERIOD
 
-                .rolling(
-
-                    ATR_PERIOD
-
-                )
-
-                .mean()
-
-                .fillna(0)
-
-            )
+            ).mean()
 
 
 
-            return atr
+            return atr.fillna(0)
 
 
 
@@ -211,17 +203,14 @@ class VWAPSuperTrend:
 
 
 
+
+
     # =====================================================
     # SUPERTREND
     # =====================================================
 
-    def calculate_supertrend(
 
-        self,
-
-        df
-
-    ):
+    def calculate_supertrend(self, df):
 
 
         try:
@@ -234,9 +223,13 @@ class VWAPSuperTrend:
             )
 
 
+
             if atr is None:
 
+
                 return None
+
+
 
 
 
@@ -253,44 +246,44 @@ class VWAPSuperTrend:
 
 
 
-            upper_band = (
+
+            upper = (
 
                 hl2
 
                 +
 
-                (
+                SUPERTREND_MULTIPLIER
 
-                    SUPERTREND_MULTIPLIER
+                *
 
-                    *
-
-                    atr
-
-                )
+                atr
 
             )
 
 
 
-            lower_band = (
+            lower = (
 
                 hl2
 
                 -
 
-                (
+                SUPERTREND_MULTIPLIER
 
-                    SUPERTREND_MULTIPLIER
+                *
 
-                    *
-
-                    atr
-
-                )
+                atr
 
             )
 
+
+
+
+
+            final_upper = upper.copy()
+
+            final_lower = lower.copy()
 
 
 
@@ -303,6 +296,7 @@ class VWAPSuperTrend:
 
 
 
+
             for i in range(
 
                 len(df)
@@ -311,18 +305,29 @@ class VWAPSuperTrend:
 
 
 
-                close = df["close"].iloc[i]
+                if i == 0:
+
+
+                    trend.append(
+
+                        direction
+
+                    )
+
+                    continue
 
 
 
-                if close > upper_band.iloc[i]:
+
+
+                if df["close"].iloc[i] > final_upper.iloc[i-1]:
 
 
                     direction = 1
 
 
 
-                elif close < lower_band.iloc[i]:
+                elif df["close"].iloc[i] < final_lower.iloc[i-1]:
 
 
                     direction = -1
@@ -335,6 +340,8 @@ class VWAPSuperTrend:
                     direction
 
                 )
+
+
 
 
 
@@ -366,17 +373,14 @@ class VWAPSuperTrend:
 
 
 
+
+
     # =====================================================
-    # GENERATE SIGNAL
+    # SIGNAL
     # =====================================================
 
-    def generate_signal(
 
-        self,
-
-        df
-
-    ):
+    def generate_signal(self, df):
 
 
         try:
@@ -397,8 +401,8 @@ class VWAPSuperTrend:
 
 
 
-            data = df.copy()
 
+            data = df.copy()
 
 
 
@@ -410,7 +414,7 @@ class VWAPSuperTrend:
 
 
 
-            data["supertrend"] = self.calculate_supertrend(
+            data["trend"] = self.calculate_supertrend(
 
                 data
 
@@ -420,27 +424,24 @@ class VWAPSuperTrend:
 
 
 
-            if (
+            candle = data.iloc[-2]
 
-                data["vwap"] is None
 
-                or
 
-                data["supertrend"] is None
 
-            ):
+
+            timestamp = candle["timestamp"]
+
+
+
+
+
+            if timestamp == self.last_candle:
 
 
                 return None
 
 
-
-
-            # ---------------------------------
-            # CLOSED CANDLE
-            # ---------------------------------
-
-            candle = data.iloc[-2]
 
 
 
@@ -449,9 +450,8 @@ class VWAPSuperTrend:
 
 
 
-            # ---------------------------------
+
             # BUY
-            # ---------------------------------
 
             if (
 
@@ -463,7 +463,7 @@ class VWAPSuperTrend:
 
                 and
 
-                candle["supertrend"]
+                candle["trend"]
 
                 ==
 
@@ -478,9 +478,8 @@ class VWAPSuperTrend:
 
 
 
-            # ---------------------------------
             # SELL
-            # ---------------------------------
+
 
             elif (
 
@@ -492,7 +491,7 @@ class VWAPSuperTrend:
 
                 and
 
-                candle["supertrend"]
+                candle["trend"]
 
                 ==
 
@@ -507,41 +506,40 @@ class VWAPSuperTrend:
 
 
 
-            # ---------------------------------
-            # DUPLICATE BLOCK
-            # ---------------------------------
-
-            if signal is None:
 
 
-                return None
-
-
-
-            if signal == self.last_signal:
-
-
-                return None
+            self.last_candle = timestamp
 
 
 
 
 
-            self.last_signal = signal
+            if signal != self.last_signal:
+
+
+                self.last_signal = signal
+
+
+                if signal:
+
+
+                    print(
+
+                        "[SIGNAL]",
+
+                        signal
+
+                    )
+
+
+                    return signal
 
 
 
-            print(
-
-                "[STRATEGY SIGNAL]",
-
-                signal
-
-            )
 
 
 
-            return signal
+            return None
 
 
 
@@ -565,8 +563,10 @@ class VWAPSuperTrend:
 
 
 
+
 # =====================================================
 # INSTANCE
 # =====================================================
+
 
 strategy = VWAPSuperTrend()
