@@ -7,7 +7,7 @@ import requests
 
 
 from config import (
-    TELEGRAM_ENABLED,
+    TELEGRAM_ENABLE,
     TELEGRAM_TOKEN,
     TELEGRAM_CHAT_ID
 )
@@ -22,17 +22,13 @@ class Telegram:
     def __init__(self):
 
 
-        if TELEGRAM_ENABLED:
+        print(
 
-            print(
-                "[TELEGRAM READY]"
-            )
+            "[TELEGRAM READY]"
 
-        else:
+        )
 
-            print(
-                "[TELEGRAM DISABLED]"
-            )
+
 
 
 
@@ -54,7 +50,7 @@ class Telegram:
         try:
 
 
-            if not TELEGRAM_ENABLED:
+            if not TELEGRAM_ENABLE:
 
 
                 return False
@@ -68,6 +64,7 @@ class Telegram:
 
 
                 return False
+
 
 
 
@@ -120,48 +117,28 @@ class Telegram:
 
 
 
+
+
             r = requests.post(
 
                 url,
 
-                json=data,
+                data=data,
 
-                timeout=10
+                timeout=5
 
             )
 
 
 
+            return (
 
+                r.status_code == 200
 
-            if r.status_code == 200:
-
-
-                print(
-
-                    "[TELEGRAM SENT]"
-
-                )
-
-
-                return True
+            )
 
 
 
-            else:
-
-
-                print(
-
-                    "[TELEGRAM ERROR]",
-
-                    r.text
-
-                )
-
-
-
-                return False
 
 
 
@@ -188,7 +165,7 @@ class Telegram:
 
 
     # =====================================================
-    # START
+    # BOT START
     # =====================================================
 
 
@@ -197,12 +174,16 @@ class Telegram:
 
         self.send(
 
-"""
-🟢 VWAP SUPERTREND BOT START
+            """
 
-System Online
+🚀 VWAP SUPERTREND BOT START
 
-Market Scanner Running
+Mode:
+Running
+
+System:
+ONLINE
+
 """
 
         )
@@ -213,8 +194,10 @@ Market Scanner Running
 
 
 
+
+
     # =====================================================
-    # STOP
+    # BOT STOP
     # =====================================================
 
 
@@ -223,13 +206,18 @@ Market Scanner Running
 
         self.send(
 
-"""
-🔴 VWAP SUPERTREND BOT STOP
+            """
 
-System Shutdown
+🛑 VWAP SUPERTREND BOT STOPPED
+
+System:
+OFFLINE
+
 """
 
         )
+
+
 
 
 
@@ -254,7 +242,7 @@ System Shutdown
         self.send(
 
 f"""
-🚀 ORDER EXECUTED
+📌 ORDER EXECUTED
 
 Symbol:
 {symbol}
@@ -267,9 +255,12 @@ Qty:
 
 Price:
 {price}
+
 """
 
         )
+
+
 
 
 
@@ -294,6 +285,42 @@ f"""
 ⚠️ BOT ERROR
 
 {error}
+
+"""
+
+        )
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # TP SL
+    # =====================================================
+
+
+    def tp_sl(
+        self,
+        tp,
+        sl
+    ):
+
+
+        self.send(
+
+f"""
+🎯 TP / SL SET
+
+TP:
+{tp}
+
+SL:
+{sl}
+
 """
 
         )
