@@ -1,719 +1,126 @@
-<!DOCTYPE html>
-<html lang="ko">
-
-<head>
-
-<meta charset="UTF-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>
-VWAP SUPERTREND BOT
-</title>
-
-
-<style>
-
-*{
-    box-sizing:border-box;
-}
-
-
-body{
-
-    margin:0;
-
-    background:
-    linear-gradient(
-        135deg,
-        #0f172a,
-        #020617
-    );
-
-    color:white;
-
-    font-family:
-    "Segoe UI",
-    Arial,
-    sans-serif;
-
-}
-
-
-
-.container{
-
-    max-width:1100px;
-
-    margin:auto;
-
-    padding:20px;
-
-}
-
-
-
-
-.header{
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    margin-bottom:20px;
-
-}
-
-
-
-h1{
-
-    color:#38bdf8;
-
-}
-
-
-
-
-.card{
-
-    background:
-
-    rgba(255,255,255,0.08);
-
-    backdrop-filter:blur(10px);
-
-    border-radius:16px;
-
-    padding:20px;
-
-    margin-bottom:20px;
-
-    box-shadow:
-
-    0 10px 30px rgba(0,0,0,.4);
-
-}
-
-
-
-
-.grid{
-
-    display:grid;
-
-    grid-template-columns:
-
-    repeat(auto-fit,minmax(220px,1fr));
-
-    gap:15px;
-
-}
-
-
-
-
-
-.value{
-
-    font-size:25px;
-
-    color:#22c55e;
-
-    font-weight:bold;
-
-}
-
-
-
-
-
-button{
-
-
-    border:0;
-
-    padding:14px 25px;
-
-    border-radius:12px;
-
-    margin:5px;
-
-    cursor:pointer;
-
-    font-size:15px;
-
-    font-weight:bold;
-
-    transition:.2s;
-
-
-}
-
-
-
-button:hover{
-
-
-    transform:
-
-    scale(1.08);
-
-
-}
-
-
-
-button:active{
-
-
-    transform:
-
-    scale(.92);
-
-
-}
-
-
-
-
-.demo{
-
-    background:#2563eb;
-
-    color:white;
-
-}
-
-
-.live{
-
-    background:#dc2626;
-
-    color:white;
-
-}
-
-
-
-.start{
-
-    background:#16a34a;
-
-    color:white;
-
-}
-
-
-.stop{
-
-    background:#f59e0b;
-
-    color:black;
-
-}
-
-
-
-.long{
-
-    background:#22c55e;
-
-    color:white;
-
-}
-
-
-
-.short{
-
-    background:#ef4444;
-
-    color:white;
-
-}
-
-
-
-.close{
-
-    background:#7f1d1d;
-
-    color:white;
-
-}
-
-
-
-.reset{
-
-    background:#64748b;
-
-    color:white;
-
-}
-
-
-
-
-.active{
-
-
-    outline:
-
-    3px solid white;
-
-
-    transform:
-
-    scale(1.1);
-
-
-}
-
-
-
-
-#logs{
-
-
-    height:300px;
-
-    overflow:auto;
-
-    background:#020617;
-
-    padding:15px;
-
-    border-radius:10px;
-
-    font-size:13px;
-
-    line-height:1.6;
-
-}
-
-
-
-.status-ok{
-
-    color:#22c55e;
-
-}
-
-
-.status-stop{
-
-    color:#ef4444;
-
-}
-
-
-
-</style>
-
-</head>
-
-
-
-<body>
-
-
-<div class="container">
-
-
-
-<div class="header">
-
-<h1>
-🚀 VWAP SUPERTREND AUTO BOT
-</h1>
-
-
-<div>
-
-<span>
-MODE :
-</span>
-
-<span id="mode"
-class="value">
--
-</span>
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-<div class="card">
-
-
-<h2>
-🎮 BOT CONTROL
-</h2>
-
-
-
-<button
-class="demo"
-id="demoBtn"
-onclick="changeMode('DEMO')">
-
-DEMO
-
-</button>
-
-
-
-<button
-class="live"
-id="liveBtn"
-onclick="changeMode('LIVE')">
-
-LIVE
-
-</button>
-
-
-
-<br>
-
-
-
-<button
-class="start"
-onclick="botStart()">
-
-▶ START
-
-</button>
-
-
-<button
-class="stop"
-onclick="botStop()">
-
-■ STOP
-
-</button>
-
-
-<button
-class="reset"
-onclick="resetBot()">
-
-RESET
-
-</button>
-
-
-
-</div>
-
-
-
-
-
-
-
-<div class="card">
-
-
-<h2>
-📈 MANUAL ORDER
-</h2>
-
-
-
-<button
-class="long"
-onclick="manualOrder('Buy')">
-
-LONG BUY
-
-</button>
-
-
-
-<button
-class="short"
-onclick="manualOrder('Sell')">
-
-SHORT SELL
-
-</button>
-
-
-
-<button
-class="close"
-onclick="closePosition()">
-
-CLOSE POSITION
-
-</button>
-
-
-
-</div>
-
-
-
-
-
-
-
-
-
-<div class="card">
-
-
-<h2>
-📊 STATUS
-</h2>
-
-
-<div class="grid">
-
-
-
-<div>
-
-BOT
-
-<br>
-
-<span
-id="bot"
-class="value">
-
--
-
-</span>
-
-</div>
-
-
-
-
-<div>
-
-POSITION
-
-<br>
-
-<span
-id="side"
-class="value">
-
--
-
-</span>
-
-</div>
-
-
-
-
-<div>
-
-SIZE
-
-<br>
-
-<span
-id="size"
-class="value">
-
--
-
-</span>
-
-</div>
-
-
-
-
-<div>
-
-ENTRY
-
-<br>
-
-<span
-id="entry"
-class="value">
-
--
-
-</span>
-
-</div>
-
-
-
-
-<div>
-
-PNL
-
-<br>
-
-<span
-id="pnl"
-class="value">
-
--
-
-</span>
-
-</div>
-
-
-
-
-<div>
-
-SIGNAL
-
-<br>
-
-<span
-id="signal"
-class="value">
-
--
-
-</span>
-
-</div>
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-
-<div class="card">
-
-
-<h2>
-📜 SYSTEM LOG
-</h2>
-
-
-<div id="logs">
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-</div>
-
-
-
-
-
-
-
-
 <script>
 
 
+// =====================================================
+// POST HELPER
+// =====================================================
 
-function post(url,data={}){
+function post(url, data={}){
 
 
-return fetch(
+    return fetch(
 
-url,
+        url,
 
-{
+        {
 
-method:"POST",
+            method:"POST",
 
-headers:{
+            headers:{
 
-"Content-Type":
+                "Content-Type":
+                "application/json"
 
-"application/json"
+            },
 
-},
 
-body:
+            body:
 
-JSON.stringify(data)
+            JSON.stringify(data)
+
+        }
+
+    );
+
 
 }
 
-);
-
-
-}
 
 
 
 
-
+// =====================================================
+// MODE CHANGE
+// =====================================================
 
 function changeMode(mode){
 
 
-post(
+    post(
 
-"/api/mode",
+        "/api/mode",
 
-{
+        {
 
-mode:mode
+            mode:mode
+
+        }
+
+    )
+
+    .then(
+
+        r=>r.json()
+
+    )
+
+    .then(
+
+        data=>{
+
+
+            console.log(data);
+
+
+            update();
+
+
+        }
+
+    );
+
 
 }
 
-)
-
-.then(update);
-
-
-}
 
 
 
 
+
+
+// =====================================================
+// BOT START
+// =====================================================
 
 function botStart(){
 
 
-post(
+    post(
 
-"/api/start"
+        "/api/start"
 
-)
+    )
 
-.then(update);
+    .then(
+
+        r=>r.json()
+
+    )
+
+    .then(
+
+        data=>{
+
+
+            console.log(data);
+
+
+            update();
+
+
+        }
+
+    );
 
 
 }
@@ -721,17 +128,42 @@ post(
 
 
 
+
+
+
+// =====================================================
+// BOT STOP
+// =====================================================
 
 function botStop(){
 
 
-post(
+    post(
 
-"/api/stop"
+        "/api/stop"
 
-)
+    )
 
-.then(update);
+    .then(
+
+        r=>r.json()
+
+    )
+
+    .then(
+
+        data=>{
+
+
+            console.log(data);
+
+
+            update();
+
+
+        }
+
+    );
 
 
 }
@@ -740,17 +172,52 @@ post(
 
 
 
+
+
+// =====================================================
+// RESET
+// =====================================================
 
 function resetBot(){
 
 
-post(
+    if(
 
-"/api/reset"
+        confirm(
 
-)
+            "상태 초기화?"
 
-.then(update);
+        )
+
+    ){
+
+
+        post(
+
+            "/api/reset"
+
+        )
+
+        .then(
+
+            r=>r.json()
+
+        )
+
+        .then(
+
+            data=>{
+
+
+                update();
+
+
+            }
+
+        );
+
+
+    }
 
 
 }
@@ -761,158 +228,453 @@ post(
 
 
 
-function closePosition(){
-
-
-if(confirm(
-
-"포지션 종료?"
-
-)){
-
-
-post(
-
-"/api/close"
-
-)
-
-.then(update);
-
-
-}
-
-
-}
-
-
-
-
-
+// =====================================================
+// MANUAL ORDER
+// =====================================================
 
 function manualOrder(side){
 
 
-if(confirm(
 
-side+" 주문 실행?"
-
-)){
+    let text = "";
 
 
-post(
+    if(side=="Buy"){
 
-"/api/order",
+        text="LONG BUY";
 
-{
+    }
 
-side:side
+
+    else{
+
+        text="SHORT SELL";
+
+    }
+
+
+
+
+
+
+    if(
+
+        !confirm(
+
+            text+" 주문 실행?"
+
+        )
+
+    ){
+
+        return;
+
+    }
+
+
+
+
+
+
+
+    post(
+
+        "/api/order",
+
+        {
+
+            side:side
+
+        }
+
+    )
+
+    .then(
+
+        r=>r.json()
+
+    )
+
+    .then(
+
+        data=>{
+
+
+            alert(
+
+                data.message ||
+
+                JSON.stringify(data)
+
+            );
+
+
+            update();
+
+
+        }
+
+    )
+
+    .catch(
+
+        e=>{
+
+
+            alert(
+
+                e
+
+            );
+
+
+        }
+
+    );
+
+
 
 }
 
-)
 
-.then(update);
+
+
+
+
+
+
+// =====================================================
+// CLOSE POSITION
+// =====================================================
+
+function closePosition(){
+
+
+
+    if(
+
+        confirm(
+
+            "현재 포지션 종료?"
+
+        )
+
+    ){
+
+
+
+        post(
+
+            "/api/close"
+
+        )
+
+        .then(
+
+            r=>r.json()
+
+        )
+
+        .then(
+
+            data=>{
+
+
+                alert(
+
+                    "CLOSE COMPLETE"
+
+                );
+
+
+                update();
+
+
+            }
+
+        );
+
+
+    }
 
 
 }
 
 
-}
 
 
 
 
 
-
-
-
+// =====================================================
+// STATUS UPDATE
+// =====================================================
 
 function update(){
 
 
 
-fetch(
+    fetch(
 
-"/api/status"
+        "/api/status"
 
-)
-
-
-.then(
-
-r=>r.json()
-
-)
+    )
 
 
-.then(
+    .then(
 
-data=>{
+        r=>r.json()
+
+    )
 
 
-let s=data.status;
+    .then(
+
+        data=>{
 
 
 
-mode.innerHTML=s.mode;
-
-
-bot.innerHTML=s.bot;
-
-
-side.innerHTML=s.position;
-
-
-size.innerHTML=s.position_size;
-
-
-entry.innerHTML=s.entry_price;
-
-
-pnl.innerHTML=s.pnl;
-
-
-signal.innerHTML=s.signal;
+            let s=data.status;
 
 
 
 
 
-demoBtn.classList.remove(
+            document.getElementById(
 
-"active"
+                "mode"
 
-);
-
-
-liveBtn.classList.remove(
-
-"active"
-
-);
+            ).innerHTML = s.mode;
 
 
 
-if(s.mode=="DEMO"){
 
-demoBtn.classList.add(
 
-"active"
+            document.getElementById(
 
-);
+                "bot"
+
+            ).innerHTML = s.bot;
+
+
+
+
+
+            document.getElementById(
+
+                "side"
+
+            ).innerHTML = s.position;
+
+
+
+
+
+            document.getElementById(
+
+                "size"
+
+            ).innerHTML = s.position_size;
+
+
+
+
+
+            document.getElementById(
+
+                "entry"
+
+            ).innerHTML = s.entry_price;
+
+
+
+
+
+            document.getElementById(
+
+                "pnl"
+
+            ).innerHTML = s.pnl;
+
+
+
+
+
+            if(
+
+                document.getElementById("signal")
+
+            ){
+
+
+                document.getElementById(
+
+                    "signal"
+
+                ).innerHTML = s.signal;
+
+
+            }
+
+
+
+
+
+
+
+
+            // -----------------------------
+            // MODE BUTTON ACTIVE
+            // -----------------------------
+
+
+            let demo = document.getElementById(
+
+                "demoBtn"
+
+            );
+
+
+            let live = document.getElementById(
+
+                "liveBtn"
+
+            );
+
+
+
+            if(demo && live){
+
+
+                demo.classList.remove(
+
+                    "active"
+
+                );
+
+
+                live.classList.remove(
+
+                    "active"
+
+                );
+
+
+
+
+                if(
+
+                    s.mode=="DEMO"
+
+                ){
+
+
+                    demo.classList.add(
+
+                        "active"
+
+                    );
+
+
+                }
+
+                else{
+
+
+                    live.classList.add(
+
+                        "active"
+
+                    );
+
+
+                }
+
+
+            }
+
+
+
+
+
+
+
+
+
+            // -----------------------------
+            // LOG
+            // -----------------------------
+
+
+            let logBox = document.getElementById(
+
+                "logs"
+
+            );
+
+
+
+            if(logBox){
+
+
+
+                let html="";
+
+
+
+                data.logs.forEach(
+
+                    function(x){
+
+
+                        html += x+"<br>";
+
+                    }
+
+                );
+
+
+
+                logBox.innerHTML=html;
+
+
+
+                logBox.scrollTop =
+
+                logBox.scrollHeight;
+
+
+
+            }
+
+
+
+
+
+        }
+
+    )
+
+
+    .catch(
+
+        e=>{
+
+            console.log(
+
+                "STATUS ERROR",
+
+                e
+
+            );
+
+        }
+
+    );
+
 
 }
 
-else{
-
-liveBtn.classList.add(
-
-"active"
-
-);
-
-}
 
 
 
@@ -920,66 +682,26 @@ liveBtn.classList.add(
 
 
 
-let html="";
 
-
-
-data.logs.forEach(
-
-x=>{
-
-
-html += x+"<br>";
-
-
-}
-
-);
-
-
-
-logs.innerHTML=html;
-
-
-logs.scrollTop=
-
-logs.scrollHeight;
-
-
-
-}
-
-
-);
-
-
-
-}
-
-
-
-
-
+// =====================================================
+// AUTO REFRESH
+// =====================================================
 
 
 setInterval(
 
-update,
+    update,
 
-3000
+    3000
 
 );
 
 
+
+// FIRST LOAD
 
 update();
 
 
 
 </script>
-
-
-
-</body>
-
-</html>
