@@ -1,49 +1,36 @@
 # =====================================================
-# VWAP SUPERTREND BOT
-# Python Dependencies
+# VWAP SUPERTREND BOT REQUIREMENTS
 # =====================================================
 
 
-# HTTP API
-requests>=2.31.0
+# Bybit API
+pybit==5.7.0
 
 
-# WebSocket (Bybit Private WS)
-websocket-client>=1.8.0
+# HTTP
+requests==2.32.3
 
 
-# Web Dashboard
-Flask>=3.0.0
+# Web Server
+Flask==3.0.3
 
 
-# Data Processing
-pandas>=2.2.0
-numpy>=1.26.0
+# WebSocket
+websocket-client==1.8.0
 
 
-# Environment Variable
-python-dotenv>=1.0.1
+# Data Analysis
+pandas==2.2.2
+numpy==2.0.1
 
 
-# Timezone Support
-pytz>=2024.1
+# Environment
+python-dotenv==1.0.1
 
 
-# Technical Indicator Support
-ta>=0.11.0
+# Database
+# SQLite included in Python
 
 
-# Async Support
-aiohttp>=3.9.0
-
-
-# =====================================================
-# OPTIONAL
-# =====================================================
-
-# Better console output
-colorama>=0.4.6
-
-
-# JSON / Config Utility
-pyyaml>=6.0.1
+# Time / Utility
+pytz==2024.1
