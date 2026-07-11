@@ -1,6 +1,6 @@
 # =====================================================
 # web/server.py
-# VWAP SUPERTREND BOT WEB SERVER
+# VWAP SUPERTREND BOT DASHBOARD SERVER
 # =====================================================
 
 from flask import (
@@ -14,15 +14,16 @@ import threading
 import time
 
 
-
-app = Flask(
-
-    __name__,
-
-    template_folder="templates"
-
+from config import (
+    WEB_HOST,
+    WEB_PORT
 )
 
+
+app = Flask(
+    __name__,
+    template_folder="templates"
+)
 
 
 # =====================================================
@@ -42,64 +43,48 @@ trading_mode = "DEMO"
 MAX_LOGS = 500
 
 
-
 status = {
-
 
     "mode": "DEMO",
 
-
     "bot": "STOPPED",
-
 
     "position": "NONE",
 
-
     "position_size": 0,
-
 
     "entry_price": 0,
 
-
     "pnl": 0,
-
 
     "price": 0,
 
-
     "balance": 0,
-
 
     "equity": 0,
 
-
     "vwap": 0,
-
 
     "trend": "NONE",
 
+    "volume": 0,
 
-    "signal": "NONE",
-
-
-    "volume": 0
-
+    "signal": "NONE"
 
 }
 
 
-
 logs = []
 
+
+chart_data = []
 
 
 status_lock = threading.Lock()
 
 log_lock = threading.Lock()
 
-mode_lock = threading.Lock()
-
-
+chart_lock = threading.Lock()
 
 
 
@@ -109,57 +94,21 @@ mode_lock = threading.Lock()
 
 def add_log(message):
 
-
-    now = time.strftime(
-
-        "%H:%M:%S"
-
-    )
-
+    now = time.strftime("%H:%M:%S")
 
     text = f"[{now}] {message}"
-
-
 
     print(text)
 
 
-
     with log_lock:
-
 
         logs.append(text)
 
 
-
         while len(logs) > MAX_LOGS:
 
-
             logs.pop(0)
-
-
-
-
-
-
-
-def clear_logs():
-
-
-    with log_lock:
-
-
-        logs.clear()
-
-
-
-    add_log(
-
-        "LOG CLEARED"
-
-    )
-
-
 
 
 
@@ -169,101 +118,17 @@ def clear_logs():
 
 def update_status(data):
 
-
-    if not isinstance(data, dict):
-
-        return
-
-
-
     with status_lock:
-
 
         status.update(data)
 
 
 
-
-
 def get_status():
 
-
     with status_lock:
-
 
         return status.copy()
-
-
-
-
-
-def reset_status():
-
-
-    global trading_mode
-
-
-
-    with status_lock:
-
-
-        status.clear()
-
-
-
-        status.update({
-
-
-            "mode": trading_mode,
-
-
-            "bot": "STOPPED",
-
-
-            "position": "NONE",
-
-
-            "position_size": 0,
-
-
-            "entry_price": 0,
-
-
-            "pnl": 0,
-
-
-            "price": 0,
-
-
-            "balance": 0,
-
-
-            "equity": 0,
-
-
-            "vwap": 0,
-
-
-            "trend": "NONE",
-
-
-            "signal": "NONE",
-
-
-            "volume": 0
-
-
-        })
-
-
-
-    add_log(
-
-        "STATUS RESET"
-
-    )
-
-
 
 
 
@@ -273,13 +138,9 @@ def reset_status():
 
 def set_bot_instance(bot):
 
-
     global bot_instance
 
-
     bot_instance = bot
-
-
 
 
 
@@ -289,15 +150,7 @@ def set_bot_instance(bot):
 
 def get_trading_mode():
 
-
-    with mode_lock:
-
-
-        return trading_mode
-
-
-
-
+    return trading_mode
 
 
 
@@ -309,14 +162,9 @@ def get_trading_mode():
 
 def index():
 
-
     return render_template(
-
         "dashboard.html"
-
     )
-
-
 
 
 
@@ -328,30 +176,18 @@ def index():
 
 def api_status():
 
-
     with log_lock:
 
-
-        current_logs = logs[-100:]
-
+        log_copy = logs[-100:]
 
 
     return jsonify({
 
+        "status": get_status(),
 
-        "status":
-
-            get_status(),
-
-
-        "logs":
-
-            current_logs
-
+        "logs": log_copy
 
     })
-
-
 
 
 
@@ -363,9 +199,7 @@ def api_status():
 
 def api_logs():
 
-
     with log_lock:
-
 
         return jsonify({
 
@@ -375,6 +209,32 @@ def api_logs():
 
 
 
+# =====================================================
+# CHART API
+# =====================================================
+
+@app.route("/api/chart")
+
+def api_chart():
+
+    with chart_lock:
+
+        return jsonify(
+
+            chart_data.copy()
+
+        )
+
+
+
+def update_chart(data):
+
+    with chart_lock:
+
+        chart_data.clear()
+
+        chart_data.extend(data)
+
 
 
 # =====================================================
@@ -382,71 +242,38 @@ def api_logs():
 # =====================================================
 
 @app.route(
-
     "/api/start",
-
     methods=["POST"]
-
 )
 
 def api_start():
 
-
     try:
-
 
         if bot_instance is None:
 
-
             return jsonify({
-
 
                 "success":False,
 
-
                 "error":"BOT NOT READY"
 
-
             })
-
-
-
-        if get_status()["bot"] == "RUNNING":
-
-
-            return jsonify({
-
-
-                "success":True,
-
-
-                "message":"ALREADY RUNNING"
-
-
-            })
-
 
 
         bot_instance.start()
 
 
-
         update_status({
 
-
             "bot":"RUNNING"
-
 
         })
 
 
-
         add_log(
-
             "BOT START"
-
         )
-
 
 
         return jsonify({
@@ -454,7 +281,6 @@ def api_start():
             "success":True
 
         })
-
 
 
     except Exception as e:
@@ -475,49 +301,34 @@ def api_start():
 
 
 
-
-
 # =====================================================
 # STOP
 # =====================================================
 
 @app.route(
-
     "/api/stop",
-
     methods=["POST"]
-
 )
 
 def api_stop():
 
-
     try:
 
-
         if bot_instance:
-
 
             bot_instance.stop()
 
 
-
         update_status({
 
-
             "bot":"STOPPED"
-
 
         })
 
 
-
         add_log(
-
             "BOT STOP"
-
         )
-
 
 
         return jsonify({
@@ -525,7 +336,6 @@ def api_stop():
             "success":True
 
         })
-
 
 
     except Exception as e:
@@ -538,7 +348,6 @@ def api_stop():
         )
 
 
-
         return jsonify({
 
             "success":False
@@ -547,55 +356,38 @@ def api_stop():
 
 
 
-
-
 # =====================================================
 # RESTART
 # =====================================================
 
 @app.route(
-
     "/api/restart",
-
     methods=["POST"]
-
 )
 
 def api_restart():
 
-
     try:
-
 
         if bot_instance:
 
-
             bot_instance.stop()
 
-
             time.sleep(1)
-
 
             bot_instance.start()
 
 
-
         update_status({
 
-
             "bot":"RUNNING"
-
 
         })
 
 
-
         add_log(
-
             "BOT RESTART"
-
         )
-
 
 
         return jsonify({
@@ -603,7 +395,6 @@ def api_restart():
             "success":True
 
         })
-
 
 
     except Exception as e:
@@ -624,25 +415,18 @@ def api_restart():
 
 
 
-
-
 # =====================================================
 # MODE CHANGE
 # =====================================================
 
 @app.route(
-
     "/api/mode",
-
     methods=["POST"]
-
 )
 
 def api_mode():
 
-
     global trading_mode
-
 
 
     data = request.get_json(
@@ -650,7 +434,6 @@ def api_mode():
         silent=True
 
     ) or {}
-
 
 
     mode = data.get(
@@ -674,33 +457,23 @@ def api_mode():
 
         return jsonify({
 
-
             "success":False,
 
-
             "error":"INVALID MODE"
-
 
         })
 
 
 
-
-    with mode_lock:
-
-
-        trading_mode = mode
+    trading_mode = mode
 
 
 
     update_status({
 
-
         "mode":mode
 
-
     })
-
 
 
     add_log(
@@ -711,19 +484,15 @@ def api_mode():
 
 
 
-
     try:
-
 
         from api.bybit_api import bybit_api
 
+        bybit_api.change_session(
 
+            mode
 
-        bybit_api.current_mode = None
-
-
-        bybit_api.create_session()
-
+        )
 
 
     except Exception as e:
@@ -739,16 +508,11 @@ def api_mode():
 
     return jsonify({
 
-
         "success":True,
-
 
         "mode":mode
 
-
     })
-
-
 
 
 
@@ -757,25 +521,18 @@ def api_mode():
 # =====================================================
 
 @app.route(
-
     "/api/close",
-
     methods=["POST"]
-
 )
 
 def api_close():
 
-
     try:
-
 
         from order.order_manager import order_manager
 
 
-
         result = order_manager.close_position()
-
 
 
         add_log(
@@ -785,17 +542,11 @@ def api_close():
         )
 
 
-
         return jsonify({
 
-
-            "success":
-
-                bool(result)
-
+            "success":bool(result)
 
         })
-
 
 
     except Exception as e:
@@ -816,36 +567,42 @@ def api_close():
 
 
 
-
-
 # =====================================================
 # RESET
 # =====================================================
 
 @app.route(
-
     "/api/reset",
-
     methods=["POST"]
-
 )
 
 def api_reset():
 
+    update_status({
 
-    reset_status()
+        "position":"NONE",
 
+        "position_size":0,
 
+        "entry_price":0,
 
-    return jsonify({
-
-
-        "success":True
-
+        "pnl":0
 
     })
 
 
+    add_log(
+
+        "STATUS RESET"
+
+    )
+
+
+    return jsonify({
+
+        "success":True
+
+    })
 
 
 
@@ -857,89 +614,65 @@ def api_reset():
 
 def api_ping():
 
-
     return jsonify({
-
 
         "success":True,
 
-
         "server":"running",
 
-
         "time":int(time.time())
-
 
     })
 
 
 
-
-
 # =====================================================
-# SERVER THREAD
+# SERVER START
 # =====================================================
 
 def run_server():
 
-
     global server_started
-
     global _server_thread
 
 
-
     if server_started:
-
 
         return
 
 
 
-    server_started = True
+    server_started=True
 
 
 
     def _run():
 
-
         app.run(
 
+            host=WEB_HOST,
 
-            host="0.0.0.0",
-
-
-            port=8000,
-
+            port=WEB_PORT,
 
             debug=False,
 
-
             use_reloader=False,
 
-
             threaded=True
-
 
         )
 
 
 
-
     _server_thread = threading.Thread(
-
 
         target=_run,
 
-
         daemon=True,
-
 
         name="WebServer"
 
-
     )
-
 
 
     _server_thread.start()
@@ -948,10 +681,9 @@ def run_server():
 
     print(
 
-        "[WEB SERVER START] http://0.0.0.0:8000"
+        f"[WEB SERVER START] http://{WEB_HOST}:{WEB_PORT}"
 
     )
-
 
 
     add_log(
@@ -962,20 +694,15 @@ def run_server():
 
 
 
-
-
 # =====================================================
 # STOP SERVER
 # =====================================================
 
 def stop_server():
 
-
     global server_started
 
-
-    server_started = False
-
+    server_started=False
 
 
     add_log(
@@ -986,6 +713,72 @@ def stop_server():
 
 
 
+# =====================================================
+# CLEAR LOG
+# =====================================================
+
+def clear_logs():
+
+    with log_lock:
+
+        logs.clear()
+
+
+    add_log(
+
+        "LOG CLEARED"
+
+    )
+
+
+
+# =====================================================
+# RESET STATUS
+# =====================================================
+
+def reset_status():
+
+    with status_lock:
+
+        status.clear()
+
+        status.update({
+
+            "mode":trading_mode,
+
+            "bot":"STOPPED",
+
+            "position":"NONE",
+
+            "position_size":0,
+
+            "entry_price":0,
+
+            "pnl":0,
+
+            "price":0,
+
+            "balance":0,
+
+            "equity":0,
+
+            "vwap":0,
+
+            "trend":"NONE",
+
+            "volume":0,
+
+            "signal":"NONE"
+
+        })
+
+
+    add_log(
+
+        "STATUS RESET"
+
+    )
+
 
 
 # =====================================================
@@ -993,7 +786,6 @@ def stop_server():
 # =====================================================
 
 __all__ = [
-
 
     "app",
 
@@ -1013,12 +805,11 @@ __all__ = [
 
     "reset_status",
 
-    "get_trading_mode"
+    "get_trading_mode",
 
+    "update_chart"
 
 ]
-
-
 
 
 
@@ -1028,12 +819,9 @@ __all__ = [
 
 if __name__ == "__main__":
 
-
     run_server()
 
 
-
     while True:
-
 
         time.sleep(1)
