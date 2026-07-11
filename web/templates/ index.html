@@ -13,141 +13,98 @@ VWAP SUPERTREND BOT
 <style>
 
 body{
-
     background:#101010;
-
-    color:white;
-
-    font-family:Arial, sans-serif;
-
+    color:#eee;
+    font-family:Arial;
     padding:30px;
-
 }
-
-
-
-h1{
-
-    color:#00ff99;
-
-}
-
 
 
 .card{
 
     background:#1e1e1e;
-
     padding:20px;
-
     margin-bottom:20px;
-
     border-radius:15px;
 
-    box-shadow:0 0 15px #000;
-
 }
-
 
 
 button{
 
-    padding:12px 20px;
-
+    padding:12px 25px;
     margin:5px;
-
     border:none;
-
     border-radius:8px;
-
-    font-weight:bold;
-
     cursor:pointer;
+    font-weight:bold;
+    font-size:15px;
 
 }
 
+
+button:hover{
+
+    transform:scale(1.05);
+
+}
 
 
 .demo{
 
-    background:#3498db;
-
+    background:#2980b9;
     color:white;
 
 }
-
 
 
 .live{
 
-    background:#e74c3c;
-
+    background:#c0392b;
     color:white;
 
 }
 
 
-
 .start{
 
-    background:#2ecc71;
+    background:#27ae60;
+    color:white;
 
 }
-
 
 
 .stop{
 
     background:#f39c12;
+    color:white;
 
 }
-
 
 
 .close{
 
-    background:#c0392b;
-
+    background:#8e44ad;
     color:white;
 
 }
-
-
-
-.reset{
-
-    background:#555;
-
-    color:white;
-
-}
-
 
 
 .value{
 
     font-size:22px;
-
     color:#00ff99;
 
 }
 
 
-
-#logs{
+pre{
 
     background:#000;
-
-    height:250px;
-
-    overflow:auto;
-
-    padding:10px;
-
-    font-size:13px;
+    padding:15px;
+    border-radius:10px;
 
 }
-
 
 
 </style>
@@ -155,15 +112,12 @@ button{
 </head>
 
 
-
 <body>
-
 
 
 <h1>
 VWAP SUPERTREND AUTO BOT
 </h1>
-
 
 
 
@@ -176,7 +130,7 @@ CONTROL
 
 
 <button class="demo"
-onclick="changeMode('DEMO')">
+onclick="modeChange('DEMO')">
 
 DEMO
 
@@ -184,11 +138,12 @@ DEMO
 
 
 <button class="live"
-onclick="changeMode('LIVE')">
+onclick="modeChange('LIVE')">
 
 LIVE
 
 </button>
+
 
 
 <br>
@@ -210,21 +165,13 @@ STOP
 </button>
 
 
+
 <button class="close"
 onclick="closePosition()">
 
-CLOSE POSITION
+CLOSE
 
 </button>
-
-
-<button class="reset"
-onclick="resetBot()">
-
-RESET
-
-</button>
-
 
 
 </div>
@@ -241,95 +188,44 @@ STATUS
 </h2>
 
 
-
 <p>
-
 MODE :
-
-<span class="value" id="mode">
-
+<span id="mode" class="value">
 -
-
 </span>
-
-
 </p>
 
 
-
 <p>
-
 BOT :
-
-<span class="value" id="bot">
-
+<span id="bot" class="value">
 -
-
 </span>
-
-
 </p>
 
 
-
 <p>
-
 POSITION :
-
 <span id="position">
-
 -
-
 </span>
-
-
 </p>
 
 
-
 <p>
-
 SIZE :
-
 <span id="size">
-
 -
-
 </span>
-
-
 </p>
 
 
-
 <p>
-
-ENTRY :
-
-<span id="entry">
-
--
-
-</span>
-
-
-</p>
-
-
-
-<p>
-
 PNL :
-
 <span id="pnl">
-
 -
-
 </span>
-
-
 </p>
-
 
 
 </div>
@@ -343,16 +239,15 @@ PNL :
 
 <h2>
 LOG
+
 </h2>
 
 
-<div id="logs">
+<pre id="logs">
+</pre>
+
 
 </div>
-
-
-</div>
-
 
 
 
@@ -375,9 +270,7 @@ method:"POST",
 
 headers:{
 
-"Content-Type":
-
-"application/json"
+"Content-Type":"application/json"
 
 },
 
@@ -385,18 +278,19 @@ body:
 
 JSON.stringify(data)
 
+
 }
 
 );
 
 
-
 }
 
 
 
 
-function changeMode(mode){
+
+function modeChange(mode){
 
 
 post(
@@ -411,11 +305,15 @@ mode:mode
 
 )
 
-.then(update);
+.then(()=>{
 
+update();
+
+});
 
 
 }
+
 
 
 
@@ -429,10 +327,15 @@ post(
 
 )
 
-.then(update);
+.then(()=>{
+
+update();
+
+});
 
 
 }
+
 
 
 
@@ -446,10 +349,15 @@ post(
 
 )
 
-.then(update);
+.then(()=>{
+
+update();
+
+});
 
 
 }
+
 
 
 
@@ -466,28 +374,14 @@ post(
 
 )
 
-.then(update);
+.then(()=>{
+
+update();
+
+});
 
 
 }
-
-
-}
-
-
-
-
-
-function resetBot(){
-
-
-post(
-
-"/api/reset"
-
-)
-
-.then(update);
 
 
 }
@@ -506,13 +400,11 @@ fetch(
 
 )
 
-
 .then(
 
 r=>r.json()
 
 )
-
 
 .then(
 
@@ -524,91 +416,52 @@ let s=data.status;
 
 
 document.getElementById(
-
 "mode"
-
 ).innerHTML=s.mode;
 
 
 
 document.getElementById(
-
 "bot"
-
 ).innerHTML=s.bot;
 
 
 
 document.getElementById(
-
 "position"
-
 ).innerHTML=s.position;
 
 
 
 document.getElementById(
-
 "size"
-
 ).innerHTML=s.position_size;
 
 
 
 document.getElementById(
-
-"entry"
-
-).innerHTML=s.entry_price;
-
-
-
-document.getElementById(
-
 "pnl"
-
 ).innerHTML=s.pnl;
 
 
 
+document.getElementById(
+"logs"
+).textContent=
+
+data.logs.join("\n");
 
 
-let html="";
-
-
-
-data.logs.forEach(
-
-x=>{
-
-
-html += x+"<br>";
 
 }
 
-);
+)
 
+.catch(
 
+e=>{
 
-document.getElementById(
-
-"logs"
-
-).innerHTML=html;
-
-
-
-let box=document.getElementById(
-
-"logs"
-
-);
-
-
-
-box.scrollTop=box.scrollHeight;
-
-
+console.log(e);
 
 }
 
@@ -629,14 +482,10 @@ update,
 );
 
 
-
 update();
 
 
-
 </script>
-
-
 
 
 </body>
