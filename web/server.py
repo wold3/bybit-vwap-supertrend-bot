@@ -1,6 +1,7 @@
 # =====================================================
 # web/server.py
 # VWAP SUPERTREND BOT WEB SERVER
+# BYBIT V5
 # =====================================================
 
 from flask import (
@@ -20,6 +21,8 @@ app = Flask(__name__)
 
 
 
+
+
 # =====================================================
 # GLOBAL STATE
 # =====================================================
@@ -29,37 +32,21 @@ logs = []
 
 status = {
 
+    "bot": "STOPPED",
 
-    "bot":
-        "STOPPED",
+    "mode": "DEMO",
 
+    "symbol": "BTCUSDT",
 
-    "mode":
-        "DEMO",
+    "position": "NONE",
 
+    "position_size": 0,
 
-    "symbol":
-        "BTCUSDT",
+    "entry_price": 0,
 
+    "pnl": 0,
 
-    "position":
-        "NONE",
-
-
-    "position_size":
-        0,
-
-
-    "entry_price":
-        0,
-
-
-    "pnl":
-        0,
-
-
-    "last_action":
-        ""
+    "last_action": ""
 
 }
 
@@ -67,8 +54,10 @@ status = {
 
 trading_mode = "DEMO"
 
-
 trading_symbol = "BTCUSDT"
+
+bot_status = "STOPPED"
+
 
 
 
@@ -99,8 +88,7 @@ def add_log(message):
 
 
 
-    if len(logs) > 200:
-
+    if len(logs) > 300:
 
         logs.pop(0)
 
@@ -109,24 +97,64 @@ def add_log(message):
 
 
 
-
-
 # =====================================================
-# STATUS UPDATE
+# STATUS
 # =====================================================
 
 def update_status(data):
 
 
-    if not isinstance(data,dict):
+    if isinstance(data, dict):
 
-        return
-
-
-
-    status.update(data)
+        status.update(data)
 
 
+
+
+
+
+def get_status():
+
+    return status.copy()
+
+
+
+
+
+
+# =====================================================
+# BOT CONTROL
+# =====================================================
+
+def set_bot(value):
+
+
+    global bot_status
+
+
+    bot_status = value
+
+
+    status["bot"] = value
+
+
+    add_log(
+
+        f"BOT STATUS {value}"
+
+    )
+
+
+    return True
+
+
+
+
+
+
+def get_bot():
+
+    return bot_status
 
 
 
@@ -135,7 +163,7 @@ def update_status(data):
 
 
 # =====================================================
-# MODE
+# TRADING MODE
 # =====================================================
 
 def get_trading_mode():
@@ -148,28 +176,30 @@ def get_trading_mode():
 
 
 
-
 def set_trading_mode(mode):
 
 
     global trading_mode
 
 
-    if mode in [
+    if mode in (
 
         "DEMO",
 
         "LIVE"
 
-    ]:
+    ):
 
 
         trading_mode = mode
 
 
+        status["mode"] = mode
+
+
         add_log(
 
-            f"MODE CHANGE {mode}"
+            f"MODE {mode}"
 
         )
 
@@ -200,14 +230,13 @@ def get_trading_symbol():
 
 
 
-
 def set_trading_symbol(symbol):
 
 
     global trading_symbol
 
 
-    trading_symbol = symbol.upper()
+    trading_symbol = str(symbol).upper()
 
 
     status["symbol"] = trading_symbol
@@ -215,7 +244,7 @@ def set_trading_symbol(symbol):
 
     add_log(
 
-        f"SYMBOL CHANGE {trading_symbol}"
+        f"SYMBOL {trading_symbol}"
 
     )
 
@@ -248,13 +277,10 @@ def home():
 
     if os.path.exists(path):
 
-
         return send_file(path)
 
 
-
     return "VWAP SUPERTREND BOT"
-
 
 
 
@@ -274,14 +300,9 @@ def api_status():
 
     return jsonify({
 
+        "status": status,
 
-        "status":
-            status,
-
-
-        "logs":
-            logs[-50:]
-
+        "logs": logs[-100:]
 
     })
 
@@ -291,20 +312,12 @@ def api_status():
 
 
 
-
-
-# =====================================================
-# LOG API
-# =====================================================
-
 @app.route("/api/logs")
 
 def api_logs():
 
 
     return jsonify(logs)
-
-
 
 
 
@@ -342,9 +355,7 @@ def api_order():
 
         qty = data.get(
 
-            "qty",
-
-            None
+            "qty"
 
         )
 
@@ -366,19 +377,15 @@ def api_order():
 
         return jsonify({
 
-
             "success":
 
                 bool(result),
-
 
             "result":
 
                 str(result)
 
         })
-
-
 
 
 
@@ -394,15 +401,9 @@ def api_order():
 
         return jsonify({
 
+            "success":False,
 
-            "success":
-
-                False,
-
-
-            "error":
-
-                str(e)
+            "error":str(e)
 
         })
 
@@ -413,9 +414,8 @@ def api_order():
 
 
 
-
 # =====================================================
-# CLOSE API
+# CLOSE
 # =====================================================
 
 @app.route(
@@ -438,18 +438,13 @@ def api_close():
         result = order_manager.close_position()
 
 
-
         return jsonify({
-
 
             "success":
 
                 bool(result)
 
-
         })
-
-
 
 
 
@@ -458,21 +453,16 @@ def api_close():
 
         add_log(
 
-            f"WEB CLOSE ERROR {e}"
+            f"CLOSE ERROR {e}"
 
         )
 
 
         return jsonify({
 
-
-            "success":
-
-                False
-
+            "success":False
 
         })
-
 
 
 
@@ -482,7 +472,7 @@ def api_close():
 
 
 # =====================================================
-# BOT CONTROL
+# BOT START STOP
 # =====================================================
 
 @app.route(
@@ -496,31 +486,18 @@ def api_close():
 def api_start():
 
 
-    update_status({
+    set_bot(
 
-        "bot":
-
-            "RUNNING"
-
-    })
-
-
-    add_log(
-
-        "WEB START"
+        "RUNNING"
 
     )
 
 
     return jsonify({
 
-        "success":
-
-            True
+        "success":True
 
     })
-
-
 
 
 
@@ -538,31 +515,18 @@ def api_start():
 def api_stop():
 
 
-    update_status({
+    set_bot(
 
-        "bot":
-
-            "STOPPED"
-
-    })
-
-
-    add_log(
-
-        "WEB STOP"
+        "STOPPED"
 
     )
 
 
     return jsonify({
 
-        "success":
-
-            True
+        "success":True
 
     })
-
-
 
 
 
@@ -577,7 +541,7 @@ def api_stop():
 def start_server():
 
 
-    threading.Thread(
+    thread = threading.Thread(
 
         target=lambda:
 
@@ -595,7 +559,10 @@ def start_server():
 
         daemon=True
 
-    ).start()
+    )
+
+
+    thread.start()
 
 
     add_log(
