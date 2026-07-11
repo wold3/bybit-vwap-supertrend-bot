@@ -14,8 +14,6 @@ from web.server import add_log
 
 
 
-
-
 class MarketData:
 
 
@@ -26,8 +24,6 @@ class MarketData:
         print(
             "[MARKET DATA READY]"
         )
-
-
 
 
 
@@ -49,7 +45,7 @@ class MarketData:
         try:
 
 
-            rows = bybit_api.get_kline(
+            response = bybit_api.get_kline(
 
                 interval=interval,
 
@@ -59,82 +55,109 @@ class MarketData:
 
 
 
-            if not rows:
+            if not response:
 
                 return None
 
 
 
+            # =================================================
+            # BYBIT V5 RESPONSE NORMALIZE
+            # =================================================
 
-            # ---------------------------------
-            # BYBIT V5 DATA CHECK
-            # ---------------------------------
-
-            if isinstance(rows, dict):
+            rows = []
 
 
-                rows = (
 
-                    rows
+            # response = dict
 
-                    .get("result",{})
+            if isinstance(response, dict):
 
-                    .get("list",[])
+
+                result = response.get(
+
+                    "result",
+
+                    {}
 
                 )
 
 
+                if isinstance(result, dict):
+
+
+                    rows = result.get(
+
+                        "list",
+
+                        []
+
+                    )
+
+
+
+                elif isinstance(result, list):
+
+
+                    rows = result
+
+
+
+
+
+            # response = list
+
+            elif isinstance(response, list):
+
+
+                rows = response
+
+
 
 
             if not rows:
+
+
+                add_log(
+
+                    "EMPTY KLINE"
+
+                )
+
 
                 return None
 
 
 
 
+
+            # =================================================
+            # DATAFRAME
+            # =================================================
 
             df = pd.DataFrame(rows)
 
 
 
-
-            # ---------------------------------
-            # COLUMN
-            # ---------------------------------
-
-            if len(df.columns) >= 7:
+            if df.empty:
 
 
-                df = df.iloc[:,0:7]
-
-
-                df.columns = [
-
-                    "timestamp",
-
-                    "open",
-
-                    "high",
-
-                    "low",
-
-                    "close",
-
-                    "volume",
-
-                    "turnover"
-
-                ]
+                return None
 
 
 
-            else:
+
+
+            # =================================================
+            # COLUMN CHECK
+            # =================================================
+
+            if len(df.columns) < 7:
 
 
                 add_log(
 
-                    "INVALID KLINE FORMAT"
+                    f"INVALID KLINE COLUMNS {df.columns}"
 
                 )
 
@@ -144,22 +167,13 @@ class MarketData:
 
 
 
-
-            # ---------------------------------
-            # SORT
-            # ---------------------------------
-
-            df = df.iloc[::-1].reset_index(
-
-                drop=True
-
-            )
+            df = df.iloc[:,0:7]
 
 
 
+            df.columns = [
 
-
-            numeric = [
+                "timestamp",
 
                 "open",
 
@@ -177,7 +191,45 @@ class MarketData:
 
 
 
-            for col in numeric:
+
+
+            # =================================================
+            # SORT OLD -> NEW
+            # =================================================
+
+            df = df.iloc[::-1].reset_index(
+
+                drop=True
+
+            )
+
+
+
+
+
+            # =================================================
+            # NUMERIC
+            # =================================================
+
+            numeric_columns = [
+
+                "open",
+
+                "high",
+
+                "low",
+
+                "close",
+
+                "volume",
+
+                "turnover"
+
+            ]
+
+
+
+            for col in numeric_columns:
 
 
                 df[col] = pd.to_numeric(
@@ -187,6 +239,7 @@ class MarketData:
                     errors="coerce"
 
                 )
+
 
 
 
@@ -212,7 +265,15 @@ class MarketData:
 
 
 
+
             if len(df) < 50:
+
+
+                add_log(
+
+                    f"NOT ENOUGH CANDLE {len(df)}"
+
+                )
 
 
                 return None
@@ -221,12 +282,11 @@ class MarketData:
 
 
 
-            self.last_data=df
+            self.last_data = df
 
 
 
             return df
-
 
 
 
@@ -248,8 +308,6 @@ class MarketData:
 
 
 
-
-
     # =====================================================
     # CURRENT PRICE
     # =====================================================
@@ -264,7 +322,14 @@ class MarketData:
 
 
 
-        except Exception:
+        except Exception as e:
+
+
+            add_log(
+
+                f"PRICE ERROR {e}"
+
+            )
 
 
             return 0
@@ -287,8 +352,6 @@ class MarketData:
 
 
         time.sleep(sec)
-
-
 
 
 
