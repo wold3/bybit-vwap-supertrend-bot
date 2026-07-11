@@ -9,7 +9,10 @@ import threading
 import time
 
 
-from config import WEB_HOST, WEB_PORT
+from config import (
+    WEB_HOST,
+    WEB_PORT
+)
 
 
 app = Flask(
@@ -25,107 +28,38 @@ app = Flask(
 
 bot_instance = None
 
-
 server_started = False
 
 
-_server_thread = None
+logs = []
 
 
-
-MAX_LOGS = 500
-
-
-
-status_lock = threading.Lock()
-
-log_lock = threading.Lock()
-
-
-
-# =====================================================
-# STATUS
-# =====================================================
+MAX_LOGS = 300
 
 
 status = {
 
+    "mode":"DEMO",
 
-    "mode":
+    "bot":"STOPPED",
 
-        "DEMO",
+    "symbol":"BTCUSDT",
 
+    "position":"NONE",
 
-    "symbol":
+    "position_size":0,
 
-        "BTCUSDT",
+    "entry_price":0,
 
+    "pnl":0,
 
-    "bot":
-
-        "STOPPED",
-
-
-    "position":
-
-        "NONE",
-
-
-    "position_size":
-
-        0,
-
-
-    "entry_price":
-
-        0,
-
-
-    "pnl":
-
-        0,
-
-
-    "price":
-
-        0,
-
-
-    "balance":
-
-        0,
-
-
-    "vwap":
-
-        0,
-
-
-    "trend":
-
-        "NONE",
-
-
-    "signal":
-
-        "NONE",
-
-
-    "watchdog":
-
-        "OFF",
-
-
-    "last_action":
-
-        "SYSTEM READY"
+    "last_action":"NONE"
 
 }
 
 
 
-logs=[]
-
+lock = threading.Lock()
 
 
 
@@ -133,129 +67,54 @@ logs=[]
 # LOG
 # =====================================================
 
+def add_log(msg):
 
-def add_log(message):
+    t=time.strftime("%H:%M:%S")
 
-
-    text = (
-
-        f"[{time.strftime('%H:%M:%S')}] "
-
-        f"{message}"
-
-    )
-
+    text=f"[{t}] {msg}"
 
     print(text)
 
 
-
-    with log_lock:
-
+    with lock:
 
         logs.append(text)
 
-
-
         if len(logs)>MAX_LOGS:
-
 
             logs.pop(0)
 
 
 
-
-
-
-
-
-
-# =====================================================
-# STATUS CONTROL
-# =====================================================
-
-
 def update_status(data):
 
-
-    if not data:
-
-        return
-
-
-
-    with status_lock:
-
+    with lock:
 
         status.update(data)
 
 
 
-
-
-
 def get_status():
 
-
-    with status_lock:
-
+    with lock:
 
         return status.copy()
 
 
 
-
-
-
-
 # =====================================================
-# BOT INSTANCE
+# BOT CONNECT
 # =====================================================
-
 
 def set_bot_instance(bot):
 
-
     global bot_instance
-
 
     bot_instance=bot
 
-
-
     add_log(
-
         "BOT INSTANCE CONNECTED"
-
     )
-
-
-
-
-
-
-
-
-
-# =====================================================
-# MODE
-# =====================================================
-
-
-def get_trading_mode():
-
-
-    return status.get(
-
-        "mode",
-
-        "DEMO"
-
-    )
-
-
-
-
 
 
 
@@ -265,63 +124,35 @@ def get_trading_mode():
 # HOME
 # =====================================================
 
-
 @app.route("/")
 
 def index():
 
-
     return render_template(
-
         "index.html"
-
     )
 
 
 
 
 
-
-
-
-
-
 # =====================================================
-# STATUS API
+# STATUS
 # =====================================================
-
 
 @app.route("/api/status")
 
 def api_status():
 
+    with lock:
 
-    with log_lock:
+        return jsonify({
 
+            "status":status.copy(),
 
-        log_copy=logs[-100:]
+            "logs":logs[-100:]
 
-
-
-    return jsonify({
-
-
-        "status":
-
-            get_status(),
-
-
-
-        "logs":
-
-            log_copy
-
-
-    })
-
-
-
-
+        })
 
 
 
@@ -331,83 +162,51 @@ def api_status():
 # START
 # =====================================================
 
-
 @app.route(
-
     "/api/start",
-
     methods=["POST"]
-
 )
 
-def api_start():
-
+def start_bot():
 
     try:
 
-
         if bot_instance:
-
 
             bot_instance.start()
 
 
-
         update_status({
 
-            "bot":
-
-                "RUNNING",
-
+            "bot":"RUNNING",
 
             "last_action":
-
-                "START BUTTON CLICK"
+            "START BUTTON"
 
         })
-
 
 
         add_log(
-
             "START BUTTON CLICK"
-
         )
 
 
-
-        return jsonify({
-
-            "success":
-
-                True
-
-        })
-
+        return jsonify(
+            success=True
+        )
 
 
     except Exception as e:
 
 
-
         add_log(
-
             f"START ERROR {e}"
-
         )
 
 
-        return jsonify({
-
-            "success":
-
-                False
-
-        })
-
-
-
-
+        return jsonify(
+            success=False
+        )
 
 
 
@@ -417,16 +216,12 @@ def api_start():
 # STOP
 # =====================================================
 
-
 @app.route(
-
     "/api/stop",
-
     methods=["POST"]
-
 )
 
-def api_stop():
+def stop_bot():
 
 
     try:
@@ -434,41 +229,29 @@ def api_stop():
 
         if bot_instance:
 
-
             bot_instance.stop()
 
 
 
         update_status({
 
-            "bot":
-
-                "STOPPED",
-
+            "bot":"STOPPED",
 
             "last_action":
-
-                "STOP BUTTON CLICK"
+            "STOP BUTTON"
 
         })
 
 
 
         add_log(
-
             "STOP BUTTON CLICK"
-
         )
 
 
-
-        return jsonify({
-
-            "success":
-
-                True
-
-        })
+        return jsonify(
+            success=True
+        )
 
 
 
@@ -476,113 +259,13 @@ def api_stop():
 
 
         add_log(
-
             f"STOP ERROR {e}"
-
         )
 
 
-        return jsonify({
-
-            "success":
-
-                False
-
-        })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# RESTART
-# =====================================================
-
-
-@app.route(
-
-    "/api/restart",
-
-    methods=["POST"]
-
-)
-
-def api_restart():
-
-
-    try:
-
-
-        if bot_instance:
-
-
-            bot_instance.stop()
-
-
-            time.sleep(1)
-
-
-            bot_instance.start()
-
-
-
-        update_status({
-
-            "bot":
-
-                "RUNNING",
-
-
-            "last_action":
-
-                "RESTART BUTTON CLICK"
-
-        })
-
-
-
-        add_log(
-
-            "RESTART BUTTON CLICK"
-
+        return jsonify(
+            success=False
         )
-
-
-
-        return jsonify({
-
-            "success":
-
-                True
-
-        })
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"RESTART ERROR {e}"
-
-        )
-
-
-        return jsonify({
-
-            "success":
-
-                False
-
-        })
-
-
-
 
 
 
@@ -593,115 +276,39 @@ def api_restart():
 # MODE
 # =====================================================
 
-
 @app.route(
-
     "/api/mode",
-
     methods=["POST"]
-
 )
 
-def api_mode():
+def mode():
 
-
-    data=request.get_json(
-
-        silent=True
-
-    ) or {}
-
-
+    data=request.json or {}
 
     mode=data.get(
-
         "mode",
-
         "DEMO"
-
-    ).upper()
-
-
-
-    if mode not in [
-
-        "DEMO",
-
-        "LIVE"
-
-    ]:
-
-
-        return jsonify({
-
-            "success":
-
-                False
-
-        })
-
-
+    )
 
 
     update_status({
 
-        "mode":
-
-            mode,
-
+        "mode":mode,
 
         "last_action":
-
-            f"MODE {mode}"
+        f"{mode} MODE BUTTON"
 
     })
-
 
 
     add_log(
-
         f"MODE CHANGE {mode}"
-
     )
 
 
-
-
-    try:
-
-
-        from api.bybit_api import bybit_api
-
-
-        bybit_api.create_session()
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"MODE ERROR {e}"
-
-        )
-
-
-
-    return jsonify({
-
-        "success":
-
-            True,
-
-        "mode":
-
-            mode
-
-    })
-
-
-
+    return jsonify(
+        success=True
+    )
 
 
 
@@ -712,137 +319,81 @@ def api_mode():
 # SYMBOL
 # =====================================================
 
-
 @app.route(
-
     "/api/symbol",
-
     methods=["POST"]
-
 )
 
-def api_symbol():
+def symbol():
 
 
-    data=request.get_json(
-
-        silent=True
-
-    ) or {}
+    data=request.json or {}
 
 
-
-    symbol=data.get(
-
-        "symbol"
-
+    sym=data.get(
+        "symbol",
+        "BTCUSDT"
     )
-
-
-
-    if not symbol:
-
-
-        return jsonify({
-
-            "success":
-
-                False
-
-        })
-
-
-
-
-
-    symbol=symbol.upper()
-
 
 
     try:
 
-
         from api.bybit_api import bybit_api
 
 
-
         bybit_api.change_symbol(
-
-            symbol
-
+            sym
         )
 
+
+        update_status({
+
+            "symbol":sym,
+
+            "last_action":
+            f"SYMBOL {sym}"
+
+        })
+
+
+        add_log(
+            f"SYMBOL CHANGE {sym}"
+        )
+
+
+        return jsonify(
+            success=True
+        )
 
 
     except Exception as e:
 
 
         add_log(
-
             f"SYMBOL ERROR {e}"
+        )
 
+
+        return jsonify(
+            success=False
         )
 
 
 
 
-    update_status({
-
-        "symbol":
-
-            symbol,
-
-
-        "last_action":
-
-            f"SYMBOL CHANGE {symbol}"
-
-    })
-
-
-
-    add_log(
-
-        f"SYMBOL CHANGE {symbol}"
-
-    )
-
-
-
-    return jsonify({
-
-        "success":
-
-            True,
-
-        "symbol":
-
-            symbol
-
-    })
-
-
-
-
-
-
 
 
 
 # =====================================================
-# CLOSE POSITION
+# CLOSE
 # =====================================================
-
 
 @app.route(
-
     "/api/close",
-
     methods=["POST"]
-
 )
 
-def api_close():
+def close():
 
 
     try:
@@ -851,87 +402,39 @@ def api_close():
         from order.order_manager import order_manager
 
 
-
-        result=order_manager.close_position()
+        order_manager.close_position()
 
 
 
         update_status({
 
             "last_action":
-
-                "CLOSE BUTTON CLICK"
+            "CLOSE POSITION BUTTON"
 
         })
-
 
 
         add_log(
-
             "CLOSE BUTTON CLICK"
-
         )
 
 
-
-        return jsonify({
-
-            "success":
-
-                bool(result)
-
-        })
-
+        return jsonify(
+            success=True
+        )
 
 
     except Exception as e:
 
 
         add_log(
-
             f"CLOSE ERROR {e}"
-
         )
 
 
-        return jsonify({
-
-            "success":
-
-                False
-
-        })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# LOG
-# =====================================================
-
-
-@app.route("/api/logs")
-
-def api_logs():
-
-
-    with log_lock:
-
-
-        return jsonify({
-
-            "logs":
-
-                logs.copy()
-
-        })
-
-
+        return jsonify(
+            success=False
+        )
 
 
 
@@ -940,9 +443,8 @@ def api_logs():
 
 
 # =====================================================
-# SERVER START
+# SERVER
 # =====================================================
-
 
 def run_server():
 
@@ -950,25 +452,18 @@ def run_server():
     global server_started
 
 
-    global _server_thread
-
-
-
     if server_started:
 
         return
-
 
 
     server_started=True
 
 
 
+    th=threading.Thread(
 
-
-    def run():
-
-
+        target=lambda:
         app.run(
 
             host=WEB_HOST,
@@ -977,79 +472,48 @@ def run_server():
 
             debug=False,
 
-            use_reloader=False,
+            use_reloader=False
 
-            threaded=True
-
-        )
-
-
-
-
-
-    _server_thread=threading.Thread(
-
-        target=run,
+        ),
 
         daemon=True
 
     )
 
 
-
-    _server_thread.start()
-
+    th.start()
 
 
-    add_log(
-
-        "WEB SERVER STARTED"
-
+    print(
+        f"[WEB] http://{WEB_HOST}:{WEB_PORT}"
     )
 
 
 
 
 
-
-
-
-
-# =====================================================
-# EXPORT
-# =====================================================
-
-
 __all__=[
 
+"app",
 
-    "app",
+"run_server",
 
-    "run_server",
+"set_bot_instance",
 
-    "set_bot_instance",
+"update_status",
 
-    "update_status",
+"get_status",
 
-    "get_status",
-
-    "add_log",
-
-    "get_trading_mode"
+"add_log"
 
 ]
 
 
 
-
-
 if __name__=="__main__":
-
 
     run_server()
 
-
     while True:
-
 
         time.sleep(1)
