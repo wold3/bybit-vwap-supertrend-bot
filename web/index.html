@@ -1,52 +1,297 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
+
 <head>
+
+<meta charset="UTF-8">
+
 <title>VWAP SUPERTREND BOT</title>
-<meta charset="utf-8">
+
+<style>
+
+body{
+
+    background:#111;
+
+    color:white;
+
+    font-family:Arial;
+
+    padding:20px;
+
+}
+
+
+.box{
+
+    border:1px solid #555;
+
+    padding:20px;
+
+    margin:15px 0;
+
+}
+
+
+#logs{
+
+    background:black;
+
+    height:300px;
+
+    overflow:auto;
+
+    padding:10px;
+
+    font-family:monospace;
+
+}
+
+
+button{
+
+    padding:15px;
+
+    margin:5px;
+
+    font-size:18px;
+
+}
+
+</style>
+
 </head>
 
+
 <body>
+
 
 <h1>
 VWAP SUPERTREND BOT
 </h1>
 
-<hr>
 
-<h3>
+
+<div class="box">
+
+<h2>
 BOT STATUS
-</h3>
+</h2>
+
 
 <div id="status">
-LOADING...
+
+CONNECTING...
+
 </div>
+
+
+</div>
+
+
+
+
+
+<div class="box">
+
+
+<h2>
+ORDER
+</h2>
+
+
+<button onclick="order('Buy')">
+BUY
+</button>
+
+
+<button onclick="order('Sell')">
+SELL
+</button>
+
+
+<button onclick="closePosition()">
+CLOSE
+</button>
+
+
+</div>
+
+
+
+
+
+<div class="box">
+
+
+<h2>
+LOGS
+</h2>
+
+
+<div id="logs">
+
+</div>
+
+
+</div>
+
+
+
+
+
 
 
 <script>
 
+
 function update(){
 
-fetch("/api/status")
 
-.then(r=>r.json())
+    fetch("/api/status")
 
-.then(data=>{
+    .then(function(response){
 
-document.getElementById("status").innerHTML =
-JSON.stringify(data.status);
+        return response.json();
+
+    })
 
 
-});
+    .then(function(data){
+
+
+        let s=data.status;
+
+
+
+        document.getElementById("status").innerHTML =
+
+        `
+
+        API : ${s.api}<br>
+
+        BOT : ${s.bot}<br>
+
+        MODE : ${s.mode}<br>
+
+        SYMBOL : ${s.symbol}<br>
+
+        POSITION : ${s.position}<br>
+
+        SIZE : ${s.position_size}<br>
+
+        ENTRY : ${s.entry_price}<br>
+
+        PRICE : ${s.price}<br>
+
+        PNL : ${s.pnl}
+
+        `;
+
+
+
+        let log="";
+
+
+        data.logs.forEach(function(x){
+
+            log += x+"<br>";
+
+        });
+
+
+
+        document.getElementById("logs").innerHTML=log;
+
+
+
+    })
+
+
+
+    .catch(function(error){
+
+
+        document.getElementById("status").innerHTML =
+
+        "API ERROR : "+error;
+
+
+    });
+
+
 
 }
 
 
+
+
+
+function order(side){
+
+
+fetch("/api/order",{
+
+
+method:"POST",
+
+
+headers:{
+
+
+"Content-Type":"application/json"
+
+
+},
+
+
+body:JSON.stringify({
+
+
+side:side,
+
+
+qty:0.001
+
+
+})
+
+
+});
+
+
+}
+
+
+
+
+
+function closePosition(){
+
+
+fetch("/api/close",{
+
+
+method:"POST"
+
+
+});
+
+
+}
+
+
+
+
 setInterval(update,1000);
 
+
 update();
+
 
 </script>
 
 
 </body>
+
 </html>
