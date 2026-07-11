@@ -1,6 +1,6 @@
 # =====================================================
 # services/watchdog.py
-# System Watchdog
+# Trading Bot Watchdog
 # =====================================================
 
 import time
@@ -29,7 +29,9 @@ class Watchdog:
         self.thread = None
 
 
+
         self.last_heartbeat = time.time()
+
 
 
         self.timeout = 60
@@ -71,7 +73,7 @@ class Watchdog:
 
         self.thread = threading.Thread(
 
-            target=self.loop,
+            target=self.monitor,
 
             daemon=True
 
@@ -82,11 +84,13 @@ class Watchdog:
 
 
 
-        print(
+        update_status({
 
-            "[WATCHDOG RUNNING]"
+            "watchdog":
 
-        )
+                "RUNNING"
+
+        })
 
 
 
@@ -113,11 +117,19 @@ class Watchdog:
 
 
     # =====================================================
-    # LOOP
+    # MONITOR
     # =====================================================
 
 
-    def loop(self):
+    def monitor(self):
+
+
+        print(
+
+            "[WATCHDOG THREAD START]"
+
+        )
+
 
 
         while self.running:
@@ -126,7 +138,7 @@ class Watchdog:
             try:
 
 
-                delay = (
+                elapsed = (
 
                     time.time()
 
@@ -140,14 +152,36 @@ class Watchdog:
 
 
 
-                if delay > self.timeout:
+                if elapsed > self.timeout:
 
 
-                    self.warning(
+                    print(
 
-                        f"MARKET THREAD STOP {int(delay)} sec"
+                        "[WATCHDOG WARNING]",
+
+                        elapsed
 
                     )
+
+
+
+                    add_log(
+
+                        "WATCHDOG TIMEOUT"
+
+                    )
+
+
+
+                    update_status({
+
+                        "watchdog":
+
+                            "WARNING"
+
+                    })
+
+
 
 
 
@@ -158,9 +192,10 @@ class Watchdog:
 
                         "watchdog":
 
-                            "OK"
+                            "HEALTHY"
 
                     })
+
 
 
 
@@ -192,51 +227,6 @@ class Watchdog:
 
 
     # =====================================================
-    # WARNING
-    # =====================================================
-
-
-    def warning(
-        self,
-        message
-    ):
-
-
-        print(
-
-            "[WATCHDOG WARNING]",
-
-            message
-
-        )
-
-
-
-        add_log(
-
-            message
-
-        )
-
-
-
-        update_status({
-
-            "watchdog":
-
-                "WARNING"
-
-        })
-
-
-
-
-
-
-
-
-
-    # =====================================================
     # STOP
     # =====================================================
 
@@ -248,9 +238,19 @@ class Watchdog:
 
 
 
+        update_status({
+
+            "watchdog":
+
+                "STOPPED"
+
+        })
+
+
+
         print(
 
-            "[WATCHDOG STOP]"
+            "[WATCHDOG STOPPED]"
 
         )
 
