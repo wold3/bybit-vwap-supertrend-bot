@@ -1,6 +1,6 @@
 // =====================================================
 // VWAP SUPERTREND BOT
-// BYBIT CANDLE CHART
+// BYBIT V5 CANDLE CHART
 // =====================================================
 
 
@@ -14,48 +14,57 @@ async function loadChart(){
     try{
 
 
-        const res =
-        await fetch("/api/candles");
+        const res = await fetch(
+            "/api/candles"
+        );
 
 
-        const json =
-        await res.json();
+        const json = await res.json();
+
+
+
+        if(
+            !json.result ||
+            !json.result.list
+        ){
+
+            console.log(
+                "NO CANDLE DATA"
+            );
+
+            return;
+
+        }
 
 
 
         let list =
-        json.result.list;
+            json.result.list;
 
 
 
-        list.reverse();
+        list = list.reverse();
 
 
 
-        let data = [];
+        let candles = [];
 
 
 
         list.forEach(c=>{
 
 
-            data.push({
+            candles.push({
 
+                x: Number(c[0]),
 
-                x:Number(c[0]),
+                o: Number(c[1]),
 
+                h: Number(c[2]),
 
-                o:Number(c[1]),
+                l: Number(c[3]),
 
-
-                h:Number(c[2]),
-
-
-                l:Number(c[3]),
-
-
-                c:Number(c[4])
-
+                c: Number(c[4])
 
             });
 
@@ -65,7 +74,14 @@ async function loadChart(){
 
 
 
-        drawChart(data);
+        console.log(
+            "CANDLES",
+            candles
+        );
+
+
+
+        drawChart(candles);
 
 
 
@@ -92,6 +108,7 @@ async function loadChart(){
 
 
 
+
 function drawChart(data){
 
 
@@ -105,7 +122,7 @@ function drawChart(data){
 
     if(!ctx)
 
-    return;
+        return;
 
 
 
@@ -115,7 +132,7 @@ function drawChart(data){
     if(candleChart){
 
 
-        candleChart.data.datasets[0].data=data;
+        candleChart.data.datasets[0].data = data;
 
 
         candleChart.update();
@@ -131,11 +148,9 @@ function drawChart(data){
 
 
 
-
     candleChart = new Chart(
 
         ctx,
-
 
         {
 
@@ -163,6 +178,8 @@ function drawChart(data){
 
 
 
+
+
         options:{
 
 
@@ -173,24 +190,42 @@ function drawChart(data){
 
 
 
+            animation:false,
+
+
+
+            parsing:false,
+
+
+
             scales:{
 
 
                 x:{
 
 
-                    type:"time"
+                    type:"timeseries",
+
+
+
+                    ticks:{
+
+
+                        maxTicksLimit:10
+
+
+                    }
 
 
 
                 },
 
 
+
                 y:{
 
 
                     position:"right"
-
 
 
                 }
@@ -213,15 +248,16 @@ function drawChart(data){
                 }
 
 
+
             }
 
 
-        }
-
-
 
         }
 
+
+
+        }
 
 
     );
@@ -235,11 +271,12 @@ function drawChart(data){
 
 
 
+
 setInterval(
 
-loadChart,
+    loadChart,
 
-5000
+    5000
 
 );
 
