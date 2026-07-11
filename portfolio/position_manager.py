@@ -1,5 +1,6 @@
 # =====================================================
 # portfolio/position_manager.py
+# VWAP SUPERTREND BOT
 # BYBIT V5 POSITION MANAGER
 # =====================================================
 
@@ -8,6 +9,9 @@ import time
 
 
 from api.bybit_api import bybit_api
+
+
+from config import SYMBOL
 
 
 from web.server import (
@@ -20,17 +24,49 @@ from web.server import (
 
 
 
+
+
 class PositionManager:
+
 
 
     def __init__(self):
 
+
         self.lock = threading.Lock()
 
 
-        self.position = {
 
-            "symbol": "",
+        self.position = self.default_position()
+
+
+
+        self.last_sync = 0
+
+
+
+        print(
+
+            "[POSITION MANAGER READY]"
+
+        )
+
+
+
+
+
+
+
+    # =====================================================
+    # DEFAULT
+    # =====================================================
+
+    def default_position(self):
+
+
+        return {
+
+            "symbol": SYMBOL,
 
             "side": "NONE",
 
@@ -44,31 +80,35 @@ class PositionManager:
 
             "pnl": 0.0,
 
-            "updated": 0
+            "updated": time.time()
 
         }
 
 
-        print(
-            "[POSITION MANAGER READY]"
-        )
+
+
 
 
 
     # =====================================================
-    # REFRESH REST API
+    # REST SYNC
     # =====================================================
 
     def refresh(self):
 
+
         try:
+
 
             result = bybit_api.get_position()
 
 
+
             if not result:
 
+
                 return False
+
 
 
 
@@ -86,16 +126,37 @@ class PositionManager:
 
             if not rows:
 
+
                 self.reset()
 
                 return True
 
 
 
-            self.update(rows[0])
+
+
+
+            for row in rows:
+
+
+                if row.get("symbol") == SYMBOL:
+
+
+                    self.update(row)
+
+
+                    return True
+
+
+
+
+
+            self.reset()
 
 
             return True
+
+
 
 
 
@@ -113,8 +174,12 @@ class PositionManager:
 
 
 
+
+
+
+
     # =====================================================
-    # UPDATE FROM WS / REST
+    # UPDATE
     # =====================================================
 
     def update(self, data):
@@ -122,15 +187,49 @@ class PositionManager:
 
         try:
 
-            # WS가 list로 전달하는 경우
+
 
             if isinstance(data, list):
 
-                if not data:
 
-                    return False
+                for row in data:
 
-                data = data[0]
+
+                    self.update(row)
+
+
+                return True
+
+
+
+
+
+            if not isinstance(data, dict):
+
+
+                return False
+
+
+
+
+
+            symbol = data.get(
+
+                "symbol",
+
+                SYMBOL
+
+            )
+
+
+
+            if symbol != SYMBOL:
+
+
+                return False
+
+
+
 
 
 
@@ -142,9 +241,13 @@ class PositionManager:
 
                     0
 
-                ) or 0
+                )
+
+                or 0
 
             )
+
+
 
 
 
@@ -157,24 +260,27 @@ class PositionManager:
             )
 
 
+
+
+
             if size <= 0:
+
 
                 side = "NONE"
 
 
 
-            new_position = {
+
+
+
+
+            new = {
 
 
                 "symbol":
 
-                    data.get(
+                    symbol,
 
-                        "symbol",
-
-                        ""
-
-                    ),
 
 
                 "side":
@@ -182,9 +288,11 @@ class PositionManager:
                     side,
 
 
+
                 "size":
 
                     size,
+
 
 
                 "entry_price":
@@ -197,7 +305,9 @@ class PositionManager:
 
                             0
 
-                        ) or 0
+                        )
+
+                        or 0
 
                     ),
 
@@ -213,9 +323,12 @@ class PositionManager:
 
                             0
 
-                        ) or 0
+                        )
+
+                        or 0
 
                     ),
+
 
 
 
@@ -229,9 +342,12 @@ class PositionManager:
 
                             0
 
-                        ) or 0
+                        )
+
+                        or 0
 
                     ),
+
 
 
 
@@ -245,9 +361,12 @@ class PositionManager:
 
                             0
 
-                        ) or 0
+                        )
+
+                        or 0
 
                     ),
+
 
 
 
@@ -259,42 +378,82 @@ class PositionManager:
 
 
 
+
+
+
+
             with self.lock:
 
-                self.position.update(
 
-                    new_position
+                old_pnl = self.position.get(
+
+                    "pnl",
+
+                    0
 
                 )
+
+
+                self.position = new
+
+
+
+            self.last_sync=time.time()
+
+
+
 
 
 
             update_status({
 
+
                 "position":
 
-                    new_position["side"],
+                    new["side"],
+
 
 
                 "position_size":
 
-                    new_position["size"],
+                    new["size"],
+
 
 
                 "entry_price":
 
-                    new_position["entry_price"],
+                    new["entry_price"],
+
 
 
                 "pnl":
 
-                    new_position["pnl"]
+                    new["pnl"]
+
 
             })
 
 
 
+
+
+
+
+            # PNL change log
+
+            if old_pnl != new["pnl"]:
+
+
+                pass
+
+
+
+
+
             return True
+
+
+
 
 
 
@@ -312,8 +471,12 @@ class PositionManager:
 
 
 
+
+
+
+
     # =====================================================
-    # GET POSITION
+    # GET
     # =====================================================
 
     def get_position(self):
@@ -321,12 +484,17 @@ class PositionManager:
 
         with self.lock:
 
+
             return self.position.copy()
 
 
 
+
+
+
+
     # =====================================================
-    # POSITION CHECK
+    # CHECK
     # =====================================================
 
     def has_position(self):
@@ -334,7 +502,11 @@ class PositionManager:
 
         with self.lock:
 
+
             return self.position["size"] > 0
+
+
+
 
 
 
@@ -343,15 +515,25 @@ class PositionManager:
 
         with self.lock:
 
+
             return (
 
-                self.position["side"] == "Buy"
+                self.position["side"]
+
+                ==
+
+                "Buy"
 
                 and
 
-                self.position["size"] > 0
+                self.position["size"]
+
+                > 0
 
             )
+
+
+
 
 
 
@@ -360,15 +542,54 @@ class PositionManager:
 
         with self.lock:
 
+
             return (
 
-                self.position["side"] == "Sell"
+                self.position["side"]
+
+                ==
+
+                "Sell"
 
                 and
 
-                self.position["size"] > 0
+                self.position["size"]
+
+                > 0
 
             )
+
+
+
+
+
+
+
+
+    # =====================================================
+    # WAIT SYNC
+    # =====================================================
+
+    def is_stale(self, timeout=60):
+
+
+        return (
+
+            time.time()
+
+            -
+
+            self.last_sync
+
+            >
+
+            timeout
+
+        )
+
+
+
+
 
 
 
@@ -383,6 +604,10 @@ class PositionManager:
 
 
 
+
+
+
+
     # =====================================================
     # RESET
     # =====================================================
@@ -393,40 +618,35 @@ class PositionManager:
         with self.lock:
 
 
-            self.position = {
-
-
-                "symbol": "",
-
-                "side": "NONE",
-
-                "size": 0.0,
-
-                "entry_price": 0.0,
-
-                "mark_price": 0.0,
-
-                "liq_price": 0.0,
-
-                "pnl": 0.0,
-
-                "updated": time.time()
-
-            }
+            self.position = self.default_position()
 
 
 
         update_status({
 
-            "position":"NONE",
 
-            "position_size":0,
+            "position":
 
-            "entry_price":0,
+                "NONE",
 
-            "pnl":0
+
+            "position_size":
+
+                0,
+
+
+            "entry_price":
+
+                0,
+
+
+            "pnl":
+
+                0
+
 
         })
+
 
 
         add_log(
@@ -437,37 +657,29 @@ class PositionManager:
 
 
 
+
+
+
+
     # =====================================================
-    # CLOSE
+    # CLOSE LOCAL STATE
     # =====================================================
 
     def close(self):
 
 
-        try:
+        self.reset()
 
 
-            self.reset()
+        add_log(
 
+            "POSITION MANAGER CLOSED"
 
-            print(
-
-                "[POSITION MANAGER CLOSED]"
-
-            )
+        )
 
 
 
-        except Exception as e:
 
-
-            print(
-
-                "[POSITION CLOSE ERROR]",
-
-                e
-
-            )
 
 
 
