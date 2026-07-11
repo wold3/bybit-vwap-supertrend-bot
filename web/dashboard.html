@@ -10,15 +10,18 @@ VWAP SUPERTREND BOT
 </title>
 
 
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
+
 <style>
 
 body {
 
-    font-family: Arial, sans-serif;
-
     background:#111;
 
     color:#eee;
+
+    font-family:Arial;
 
     margin:20px;
 
@@ -34,22 +37,13 @@ h1 {
 
 .card {
 
-    background:#1c1c1c;
-
-    border-radius:10px;
+    background:#1d1d1d;
 
     padding:20px;
 
     margin-bottom:15px;
 
-}
-
-
-.value {
-
-    font-size:28px;
-
-    font-weight:bold;
+    border-radius:10px;
 
 }
 
@@ -59,15 +53,30 @@ h1 {
     display:grid;
 
     grid-template-columns:
-
-    repeat(3, 1fr);
+    repeat(3,1fr);
 
     gap:15px;
 
 }
 
 
-.log {
+.value {
+
+    font-size:26px;
+
+    font-weight:bold;
+
+}
+
+
+#chart {
+
+    height:400px;
+
+}
+
+
+.logs {
 
     height:250px;
 
@@ -77,33 +86,18 @@ h1 {
 
     padding:10px;
 
-    font-size:14px;
-
-}
-
-
-.green {
-
-    color:#00ff99;
-
-}
-
-
-.red {
-
-    color:#ff5555;
-
 }
 
 
 </style>
 
-
 </head>
 
 
 
+
 <body>
+
 
 
 <h1>
@@ -119,16 +113,11 @@ VWAP-SUPERTREND BOT
 BOT STATUS
 </h3>
 
-
 <div id="bot" class="value">
-
 -
-
 </div>
 
-
 </div>
-
 
 
 
@@ -149,7 +138,6 @@ PRICE
 </div>
 
 </div>
-
 
 
 
@@ -200,7 +188,6 @@ VOLUME
 
 
 
-
 <div class="card">
 
 <h3>
@@ -212,7 +199,6 @@ SIGNAL
 </div>
 
 </div>
-
 
 
 
@@ -242,16 +228,34 @@ POSITION
 
 
 <h3>
+PRICE CHART
+</h3>
+
+
+<div id="chart"></div>
+
+
+</div>
+
+
+
+
+
+
+
+<div class="card">
+
+
+<h3>
 LIVE LOG
 </h3>
 
 
-<div id="logs" class="log">
-
-</div>
+<div id="logs" class="logs"></div>
 
 
 </div>
+
 
 
 
@@ -261,18 +265,60 @@ LIVE LOG
 <script>
 
 
-async function updateDashboard(){
+const chart = LightweightCharts.createChart(
+
+    document.getElementById("chart"),
+
+    {
+
+        layout:{
+
+            background:{
+                color:"#111"
+            },
+
+            textColor:"#eee"
+
+        },
+
+        grid:{
+
+            vertLines:{
+                visible:false
+            },
+
+            horzLines:{
+                visible:false
+            }
+
+        }
+
+    }
+
+);
+
+
+
+const candleSeries = chart.addCandlestickSeries();
+
+
+
+
+
+
+
+async function updateStatus(){
 
 
     try{
 
 
-        const res = await fetch(
+        const r = await fetch(
             "/api/status"
         );
 
 
-        const data = await res.json();
+        const data = await r.json();
 
 
 
@@ -283,7 +329,7 @@ async function updateDashboard(){
         document.getElementById(
             "bot"
         ).innerHTML =
-            s.bot || "-";
+            s.bot;
 
 
 
@@ -291,9 +337,8 @@ async function updateDashboard(){
             "price"
         ).innerHTML =
             Number(
-                s.price || 0
+                s.price
             ).toFixed(2);
-
 
 
 
@@ -301,17 +346,15 @@ async function updateDashboard(){
             "vwap"
         ).innerHTML =
             Number(
-                s.vwap || 0
+                s.vwap
             ).toFixed(2);
-
 
 
 
         document.getElementById(
             "trend"
         ).innerHTML =
-            s.trend || "-";
-
+            s.trend;
 
 
 
@@ -319,49 +362,109 @@ async function updateDashboard(){
             "volume"
         ).innerHTML =
             s.volume
-            ? "OK"
+            ?
+            "OK"
             :
             "LOW";
-
 
 
 
         document.getElementById(
             "signal"
         ).innerHTML =
-            s.signal || "-";
-
+            s.signal;
 
 
 
         document.getElementById(
             "position"
         ).innerHTML =
-            s.position || "NONE";
+            s.position;
 
 
 
 
 
-        let html="";
-
+        let logs="";
 
 
         data.logs.forEach(
 
-            function(log){
+            x=>{
 
-                html += log + "<br>";
+                logs += x+"<br>";
 
             }
 
         );
 
 
-
         document.getElementById(
             "logs"
-        ).innerHTML = html;
+        ).innerHTML =
+            logs;
+
+
+
+    }
+
+    catch(e){
+
+        console.log(e);
+
+    }
+
+}
+
+
+
+
+
+
+
+
+
+async function updateChart(){
+
+
+    try{
+
+
+        const r = await fetch(
+            "/api/chart"
+        );
+
+
+        const candles = await r.json();
+
+
+
+        candleSeries.setData(
+
+            candles.map(
+
+                c=>({
+
+                    time:
+                        c.time,
+
+                    open:
+                        c.open,
+
+                    high:
+                        c.high,
+
+                    low:
+                        c.low,
+
+                    close:
+                        c.close
+
+                })
+
+            )
+
+        );
 
 
 
@@ -383,9 +486,11 @@ async function updateDashboard(){
 
 
 
+
+
 setInterval(
 
-    updateDashboard,
+    updateStatus,
 
     3000
 
@@ -393,7 +498,19 @@ setInterval(
 
 
 
-updateDashboard();
+setInterval(
+
+    updateChart,
+
+    5000
+
+);
+
+
+
+updateStatus();
+
+updateChart();
 
 
 
