@@ -1,6 +1,6 @@
 # =====================================================
-# strategy/vwap_supertrend_strategy.py
-# VWAP + SuperTrend Strategy
+# strategy/vwap_supertrend.py
+# VWAP + SUPERTREND STRATEGY
 # =====================================================
 
 import pandas as pd
@@ -8,19 +8,11 @@ import numpy as np
 
 
 
-
-
 from config import (
 
     ATR_PERIOD,
 
-    SUPERTREND_MULTIPLIER,
-
-    USE_VOLUME_FILTER,
-
-    VOLUME_PERIOD,
-
-    MIN_VOLUME_MULTIPLIER
+    SUPERTREND_MULTIPLIER
 
 )
 
@@ -28,10 +20,17 @@ from config import (
 
 
 
-class VWAPSuperTrendStrategy:
+
+
+class VWAPSuperTrend:
+
 
 
     def __init__(self):
+
+
+        self.last_signal = None
+
 
 
         print(
@@ -53,39 +52,56 @@ class VWAPSuperTrendStrategy:
     # =====================================================
 
     def calculate_vwap(
+
         self,
+
         df
+
     ):
 
 
-        price = (
-
-            df["close"]
-
-        )
+        try:
 
 
-        volume = (
+            price = (
 
-            df["volume"]
+                df["close"]
 
-        )
+            )
 
 
-        vwap = (
+            volume = (
 
-            price
+                df["volume"]
 
-            *
-
-            volume
-
-        ).cumsum() / volume.cumsum()
+            )
 
 
 
-        return vwap
+            vwap = (
 
+                (price * volume)
+
+                .cumsum()
+
+                /
+
+                volume.cumsum()
+
+            )
+
+
+
+            return vwap
+
+
+
+
+
+        except Exception:
+
+
+            return None
 
 
 
@@ -100,8 +116,11 @@ class VWAPSuperTrendStrategy:
     # =====================================================
 
     def calculate_atr(
+
         self,
+
         df
+
     ):
 
 
@@ -120,6 +139,7 @@ class VWAPSuperTrendStrategy:
         tr1 = high - low
 
 
+
         tr2 = abs(
 
             high - close.shift()
@@ -127,13 +147,12 @@ class VWAPSuperTrendStrategy:
         )
 
 
+
         tr3 = abs(
 
             low - close.shift()
 
         )
-
-
 
 
 
@@ -159,19 +178,11 @@ class VWAPSuperTrendStrategy:
 
 
 
+        atr = tr.rolling(
 
+            ATR_PERIOD
 
-        atr = (
-
-            tr.rolling(
-
-                ATR_PERIOD
-
-            )
-
-            .mean()
-
-        )
+        ).mean()
 
 
 
@@ -191,8 +202,11 @@ class VWAPSuperTrendStrategy:
     # =====================================================
 
     def calculate_supertrend(
+
         self,
+
         df
+
     ):
 
 
@@ -224,15 +238,11 @@ class VWAPSuperTrendStrategy:
 
             +
 
-            (
+            SUPERTREND_MULTIPLIER
 
-                SUPERTREND_MULTIPLIER
+            *
 
-                *
-
-                atr
-
-            )
+            atr
 
         )
 
@@ -244,15 +254,11 @@ class VWAPSuperTrendStrategy:
 
             -
 
-            (
+            SUPERTREND_MULTIPLIER
 
-                SUPERTREND_MULTIPLIER
+            *
 
-                *
-
-                atr
-
-            )
+            atr
 
         )
 
@@ -277,6 +283,7 @@ class VWAPSuperTrendStrategy:
         ):
 
 
+
             if df["close"].iloc[i] > upper.iloc[i]:
 
 
@@ -291,14 +298,11 @@ class VWAPSuperTrendStrategy:
 
 
 
-
-
             trend.append(
 
                 current
 
             )
-
 
 
 
@@ -320,327 +324,138 @@ class VWAPSuperTrendStrategy:
 
 
     # =====================================================
-    # VOLUME FILTER
+    # SIGNAL
     # =====================================================
 
-    def volume_check(
+    def generate_signal(
+
         self,
+
         df
+
     ):
 
 
-        if not USE_VOLUME_FILTER:
 
-
-            return True
-
-
-
-
-
-        avg_volume = (
-
-            df["volume"]
-
-            .rolling(
-
-                VOLUME_PERIOD
-
-            )
-
-            .mean()
-
-            .iloc[-1]
-
-        )
-
-
-
-        current = (
-
-            df["volume"]
-
-            .iloc[-1]
-
-        )
-
-
-
-
-
-        return (
-
-            current
-
-            >=
-
-            avg_volume
-
-            *
-
-            MIN_VOLUME_MULTIPLIER
-
-        )
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # ANALYZE
-    # =====================================================
-
-    def analyze(
-        self,
-        candles
-    ):
-
-
-        try:
-
-
-            if len(candles) < 50:
-
-
-                return None
-
-
-
-
-
-            df = pd.DataFrame(
-
-                candles
-
-            )
-
-
-
-
-
-            df["vwap"] = (
-
-                self.calculate_vwap(
-
-                    df
-
-                )
-
-            )
-
-
-
-
-
-            df["trend"] = (
-
-                self.calculate_supertrend(
-
-                    df
-
-                )
-
-            )
-
-
-
-
-
-
-
-            last = df.iloc[-1]
-
-
-            prev = df.iloc[-2]
-
-
-
-
-
-            if not self.volume_check(df):
-
-
-                return None
-
-
-
-
-
-
-
-            signal = None
-
-
-
-
-
-            # -------------------------
-            # BUY
-            # -------------------------
-
-            if (
-
-                prev["close"]
-
-                <
-
-                prev["vwap"]
-
-                and
-
-                last["close"]
-
-                >
-
-                last["vwap"]
-
-                and
-
-                last["trend"]
-
-                ==
-
-                1
-
-            ):
-
-
-                signal = {
-
-
-                    "signal":
-
-                        "BUY",
-
-
-                    "price":
-
-                        float(
-
-                            last["close"]
-
-                        ),
-
-
-                    "vwap":
-
-                        float(
-
-                            last["vwap"]
-
-                        ),
-
-
-                    "trend":
-
-                        "UP"
-
-                }
-
-
-
-
-
-
-
-
-
-            # -------------------------
-            # SELL
-            # -------------------------
-
-            elif (
-
-                prev["close"]
-
-                >
-
-                prev["vwap"]
-
-                and
-
-                last["close"]
-
-                <
-
-                last["vwap"]
-
-                and
-
-                last["trend"]
-
-                ==
-
-                -1
-
-            ):
-
-
-                signal = {
-
-
-                    "signal":
-
-                        "SELL",
-
-
-                    "price":
-
-                        float(
-
-                            last["close"]
-
-                        ),
-
-
-                    "vwap":
-
-                        float(
-
-                            last["vwap"]
-
-                        ),
-
-
-                    "trend":
-
-                        "DOWN"
-
-                }
-
-
-
-
-
-
-
-
-            return signal
-
-
-
-
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[STRATEGY ERROR]",
-
-                e
-
-            )
+        if len(df) < 50:
 
 
             return None
 
+
+
+
+
+
+        df = df.copy()
+
+
+
+        df["vwap"] = self.calculate_vwap(
+
+            df
+
+        )
+
+
+
+        df["supertrend"] = self.calculate_supertrend(
+
+            df
+
+        )
+
+
+
+
+
+        last = df.iloc[-1]
+
+
+
+
+
+        signal = None
+
+
+
+
+
+
+        # BUY
+
+        if (
+
+            last["close"]
+
+            >
+
+            last["vwap"]
+
+            and
+
+            last["supertrend"]
+
+            ==
+
+            1
+
+        ):
+
+
+
+            signal = "Buy"
+
+
+
+
+
+
+
+        # SELL
+
+        elif (
+
+            last["close"]
+
+            <
+
+            last["vwap"]
+
+            and
+
+            last["supertrend"]
+
+            ==
+
+            -1
+
+        ):
+
+
+
+            signal = "Sell"
+
+
+
+
+
+
+
+        if signal == self.last_signal:
+
+
+            return None
+
+
+
+
+
+        self.last_signal = signal
+
+
+
+        return signal
 
 
 
@@ -654,4 +469,4 @@ class VWAPSuperTrendStrategy:
 # INSTANCE
 # =====================================================
 
-vwap_supertrend_strategy = VWAPSuperTrendStrategy()
+strategy = VWAPSuperTrend()
