@@ -1,7 +1,7 @@
 # =====================================================
 # api/bybit_api.py
 # Bybit V5 API Manager
-# Demo / Live Trading
+# Demo / Live Support
 # =====================================================
 
 import time
@@ -11,12 +11,14 @@ import requests
 import json
 
 
+
 from config import (
     BYBIT_API_KEY,
     BYBIT_API_SECRET,
+    LIVE,
     CATEGORY,
     DEFAULT_SYMBOL,
-    LIVE
+    INTERVAL
 )
 
 
@@ -31,19 +33,23 @@ class BybitAPI:
 
         if LIVE:
 
-
             self.base_url = (
                 "https://api.bybit.com"
+            )
+
+            self.ws_url = (
+                "wss://stream.bybit.com/v5/private"
             )
 
 
         else:
 
-
-            # Bybit Demo Trading API
-
             self.base_url = (
                 "https://api-demo.bybit.com"
+            )
+
+            self.ws_url = (
+                "wss://stream-demo.bybit.com/v5/private"
             )
 
 
@@ -53,6 +59,7 @@ class BybitAPI:
             "[BYBIT API READY]"
 
         )
+
 
 
         print(
@@ -69,6 +76,8 @@ class BybitAPI:
 
 
 
+
+
     # =====================================================
     # SIGN
     # =====================================================
@@ -76,29 +85,17 @@ class BybitAPI:
 
     def sign(
         self,
-        payload
+        timestamp,
+        body=""
     ):
-
-
-        timestamp = str(
-
-            int(
-
-                time.time()*1000
-
-            )
-
-        )
-
 
 
         recv_window = "5000"
 
 
-
         param = (
 
-            timestamp
+            str(timestamp)
 
             +
 
@@ -110,13 +107,13 @@ class BybitAPI:
 
             +
 
-            payload
+            body
 
         )
 
 
 
-        signature = hmac.new(
+        return hmac.new(
 
             BYBIT_API_SECRET.encode(),
 
@@ -125,20 +122,6 @@ class BybitAPI:
             hashlib.sha256
 
         ).hexdigest()
-
-
-
-        return (
-
-            timestamp,
-
-            recv_window,
-
-            signature
-
-        )
-
-
 
 
 
@@ -162,52 +145,32 @@ class BybitAPI:
         try:
 
 
-            if params is None:
+            timestamp = str(
 
-                params = {}
+                int(
 
-
-
-            if method == "GET":
-
-
-                payload = (
-
-                    json.dumps(
-
-                        params,
-
-                        separators=(
-                            ",",
-                            ":"
-                        )
-
-                    )
+                    time.time()*1000
 
                 )
-
-            else:
-
-
-                payload = json.dumps(
-
-                    params,
-
-                    separators=(
-                        ",",
-                        ":"
-                    )
-
-                )
-
-
-
-
-            timestamp, recv, signature = self.sign(
-
-                payload
 
             )
+
+
+
+            body = ""
+
+
+
+            if method == "POST":
+
+
+                body = json.dumps(
+
+                    params
+
+                )
+
+
 
 
 
@@ -219,19 +182,25 @@ class BybitAPI:
                     BYBIT_API_KEY,
 
 
-                "X-BAPI-SIGN":
-
-                    signature,
-
-
                 "X-BAPI-TIMESTAMP":
 
                     timestamp,
 
 
+                "X-BAPI-SIGN":
+
+                    self.sign(
+
+                        timestamp,
+
+                        body
+
+                    ),
+
+
                 "X-BAPI-RECV-WINDOW":
 
-                    recv,
+                    "5000",
 
 
                 "Content-Type":
@@ -239,6 +208,8 @@ class BybitAPI:
                     "application/json"
 
             }
+
+
 
 
 
@@ -253,6 +224,7 @@ class BybitAPI:
                 path
 
             )
+
 
 
 
@@ -273,7 +245,6 @@ class BybitAPI:
                 )
 
 
-
             else:
 
 
@@ -283,7 +254,7 @@ class BybitAPI:
 
                     headers=headers,
 
-                    json=params,
+                    data=body,
 
                     timeout=10
 
@@ -291,6 +262,9 @@ class BybitAPI:
 
 
 
+
+
+            data = r.json()
 
 
 
@@ -304,15 +278,7 @@ class BybitAPI:
 
 
 
-            data = r.json()
-
-
-
-            if data.get(
-
-                "retCode"
-
-            ) != 0:
+            if data.get("retCode") != 0:
 
 
                 print(
@@ -331,12 +297,13 @@ class BybitAPI:
 
 
 
+
         except Exception as e:
 
 
             print(
 
-                "[REQUEST ERROR]",
+                "[BYBIT REQUEST ERROR]",
 
                 e
 
@@ -367,11 +334,9 @@ class BybitAPI:
 
             {
 
-
                 "accountType":
 
                     "UNIFIED"
-
 
             }
 
@@ -390,13 +355,10 @@ class BybitAPI:
     # =====================================================
 
 
-    def get_kline(
-        self,
-        limit=200
-    ):
+    def get_kline(self):
 
 
-        result = self.request(
+        data = self.request(
 
             "GET",
 
@@ -417,12 +379,12 @@ class BybitAPI:
 
                 "interval":
 
-                    "5",
+                    INTERVAL,
 
 
                 "limit":
 
-                    limit
+                    200
 
             }
 
@@ -430,12 +392,10 @@ class BybitAPI:
 
 
 
-        if not result:
+        if not data:
 
 
             return []
-
-
 
 
 
@@ -444,7 +404,7 @@ class BybitAPI:
 
             return (
 
-                result
+                data
 
                 ["result"]
 
@@ -605,7 +565,12 @@ class BybitAPI:
 
                 "stopLoss":
 
-                    str(sl)
+                    str(sl),
+
+
+                "tpslMode":
+
+                    "Full"
 
             }
 
