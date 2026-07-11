@@ -1,10 +1,16 @@
 # =====================================================
 # main.py
-# VWAP SUPERTREND BOT MAIN
+# VWAP SUPERTREND BOT ENTRY POINT
+# Manual Run Version
 # =====================================================
 
 import time
-import traceback
+import threading
+import signal
+import sys
+
+
+
 
 
 from app import (
@@ -12,13 +18,8 @@ from app import (
 )
 
 
-from database.database import (
-    database
-)
-
-
 from web.server import (
-    add_log
+    run_server
 )
 
 
@@ -30,62 +31,81 @@ from services.telegram import (
 
 
 
-def main():
+# =====================================================
+# GLOBAL
+# =====================================================
 
 
+running = True
+
+
+
+
+
+
+
+# =====================================================
+# WEB SERVER THREAD
+# =====================================================
+
+
+def start_web():
+
+
+    run_server()
+
+
+
+
+
+
+
+# =====================================================
+# SHUTDOWN
+# =====================================================
+
+
+def shutdown(
+    sig=None,
+    frame=None
+):
+
+
+    global running
+
+
+
+    if not running:
+
+
+        return
+
+
+
+    running = False
+
+
+
+    print()
+
     print("====================")
-    print("[SYSTEM START]")
+
+    print("[SYSTEM STOP]")
+
     print("====================")
+
+
 
 
 
     try:
 
 
-        add_log(
-
-            "SYSTEM START"
-
-        )
-
-
-        telegram.bot_start()
+        app.stop()
 
 
 
-        app.start()
-
-
-
-
-
-        while True:
-
-
-            time.sleep(1)
-
-
-
-
-
-
-    except KeyboardInterrupt:
-
-
-        print(
-
-            "[USER STOP]"
-
-        )
-
-
-        add_log(
-
-            "USER STOP"
-
-        )
-
-
+        telegram.bot_stop()
 
 
 
@@ -94,7 +114,7 @@ def main():
 
         print(
 
-            "[MAIN ERROR]",
+            "[SHUTDOWN ERROR]",
 
             e
 
@@ -102,79 +122,15 @@ def main():
 
 
 
-        traceback.print_exc()
+
+
+    print()
+
+    print("[EXIT COMPLETE]")
 
 
 
-        try:
-
-
-            database.save_error(
-
-                e
-
-            )
-
-
-        except:
-
-
-            pass
-
-
-
-
-
-
-    finally:
-
-
-        print(
-
-            "[SYSTEM SHUTDOWN]"
-
-        )
-
-
-
-        try:
-
-
-            telegram.bot_stop()
-
-
-
-        except:
-
-
-            pass
-
-
-
-
-
-        try:
-
-
-            app.stop()
-
-
-
-        except:
-
-
-            pass
-
-
-
-
-
-
-        print(
-
-            "[PROGRAM EXIT]"
-
-        )
+    sys.exit(0)
 
 
 
@@ -182,6 +138,186 @@ def main():
 
 
 
+
+
+# =====================================================
+# SIGNAL HANDLER
+# =====================================================
+
+
+signal.signal(
+
+    signal.SIGINT,
+
+    shutdown
+
+)
+
+
+signal.signal(
+
+    signal.SIGTERM,
+
+    shutdown
+
+)
+
+
+
+
+
+
+
+
+
+# =====================================================
+# MAIN
+# =====================================================
+
+
+def main():
+
+
+    print()
+
+    print("==============================")
+
+    print(" VWAP SUPERTREND AUTO BOT ")
+
+    print("==============================")
+
+
+
+
+
+    print(
+
+        "[MODE]",
+
+        "MANUAL RUN"
+
+    )
+
+
+
+
+
+
+
+
+
+    # Telegram START
+
+
+    telegram.bot_start()
+
+
+
+
+
+
+
+
+
+    # Dashboard
+
+
+    web_thread = threading.Thread(
+
+        target=start_web,
+
+        daemon=True
+
+    )
+
+
+    web_thread.start()
+
+
+
+
+
+
+
+
+
+    time.sleep(2)
+
+
+
+
+
+
+
+
+
+    # Trading System Start
+
+
+    app.start()
+
+
+
+
+
+
+
+
+
+    print()
+
+    print("==============================")
+
+    print("[BOT RUNNING]")
+
+    print("==============================")
+
+    print()
+
+    print(
+
+        "Dashboard:"
+
+    )
+
+    print(
+
+        "http://127.0.0.1:8000"
+
+    )
+
+    print()
+
+    print(
+
+        "STOP : Ctrl + C"
+
+    )
+
+
+
+
+
+
+
+
+
+    while running:
+
+
+        time.sleep(1)
+
+
+
+
+
+
+
+
+
+# =====================================================
+# EXECUTE
+# =====================================================
 
 
 if __name__ == "__main__":
