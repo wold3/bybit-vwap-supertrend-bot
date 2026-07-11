@@ -1,57 +1,29 @@
-# =======================================================
+# =====================================================
 # main.py
-# VWAP SuperTrend Trading Bot MAIN
-# Direct Run Version
-# =======================================================
-
+# VWAP SUPERTREND AUTO BOT
+# =====================================================
 
 import time
 import signal
 import sys
-import traceback
 
 
 from app import TradingApp
 
 
 from web.server import (
-
     run_server,
-
-    stop_server,
-
     set_bot_instance,
-
-    add_log,
-
-    update_status
-
+    add_log
 )
 
 
 
-
-
-# =======================================================
-# GLOBAL
-# =======================================================
-
 bot = None
 
-running = True
 
 
-
-
-
-# =======================================================
-# SIGNAL HANDLER
-# =======================================================
-
-def shutdown_handler(signum, frame):
-
-    global running
-
+def shutdown(sig=None, frame=None):
 
     print()
 
@@ -60,15 +32,6 @@ def shutdown_handler(signum, frame):
     print("====================")
 
 
-
-    running = False
-
-
-
-    # -----------------------------
-    # BOT STOP
-    # -----------------------------
-
     try:
 
         if bot:
@@ -76,47 +39,12 @@ def shutdown_handler(signum, frame):
             bot.stop()
 
 
-            print(
-                "[BOT STOPPED]"
-            )
-
-
     except Exception as e:
 
-
         print(
-            "[BOT STOP ERROR]",
+            "STOP ERROR",
             e
         )
-
-
-
-    # -----------------------------
-    # WEB STOP
-    # -----------------------------
-
-    try:
-
-        stop_server()
-
-
-    except Exception as e:
-
-
-        print(
-            "[WEB STOP ERROR]",
-            e
-        )
-
-
-
-    add_log(
-        "SYSTEM SHUTDOWN COMPLETE"
-    )
-
-
-
-    time.sleep(1)
 
 
     sys.exit(0)
@@ -125,193 +53,107 @@ def shutdown_handler(signum, frame):
 
 
 
+def main():
 
-
-# =======================================================
-# START
-# =======================================================
-
-def start():
 
     global bot
+
 
 
     print()
 
     print("====================")
-    print(" VWAP SUPERTREND BOT ")
+    print("[MAIN READY]")
     print("====================")
 
 
 
-    try:
+    # WEB SERVER
 
+    run_server()
 
 
-        # ---------------------------------
-        # WEB SERVER
-        # ---------------------------------
 
-        run_server()
+    # BOT INSTANCE
 
+    bot = TradingApp()
 
-        time.sleep(1)
 
 
+    set_bot_instance(
 
-        # ---------------------------------
-        # CREATE BOT
-        # ---------------------------------
+        bot
 
-        bot = TradingApp()
+    )
 
 
 
-        set_bot_instance(
-            bot
-        )
+    add_log(
 
+        "BOT INSTANCE CREATED"
 
+    )
 
-        add_log(
-            "BOT INSTANCE CREATED"
-        )
 
 
-
-        update_status({
-
-            "bot":
-                "STOPPED"
-
-        })
-
-
-
-        print(
-            "[MAIN READY]"
-        )
-
-
-
-
-
-        # ---------------------------------
-        # AUTO START
-        # ---------------------------------
-
-        bot.start()
-
-
-
-        add_log(
-            "AUTO START COMPLETE"
-        )
-
-
-
-
-
-        # ---------------------------------
-        # MAIN WAIT LOOP
-        # ---------------------------------
-
-        while running:
-
-
-            time.sleep(1)
-
-
-
-
-
-
-    except KeyboardInterrupt:
-
-
-        shutdown_handler(
-            None,
-            None
-        )
-
-
-
-
-    except Exception as e:
-
-
-        traceback.print_exc()
-
-
-
-        add_log(
-
-            f"MAIN ERROR {e}"
-
-        )
-
-
-
-        try:
-
-
-            if bot:
-
-
-                bot.stop()
-
-
-
-        except:
-
-
-            pass
-
-
-
-        try:
-
-
-            stop_server()
-
-
-        except:
-
-
-            pass
-
-
-
-
-
-
-
-# =======================================================
-# ENTRY
-# =======================================================
-
-if __name__ == "__main__":
-
-
+    # CTRL+C 처리
 
     signal.signal(
 
         signal.SIGINT,
 
-        shutdown_handler
+        shutdown
 
     )
-
 
 
     signal.signal(
 
         signal.SIGTERM,
 
-        shutdown_handler
+        shutdown
 
     )
 
 
 
-    start()
+    print()
+
+    print("====================")
+    print("[AUTO START]")
+    print("====================")
+
+
+
+    bot.start()
+
+
+
+    add_log(
+
+        "AUTO START COMPLETE"
+
+    )
+
+
+
+    print()
+
+    print("[RUNNING]")
+
+
+
+    while True:
+
+
+        time.sleep(1)
+
+
+
+
+
+
+if __name__ == "__main__":
+
+
+    main()
