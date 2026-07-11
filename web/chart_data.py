@@ -1,28 +1,95 @@
 # =====================================================
 # web/chart_data.py
-# Chart Data Store
+# Chart Data Manager
 # =====================================================
 
 
-candles = []
+import threading
 
 
 
-def add_candle(data):
 
 
-    candles.append(data)
+# 최근 캔들 저장
+
+CANDLES = []
 
 
 
-    if len(candles) > 200:
-
-        candles.pop(0)
+MAX_CANDLES = 200
 
 
+
+LOCK = threading.Lock()
+
+
+
+
+
+
+
+# =====================================================
+# ADD CANDLE
+# =====================================================
+
+
+def add_candle(candle):
+
+
+    with LOCK:
+
+
+        CANDLES.append(
+
+            candle
+
+        )
+
+
+
+        if len(CANDLES) > MAX_CANDLES:
+
+
+            CANDLES.pop(0)
+
+
+
+
+
+
+
+# =====================================================
+# GET CANDLES
+# =====================================================
 
 
 def get_candles():
 
 
-    return candles
+    with LOCK:
+
+
+        return list(
+
+            CANDLES
+
+        )
+
+
+
+
+
+
+
+# =====================================================
+# CLEAR
+# =====================================================
+
+
+def clear_chart():
+
+
+    with LOCK:
+
+
+        CANDLES.clear()
