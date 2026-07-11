@@ -5,7 +5,9 @@
 
 <meta charset="UTF-8">
 
-<title>VWAP SUPERTREND BOT</title>
+<title>
+VWAP SUPERTREND BOT
+</title>
 
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -19,193 +21,292 @@
 
 <style>
 
+
+*{
+
+box-sizing:border-box;
+
+}
+
+
+
 body{
 
-    margin:0;
 
-    background:#0b0f14;
+margin:0;
 
-    color:#e6edf3;
+background:#0d1117;
 
-    font-family:Arial,sans-serif;
+color:#e6edf3;
+
+font-family:
+
+Arial,
+
+sans-serif;
+
 
 }
 
 
-.header{
 
-    padding:20px;
+header{
 
-    background:#161b22;
 
-    border-bottom:1px solid #30363d;
+background:#161b22;
+
+padding:20px;
+
+border-bottom:
+
+1px solid #30363d;
+
+
+}
+
+
+
+header h1{
+
+
+margin:0;
+
+font-size:28px;
+
 
 }
 
-
-.header h1{
-
-    margin:0;
-
-}
 
 
 
 .container{
 
-    padding:20px;
 
-    display:grid;
+padding:20px;
 
-    grid-template-columns:
+display:grid;
 
-    repeat(auto-fit,minmax(280px,1fr));
+grid-template-columns:
 
-    gap:20px;
+repeat(auto-fit,minmax(260px,1fr));
+
+gap:20px;
+
 
 }
+
+
 
 
 
 .card{
 
-    background:#161b22;
 
-    border:1px solid #30363d;
+background:#161b22;
 
-    border-radius:12px;
+border:
 
-    padding:20px;
+1px solid #30363d;
+
+border-radius:12px;
+
+padding:20px;
+
 
 }
+
 
 
 
 .full{
 
-    grid-column:1/-1;
+
+grid-column:
+
+1 / -1;
+
 
 }
+
 
 
 
 .title{
 
-    color:#8b949e;
 
-    margin-bottom:10px;
+color:#8b949e;
+
+font-size:14px;
+
+margin-bottom:10px;
+
 
 }
+
 
 
 
 .value{
 
-    font-size:30px;
 
-    font-weight:bold;
+font-size:30px;
+
+font-weight:bold;
+
 
 }
+
 
 
 
 .price{
 
-    font-size:42px;
 
-    font-weight:bold;
+font-size:42px;
+
+font-weight:bold;
+
 
 }
+
+
+
+
+.green{
+
+
+color:#3fb950;
+
+}
+
+
+
+.red{
+
+
+color:#f85149;
+
+}
+
+
 
 
 
 button{
 
-    width:120px;
 
-    height:45px;
+width:120px;
 
-    margin:5px;
+height:45px;
 
-    border:0;
+border:0;
 
-    border-radius:8px;
+border-radius:8px;
 
-    color:white;
+margin:5px;
 
-    font-size:18px;
+color:white;
 
-    cursor:pointer;
+font-size:17px;
+
+cursor:pointer;
+
 
 }
+
 
 
 
 .buy{
 
-    background:#238636;
+
+background:#238636;
+
 
 }
+
 
 
 .sell{
 
-    background:#da3633;
+
+background:#da3633;
+
 
 }
+
 
 
 .close{
 
-    background:#57606a;
+
+background:#57606a;
+
 
 }
 
 
 
-.chart-box{
 
-    height:650px;
+
+.chart-card{
+
+
+height:700px;
+
 
 }
 
 
 
-.chart-container{
 
-    position:relative;
+.chart-area{
 
-    height:560px;
 
-    width:100%;
+height:600px;
+
+width:100%;
+
 
 }
 
 
-
-#logs{
-
-    height:300px;
-
-    overflow:auto;
-
-    background:#000;
-
-    padding:15px;
-
-    font-family:monospace;
-
-}
 
 
 
 canvas{
 
-    width:100% !important;
 
-    height:100% !important;
+width:100%!important;
+
+height:100%!important;
+
 
 }
+
+
+
+
+#logs{
+
+
+height:300px;
+
+background:#000;
+
+overflow:auto;
+
+padding:15px;
+
+font-family:
+
+monospace;
+
+font-size:13px;
+
+
+}
+
 
 
 </style>
@@ -215,16 +316,20 @@ canvas{
 
 
 
+
 <body>
 
 
-<div class="header">
+
+<header>
+
 
 <h1>
 VWAP SUPERTREND BOT
 </h1>
 
-</div>
+
+</header>
 
 
 
@@ -238,15 +343,26 @@ VWAP SUPERTREND BOT
 
 <div class="card">
 
+
 <div class="title">
+
 BOT STATUS
+
 </div>
 
-<div id="bot" class="value">
+
+<div id="bot"
+
+class="value">
+
 -
-</div>
 
 </div>
+
+
+</div>
+
+
 
 
 
@@ -254,15 +370,26 @@ BOT STATUS
 
 <div class="card">
 
+
 <div class="title">
+
 MODE
+
 </div>
 
-<div id="mode" class="value">
+
+<div id="mode"
+
+class="value">
+
 -
-</div>
 
 </div>
+
+
+</div>
+
+
 
 
 
@@ -270,15 +397,27 @@ MODE
 
 <div class="card">
 
+
 <div class="title">
+
 SYMBOL
+
 </div>
 
-<div id="symbol" class="value">
+
+<div id="symbol"
+
+class="value">
+
 -
-</div>
 
 </div>
+
+
+</div>
+
+
+
 
 
 
@@ -286,15 +425,27 @@ SYMBOL
 
 <div class="card">
 
+
 <div class="title">
+
 PRICE
+
 </div>
 
-<div id="price" class="price">
+
+<div id="price"
+
+class="price">
+
 -
-</div>
 
 </div>
+
+
+</div>
+
+
+
 
 
 
@@ -302,46 +453,74 @@ PRICE
 
 <div class="card">
 
+
 <div class="title">
+
 POSITION
+
 </div>
 
-<div id="position" class="value">
+
+<div id="position"
+
+class="value">
+
 -
+
 </div>
+
 
 <br>
+
 
 SIZE :
-<span id="size">-</span>
+
+<span id="size">
+
+-
+
+</span>
+
 
 <br>
+
 
 ENTRY :
-<span id="entry">-</span>
+
+<span id="entry">
+
+-
+
+</span>
+
 
 <br>
 
+
 MARK :
-<span id="mark">-</span>
 
-</div>
+<span id="mark">
 
-
-
-
-
-<div class="card">
-
-<div class="title">
-PNL
-</div>
-
-<div id="pnl" class="price">
 -
-</div>
+
+</span>
+
+
+<br>
+
+
+LIQ :
+
+<span id="liq">
+
+-
+
+</span>
+
 
 </div>
+
+
 
 
 
@@ -350,28 +529,72 @@ PNL
 
 <div class="card">
 
+
 <div class="title">
-MANUAL ORDER
+
+PNL
+
 </div>
 
 
-<button class="buy"
-onclick="sendOrder('Buy')">
+<div id="pnl"
+
+class="price">
+
+-
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="card">
+
+
+<div class="title">
+
+MANUAL ORDER
+
+</div>
+
+
+
+<button
+
+class="buy"
+
+onclick="order('Buy')">
 
 BUY
 
 </button>
 
 
-<button class="sell"
-onclick="sendOrder('Sell')">
+
+<button
+
+class="sell"
+
+onclick="order('Sell')">
 
 SELL
 
 </button>
 
 
-<button class="close"
+
+<button
+
+class="close"
+
 onclick="closeOrder()">
 
 CLOSE
@@ -387,7 +610,7 @@ CLOSE
 
 
 
-<div class="card full chart-box">
+<div class="card full chart-card">
 
 
 <div class="title">
@@ -397,17 +620,19 @@ BTCUSDT 5M CANDLE CHART
 </div>
 
 
-<div class="chart-container">
+
+<div class="chart-area">
 
 
-<canvas id="chart"></canvas>
+<canvas id="chart">
+
+</canvas>
 
 
 </div>
 
 
 </div>
-
 
 
 
@@ -425,10 +650,14 @@ SYSTEM LOG
 </div>
 
 
-<div id="logs"></div>
+<div id="logs">
+
+</div>
 
 
 </div>
+
+
 
 
 
@@ -447,55 +676,106 @@ SYSTEM LOG
 <script>
 
 
-function updateStatus(){
+async function updateStatus(){
 
 
-fetch("/api/status")
+try{
 
 
-.then(r=>r.json())
+let res=
+
+await fetch(
+
+"/api/status"
+
+);
 
 
-.then(data=>{
+
+let data=
+
+await res.json();
+
 
 
 let s=data.status;
 
 
-document.getElementById("bot").innerHTML=s.bot;
 
-document.getElementById("mode").innerHTML=s.mode;
+bot.innerHTML=s.bot;
 
-document.getElementById("symbol").innerHTML=s.symbol;
 
-document.getElementById("price").innerHTML=s.price;
+mode.innerHTML=s.mode;
 
-document.getElementById("position").innerHTML=s.position;
 
-document.getElementById("size").innerHTML=s.position_size;
+symbol.innerHTML=s.symbol;
 
-document.getElementById("entry").innerHTML=s.entry_price;
 
-document.getElementById("mark").innerHTML=s.mark_price;
+price.innerHTML=s.price;
 
-document.getElementById("pnl").innerHTML=s.pnl;
+
+position.innerHTML=s.position;
+
+
+size.innerHTML=s.position_size;
+
+
+entry.innerHTML=s.entry_price;
+
+
+mark.innerHTML=s.mark_price;
+
+
+liq.innerHTML=s.liq_price;
+
+
+pnl.innerHTML=s.pnl;
+
+
+
 
 
 
 let html="";
 
 
-data.logs.forEach(x=>{
 
-html+=x+"<br>";
+data.logs.forEach(
 
-});
-
-
-document.getElementById("logs").innerHTML=html;
+l=>{
 
 
-});
+html+=l+"<br>";
+
+}
+
+
+);
+
+
+
+logs.innerHTML=html;
+
+
+
+logs.scrollTop=
+
+logs.scrollHeight;
+
+
+
+}
+
+
+
+catch(e){
+
+
+console.log(e);
+
+
+}
+
 
 
 }
@@ -504,18 +784,30 @@ document.getElementById("logs").innerHTML=html;
 
 
 
-function sendOrder(side){
 
 
-fetch("/api/order",{
+
+
+function order(side){
+
+
+
+fetch(
+
+"/api/order",
+
+{
 
 
 method:"POST",
 
+
 headers:{
 
 
-"Content-Type":"application/json"
+"Content-Type":
+
+"application/json"
 
 
 },
@@ -526,16 +818,23 @@ body:JSON.stringify({
 
 side:side,
 
+
 qty:0.001
 
 
 })
 
 
-});
+}
+
+
+
+);
+
 
 
 }
+
 
 
 
@@ -545,11 +844,22 @@ qty:0.001
 function closeOrder(){
 
 
-fetch("/api/close",{
+
+fetch(
+
+"/api/close",
+
+{
+
 
 method:"POST"
 
-});
+
+}
+
+
+);
+
 
 
 }
@@ -557,9 +867,21 @@ method:"POST"
 
 
 
-setInterval(updateStatus,1000);
+
+
+
+setInterval(
+
+updateStatus,
+
+1000
+
+);
+
+
 
 updateStatus();
+
 
 
 </script>
@@ -568,9 +890,12 @@ updateStatus();
 
 
 
+
 <script src="/chart.js"></script>
 
 
+
 </body>
+
 
 </html>
