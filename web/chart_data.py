@@ -8,113 +8,20 @@ import threading
 
 
 
-class ChartData:
 
+# =====================================================
+# STORAGE
+# =====================================================
 
-    def __init__(self):
 
+candles = []
 
-        self.candles = []
 
+MAX_CANDLES = 200
 
-        self.lock = threading.Lock()
 
 
-        self.max_candles = 500
-
-
-
-        print(
-            "[CHART DATA READY]"
-        )
-
-
-
-
-
-
-
-    # =====================================================
-    # ADD CANDLE
-    # =====================================================
-
-
-    def add(
-        self,
-        candle
-    ):
-
-
-        try:
-
-
-            with self.lock:
-
-
-                self.candles.append(
-
-                    candle
-
-                )
-
-
-
-                if len(self.candles) > self.max_candles:
-
-
-                    self.candles = (
-
-                        self.candles[-self.max_candles:]
-
-                    )
-
-
-
-        except Exception as e:
-
-
-            print(
-
-                "[CHART ADD ERROR]",
-
-                e
-
-            )
-
-
-
-
-
-
-
-    # =====================================================
-    # GET DATA
-    # =====================================================
-
-
-    def get(self):
-
-
-        try:
-
-
-            with self.lock:
-
-
-                return list(
-
-                    self.candles
-
-                )
-
-
-
-        except:
-
-
-            return []
-
-
+lock = threading.Lock()
 
 
 
@@ -123,19 +30,7 @@ class ChartData:
 
 
 # =====================================================
-# INSTANCE
-# =====================================================
-
-
-chart_data = ChartData()
-
-
-
-
-
-
-# =====================================================
-# COMPATIBILITY FUNCTION
+# ADD CANDLE
 # =====================================================
 
 
@@ -144,8 +39,80 @@ def add_candle(
 ):
 
 
-    chart_data.add(
+    try:
 
-        candle
 
-    )
+        with lock:
+
+
+            candles.append(
+
+                candle
+
+            )
+
+
+
+            if len(candles) > MAX_CANDLES:
+
+
+                candles.pop(0)
+
+
+
+
+
+    except Exception as e:
+
+
+        print(
+
+            "[CHART DATA ERROR]",
+
+            e
+
+        )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# GET CHART DATA
+# =====================================================
+
+
+def get_chart():
+
+
+    try:
+
+
+        with lock:
+
+
+            return list(
+
+                candles
+
+            )
+
+
+
+    except Exception as e:
+
+
+        print(
+
+            "[CHART GET ERROR]",
+
+            e
+
+        )
+
+
+        return []
