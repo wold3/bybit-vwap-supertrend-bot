@@ -1,7 +1,9 @@
 # =======================================================
 # main.py
 # VWAP SuperTrend Trading Bot MAIN
+# Direct Run Version
 # =======================================================
+
 
 import time
 import signal
@@ -16,15 +18,17 @@ from web.server import (
 
     run_server,
 
+    stop_server,
+
     set_bot_instance,
 
     add_log,
 
-    update_status,
-
-    reset_status
+    update_status
 
 )
+
+
 
 
 
@@ -41,21 +45,18 @@ running = True
 
 
 # =======================================================
-# SHUTDOWN HANDLER
+# SIGNAL HANDLER
 # =======================================================
 
 def shutdown_handler(signum, frame):
 
     global running
-    global bot
 
 
     print()
 
     print("====================")
-
     print("[SYSTEM SHUTDOWN]")
-
     print("====================")
 
 
@@ -64,34 +65,55 @@ def shutdown_handler(signum, frame):
 
 
 
-    try:
+    # -----------------------------
+    # BOT STOP
+    # -----------------------------
 
+    try:
 
         if bot:
 
-
             bot.stop()
 
+
+            print(
+                "[BOT STOPPED]"
+            )
 
 
     except Exception as e:
 
 
         print(
-
             "[BOT STOP ERROR]",
-
             e
+        )
 
+
+
+    # -----------------------------
+    # WEB STOP
+    # -----------------------------
+
+    try:
+
+        stop_server()
+
+
+    except Exception as e:
+
+
+        print(
+            "[WEB STOP ERROR]",
+            e
         )
 
 
 
     add_log(
-
         "SYSTEM SHUTDOWN COMPLETE"
-
     )
+
 
 
     time.sleep(1)
@@ -106,7 +128,7 @@ def shutdown_handler(signum, frame):
 
 
 # =======================================================
-# BOT START
+# START
 # =======================================================
 
 def start():
@@ -116,22 +138,13 @@ def start():
 
     print()
 
-    print("==============================")
-
-    print(" VWAP SUPERTREND AUTO BOT ")
-
-    print("==============================")
+    print("====================")
+    print(" VWAP SUPERTREND BOT ")
+    print("====================")
 
 
 
     try:
-
-
-        # ---------------------------------
-        # RESET STATUS
-        # ---------------------------------
-
-        reset_status()
 
 
 
@@ -142,18 +155,7 @@ def start():
         run_server()
 
 
-
-        time.sleep(2)
-
-
-
-        add_log(
-
-            "WEB SERVER READY"
-
-        )
-
-
+        time.sleep(1)
 
 
 
@@ -166,17 +168,13 @@ def start():
 
 
         set_bot_instance(
-
             bot
-
         )
 
 
 
         add_log(
-
             "BOT INSTANCE CREATED"
-
         )
 
 
@@ -184,19 +182,14 @@ def start():
         update_status({
 
             "bot":
-
                 "STOPPED"
 
         })
 
 
 
-
-
         print(
-
             "[MAIN READY]"
-
         )
 
 
@@ -212,9 +205,7 @@ def start():
 
 
         add_log(
-
             "AUTO START COMPLETE"
-
         )
 
 
@@ -222,7 +213,7 @@ def start():
 
 
         # ---------------------------------
-        # MAIN PROCESS LOOP
+        # MAIN WAIT LOOP
         # ---------------------------------
 
         while running:
@@ -234,17 +225,14 @@ def start():
 
 
 
+
     except KeyboardInterrupt:
 
 
         shutdown_handler(
-
             None,
-
             None
-
         )
-
 
 
 
@@ -258,7 +246,7 @@ def start():
 
         add_log(
 
-            f"MAIN FATAL ERROR {e}"
+            f"MAIN ERROR {e}"
 
         )
 
@@ -274,7 +262,20 @@ def start():
 
 
 
-        except Exception:
+        except:
+
+
+            pass
+
+
+
+        try:
+
+
+            stop_server()
+
+
+        except:
 
 
             pass
@@ -283,33 +284,10 @@ def start():
 
 
 
-        time.sleep(5)
-
-
-
-        # 재시작 대기
-
-        if running:
-
-
-            add_log(
-
-                "MAIN RESTART"
-
-            )
-
-
-            start()
-
-
-
-
-
-
 
 
 # =======================================================
-# ENTRY POINT
+# ENTRY
 # =======================================================
 
 if __name__ == "__main__":
