@@ -4,17 +4,15 @@
 # =====================================================
 
 from flask import Flask, jsonify, request, render_template
+
 import threading
 import time
 
 
 
 app = Flask(
-
     __name__,
-
     template_folder="templates"
-
 )
 
 
@@ -22,81 +20,45 @@ app = Flask(
 
 
 # =====================================================
-# GLOBAL STATE
+# GLOBAL DATA
 # =====================================================
 
 lock = threading.Lock()
 
 
-
-status = {
-
-
-    "bot":
-
-        "STOPPED",
-
-
-    "mode":
-
-        "DEMO",
-
-
-    "symbol":
-
-        "BTCUSDT",
-
-
-    "position":
-
-        "NONE",
-
-
-    "position_size":
-
-        0,
-
-
-    "entry_price":
-
-        0,
-
-
-    "mark_price":
-
-        0,
-
-
-    "liq_price":
-
-        0,
-
-
-    "pnl":
-
-        0,
-
-
-    "last_action":
-
-        "READY"
-
-
-}
-
-
-
 logs = []
-
 
 
 trading_mode = "DEMO"
 
 
-
 trading_symbol = "BTCUSDT"
 
 
+
+status = {
+
+    "bot": "STOPPED",
+
+    "mode": "DEMO",
+
+    "symbol": "BTCUSDT",
+
+    "position": "NONE",
+
+    "position_size": 0,
+
+    "entry_price": 0,
+
+    "mark_price": 0,
+
+    "liq_price": 0,
+
+    "pnl": 0,
+
+    "last_action": "READY"
+
+}
 
 
 
@@ -107,7 +69,7 @@ bot_instance = None
 
 
 # =====================================================
-# SET BOT INSTANCE
+# BOT INSTANCE
 # =====================================================
 
 def set_bot(bot):
@@ -127,32 +89,23 @@ def set_bot(bot):
 
 def add_log(message):
 
+    now = time.strftime("%H:%M:%S")
 
-    now = time.strftime(
-
-        "%H:%M:%S"
-
-    )
+    text = f"[{now}] {message}"
 
 
-    line = f"[{now}] {message}"
-
-
-
-    print(line)
+    print(text)
 
 
 
     with lock:
 
+        logs.append(text)
 
-        logs.append(line)
 
-
-        if len(logs) > 200:
+        if len(logs) > 300:
 
             logs.pop(0)
-
 
 
         status["last_action"] = message
@@ -169,9 +122,7 @@ def add_log(message):
 
 def update_status(data):
 
-
     with lock:
-
 
         status.update(data)
 
@@ -179,8 +130,10 @@ def update_status(data):
 
 
 
+
+
 # =====================================================
-# GET MODE
+# GET SETTINGS
 # =====================================================
 
 def get_trading_mode():
@@ -191,14 +144,10 @@ def get_trading_mode():
 
 
 
-
-# =====================================================
-# GET SYMBOL
-# =====================================================
-
 def get_trading_symbol():
 
     return trading_symbol
+
 
 
 
@@ -214,10 +163,9 @@ def get_trading_symbol():
 def home():
 
     return render_template(
-
         "index.html"
-
     )
+
 
 
 
@@ -229,11 +177,7 @@ def home():
 # STATUS API
 # =====================================================
 
-@app.route(
-
-    "/api/status"
-
-)
+@app.route("/api/status")
 
 def api_status():
 
@@ -243,19 +187,11 @@ def api_status():
 
         return jsonify({
 
+            "status": status.copy(),
 
-            "status":
-
-                status.copy(),
-
-
-            "logs":
-
-                logs.copy()
-
+            "logs": logs.copy()
 
         })
-
 
 
 
@@ -268,11 +204,8 @@ def api_status():
 # =====================================================
 
 @app.route(
-
     "/api/start",
-
     methods=["POST"]
-
 )
 
 def api_start():
@@ -287,6 +220,14 @@ def api_start():
             bot_instance.start()
 
 
+
+        update_status({
+
+            "bot":"RUNNING"
+
+        })
+
+
         add_log(
 
             "BUTTON START"
@@ -294,15 +235,11 @@ def api_start():
         )
 
 
-        return jsonify(
+        return jsonify({
 
-            {
+            "ok":True
 
-                "ok":True
-
-            }
-
-        )
+        })
 
 
 
@@ -316,15 +253,12 @@ def api_start():
         )
 
 
-        return jsonify(
+        return jsonify({
 
-            {
+            "ok":False
 
-                "ok":False
+        })
 
-            }
-
-        )
 
 
 
@@ -337,11 +271,8 @@ def api_start():
 # =====================================================
 
 @app.route(
-
     "/api/stop",
-
     methods=["POST"]
-
 )
 
 def api_stop():
@@ -357,6 +288,13 @@ def api_stop():
 
 
 
+        update_status({
+
+            "bot":"STOPPED"
+
+        })
+
+
         add_log(
 
             "BUTTON STOP"
@@ -364,16 +302,11 @@ def api_stop():
         )
 
 
+        return jsonify({
 
-        return jsonify(
+            "ok":True
 
-            {
-
-                "ok":True
-
-            }
-
-        )
+        })
 
 
 
@@ -387,15 +320,11 @@ def api_stop():
         )
 
 
-        return jsonify(
+        return jsonify({
 
-            {
+            "ok":False
 
-                "ok":False
-
-            }
-
-        )
+        })
 
 
 
@@ -404,15 +333,12 @@ def api_stop():
 
 
 # =====================================================
-# CLOSE POSITION
+# CLOSE
 # =====================================================
 
 @app.route(
-
     "/api/close",
-
     methods=["POST"]
-
 )
 
 def api_close():
@@ -424,29 +350,23 @@ def api_close():
         from order.order_manager import order_manager
 
 
+
         result = order_manager.close_position()
 
 
 
         add_log(
 
-            "BUTTON CLOSE POSITION"
+            "BUTTON CLOSE"
 
         )
 
 
+        return jsonify({
 
-        return jsonify(
+            "ok":bool(result)
 
-            {
-
-                "ok":
-
-                    bool(result)
-
-            }
-
-        )
+        })
 
 
 
@@ -460,33 +380,90 @@ def api_close():
         )
 
 
-        return jsonify(
+        return jsonify({
 
-            {
+            "ok":False
 
-                "ok":False
+        })
 
-            }
+
+
+
+
+
+
+
+
+# =====================================================
+# REVERSE
+# =====================================================
+
+@app.route(
+    "/api/reverse",
+    methods=["POST"]
+)
+
+def api_reverse():
+
+
+    try:
+
+
+        from order.order_manager import order_manager
+
+
+
+        result = order_manager.reverse_position()
+
+
+
+        add_log(
+
+            "BUTTON REVERSE"
 
         )
 
 
 
+        return jsonify({
+
+            "ok":bool(result)
+
+        })
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"REVERSE ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "ok":False
+
+        })
+
+
+
+
 
 
 
 
 
 # =====================================================
-# MODE CHANGE
+# MODE
 # =====================================================
 
 @app.route(
-
     "/api/mode",
-
     methods=["POST"]
-
 )
 
 def api_mode():
@@ -496,7 +473,7 @@ def api_mode():
 
 
 
-    data=request.json
+    data=request.json or {}
 
 
 
@@ -519,15 +496,11 @@ def api_mode():
     ]:
 
 
-        return jsonify(
+        return jsonify({
 
-            {
+            "ok":False
 
-                "ok":False
-
-            }
-
-        )
+        })
 
 
 
@@ -537,19 +510,9 @@ def api_mode():
 
     update_status({
 
-
-        "mode":
-
-            mode,
-
-
-        "last_action":
-
-            f"MODE {mode}"
-
+        "mode":mode
 
     })
-
 
 
     add_log(
@@ -560,15 +523,12 @@ def api_mode():
 
 
 
-    return jsonify(
+    return jsonify({
 
-        {
+        "ok":True
 
-            "ok":True
+    })
 
-        }
-
-    )
 
 
 
@@ -578,15 +538,12 @@ def api_mode():
 
 
 # =====================================================
-# SYMBOL CHANGE
+# SYMBOL
 # =====================================================
 
 @app.route(
-
     "/api/symbol",
-
     methods=["POST"]
-
 )
 
 def api_symbol():
@@ -596,7 +553,7 @@ def api_symbol():
 
 
 
-    data=request.json
+    data=request.json or {}
 
 
 
@@ -610,7 +567,7 @@ def api_symbol():
 
 
 
-    trading_symbol=symbol
+    trading_symbol = symbol
 
 
 
@@ -620,11 +577,13 @@ def api_symbol():
         from api.bybit_api import bybit_api
 
 
+
         bybit_api.change_symbol(
 
             symbol
 
         )
+
 
 
     except Exception as e:
@@ -638,18 +597,10 @@ def api_symbol():
 
 
 
+
     update_status({
 
-
-        "symbol":
-
-            symbol,
-
-
-        "last_action":
-
-            f"SYMBOL {symbol}"
-
+        "symbol":symbol
 
     })
 
@@ -663,17 +614,15 @@ def api_symbol():
 
 
 
-    return jsonify(
+    return jsonify({
 
-        {
+        "ok":True,
 
-            "ok":True,
+        "symbol":symbol
 
-            "symbol":symbol
+    })
 
-        }
 
-    )
 
 
 
@@ -682,7 +631,7 @@ def api_symbol():
 
 
 # =====================================================
-# SERVER RUN
+# SERVER
 # =====================================================
 
 def run_server():
@@ -690,15 +639,11 @@ def run_server():
 
     app.run(
 
-
         host="0.0.0.0",
-
 
         port=8000,
 
-
         debug=False,
-
 
         use_reloader=False
 
