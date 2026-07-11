@@ -10,98 +10,134 @@ VWAP SUPERTREND BOT
 </title>
 
 
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-
-
 <style>
 
-body {
+body{
 
-    background:#111;
-
-    color:#eee;
-
-    font-family:Arial;
-
-    margin:20px;
+background:#111;
+color:#eee;
+font-family:Arial;
+margin:20px;
 
 }
 
 
-h1 {
+h1{
 
-    color:#00ff99;
-
-}
-
-
-.card {
-
-    background:#1d1d1d;
-
-    padding:20px;
-
-    margin-bottom:15px;
-
-    border-radius:10px;
+color:#00ff99;
 
 }
 
 
-.grid {
+.card{
 
-    display:grid;
-
-    grid-template-columns:
-    repeat(3,1fr);
-
-    gap:15px;
+background:#1d1d1d;
+padding:20px;
+margin-bottom:15px;
+border-radius:10px;
 
 }
 
 
-.value {
+.grid{
 
-    font-size:26px;
-
-    font-weight:bold;
-
-}
-
-
-#chart {
-
-    height:400px;
+display:grid;
+grid-template-columns:
+repeat(4,1fr);
+gap:15px;
 
 }
 
 
-.logs {
+.value{
 
-    height:250px;
+font-size:25px;
+font-weight:bold;
 
-    overflow:auto;
+}
 
-    background:#000;
 
-    padding:10px;
+button{
+
+padding:12px;
+margin:5px;
+border:0;
+border-radius:8px;
+cursor:pointer;
+font-weight:bold;
+
+}
+
+
+.demo{
+
+background:#0088ff;
+color:white;
+
+}
+
+
+.live{
+
+background:#ff3333;
+color:white;
+
+}
+
+
+.start{
+
+background:#00aa66;
+color:white;
+
+}
+
+
+.stop{
+
+background:#aa0000;
+color:white;
+
+}
+
+
+.restart{
+
+background:#cc8800;
+color:white;
+
+}
+
+
+.close{
+
+background:#6600cc;
+color:white;
+
+}
+
+
+.logs{
+
+height:300px;
+overflow:auto;
+background:#000;
+padding:10px;
 
 }
 
 
 </style>
 
+
 </head>
-
-
 
 
 <body>
 
 
-
 <h1>
-VWAP-SUPERTREND BOT
+VWAP SUPERTREND AUTO BOT
 </h1>
 
 
@@ -109,15 +145,72 @@ VWAP-SUPERTREND BOT
 
 <div class="card">
 
+
 <h3>
-BOT STATUS
+TRADING MODE
 </h3>
 
-<div id="bot" class="value">
+
+<button class="demo"
+onclick="changeMode('DEMO')">
+DEMO
+</button>
+
+
+<button class="live"
+onclick="changeMode('LIVE')">
+LIVE
+</button>
+
+
+<div id="mode"
+class="value">
 -
 </div>
 
+
 </div>
+
+
+
+
+
+
+<div class="card">
+
+
+<h3>
+CONTROL
+</h3>
+
+
+<button class="start"
+onclick="api('/api/start')">
+START
+</button>
+
+
+<button class="stop"
+onclick="api('/api/stop')">
+STOP
+</button>
+
+
+<button class="restart"
+onclick="api('/api/restart')">
+RESTART
+</button>
+
+
+<button class="close"
+onclick="api('/api/close')">
+CLOSE POSITION
+</button>
+
+
+</div>
+
+
 
 
 
@@ -130,10 +223,27 @@ BOT STATUS
 <div class="card">
 
 <h3>
+BOT
+</h3>
+
+<div id="bot"
+class="value">
+-
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+<h3>
 PRICE
 </h3>
 
-<div id="price" class="value">
+<div id="price"
+class="value">
 -
 </div>
 
@@ -145,26 +255,11 @@ PRICE
 <div class="card">
 
 <h3>
-VWAP
+BALANCE
 </h3>
 
-<div id="vwap" class="value">
--
-</div>
-
-</div>
-
-
-
-
-
-<div class="card">
-
-<h3>
-TREND
-</h3>
-
-<div id="trend" class="value">
+<div id="balance"
+class="value">
 -
 </div>
 
@@ -176,25 +271,11 @@ TREND
 <div class="card">
 
 <h3>
-VOLUME
+PNL
 </h3>
 
-<div id="volume" class="value">
--
-</div>
-
-</div>
-
-
-
-
-<div class="card">
-
-<h3>
-SIGNAL
-</h3>
-
-<div id="signal" class="value">
+<div id="pnl"
+class="value">
 -
 </div>
 
@@ -209,7 +290,56 @@ SIGNAL
 POSITION
 </h3>
 
-<div id="position" class="value">
+<div id="position"
+class="value">
+-
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+<h3>
+SIZE
+</h3>
+
+<div id="size"
+class="value">
+-
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+<h3>
+ENTRY
+</h3>
+
+<div id="entry"
+class="value">
+-
+</div>
+
+</div>
+
+
+
+
+<div class="card">
+
+<h3>
+EQUITY
+</h3>
+
+<div id="equity"
+class="value">
 -
 </div>
 
@@ -219,23 +349,6 @@ POSITION
 
 </div>
 
-
-
-
-
-
-<div class="card">
-
-
-<h3>
-PRICE CHART
-</h3>
-
-
-<div id="chart"></div>
-
-
-</div>
 
 
 
@@ -251,7 +364,9 @@ LIVE LOG
 </h3>
 
 
-<div id="logs" class="logs"></div>
+<div id="logs"
+class="logs">
+</div>
 
 
 </div>
@@ -262,44 +377,78 @@ LIVE LOG
 
 
 
+
+
 <script>
 
 
-const chart = LightweightCharts.createChart(
+async function api(url,data={}){
 
-    document.getElementById("chart"),
 
-    {
+try{
 
-        layout:{
 
-            background:{
-                color:"#111"
-            },
+await fetch(
 
-            textColor:"#eee"
+url,
 
-        },
+{
 
-        grid:{
+method:"POST",
 
-            vertLines:{
-                visible:false
-            },
+headers:{
 
-            horzLines:{
-                visible:false
-            }
+"Content-Type":
+"application/json"
 
-        }
+},
 
-    }
+body:
+
+JSON.stringify(data)
+
+}
 
 );
 
 
+updateStatus();
 
-const candleSeries = chart.addCandlestickSeries();
+
+}
+
+catch(e){
+
+console.log(e);
+
+}
+
+
+}
+
+
+
+
+
+
+
+async function changeMode(mode){
+
+
+await api(
+
+"/api/mode",
+
+{
+
+mode:mode
+
+}
+
+);
+
+
+}
 
 
 
@@ -310,199 +459,149 @@ const candleSeries = chart.addCandlestickSeries();
 async function updateStatus(){
 
 
-    try{
+try{
 
 
-        const r = await fetch(
-            "/api/status"
-        );
+const r =
+await fetch(
 
-
-        const data = await r.json();
-
-
-
-        const s = data.status;
-
-
-
-        document.getElementById(
-            "bot"
-        ).innerHTML =
-            s.bot;
-
-
-
-        document.getElementById(
-            "price"
-        ).innerHTML =
-            Number(
-                s.price
-            ).toFixed(2);
-
-
-
-        document.getElementById(
-            "vwap"
-        ).innerHTML =
-            Number(
-                s.vwap
-            ).toFixed(2);
-
-
-
-        document.getElementById(
-            "trend"
-        ).innerHTML =
-            s.trend;
-
-
-
-        document.getElementById(
-            "volume"
-        ).innerHTML =
-            s.volume
-            ?
-            "OK"
-            :
-            "LOW";
-
-
-
-        document.getElementById(
-            "signal"
-        ).innerHTML =
-            s.signal;
-
-
-
-        document.getElementById(
-            "position"
-        ).innerHTML =
-            s.position;
-
-
-
-
-
-        let logs="";
-
-
-        data.logs.forEach(
-
-            x=>{
-
-                logs += x+"<br>";
-
-            }
-
-        );
-
-
-        document.getElementById(
-            "logs"
-        ).innerHTML =
-            logs;
-
-
-
-    }
-
-    catch(e){
-
-        console.log(e);
-
-    }
-
-}
-
-
-
-
-
-
-
-
-
-async function updateChart(){
-
-
-    try{
-
-
-        const r = await fetch(
-            "/api/chart"
-        );
-
-
-        const candles = await r.json();
-
-
-
-        candleSeries.setData(
-
-            candles.map(
-
-                c=>({
-
-                    time:
-                        c.time,
-
-                    open:
-                        c.open,
-
-                    high:
-                        c.high,
-
-                    low:
-                        c.low,
-
-                    close:
-                        c.close
-
-                })
-
-            )
-
-        );
-
-
-
-    }
-
-
-    catch(e){
-
-
-        console.log(e);
-
-
-    }
-
-
-}
-
-
-
-
-
-
-
-setInterval(
-
-    updateStatus,
-
-    3000
+"/api/status"
 
 );
 
 
 
+const data =
+await r.json();
+
+
+
+const s =
+data.status;
+
+
+
+
+
+document.getElementById(
+"mode"
+).innerHTML =
+s.mode;
+
+
+
+document.getElementById(
+"bot"
+).innerHTML =
+s.bot;
+
+
+
+document.getElementById(
+"price"
+).innerHTML =
+Number(
+s.price || 0
+).toFixed(2);
+
+
+
+document.getElementById(
+"balance"
+).innerHTML =
+Number(
+s.balance || 0
+).toFixed(2);
+
+
+
+document.getElementById(
+"equity"
+).innerHTML =
+Number(
+s.equity || 0
+).toFixed(2);
+
+
+
+document.getElementById(
+"pnl"
+).innerHTML =
+Number(
+s.pnl || 0
+).toFixed(2);
+
+
+
+document.getElementById(
+"position"
+).innerHTML =
+s.position || "NONE";
+
+
+
+document.getElementById(
+"size"
+).innerHTML =
+s.position_size || 0;
+
+
+
+document.getElementById(
+"entry"
+).innerHTML =
+s.entry_price || 0;
+
+
+
+
+
+let html="";
+
+
+data.logs.forEach(
+
+l=>{
+
+html += l+"<br>";
+
+}
+
+);
+
+
+
+document.getElementById(
+"logs"
+).innerHTML =
+html;
+
+
+
+}
+
+
+catch(e){
+
+console.log(e);
+
+}
+
+
+
+}
+
+
+
+
+
+
+
 setInterval(
 
-    updateChart,
+updateStatus,
 
-    5000
+3000
 
 );
 
@@ -510,11 +609,10 @@ setInterval(
 
 updateStatus();
 
-updateChart();
-
 
 
 </script>
+
 
 
 </body>
