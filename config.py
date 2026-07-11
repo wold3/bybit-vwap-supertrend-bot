@@ -7,15 +7,13 @@ import os
 
 
 
-
-
 # =====================================================
-# BYBIT ACCOUNT MODE
+# TRADING MODE
 # =====================================================
 
-# demo   : Bybit Demo Trading
-# test   : Bybit Testnet
-# live   : Real Trading
+# demo : Bybit Demo Trading
+# test : Bybit Testnet
+# live : Real Trading
 
 TRADING_MODE = "demo"
 
@@ -24,7 +22,7 @@ TRADING_MODE = "demo"
 
 
 # =====================================================
-# API KEY
+# BYBIT API KEY
 # =====================================================
 
 BYBIT_API_KEY = os.getenv(
@@ -45,7 +43,7 @@ BYBIT_API_SECRET = os.getenv(
 
 
 # =====================================================
-# BYBIT URL
+# BYBIT ENDPOINT
 # =====================================================
 
 
@@ -96,9 +94,8 @@ else:
 
 
 # =====================================================
-# TRADING
+# MARKET
 # =====================================================
-
 
 CATEGORY = "linear"
 
@@ -117,22 +114,21 @@ LEVERAGE = 3
 
 
 
+
+
+# =====================================================
+# ORDER
+# =====================================================
+
+
 # True:
-# API 주문 실행
+# Bybit 주문 실행
 #
 # False:
 # 내부 테스트 주문
 
 LIVE_ORDER = True
 
-
-
-
-
-
-# =====================================================
-# ORDER
-# =====================================================
 
 
 DEFAULT_ORDER_QTY = 0.001
@@ -147,6 +143,27 @@ TIME_IN_FORCE = "IOC"
 
 
 
+
+
+# =====================================================
+# MANUAL TEST ORDER
+# =====================================================
+
+
+# Demo Trading 주문 테스트용
+
+MANUAL_TEST_ORDER = False
+
+
+TEST_ORDER_SIDE = "Buy"
+
+
+
+
+
+
+
+
 # =====================================================
 # RISK MANAGEMENT
 # =====================================================
@@ -155,13 +172,18 @@ TIME_IN_FORCE = "IOC"
 RISK_PER_TRADE_PERCENT = 0.5
 
 
+MAX_POSITION_SIZE = 1.0
+
+
+
 STOP_LOSS_PERCENT = 1.0
 
 
 TAKE_PROFIT_PERCENT = 2.0
 
 
-MAX_POSITION_SIZE = 1.0
+
+MAX_DAILY_LOSS_PERCENT = 3.0
 
 
 
@@ -178,7 +200,6 @@ ATR_PERIOD = 10
 
 
 SUPERTREND_MULTIPLIER = 3
-
 
 
 
@@ -232,8 +253,9 @@ TELEGRAM_CHAT_ID = ""
 
 
 
+
 # =====================================================
-# WEB SERVER
+# WEB DASHBOARD
 # =====================================================
 
 
@@ -277,15 +299,25 @@ print("==============================")
 
 print("[CONFIG LOADED]")
 
-print("MODE :", TRADING_MODE)
+print(
+    "MODE :",
+    TRADING_MODE
+)
 
-print("BASE URL :", BYBIT_BASE_URL)
+print(
+    "BASE :",
+    BYBIT_BASE_URL
+)
 
-print("CATEGORY :", CATEGORY)
+print(
+    "SYMBOL :",
+    DEFAULT_SYMBOL
+)
 
-print("SYMBOL :", DEFAULT_SYMBOL)
-
-print("LEVERAGE :", LEVERAGE)
+print(
+    "LEVERAGE :",
+    LEVERAGE
+)
 
 print(
     "API KEY LENGTH :",
