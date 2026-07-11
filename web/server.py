@@ -11,6 +11,7 @@ from flask import (
 )
 
 import threading
+import time
 
 
 
@@ -21,66 +22,41 @@ app = Flask(
 
 
 
+# =====================================================
+# GLOBAL STATE
+# =====================================================
+
+lock = threading.Lock()
 
 
-# =====================================================
-# GLOBAL STATUS
-# =====================================================
+
+CURRENT_MODE = "DEMO"
+
+
 
 STATUS = {
 
+    "bot": "STOPPED",
 
-    "bot":
+    "mode": "DEMO",
 
-        "STOPPED",
+    "position": "NONE",
 
+    "position_size": 0,
 
-    "mode":
+    "entry_price": 0,
 
-        "DEMO",
+    "pnl": 0,
 
+    "signal": "WAIT",
 
-    "position":
-
-        "NONE",
-
-
-    "position_size":
-
-        0,
-
-
-    "entry_price":
-
-        0,
-
-
-    "pnl":
-
-        0,
-
-
-    "signal":
-
-        "WAIT",
-
-
-    "watchdog":
-
-        "OFF"
-
+    "watchdog": "OFF"
 
 }
 
 
 
-
-
 LOGS = []
-
-
-
-CURRENT_MODE = "DEMO"
 
 
 
@@ -97,11 +73,13 @@ CURRENT_MODE = "DEMO"
 def update_status(data):
 
 
-    STATUS.update(
+    with lock:
 
-        data
+        STATUS.update(
 
-    )
+            data
+
+        )
 
 
 
@@ -112,23 +90,31 @@ def update_status(data):
 
 
 # =====================================================
-# LOG
+# LOG SYSTEM
 # =====================================================
 
 def add_log(message):
 
 
-    LOGS.append(
-
-        str(message)
-
-    )
+    with lock:
 
 
-    if len(LOGS) > 100:
+        LOGS.append(
+
+            f"{time.strftime('%H:%M:%S')} "
+
+            +
+
+            str(message)
+
+        )
 
 
-        LOGS.pop(0)
+
+        if len(LOGS) > 100:
+
+
+            LOGS.pop(0)
 
 
 
@@ -139,13 +125,19 @@ def add_log(message):
 
 
 # =====================================================
-# MODE
+# GET MODE
 # =====================================================
 
 def get_trading_mode():
 
 
-    return CURRENT_MODE
+    with lock:
+
+
+        return CURRENT_MODE
+
+
+
 
 
 
@@ -164,7 +156,7 @@ def change_mode(mode):
 
 
 
-    mode = mode.upper()
+    mode = str(mode).upper()
 
 
 
@@ -183,11 +175,15 @@ def change_mode(mode):
 
 
 
-    CURRENT_MODE = mode
+    with lock:
 
 
+        CURRENT_MODE = mode
 
-    STATUS["mode"] = mode
+
+        STATUS["mode"] = mode
+
+
 
 
 
@@ -199,7 +195,97 @@ def change_mode(mode):
 
 
 
+
+
+    # -----------------------------
+    # BYBIT SESSION CHANGE
+    # -----------------------------
+
+    try:
+
+
+        from api.bybit_api import bybit_api
+
+
+
+        bybit_api.change_session(
+
+            mode
+
+        )
+
+
+
+        add_log(
+
+            f"BYBIT SESSION : {mode}"
+
+        )
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"SESSION ERROR : {e}"
+
+        )
+
+
+
+
+
+
+
+    # -----------------------------
+    # PRIVATE WS RESTART
+    # -----------------------------
+
+    try:
+
+
+        from services.private_ws import private_ws
+
+
+
+        private_ws.stop()
+
+
+        time.sleep(1)
+
+
+        private_ws.start()
+
+
+
+        add_log(
+
+            "PRIVATE WS RESTART"
+
+        )
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"WS RESTART ERROR : {e}"
+
+        )
+
+
+
+
+
+
     return True
+
+
+
 
 
 
@@ -234,22 +320,31 @@ def index():
 # STATUS API
 # =====================================================
 
-@app.route("/api/status")
+@app.route(
 
-def status():
+    "/api/status"
+
+)
+
+def api_status():
 
 
-    return jsonify({
+    with lock:
 
-        "status":
 
-            STATUS,
+        return jsonify({
 
-        "logs":
 
-            LOGS[-30:]
+            "status":
 
-    })
+                STATUS.copy(),
+
+
+            "logs":
+
+                LOGS[-50:]
+
+        })
 
 
 
@@ -271,18 +366,20 @@ def status():
 
 )
 
-def mode():
+def api_mode():
 
 
-    data = request.json
+    data = request.get_json(
+
+        silent=True
+
+    ) or {}
 
 
 
-    new_mode = data.get(
+    mode = data.get(
 
-        "mode",
-
-        ""
+        "mode"
 
     )
 
@@ -290,13 +387,14 @@ def mode():
 
     result = change_mode(
 
-        new_mode
+        mode
 
     )
 
 
 
     return jsonify({
+
 
         "success":
 
@@ -305,7 +403,86 @@ def mode():
 
         "mode":
 
-            CURRENT_MODE
+            get_trading_mode()
+
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# HEALTH CHECK
+# =====================================================
+
+@app.route(
+
+    "/api/health"
+
+)
+
+def health():
+
+
+    return jsonify({
+
+
+        "server":
+
+            "OK",
+
+
+        "mode":
+
+            get_trading_mode()
+
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# BOT STATUS
+# =====================================================
+
+def bot_running():
+
+
+    update_status({
+
+        "bot":
+
+            "RUNNING"
+
+    })
+
+
+
+
+
+
+
+
+
+def bot_stopped():
+
+
+    update_status({
+
+        "bot":
+
+            "STOPPED"
 
     })
 
