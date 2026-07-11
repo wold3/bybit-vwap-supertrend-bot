@@ -34,7 +34,7 @@ BYBIT_API_KEY = os.getenv(
 
     "BYBIT_API_KEY",
 
-    "YOUR_API_KEY"
+    "9NmwC3yjKEYq15h0FF"
 
 )
 
@@ -43,7 +43,7 @@ BYBIT_API_SECRET = os.getenv(
 
     "BYBIT_API_SECRET",
 
-    "YOUR_API_SECRET"
+    "lQ82iPwnqHUIIpqc3hIZMwVmrbjDf8scRARJ"
 
 )
 
