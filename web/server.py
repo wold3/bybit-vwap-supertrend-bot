@@ -3,81 +3,72 @@
 # VWAP SUPERTREND BOT WEB SERVER
 # =====================================================
 
-from flask import Flask, jsonify, request, render_template
+from flask import (
+    Flask,
+    jsonify,
+    request,
+    send_file
+)
 
 import threading
 import time
+import os
 
 
 
-app = Flask(
-    __name__,
-    template_folder="templates"
-)
-
-
+app = Flask(__name__)
 
 
 
 # =====================================================
-# GLOBAL DATA
+# GLOBAL STATE
 # =====================================================
-
-lock = threading.Lock()
-
 
 logs = []
+
+
+status = {
+
+
+    "bot":
+        "STOPPED",
+
+
+    "mode":
+        "DEMO",
+
+
+    "symbol":
+        "BTCUSDT",
+
+
+    "position":
+        "NONE",
+
+
+    "position_size":
+        0,
+
+
+    "entry_price":
+        0,
+
+
+    "pnl":
+        0,
+
+
+    "last_action":
+        ""
+
+}
+
 
 
 trading_mode = "DEMO"
 
 
 trading_symbol = "BTCUSDT"
-
-
-
-status = {
-
-    "bot": "STOPPED",
-
-    "mode": "DEMO",
-
-    "symbol": "BTCUSDT",
-
-    "position": "NONE",
-
-    "position_size": 0,
-
-    "entry_price": 0,
-
-    "mark_price": 0,
-
-    "liq_price": 0,
-
-    "pnl": 0,
-
-    "last_action": "READY"
-
-}
-
-
-
-bot_instance = None
-
-
-
-
-
-# =====================================================
-# BOT INSTANCE
-# =====================================================
-
-def set_bot(bot):
-
-    global bot_instance
-
-    bot_instance = bot
-
 
 
 
@@ -89,26 +80,30 @@ def set_bot(bot):
 
 def add_log(message):
 
-    now = time.strftime("%H:%M:%S")
 
-    text = f"[{now}] {message}"
+    text = (
+
+        time.strftime("[%H:%M:%S] ")
+
+        +
+
+        str(message)
+
+    )
 
 
     print(text)
 
 
-
-    with lock:
-
-        logs.append(text)
+    logs.append(text)
 
 
-        if len(logs) > 300:
 
-            logs.pop(0)
+    if len(logs) > 200:
 
 
-        status["last_action"] = message
+        logs.pop(0)
+
 
 
 
@@ -122,9 +117,16 @@ def add_log(message):
 
 def update_status(data):
 
-    with lock:
 
-        status.update(data)
+    if not isinstance(data,dict):
+
+        return
+
+
+
+    status.update(data)
+
+
 
 
 
@@ -133,10 +135,11 @@ def update_status(data):
 
 
 # =====================================================
-# GET SETTINGS
+# MODE
 # =====================================================
 
 def get_trading_mode():
+
 
     return trading_mode
 
@@ -144,9 +147,80 @@ def get_trading_mode():
 
 
 
+
+
+def set_trading_mode(mode):
+
+
+    global trading_mode
+
+
+    if mode in [
+
+        "DEMO",
+
+        "LIVE"
+
+    ]:
+
+
+        trading_mode = mode
+
+
+        add_log(
+
+            f"MODE CHANGE {mode}"
+
+        )
+
+
+        return True
+
+
+
+    return False
+
+
+
+
+
+
+
+# =====================================================
+# SYMBOL
+# =====================================================
+
 def get_trading_symbol():
 
+
     return trading_symbol
+
+
+
+
+
+
+
+def set_trading_symbol(symbol):
+
+
+    global trading_symbol
+
+
+    trading_symbol = symbol.upper()
+
+
+    status["symbol"] = trading_symbol
+
+
+    add_log(
+
+        f"SYMBOL CHANGE {trading_symbol}"
+
+    )
+
+
+    return True
 
 
 
@@ -162,9 +236,25 @@ def get_trading_symbol():
 
 def home():
 
-    return render_template(
+
+    path = os.path.join(
+
+        os.path.dirname(__file__),
+
         "index.html"
+
     )
+
+
+    if os.path.exists(path):
+
+
+        return send_file(path)
+
+
+
+    return "VWAP SUPERTREND BOT"
+
 
 
 
@@ -182,16 +272,20 @@ def home():
 def api_status():
 
 
-    with lock:
+    return jsonify({
 
 
-        return jsonify({
+        "status":
+            status,
 
-            "status": status.copy(),
 
-            "logs": logs.copy()
+        "logs":
+            logs[-50:]
 
-        })
+
+    })
+
+
 
 
 
@@ -200,46 +294,91 @@ def api_status():
 
 
 # =====================================================
-# START
+# LOG API
+# =====================================================
+
+@app.route("/api/logs")
+
+def api_logs():
+
+
+    return jsonify(logs)
+
+
+
+
+
+
+
+
+
+# =====================================================
+# ORDER API
 # =====================================================
 
 @app.route(
-    "/api/start",
+
+    "/api/order",
+
     methods=["POST"]
+
 )
 
-def api_start():
+def api_order():
 
 
     try:
 
 
-        if bot_instance:
+        data = request.json
 
 
-            bot_instance.start()
+        side = data.get(
 
-
-
-        update_status({
-
-            "bot":"RUNNING"
-
-        })
-
-
-        add_log(
-
-            "BUTTON START"
+            "side"
 
         )
 
 
+        qty = data.get(
+
+            "qty",
+
+            None
+
+        )
+
+
+
+        from order.order_manager import order_manager
+
+
+
+        result = order_manager.open_position(
+
+            side,
+
+            qty
+
+        )
+
+
+
         return jsonify({
 
-            "ok":True
+
+            "success":
+
+                bool(result),
+
+
+            "result":
+
+                str(result)
 
         })
+
+
 
 
 
@@ -248,14 +387,22 @@ def api_start():
 
         add_log(
 
-            f"START ERROR {e}"
+            f"WEB ORDER ERROR {e}"
 
         )
 
 
         return jsonify({
 
-            "ok":False
+
+            "success":
+
+                False,
+
+
+            "error":
+
+                str(e)
 
         })
 
@@ -266,79 +413,17 @@ def api_start():
 
 
 
+
 # =====================================================
-# STOP
+# CLOSE API
 # =====================================================
 
 @app.route(
-    "/api/stop",
-    methods=["POST"]
-)
 
-def api_stop():
-
-
-    try:
-
-
-        if bot_instance:
-
-
-            bot_instance.stop()
-
-
-
-        update_status({
-
-            "bot":"STOPPED"
-
-        })
-
-
-        add_log(
-
-            "BUTTON STOP"
-
-        )
-
-
-        return jsonify({
-
-            "ok":True
-
-        })
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"STOP ERROR {e}"
-
-        )
-
-
-        return jsonify({
-
-            "ok":False
-
-        })
-
-
-
-
-
-
-
-# =====================================================
-# CLOSE
-# =====================================================
-
-@app.route(
     "/api/close",
+
     methods=["POST"]
+
 )
 
 def api_close():
@@ -350,23 +435,21 @@ def api_close():
         from order.order_manager import order_manager
 
 
-
         result = order_manager.close_position()
 
 
 
-        add_log(
-
-            "BUTTON CLOSE"
-
-        )
-
-
         return jsonify({
 
-            "ok":bool(result)
+
+            "success":
+
+                bool(result)
+
 
         })
+
+
 
 
 
@@ -375,14 +458,18 @@ def api_close():
 
         add_log(
 
-            f"CLOSE ERROR {e}"
+            f"WEB CLOSE ERROR {e}"
 
         )
 
 
         return jsonify({
 
-            "ok":False
+
+            "success":
+
+                False
+
 
         })
 
@@ -395,137 +482,41 @@ def api_close():
 
 
 # =====================================================
-# REVERSE
+# BOT CONTROL
 # =====================================================
 
 @app.route(
-    "/api/reverse",
+
+    "/api/start",
+
     methods=["POST"]
+
 )
 
-def api_reverse():
-
-
-    try:
-
-
-        from order.order_manager import order_manager
-
-
-
-        result = order_manager.reverse_position()
-
-
-
-        add_log(
-
-            "BUTTON REVERSE"
-
-        )
-
-
-
-        return jsonify({
-
-            "ok":bool(result)
-
-        })
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"REVERSE ERROR {e}"
-
-        )
-
-
-        return jsonify({
-
-            "ok":False
-
-        })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# MODE
-# =====================================================
-
-@app.route(
-    "/api/mode",
-    methods=["POST"]
-)
-
-def api_mode():
-
-
-    global trading_mode
-
-
-
-    data=request.json or {}
-
-
-
-    mode=data.get(
-
-        "mode",
-
-        "DEMO"
-
-    )
-
-
-
-    if mode not in [
-
-        "DEMO",
-
-        "LIVE"
-
-    ]:
-
-
-        return jsonify({
-
-            "ok":False
-
-        })
-
-
-
-    trading_mode = mode
-
+def api_start():
 
 
     update_status({
 
-        "mode":mode
+        "bot":
+
+            "RUNNING"
 
     })
 
 
     add_log(
 
-        f"MODE SWITCH {mode}"
+        "WEB START"
 
     )
 
 
-
     return jsonify({
 
-        "ok":True
+        "success":
+
+            True
 
     })
 
@@ -536,89 +527,38 @@ def api_mode():
 
 
 
-
-# =====================================================
-# SYMBOL
-# =====================================================
-
 @app.route(
-    "/api/symbol",
+
+    "/api/stop",
+
     methods=["POST"]
+
 )
 
-def api_symbol():
-
-
-    global trading_symbol
-
-
-
-    data=request.json or {}
-
-
-
-    symbol=data.get(
-
-        "symbol",
-
-        "BTCUSDT"
-
-    ).upper()
-
-
-
-    trading_symbol = symbol
-
-
-
-    try:
-
-
-        from api.bybit_api import bybit_api
-
-
-
-        bybit_api.change_symbol(
-
-            symbol
-
-        )
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"SYMBOL ERROR {e}"
-
-        )
-
-
+def api_stop():
 
 
     update_status({
 
-        "symbol":symbol
+        "bot":
+
+            "STOPPED"
 
     })
-
 
 
     add_log(
 
-        f"MARKET SYMBOL SWITCH {symbol}"
+        "WEB STOP"
 
     )
 
 
-
     return jsonify({
 
-        "ok":True,
+        "success":
 
-        "symbol":symbol
+            True
 
     })
 
@@ -631,20 +571,35 @@ def api_symbol():
 
 
 # =====================================================
-# SERVER
+# SERVER START
 # =====================================================
 
-def run_server():
+def start_server():
 
 
-    app.run(
+    threading.Thread(
 
-        host="0.0.0.0",
+        target=lambda:
 
-        port=8000,
+            app.run(
 
-        debug=False,
+                host="0.0.0.0",
 
-        use_reloader=False
+                port=8000,
+
+                debug=False,
+
+                use_reloader=False
+
+            ),
+
+        daemon=True
+
+    ).start()
+
+
+    add_log(
+
+        "WEB SERVER START"
 
     )
