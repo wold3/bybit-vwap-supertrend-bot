@@ -7,32 +7,10 @@ import pandas as pd
 import time
 
 
-
-from api.bybit_api import (
-
-    bybit_api
-
-)
+from api.bybit_api import bybit_api
 
 
-
-from config import (
-
-    SYMBOL,
-
-    CATEGORY
-
-)
-
-
-
-from web.server import (
-
-    add_log
-
-)
-
-
+from web.server import add_log
 
 
 
@@ -41,30 +19,19 @@ from web.server import (
 class MarketData:
 
 
-
     def __init__(self):
-
 
         self.last_data = None
 
-
-
         print(
-
             "[MARKET DATA READY]"
-
         )
 
 
 
 
-
-
-
-
-
     # =====================================================
-    # GET KLINE
+    # GET CANDLE DATA
     # =====================================================
 
     def get_candles(
@@ -81,49 +48,11 @@ class MarketData:
         try:
 
 
+            rows = bybit_api.get_kline(
 
-            result = bybit_api.get_kline(
-
-                interval,
-
-                limit
+                limit=limit
 
             )
-
-
-
-            if not result:
-
-
-                return None
-
-
-
-
-
-            rows = (
-
-                result
-
-                .get(
-
-                    "result",
-
-                    {}
-
-                )
-
-                .get(
-
-                    "list",
-
-                    []
-
-                )
-
-            )
-
-
 
 
 
@@ -131,9 +60,6 @@ class MarketData:
 
 
                 return None
-
-
-
 
 
 
@@ -146,41 +72,52 @@ class MarketData:
 
 
 
+            if len(df.columns) == 7:
 
 
-            # Bybit V5 format
+                df.columns = [
 
-            df.columns = [
+                    "timestamp",
 
-                "timestamp",
+                    "open",
 
-                "open",
+                    "high",
 
-                "high",
+                    "low",
 
-                "low",
+                    "close",
 
-                "close",
+                    "volume",
 
-                "volume",
+                    "turnover"
 
-                "turnover"
-
-            ]
-
-
+                ]
 
 
 
-            # reverse
+            else:
+
+
+                add_log(
+
+                    "INVALID KLINE FORMAT"
+
+                )
+
+
+                return None
+
+
+
+
+            # 최신 캔들 기준 정렬
 
             df = df.iloc[::-1]
 
 
 
 
-
-            numeric = [
+            numeric_columns = [
 
                 "open",
 
@@ -198,9 +135,7 @@ class MarketData:
 
 
 
-
-
-            for col in numeric:
+            for col in numeric_columns:
 
 
                 df[col] = pd.to_numeric(
@@ -214,6 +149,13 @@ class MarketData:
 
 
 
+            df["timestamp"] = pd.to_numeric(
+
+                df["timestamp"],
+
+                errors="coerce"
+
+            )
 
 
 
@@ -222,8 +164,6 @@ class MarketData:
                 inplace=True
 
             )
-
-
 
 
 
@@ -236,11 +176,7 @@ class MarketData:
 
 
 
-
-
-
         except Exception as e:
-
 
 
             add_log(
@@ -250,20 +186,14 @@ class MarketData:
             )
 
 
-
             return None
 
 
 
 
 
-
-
-
-
-
     # =====================================================
-    # LAST PRICE
+    # CURRENT PRICE
     # =====================================================
 
     def price(self):
@@ -276,7 +206,7 @@ class MarketData:
 
 
 
-        except:
+        except Exception:
 
 
             return 0
@@ -285,15 +215,17 @@ class MarketData:
 
 
 
-
-
-
-
     # =====================================================
-    # WAIT NEW CANDLE
+    # WAIT
     # =====================================================
 
-    def wait(self, sec=5):
+    def wait(
+
+        self,
+
+        sec=5
+
+    ):
 
 
         time.sleep(
@@ -301,10 +233,6 @@ class MarketData:
             sec
 
         )
-
-
-
-
 
 
 
