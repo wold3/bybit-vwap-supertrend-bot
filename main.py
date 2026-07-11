@@ -1,6 +1,7 @@
 # =====================================================
 # main.py
 # VWAP SUPERTREND AUTO BOT
+# Launcher
 # =====================================================
 
 import time
@@ -8,9 +9,7 @@ import signal
 import sys
 
 
-
 from app import TradingApp
-
 
 
 from web.server import (
@@ -27,11 +26,9 @@ from web.server import (
 
 
 
-
-
 app_instance = None
 
-
+shutdown_called = False
 
 
 
@@ -42,15 +39,24 @@ app_instance = None
 def shutdown():
 
     global app_instance
+    global shutdown_called
+
+
+    if shutdown_called:
+
+        return
+
+
+    shutdown_called = True
 
 
     print()
 
-    print("====================")
+    print("==============================")
 
     print("[SYSTEM SHUTDOWN]")
 
-    print("====================")
+    print("==============================")
 
 
 
@@ -109,12 +115,8 @@ def shutdown():
 
 
 
-
-
-
-
 # =====================================================
-# CTRL+C
+# SIGNAL HANDLER
 # =====================================================
 
 def signal_handler(
@@ -127,10 +129,6 @@ def signal_handler(
 
 
     shutdown()
-
-
-
-
 
 
 
@@ -157,10 +155,6 @@ signal.signal(
 
 
 
-
-
-
-
 # =====================================================
 # MAIN
 # =====================================================
@@ -180,7 +174,7 @@ def main():
 
     print("==============================")
 
-    print("[MODE] MANUAL RUN")
+    print("[MODE] MANUAL CONTROL")
 
 
 
@@ -189,13 +183,11 @@ def main():
     try:
 
 
-
-        # -------------------------
-        # WEB SERVER
-        # -------------------------
+        # ---------------------------------
+        # WEB SERVER START
+        # ---------------------------------
 
         run_server()
-
 
 
         time.sleep(1)
@@ -204,9 +196,9 @@ def main():
 
 
 
-        # -------------------------
-        # BOT INIT
-        # -------------------------
+        # ---------------------------------
+        # TRADING APP INIT
+        # ---------------------------------
 
         app_instance = TradingApp()
 
@@ -215,6 +207,24 @@ def main():
         set_bot_instance(
 
             app_instance
+
+        )
+
+
+
+        update_status({
+
+            "bot":
+
+                "STOPPED"
+
+        })
+
+
+
+        add_log(
+
+            "TRADING APP READY"
 
         )
 
@@ -230,43 +240,15 @@ def main():
 
 
 
-
-
-        # -------------------------
-        # BOT START
-        # -------------------------
-
-        app_instance.start()
-
-
-
-        update_status({
-
-            "bot":
-
-                "RUNNING"
-
-        })
-
-
-
-        add_log(
-
-            "BOT RUNNING"
-
-        )
-
-
-
-
-
         print()
 
         print("==============================")
 
-        print("[BOT RUNNING]")
+        print("[SYSTEM READY]")
 
         print("==============================")
+
+
 
         print()
 
@@ -286,22 +268,31 @@ def main():
 
         print(
 
-            "STOP : Ctrl + C"
+            "START / STOP : Dashboard"
 
         )
 
+        print(
+
+            "EXIT : Ctrl + C"
+
+        )
+
+        print()
 
 
 
 
-        # -------------------------
+
+        # ---------------------------------
         # MAIN LOOP
-        # -------------------------
+        # ---------------------------------
 
         while True:
 
 
             time.sleep(1)
+
 
 
 
@@ -319,7 +310,6 @@ def main():
     except Exception as e:
 
 
-
         print(
 
             "[MAIN ERROR]",
@@ -329,13 +319,7 @@ def main():
         )
 
 
-
         shutdown()
-
-
-
-
-
 
 
 
