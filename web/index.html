@@ -5,14 +5,15 @@
 
 <meta charset="UTF-8">
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
 <title>
 VWAP SUPERTREND BOT
 </title>
 
 
-<!-- =========================
-     CHART LIBRARY
-========================= -->
+<!-- Chart Library -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -26,45 +27,61 @@ VWAP SUPERTREND BOT
 
 <style>
 
+
 *{
-    box-sizing:border-box;
+
+box-sizing:border-box;
+
 }
+
 
 
 body{
 
-    margin:0;
 
-    background:#0d1117;
+margin:0;
 
-    color:#e6edf3;
+background:#0b0f14;
 
-    font-family:
+color:#e6edf3;
 
-    Arial,
-    sans-serif;
+font-family:
+
+Arial,
+sans-serif;
+
 
 }
+
 
 
 
 header{
 
-    background:#161b22;
 
-    padding:20px;
+background:#161b22;
 
-    border-bottom:1px solid #30363d;
+padding:20px;
+
+border-bottom:
+
+1px solid #30363d;
+
+
+}
+
+
+
+header h1{
+
+
+margin:0;
+
+font-size:28px;
+
 
 }
 
-
-
-h1{
-
-    margin:0;
-
-}
 
 
 
@@ -72,37 +89,43 @@ h1{
 .container{
 
 
-    padding:20px;
+padding:20px;
 
 
-    display:grid;
+display:grid;
 
 
-    grid-template-columns:
+grid-template-columns:
 
-    repeat(auto-fit,minmax(260px,1fr));
+repeat(auto-fit,minmax(280px,1fr));
 
 
-    gap:20px;
+gap:20px;
 
 
 }
 
 
 
+
+
+
+
 .card{
 
 
-    background:#161b22;
+background:#161b22;
 
 
-    border:1px solid #30363d;
+border:
+
+1px solid #30363d;
 
 
-    border-radius:12px;
+border-radius:12px;
 
 
-    padding:20px;
+padding:20px;
 
 
 }
@@ -112,48 +135,147 @@ h1{
 
 .full{
 
-    grid-column:1/-1;
+
+grid-column:
+
+1 / -1;
+
 
 }
+
+
+
 
 
 
 .title{
 
 
-    color:#8b949e;
+font-size:14px;
 
 
-    margin-bottom:10px;
+color:#8b949e;
+
+
+margin-bottom:10px;
 
 
 }
+
+
 
 
 
 .value{
 
 
-    font-size:30px;
+font-size:28px;
 
 
-    font-weight:bold;
+font-weight:bold;
 
 
 }
+
 
 
 
 .price{
 
 
-    font-size:40px;
+font-size:40px;
 
 
-    font-weight:bold;
+font-weight:bold;
 
 
 }
+
+
+
+
+
+
+.green{
+
+
+color:#00ff88;
+
+font-weight:bold;
+
+}
+
+
+
+
+.red{
+
+
+color:#ff3b3b;
+
+font-weight:bold;
+
+}
+
+
+
+
+
+.gray{
+
+
+color:#aaaaaa;
+
+
+}
+
+
+
+
+
+.long{
+
+
+background:#087f23;
+
+
+}
+
+
+
+
+.short{
+
+
+background:#b71c1c;
+
+
+}
+
+
+
+
+
+
+.profit{
+
+
+color:#00ff88;
+
+
+}
+
+
+
+
+.loss{
+
+
+color:#ff3b3b;
+
+
+}
+
 
 
 
@@ -164,53 +286,44 @@ h1{
 button{
 
 
-    width:120px;
+height:45px;
 
 
-    height:45px;
+min-width:100px;
 
 
-    border:0;
+border:0;
 
 
-    border-radius:8px;
+border-radius:8px;
 
 
-    margin:5px;
+margin:5px;
 
 
-    color:white;
+font-size:16px;
 
 
-    cursor:pointer;
+font-weight:bold;
 
 
-    font-size:17px;
+cursor:pointer;
+
+
+color:white;
 
 
 }
 
 
 
-.buy{
-
-    background:#238636;
-
-}
 
 
-
-.sell{
-
-    background:#da3633;
-
-}
+.btn-buy{
 
 
+background:#008f39;
 
-.close{
-
-    background:#57606a;
 
 }
 
@@ -218,14 +331,82 @@ button{
 
 
 
+.btn-sell{
 
-.chart-card{
 
-
-    height:750px;
+background:#c62828;
 
 
 }
+
+
+
+
+
+.btn-close{
+
+
+background:#555;
+
+
+}
+
+
+
+
+
+
+select,input{
+
+
+width:100%;
+
+
+height:38px;
+
+
+background:#0d1117;
+
+
+border:
+
+1px solid #30363d;
+
+
+border-radius:6px;
+
+
+color:white;
+
+
+padding:5px;
+
+
+}
+
+
+
+
+
+
+
+.row{
+
+
+display:grid;
+
+
+grid-template-columns:
+
+1fr 1fr;
+
+
+gap:10px;
+
+
+}
+
+
 
 
 
@@ -233,7 +414,7 @@ button{
 .chart-box{
 
 
-    height:650px;
+height:650px;
 
 
 }
@@ -241,13 +422,14 @@ button{
 
 
 
+
 canvas{
 
 
-    width:100%!important;
+width:100%!important;
 
 
-    height:100%!important;
+height:100%!important;
 
 
 }
@@ -260,25 +442,38 @@ canvas{
 #logs{
 
 
-    height:300px;
+height:250px;
 
 
-    overflow:auto;
+overflow:auto;
 
 
-    background:#000;
+background:#000;
 
 
-    padding:15px;
+padding:15px;
 
 
-    font-family:monospace;
+font-family:monospace;
 
 
-    font-size:13px;
+font-size:13px;
 
 
 }
+
+
+
+
+.switch{
+
+
+font-size:18px;
+
+
+}
+
+
 
 
 </style>
@@ -286,28 +481,16 @@ canvas{
 
 </head>
 
-
-
-
-
 <body>
-
-
 
 
 <header>
 
 <h1>
-
 VWAP SUPERTREND BOT
-
 </h1>
 
 </header>
-
-
-
-
 
 
 
@@ -318,79 +501,37 @@ VWAP SUPERTREND BOT
 
 
 
-<div class="card">
-
-<div class="title">
-BOT STATUS
-</div>
-
-<div id="bot" class="value">
--
-</div>
-
-</div>
-
-
-
-
-
+<!-- =========================
+     MARKET STATUS
+========================= -->
 
 
 <div class="card">
 
-<div class="title">
-MODE
-</div>
-
-<div id="mode" class="value">
--
-</div>
-
-</div>
-
-
-
-
-
-
-
-<div class="card">
 
 <div class="title">
-SYMBOL
+BTCUSDT PRICE
 </div>
 
-<div id="symbol" class="value">
--
-</div>
-
-</div>
-
-
-
-
-
-
-
-<div class="card">
-
-<div class="title">
-PRICE
-</div>
 
 <div id="price" class="price">
 -
 </div>
 
+
+<div id="change">
+-
+</div>
+
+
 </div>
 
 
 
 
 
-
-
 <div class="card">
+
 
 <div class="title">
 POSITION
@@ -404,15 +545,9 @@ POSITION
 
 <br>
 
-SIZE :
-<span id="size">
--
-</span>
-
-
-<br>
 
 ENTRY :
+
 <span id="entry">
 -
 </span>
@@ -420,7 +555,9 @@ ENTRY :
 
 <br>
 
+
 MARK :
+
 <span id="mark">
 -
 </span>
@@ -428,7 +565,9 @@ MARK :
 
 <br>
 
-LIQ :
+
+LIQUIDATION :
+
 <span id="liq">
 -
 </span>
@@ -440,21 +579,26 @@ LIQ :
 
 
 
-
-
 <div class="card">
 
 
 <div class="title">
-
-PNL
-
+PROFIT / LOSS
 </div>
 
 
 <div id="pnl" class="price">
-
 -
+</div>
+
+
+<div>
+
+ROI :
+
+<span id="roi">
+-
+</span>
 
 </div>
 
@@ -465,42 +609,474 @@ PNL
 
 
 
+<!-- =========================
+ACCOUNT
+========================= -->
 
 
 <div class="card">
 
 
 <div class="title">
+ACCOUNT
+</div>
 
-MANUAL ORDER
+
+총 자본금
+
+<input id="capital" value="1000">
+
+
+
+사용 가능
+
+<input id="available" readonly>
+
+
+
+투입 금액
+
+<input id="amount" value="100">
+
+
+
 
 </div>
 
 
-<button class="buy"
+
+
+
+
+
+<!-- =========================
+LEVERAGE
+========================= -->
+
+
+<div class="card">
+
+
+<div class="title">
+LEVERAGE
+</div>
+
+
+
+<select id="leverage">
+
+
+<option>1</option>
+
+<option>3</option>
+
+<option selected>5</option>
+
+<option>10</option>
+
+<option>20</option>
+
+<option>50</option>
+
+
+</select>
+
+
+
+<br><br>
+
+
+<select id="margin">
+
+
+<option>
+ISOLATED
+</option>
+
+
+<option>
+CROSS
+</option>
+
+
+</select>
+
+
+<button onclick="setLeverage()">
+
+APPLY
+
+</button>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+<!-- =========================
+ENTRY SCALE
+========================= -->
+
+
+<div class="card">
+
+
+<div class="title">
+ENTRY SCALE
+</div>
+
+
+
+1차 매수 %
+
+<select id="entry1">
+
+<option>30</option>
+
+<option>50</option>
+
+<option>70</option>
+
+</select>
+
+
+
+2차 매수 %
+
+<select id="entry2">
+
+<option>30</option>
+
+<option>40</option>
+
+<option>50</option>
+
+</select>
+
+
+
+3차 매수 %
+
+<select id="entry3">
+
+<option>20</option>
+
+<option>30</option>
+
+<option>40</option>
+
+</select>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<!-- =========================
+STOP LOSS
+========================= -->
+
+
+<div class="card">
+
+
+<div class="title">
+STOP LOSS
+</div>
+
+
+손절 %
+
+<select id="stopLoss">
+
+
+<option>1</option>
+
+<option>2</option>
+
+<option>3</option>
+
+<option>5</option>
+
+</select>
+
+
+
+손절 가격
+
+
+<input id="stopPrice">
+
+
+
+<button onclick="saveStop()">
+
+SAVE
+
+</button>
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<!-- =========================
+TAKE PROFIT
+========================= -->
+
+
+<div class="card">
+
+
+<div class="title">
+TAKE PROFIT
+</div>
+
+
+
+TP1 수익 %
+
+<select id="tp1">
+
+<option>3</option>
+
+<option>5</option>
+
+<option>10</option>
+
+</select>
+
+
+
+청산 %
+
+<select id="tp1p">
+
+<option>30</option>
+
+<option>50</option>
+
+</select>
+
+
+
+
+
+<hr>
+
+
+
+TP2 수익 %
+
+<select id="tp2">
+
+<option>5</option>
+
+<option>10</option>
+
+<option>15</option>
+
+</select>
+
+
+
+
+청산 %
+
+<select id="tp2p">
+
+<option>30</option>
+
+<option>50</option>
+
+</select>
+
+
+
+
+
+
+<hr>
+
+
+
+TP3 수익 %
+
+<select id="tp3">
+
+<option>10</option>
+
+<option>20</option>
+
+</select>
+
+
+
+청산 %
+
+<select id="tp3p">
+
+<option>40</option>
+
+<option>50</option>
+
+</select>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<!-- =========================
+AUTO BOT
+========================= -->
+
+
+<div class="card">
+
+
+<div class="title">
+AUTO BOT
+</div>
+
+
+
+<div class="switch">
+
+
+자동 진입
+
+
+<input type="checkbox" id="autoEntry">
+
+
+
+</div>
+
+
+
+
+<div class="switch">
+
+
+자동 손절
+
+
+<input type="checkbox" id="autoSL">
+
+
+
+</div>
+
+
+
+
+
+<div class="switch">
+
+
+자동 익절
+
+
+<input type="checkbox" id="autoTP">
+
+
+
+</div>
+
+
+
+
+<div class="switch">
+
+
+트레일링 스탑
+
+
+<input type="checkbox" id="trailing">
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+<!-- =========================
+ORDER
+========================= -->
+
+
+<div class="card full">
+
+
+<div class="title">
+MANUAL ORDER
+</div>
+
+
+
+<button class="btn-buy"
 onclick="sendOrder('Buy')">
 
-BUY
+BUY LONG 🟢
 
 </button>
 
 
-<button class="sell"
+
+<button class="btn-sell"
 onclick="sendOrder('Sell')">
 
-SELL
+SELL SHORT 🔴
 
 </button>
 
 
-<button class="close"
-onclick="closeOrder()">
+
+
+<button class="btn-close"
+onclick="closePosition()">
 
 CLOSE
 
 </button>
 
 
+
 </div>
 
 
@@ -510,8 +1086,12 @@ CLOSE
 
 
 
+<!-- =========================
+CHART
+========================= -->
 
-<div class="card full chart-card">
+
+<div class="card full">
 
 
 <div class="title">
@@ -521,7 +1101,9 @@ BTCUSDT 5M CANDLE CHART
 </div>
 
 
+
 <div class="chart-box">
+
 
 <canvas id="chart"></canvas>
 
@@ -529,6 +1111,7 @@ BTCUSDT 5M CANDLE CHART
 </div>
 
 
+
 </div>
 
 
@@ -536,6 +1119,11 @@ BTCUSDT 5M CANDLE CHART
 
 
 
+
+
+<!-- =========================
+LOG
+========================= -->
 
 
 <div class="card full">
@@ -548,107 +1136,271 @@ SYSTEM LOG
 </div>
 
 
-<div id="logs"></div>
+<div id="logs">
+
+</div>
 
 
 </div>
 
 
 
-
-
 </div>
 
+ <script>
 
 
-
-
-
-
-
-
-<script>
+// ==============================
+// STATUS UPDATE
+// ==============================
 
 
 async function updateStatus(){
 
 
-try{
+    try{
 
 
-const res = await fetch(
-
-"/api/status"
-
-);
+        const res =
+        await fetch("/api/status");
 
 
-
-const json = await res.json();
-
-
-const s=json.status;
+        const data =
+        await res.json();
 
 
 
-bot.innerHTML=s.bot;
-
-mode.innerHTML=s.mode;
-
-symbol.innerHTML=s.symbol;
-
-price.innerHTML=s.price;
-
-position.innerHTML=s.position;
-
-size.innerHTML=s.position_size;
-
-entry.innerHTML=s.entry_price;
-
-mark.innerHTML=s.mark_price;
-
-liq.innerHTML=s.liq_price;
-
-pnl.innerHTML=s.pnl;
+        const s =
+        data.status;
 
 
 
-let text="";
+        price.innerHTML =
+        Number(s.price).toFixed(2);
 
 
-json.logs.forEach(
 
-x=>{
+        mark.innerHTML =
+        Number(s.mark_price).toFixed(2);
 
-text += x+"<br>";
+
+
+        entry.innerHTML =
+        Number(s.entry_price).toFixed(2);
+
+
+
+        liq.innerHTML =
+        Number(s.liq_price).toFixed(2);
+
+
+
+
+
+        // =====================
+        // POSITION COLOR
+        // =====================
+
+
+        position.className="value";
+
+
+
+        if(s.position=="Buy" ||
+           s.position=="Long"){
+
+
+            position.innerHTML="LONG 🟢";
+
+
+            position.classList.add(
+                "green"
+            );
+
+
+        }
+
+
+        else if(
+            s.position=="Sell" ||
+            s.position=="Short"
+        ){
+
+
+            position.innerHTML="SHORT 🔴";
+
+
+            position.classList.add(
+                "red"
+            );
+
+
+        }
+
+
+        else{
+
+
+            position.innerHTML="NONE";
+
+
+            position.classList.add(
+                "gray"
+            );
+
+
+        }
+
+
+
+
+
+        // =====================
+        // PNL COLOR
+        // =====================
+
+
+        pnl.innerHTML =
+        Number(s.pnl).toFixed(3)
+        +" USDT";
+
+
+
+        roi.innerHTML =
+        Number(s.pnl).toFixed(2)
+        +" %";
+
+
+
+
+        pnl.className="price";
+
+        roi.className="";
+
+
+
+        if(Number(s.pnl)>0){
+
+
+            pnl.classList.add(
+                "profit"
+            );
+
+
+            roi.classList.add(
+                "profit"
+            );
+
+
+        }
+
+
+        else if(
+            Number(s.pnl)<0
+        ){
+
+
+            pnl.classList.add(
+                "loss"
+            );
+
+
+            roi.classList.add(
+                "loss"
+            );
+
+
+        }
+
+
+
+
+        // =====================
+        // PRICE COLOR
+        // =====================
+
+
+        price.className="price";
+
+
+
+        if(
+            Number(s.price)
+            >
+            Number(s.mark_price)
+        ){
+
+
+            price.classList.add(
+                "green"
+            );
+
+
+        }
+
+        else{
+
+
+            price.classList.add(
+                "red"
+            );
+
+
+        }
+
+
+
+
+
+        // =====================
+        // LOG
+        // =====================
+
+
+
+        logs.innerHTML="";
+
+
+
+        if(data.logs){
+
+
+            data.logs.forEach(x=>{
+
+
+                logs.innerHTML +=
+
+                x+"<br>";
+
+
+            });
+
+
+            logs.scrollTop =
+            logs.scrollHeight;
+
+
+        }
+
+
+
+    }
+
+
+    catch(e){
+
+
+        console.log(
+            "STATUS ERROR",
+            e
+        );
+
+
+    }
+
 
 }
 
-);
-
-
-
-logs.innerHTML=text;
-
-
-
-logs.scrollTop=
-
-logs.scrollHeight;
-
-
-
-}
-
-
-catch(e){
-
-console.log(e);
-
-}
-
-
-}
 
 
 
@@ -656,46 +1408,48 @@ console.log(e);
 
 
 
-function sendOrder(side){
+
+// ==============================
+// ORDER
+// ==============================
 
 
-fetch(
-
-"/api/order",
-
-{
+async function sendOrder(side){
 
 
-method:"POST",
+    await fetch(
+        "/api/order",
+        {
 
 
-headers:{
+        method:"POST",
 
 
-"Content-Type":
-
-"application/json"
+        headers:{
 
 
-},
+            "Content-Type":
+            "application/json"
 
 
-body:JSON.stringify({
+        },
 
 
-side:side,
+        body:JSON.stringify({
 
 
-qty:0.001
+            side:side,
 
 
-})
+            qty:
+            Number(amount.value)
 
 
-}
+        })
 
 
-);
+        }
+    );
 
 
 }
@@ -706,22 +1460,75 @@ qty:0.001
 
 
 
-function closeOrder(){
 
 
-fetch(
-
-"/api/close",
-
-{
+async function closePosition(){
 
 
-method:"POST"
+    await fetch(
+        "/api/close",
+        {
+
+
+        method:"POST"
+
+
+        }
+    );
 
 
 }
 
-);
+
+
+
+
+
+
+
+
+// ==============================
+// SETTINGS
+// ==============================
+
+
+async function setLeverage(){
+
+
+    await fetch(
+        "/api/leverage",
+        {
+
+
+        method:"POST",
+
+
+        headers:{
+
+
+        "Content-Type":
+        "application/json"
+
+
+        },
+
+
+        body:JSON.stringify({
+
+
+            leverage:
+            leverage.value,
+
+
+            margin:
+            margin.value
+
+
+        })
+
+
+        }
+    );
 
 
 }
@@ -729,6 +1536,63 @@ method:"POST"
 
 
 
+
+
+
+
+
+async function saveStop(){
+
+
+    await fetch(
+        "/api/stoploss",
+        {
+
+
+        method:"POST",
+
+
+        headers:{
+
+
+        "Content-Type":
+        "application/json"
+
+
+        },
+
+
+        body:JSON.stringify({
+
+
+        percent:
+        stopLoss.value,
+
+
+        price:
+        stopPrice.value
+
+
+        })
+
+
+        }
+    );
+
+
+}
+
+
+
+
+
+
+
+
+
+// ==============================
+// AUTO UPDATE
+// ==============================
 
 
 setInterval(
@@ -751,13 +1615,12 @@ updateStatus();
 
 
 
-
+<!-- Candle Engine -->
 
 <script src="/chart.js"></script>
-
 
 
 </body>
 
 
-</html>
+</html>    
