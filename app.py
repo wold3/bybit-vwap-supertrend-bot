@@ -1,25 +1,17 @@
 # =====================================================
 # app.py
-# VWAP SUPERTREND BOT V2
-# AUTO TRADING APPLICATION
+# VWAP SUPERTREND BOT APPLICATION V2
 # =====================================================
-
 
 import threading
 import time
 
 
-
 from web.server import (
-
     add_log,
-
     update_status,
-
     set_bot
-
 )
-
 
 
 from market.market_data import market_data
@@ -38,30 +30,22 @@ from portfolio.position_manager import position_manager
 
 
 
-
 class TradingApp:
 
 
 
     def __init__(self):
 
-
         self.running = False
 
-
         self.market_thread = None
-
 
         self.lock = threading.Lock()
 
 
-
         print(
-
-            "[BOT V2 READY]"
-
+            "[BOT READY]"
         )
-
 
 
 
@@ -85,9 +69,7 @@ class TradingApp:
 
 
                 add_log(
-
                     "BOT ALREADY RUNNING"
-
                 )
 
 
@@ -95,22 +77,15 @@ class TradingApp:
 
 
 
-
-
-            self.running=True
-
+            self.running = True
 
 
 
 
 
         set_bot(
-
             self
-
         )
-
-
 
 
 
@@ -124,8 +99,6 @@ class TradingApp:
 
 
 
-
-
         add_log(
 
             "BOT START"
@@ -136,31 +109,17 @@ class TradingApp:
 
 
 
-
         self.market_thread = threading.Thread(
-
 
             target=self.market_loop,
 
-
             daemon=True
-
 
         )
 
 
 
         self.market_thread.start()
-
-
-
-
-
-        add_log(
-
-            "AUTO TRADE ENABLED"
-
-        )
 
 
 
@@ -186,7 +145,7 @@ class TradingApp:
         with self.lock:
 
 
-            self.running=False
+            self.running = False
 
 
 
@@ -223,6 +182,81 @@ class TradingApp:
 
 
     # =====================================================
+    # MANUAL ORDER API
+    # =====================================================
+
+
+    def buy(self, qty=None):
+
+
+        add_log(
+
+            "MANUAL BUY"
+
+        )
+
+
+        return order_manager.buy(qty)
+
+
+
+
+
+
+
+    def sell(self, qty=None):
+
+
+        add_log(
+
+            "MANUAL SELL"
+
+        )
+
+
+        return order_manager.sell(qty)
+
+
+
+
+
+
+
+
+    def close(self):
+
+
+        add_log(
+
+            "MANUAL CLOSE"
+
+        )
+
+
+        return order_manager.close()
+
+
+
+
+
+
+
+    def set_leverage(self):
+
+
+        return order_manager.set_leverage()
+
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
     # MARKET LOOP
     # =====================================================
 
@@ -238,19 +272,13 @@ class TradingApp:
 
 
 
-
-
         while self.running:
-
 
 
             try:
 
 
-
-                # ---------------------------------
-                # POSITION UPDATE
-                # ---------------------------------
+                # POSITION SYNC
 
 
                 position_manager.refresh()
@@ -260,62 +288,16 @@ class TradingApp:
 
 
 
-                # ---------------------------------
-                # TP / TRAILING CHECK
-                # ---------------------------------
-
-
-                order_manager.check_take_profit()
-
-
-
-                order_manager.check_trailing_stop()
-
-
-
-
-
-
-                pos = position_manager.get_position()
-
-
-
-
-
-                update_status({
-
-
-                    "current_position":
-
-                    pos
-
-
-
-                })
-
-
-
-
-
-
-
-
-                # ---------------------------------
-                # GET MARKET DATA
-                # ---------------------------------
+                # MARKET DATA
 
 
                 df = market_data.get_candles(
 
-
                     interval="5",
-
 
                     limit=200
 
-
                 )
-
 
 
 
@@ -325,7 +307,6 @@ class TradingApp:
 
                     time.sleep(5)
 
-
                     continue
 
 
@@ -334,9 +315,8 @@ class TradingApp:
 
 
 
-                # ---------------------------------
-                # STRATEGY SIGNAL
-                # ---------------------------------
+
+                # SIGNAL
 
 
                 signal = strategy.generate_signal(
@@ -349,9 +329,7 @@ class TradingApp:
 
 
 
-
                 if signal:
-
 
 
                     price = market_data.price()
@@ -366,21 +344,16 @@ class TradingApp:
 
 
 
-
-
-
                     update_status({
 
+                        "last_action":
 
-                        "signal":
-
-                        signal,
+                        f"SIGNAL {signal}",
 
 
-                        "price":
+                        "mark_price":
 
                         price
-
 
 
                     })
@@ -389,19 +362,12 @@ class TradingApp:
 
 
 
-
-
-
-                    # ---------------------------------
                     # AUTO ORDER
-                    # ---------------------------------
 
 
                     order_manager.open_position(
 
-
                         signal
-
 
                     )
 
@@ -411,8 +377,8 @@ class TradingApp:
 
 
 
-
                 time.sleep(5)
+
 
 
 
@@ -444,207 +410,6 @@ class TradingApp:
 
         )
 
-    # =====================================================
-    # MANUAL BUY
-    # =====================================================
-
-
-    def buy(self, qty=None):
-
-
-        try:
-
-
-            add_log(
-
-                "MANUAL BUY"
-
-            )
-
-
-            return order_manager.buy(
-
-                qty
-
-            )
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"BUY ERROR {e}"
-
-            )
-
-
-            return False
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # MANUAL SELL
-    # =====================================================
-
-
-    def sell(self, qty=None):
-
-
-        try:
-
-
-            add_log(
-
-                "MANUAL SELL"
-
-            )
-
-
-            return order_manager.sell(
-
-                qty
-
-            )
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"SELL ERROR {e}"
-
-            )
-
-
-            return False
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # CLOSE
-    # =====================================================
-
-
-    def close(self):
-
-
-        try:
-
-
-            add_log(
-
-                "MANUAL CLOSE"
-
-            )
-
-
-            return order_manager.close_position()
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"CLOSE ERROR {e}"
-
-            )
-
-
-            return False
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # REVERSE
-    # =====================================================
-
-
-    def reverse(self):
-
-
-        try:
-
-
-            return order_manager.reverse_position()
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"REVERSE ERROR {e}"
-
-            )
-
-
-            return False
-
-
-
-
-
-
-
-
-
-
-    # =====================================================
-    # LEVERAGE
-    # =====================================================
-
-
-    def set_leverage(self):
-
-
-        try:
-
-
-            return order_manager.set_leverage()
-
-
-
-        except Exception as e:
-
-
-            add_log(
-
-                f"LEV ERROR {e}"
-
-            )
-
-
-            return False
-
-
 
 
 
@@ -666,20 +431,7 @@ class TradingApp:
 
             "running":
 
-            self.running,
-
-
-
-            "position":
-
-            position_manager.get_position(),
-
-
-
-            "order":
-
-            order_manager.status()
-
+            self.running
 
 
         }
