@@ -324,3 +324,256 @@ def api_leverage():
             str(e)
 
         })
+
+# =====================================================
+# STOP LOSS API
+# =====================================================
+
+@app.route(
+    "/api/stoploss",
+    methods=["POST"]
+)
+def api_stoploss():
+
+
+    try:
+
+
+        data = request.json
+
+
+
+        price = data.get(
+            "price"
+        )
+
+
+
+        percent = data.get(
+            "percent"
+        )
+
+
+
+        _settings["stop_loss"] = percent
+
+
+
+        result = _bot.order_manager.set_stop_loss(
+
+            price
+
+        )
+
+
+
+        return jsonify({
+
+            "result":
+
+            result
+
+        })
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"STOPLOSS ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "error":
+
+            str(e)
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# TAKE PROFIT API
+# =====================================================
+
+@app.route(
+    "/api/takeprofit",
+    methods=["POST"]
+)
+def api_takeprofit():
+
+
+    try:
+
+
+        data=request.json
+
+
+
+        price=data.get(
+
+            "price"
+
+        )
+
+
+
+        result = _bot.order_manager.set_take_profit(
+
+            price
+
+        )
+
+
+
+        return jsonify({
+
+            "result":
+
+            result
+
+        })
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+            "error":
+
+            str(e)
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SETTINGS API
+# =====================================================
+
+@app.route(
+    "/api/settings",
+    methods=["POST"]
+)
+def api_settings():
+
+
+    try:
+
+
+        data=request.json
+
+
+
+        _settings.update(
+
+            data
+
+        )
+
+
+
+        add_log(
+
+            "SETTINGS UPDATED"
+
+        )
+
+
+
+        return jsonify({
+
+            "settings":
+
+            _settings
+
+        })
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+            "error":
+
+            str(e)
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# TRADING MODE
+# =====================================================
+
+def get_trading_mode():
+
+
+    try:
+
+
+        from config import MODE
+
+
+        return MODE
+
+
+
+    except:
+
+
+        return "DEMO"
+
+
+
+
+
+
+
+
+
+# =====================================================
+# RUN SERVER
+# =====================================================
+
+def run_server():
+
+
+    app.run(
+
+        host="0.0.0.0",
+
+        port=8000,
+
+        debug=False,
+
+        use_reloader=False
+
+    )
