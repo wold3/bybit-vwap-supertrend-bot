@@ -1,16 +1,23 @@
 # =====================================================
 # main.py
-# VWAP SUPERTREND BOT MAIN
+# VWAP SUPERTREND BOT V3
+# MAIN EXECUTOR
 # =====================================================
 
 
 import threading
+
 import time
+
+import signal
+
+import sys
+
+
 
 
 
 from app import TradingApp
-
 
 
 from web.server import (
@@ -25,21 +32,19 @@ from web.server import (
 
 
 
-from watchdog.watchdog import watchdog
-
-
-
 
 
 
 # =====================================================
-# START WEB
+# GLOBAL
 # =====================================================
 
-def start_web():
+
+bot = None
 
 
-    run_server()
+
+server_thread = None
 
 
 
@@ -48,44 +53,53 @@ def start_web():
 
 
 # =====================================================
-# MAIN
+# START
 # =====================================================
 
-if __name__ == "__main__":
+
+def start():
+
+    global bot
 
 
+    add_log(
 
-    print()
+        "SYSTEM START"
 
-    print("==============================")
-
-    print(" VWAP SUPERTREND BOT ")
-
-    print("==============================")
-
-    print()
-
+    )
 
 
 
 
-    # -----------------------------
+
+    # BOT INSTANCE
+
+
+    bot = TradingApp()
+
+
+
+
+
+
     # WEB SERVER
-    # -----------------------------
 
 
-    web_thread = threading.Thread(
+    global server_thread
 
-        target=start_web,
+
+
+    server_thread = threading.Thread(
+
+        target=run_server,
 
         daemon=True
 
     )
 
 
-    web_thread.start()
 
-
+    server_thread.start()
 
 
 
@@ -95,39 +109,31 @@ if __name__ == "__main__":
 
 
 
-
-
-    # -----------------------------
-    # BOT
-    # -----------------------------
-
-
-    bot = TradingApp()
-
-
-
     add_log(
 
-        "AUTO START"
+        "WEB SERVER START :8000"
 
     )
 
 
 
-    bot.start()
 
 
 
 
+    # AUTO START OPTION
 
 
-    # -----------------------------
-    # WATCHDOG
-    # -----------------------------
+    # 자동매매 바로 시작하려면 True
+
+    AUTO_START = True
 
 
-    watchdog.start()
 
+    if AUTO_START:
+
+
+        bot.start()
 
 
 
@@ -136,16 +142,120 @@ if __name__ == "__main__":
 
     add_log(
 
-        "AUTO START COMPLETE"
+        "SYSTEM READY"
 
     )
 
 
 
+
+
+
+
+
+
+# =====================================================
+# STOP
+# =====================================================
+
+
+def shutdown(
+
+    signum=None,
+
+    frame=None
+
+):
+
+
+    add_log(
+
+        "SYSTEM SHUTDOWN"
+
+    )
 
 
 
     try:
+
+
+        if bot:
+
+
+            bot.stop()
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"STOP ERROR {e}"
+
+        )
+
+
+
+    time.sleep(1)
+
+
+
+    sys.exit(0)
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SIGNAL
+# =====================================================
+
+
+signal.signal(
+
+    signal.SIGINT,
+
+    shutdown
+
+)
+
+
+signal.signal(
+
+    signal.SIGTERM,
+
+    shutdown
+
+)
+
+
+
+
+
+
+
+
+
+
+# =====================================================
+# RUN
+# =====================================================
+
+
+if __name__ == "__main__":
+
+
+    start()
+
+
+
+    try:
+
 
 
         while True:
@@ -159,24 +269,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
 
 
-
-        add_log(
-
-            "MANUAL STOP"
-
-        )
-
-
-
-        watchdog.stop()
-
-
-        bot.stop()
-
-
-
-        print(
-
-            "BOT CLOSED"
-
-        )
+        shutdown()
