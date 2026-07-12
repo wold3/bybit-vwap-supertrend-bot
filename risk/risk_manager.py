@@ -1,11 +1,12 @@
 # =====================================================
 # risk/risk_manager.py
 # VWAP SUPERTREND BOT
-# RISK MANAGER
+# ADVANCED RISK MANAGER
 # =====================================================
 
 
 import time
+import threading
 
 
 
@@ -33,6 +34,8 @@ from web.server import (
 
 
 
+
+
 class RiskManager:
 
 
@@ -40,10 +43,33 @@ class RiskManager:
     def __init__(self):
 
 
+        self.lock = threading.Lock()
+
+
+
         self.daily_loss = 0
 
 
         self.order_count = 0
+
+
+        self.win_count = 0
+
+
+        self.loss_count = 0
+
+
+
+        self.last_order_time = 0
+
+
+
+        self.cooldown = 60
+
+
+
+        self.blocked = False
+
 
 
         self.last_reset = time.time()
@@ -71,22 +97,30 @@ class RiskManager:
     def reset_check(self):
 
 
-        now = time.time()
+        now=time.time()
 
 
 
-        # 24시간 초기화
-
-        if now - self.last_reset > 86400:
+        if now-self.last_reset > 86400:
 
 
-            self.daily_loss = 0
+
+            with self.lock:
 
 
-            self.order_count = 0
+                self.daily_loss=0
+
+                self.order_count=0
+
+                self.win_count=0
+
+                self.loss_count=0
+
+                self.blocked=False
 
 
-            self.last_reset = now
+                self.last_reset=now
+
 
 
 
@@ -103,81 +137,62 @@ class RiskManager:
 
 
 
+
     # =====================================================
     # ORDER CHECK
     # =====================================================
 
-    def allow_order(self, qty):
+    def allow_order(self,qty):
 
 
         try:
+
 
 
             self.reset_check()
 
 
 
+            with self.lock:
 
 
 
-            qty = float(qty)
+                if self.blocked:
 
 
+                    add_log(
+
+                        "RISK BLOCKED"
+
+                    )
 
 
-
-            # 수량 제한
-
-            if qty > MAX_POSITION_SIZE:
-
-
-                add_log(
-
-                    f"RISK BLOCK SIZE {qty}"
-
-                )
-
-
-                return False
+                    return False
 
 
 
 
 
-
-
-            # 포지션 개수 제한
-
-            if self.order_count >= MAX_OPEN_POSITION:
-
-
-                add_log(
-
-                    "RISK BLOCK MAX POSITION"
-
-                )
-
-
-                return False
+                qty=float(qty)
 
 
 
 
 
 
-            # 손실 제한
+                # 수량 제한
 
-            if self.daily_loss >= MAX_DAILY_LOSS:
-
-
-                add_log(
-
-                    "RISK BLOCK DAILY LOSS"
-
-                )
+                if qty > MAX_POSITION_SIZE:
 
 
-                return False
+                    add_log(
+
+                        f"SIZE LIMIT {qty}"
+
+                    )
+
+
+                    return False
 
 
 
@@ -185,25 +200,117 @@ class RiskManager:
 
 
 
+                # 최대 주문 제한
 
-            self.order_count += 1
+                if self.order_count >= MAX_OPEN_POSITION:
+
+
+
+                    add_log(
+
+                        "MAX POSITION LIMIT"
+
+                    )
+
+
+                    return False
+
+
+
+
+
+
+
+
+                # 일손실 제한
+
+                if self.daily_loss >= MAX_DAILY_LOSS:
+
+
+
+                    self.blocked=True
+
+
+
+                    add_log(
+
+                        "DAILY LOSS STOP"
+
+                    )
+
+
+
+                    return False
+
+
+
+
+
+
+
+
+                # 주문 간격
+
+                if (
+
+                    time.time()
+
+                    -
+
+                    self.last_order_time
+
+                    <
+
+                    self.cooldown
+
+                ):
+
+
+
+                    add_log(
+
+                        "RISK COOLDOWN"
+
+                    )
+
+
+                    return False
+
+
+
+
+
+
+
+
+                self.order_count +=1
+
+
+                self.last_order_time=time.time()
+
+
+
 
 
 
             update_status({
 
-
                 "risk":
 
-                    "OK",
+                "OK",
 
 
-                "order_count":
+                "orders":
 
-                    self.order_count
+                self.order_count,
 
+
+                "daily_loss":
+
+                self.daily_loss
 
             })
+
 
 
 
@@ -213,8 +320,8 @@ class RiskManager:
 
 
 
-
         except Exception as e:
+
 
 
             add_log(
@@ -234,11 +341,12 @@ class RiskManager:
 
 
 
+
     # =====================================================
-    # PNL UPDATE
+    # PNL TRACKING
     # =====================================================
 
-    def update_pnl(self, pnl):
+    def update_pnl(self,pnl):
 
 
         try:
@@ -248,10 +356,48 @@ class RiskManager:
 
 
 
-            if pnl < 0:
 
 
-                self.daily_loss += abs(pnl)
+            with self.lock:
+
+
+
+                if pnl < 0:
+
+
+                    self.daily_loss += abs(pnl)
+
+
+                    self.loss_count +=1
+
+
+
+                else:
+
+
+                    self.win_count +=1
+
+
+
+
+
+
+
+                if self.daily_loss >= MAX_DAILY_LOSS:
+
+
+
+                    self.blocked=True
+
+
+
+                    add_log(
+
+                        "AUTO TRADE STOP LOSS LIMIT"
+
+                    )
+
+
 
 
 
@@ -262,10 +408,33 @@ class RiskManager:
 
                 "daily_loss":
 
-                    self.daily_loss
+                self.daily_loss,
+
+
+                "wins":
+
+                self.win_count,
+
+
+                "losses":
+
+                self.loss_count,
+
+
+                "risk":
+
+                "BLOCKED"
+
+                if self.blocked
+
+                else
+
+                "OK"
 
 
             })
+
+
 
 
 
@@ -275,10 +444,41 @@ class RiskManager:
 
             add_log(
 
-                f"PNL UPDATE ERROR {e}"
+                f"PNL ERROR {e}"
 
             )
 
+
+
+
+
+
+
+
+
+    # =====================================================
+    # LOSS STREAK
+    # =====================================================
+
+    def loss_streak(self):
+
+
+        return self.loss_count
+
+
+
+
+
+
+
+    # =====================================================
+    # CAN TRADE
+    # =====================================================
+
+    def can_trade(self):
+
+
+        return not self.blocked
 
 
 
@@ -298,15 +498,29 @@ class RiskManager:
 
             "daily_loss":
 
-                self.daily_loss,
+            self.daily_loss,
 
 
-            "order_count":
+            "orders":
 
-                self.order_count
+            self.order_count,
+
+
+            "wins":
+
+            self.win_count,
+
+
+            "losses":
+
+            self.loss_count,
+
+
+            "blocked":
+
+            self.blocked
 
         }
-
 
 
 
@@ -321,10 +535,20 @@ class RiskManager:
     def reset(self):
 
 
-        self.daily_loss = 0
+        with self.lock:
 
 
-        self.order_count = 0
+            self.daily_loss=0
+
+            self.order_count=0
+
+            self.win_count=0
+
+            self.loss_count=0
+
+            self.blocked=False
+
+
 
 
         add_log(
@@ -339,8 +563,10 @@ class RiskManager:
 
 
 
+
+
 # =====================================================
 # INSTANCE
 # =====================================================
 
-risk_manager = RiskManager()
+risk_manager=RiskManager()
