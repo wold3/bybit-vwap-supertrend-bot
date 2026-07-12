@@ -2,7 +2,7 @@
 # api/bybit_api.py
 # VWAP SUPERTREND BOT
 # BYBIT V5 API MANAGER
-# DEMO / LIVE + DYNAMIC SYMBOL
+# DEMO / LIVE
 # =====================================================
 
 
@@ -15,30 +15,52 @@ import threading
 from config import (
 
     DEMO_API_KEY,
-
     DEMO_API_SECRET,
 
     LIVE_API_KEY,
-
     LIVE_API_SECRET,
 
     CATEGORY,
-
     SYMBOL,
-
     LEVERAGE
 
 )
 
 
 
-from web.server import (
 
-    get_trading_mode,
 
-    add_log
+def log(msg):
 
-)
+    try:
+
+        from web.server import add_log
+
+        add_log(msg)
+
+    except:
+
+        print(msg)
+
+
+
+
+
+
+
+def trading_mode():
+
+    try:
+
+        from web.server import get_trading_mode
+
+        return get_trading_mode()
+
+
+    except:
+
+        return "DEMO"
+
 
 
 
@@ -74,6 +96,7 @@ class BybitAPI:
 
 
 
+
     # =====================================================
     # SESSION
     # =====================================================
@@ -81,7 +104,7 @@ class BybitAPI:
     def create_session(self):
 
 
-        mode = get_trading_mode()
+        mode = trading_mode()
 
 
 
@@ -91,10 +114,7 @@ class BybitAPI:
 
             if mode == self.current_mode:
 
-
                 return
-
-
 
 
 
@@ -102,7 +122,6 @@ class BybitAPI:
 
 
                 key = DEMO_API_KEY
-
 
                 secret = DEMO_API_SECRET
 
@@ -112,7 +131,6 @@ class BybitAPI:
 
 
                 key = LIVE_API_KEY
-
 
                 secret = LIVE_API_SECRET
 
@@ -126,7 +144,7 @@ class BybitAPI:
                 testnet=False,
 
 
-                demo=(mode == "DEMO"),
+                demo=(mode=="DEMO"),
 
 
                 api_key=key,
@@ -139,9 +157,7 @@ class BybitAPI:
 
 
 
-
             self.current_mode = mode
-
 
 
 
@@ -154,8 +170,7 @@ class BybitAPI:
             )
 
 
-
-            add_log(
+            log(
 
                 f"BYBIT SESSION {mode}"
 
@@ -168,10 +183,12 @@ class BybitAPI:
 
 
 
+
+
     def check_session(self):
 
 
-        if get_trading_mode() != self.current_mode:
+        if trading_mode()!=self.current_mode:
 
 
             self.create_session()
@@ -190,22 +207,15 @@ class BybitAPI:
     # SYMBOL
     # =====================================================
 
-    def change_symbol(
-
-        self,
-
-        symbol
-
-    ):
+    def change_symbol(self,symbol):
 
 
         self.symbol = symbol.upper()
 
 
+        log(
 
-        add_log(
-
-            f"SYMBOL CHANGE {self.symbol}"
+            f"SYMBOL {self.symbol}"
 
         )
 
@@ -231,7 +241,7 @@ class BybitAPI:
 
         interval="5",
 
-        limit=200
+        limit=100
 
     ):
 
@@ -245,18 +255,13 @@ class BybitAPI:
 
             return self.session.get_kline(
 
-
                 category=CATEGORY,
-
 
                 symbol=self.symbol,
 
-
                 interval=str(interval),
 
-
                 limit=limit
-
 
             )
 
@@ -265,7 +270,7 @@ class BybitAPI:
         except Exception as e:
 
 
-            add_log(
+            log(
 
                 f"KLINE ERROR {e}"
 
@@ -273,7 +278,6 @@ class BybitAPI:
 
 
             return None
-
 
 
 
@@ -298,14 +302,11 @@ class BybitAPI:
 
 
 
-            result = self.session.get_tickers(
-
+            r=self.session.get_tickers(
 
                 category=CATEGORY,
 
-
                 symbol=self.symbol
-
 
             )
 
@@ -313,7 +314,7 @@ class BybitAPI:
 
             return float(
 
-                result["result"]["list"][0]["lastPrice"]
+                r["result"]["list"][0]["lastPrice"]
 
             )
 
@@ -322,15 +323,14 @@ class BybitAPI:
         except Exception as e:
 
 
-            add_log(
+            log(
 
                 f"PRICE ERROR {e}"
 
             )
 
 
-            return None
-
+            return 0
 
 
 
@@ -377,42 +377,30 @@ class BybitAPI:
         except Exception as e:
 
 
-            error=str(e)
-
-
-
-            if (
-
-                "110043" in error
-
-                or
-
-                "leverage not modified" in error
-
-            ):
-
-
-                add_log(
-
-                    f"LEVERAGE ALREADY {LEVERAGE}X"
-
-                )
+            if "110043" in str(e):
 
 
                 return True
 
 
 
+            log(
 
-
-            add_log(
-
-                f"LEVERAGE ERROR {error}"
+                f"LEVERAGE ERROR {e}"
 
             )
 
 
-            return None
+            return False
+
+
+
+
+
+
+
+
+
 
     # =====================================================
     # ORDER
@@ -438,7 +426,8 @@ class BybitAPI:
 
 
 
-            result = self.session.place_order(
+            result=self.session.place_order(
+
 
 
                 category=CATEGORY,
@@ -459,16 +448,16 @@ class BybitAPI:
                 reduceOnly=reduce_only
 
 
-            )
-
-
-
-            add_log(
-
-                f"ORDER {self.symbol} {side} {qty}"
 
             )
 
+
+
+            log(
+
+                f"ORDER {side} {qty}"
+
+            )
 
 
             return result
@@ -477,11 +466,10 @@ class BybitAPI:
 
 
 
-
         except Exception as e:
 
 
-            add_log(
+            log(
 
                 f"ORDER ERROR {e}"
 
@@ -526,11 +514,10 @@ class BybitAPI:
 
 
 
-
         except Exception as e:
 
 
-            add_log(
+            log(
 
                 f"POSITION ERROR {e}"
 
@@ -564,9 +551,7 @@ class BybitAPI:
 
             return self.session.get_wallet_balance(
 
-
                 accountType="UNIFIED"
-
 
             )
 
@@ -575,7 +560,7 @@ class BybitAPI:
         except Exception as e:
 
 
-            add_log(
+            log(
 
                 f"BALANCE ERROR {e}"
 
@@ -601,9 +586,9 @@ class BybitAPI:
 
         self,
 
-        tp,
+        tp=None,
 
-        sl
+        sl=None
 
     ):
 
@@ -615,28 +600,45 @@ class BybitAPI:
 
 
 
-            result = self.session.set_trading_stop(
+            params={
 
 
-                category=CATEGORY,
+                "category":CATEGORY,
 
 
-                symbol=self.symbol,
+                "symbol":self.symbol
 
 
-                takeProfit=str(tp),
+
+            }
 
 
-                stopLoss=str(sl)
 
+            if tp:
+
+                params["takeProfit"]=str(tp)
+
+
+
+            if sl:
+
+                params["stopLoss"]=str(sl)
+
+
+
+
+
+            result=self.session.set_trading_stop(
+
+                **params
 
             )
 
 
 
-            add_log(
+            log(
 
-                f"SET TP {tp} SL {sl}"
+                f"TP {tp} SL {sl}"
 
             )
 
@@ -651,7 +653,7 @@ class BybitAPI:
         except Exception as e:
 
 
-            add_log(
+            log(
 
                 f"TP SL ERROR {e}"
 
@@ -679,144 +681,75 @@ class BybitAPI:
         try:
 
 
-            position = self.get_position()
+            data=self.get_position()
 
 
 
-            if not position:
-
-
-                return None
-
-
-
-
-
-            rows = position.get(
-
-                "result",
-
-                {}
-
-            ).get(
-
-                "list",
-
-                []
-
-            )
+            rows=data["result"]["list"]
 
 
 
             if not rows:
 
-
                 return None
 
 
 
 
-
-            pos = rows[0]
-
+            pos=rows[0]
 
 
-            size = float(
 
-                pos.get(
+            size=float(
 
-                    "size",
-
-                    0
-
-                )
+                pos["size"]
 
             )
 
 
 
-            if size <= 0:
-
+            if size<=0:
 
                 return None
 
 
 
 
+            side=pos["side"]
 
 
-            side = pos.get(
 
-                "side",
+            close_side = (
 
-                ""
+                "Sell"
+
+                if side=="Buy"
+
+                else
+
+                "Buy"
 
             )
 
 
 
 
-
-            if side == "Buy":
-
-
-                close_side = "Sell"
-
-
-
-            elif side == "Sell":
-
-
-                close_side = "Buy"
-
-
-
-            else:
-
-
-                return None
-
-
-
-
-
-
-
-            result = self.place_order(
-
+            return self.place_order(
 
                 close_side,
 
-
                 size,
-
 
                 True
 
-
             )
-
-
-
-            add_log(
-
-                f"CLOSE {self.symbol} {close_side}"
-
-            )
-
-
-
-            return result
-
-
-
 
 
 
         except Exception as e:
 
 
-            add_log(
+            log(
 
                 f"CLOSE ERROR {e}"
 
@@ -846,16 +779,15 @@ class BybitAPI:
 
             "mode":
 
-                self.current_mode,
+            self.current_mode,
 
 
             "symbol":
 
-                self.symbol
+            self.symbol
 
 
         }
-
 
 
 
