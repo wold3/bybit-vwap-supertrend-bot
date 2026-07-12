@@ -1,215 +1,125 @@
 # =====================================================
-# STATUS API
+# web/server.py
+# VWAP SUPERTREND BOT
+# WEB DASHBOARD SERVER
 # =====================================================
 
-@app.route("/api/status")
-def api_status():
 
+from flask import Flask, jsonify, request
 
-    return jsonify({
-
-
-        "logs": _logs[-100:],
-
-
-        "status": _status
-
-
-    })
-
-
-
-
+import threading
+import time
 
 
 
 # =====================================================
-# CANDLE API
+# FLASK
 # =====================================================
 
-@app.route("/api/candles")
-def api_candles():
-
-
-    try:
-
-
-        if _bot:
-
-
-            data = _bot.market_data.get_candles()
-
-
-            return jsonify(data)
-
-
-
-        return jsonify({
-
-
-            "result":{
-
-
-                "list":[]
-
-
-            }
-
-
-        })
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"CANDLE ERROR {e}"
-
-        )
-
-
-        return jsonify({
-
-
-            "result":{
-
-
-                "list":[]
-
-
-            }
-
-
-        })
-
-
-
-
-
-
-
-
-
-
-# =====================================================
-# ORDER API
-# =====================================================
-
-@app.route(
-    "/api/order",
-    methods=["POST"]
+app = Flask(
+    __name__,
+    static_folder="static",
+    template_folder="."
 )
 
-def api_order():
 
 
-    try:
+# =====================================================
+# GLOBAL DATA
+# =====================================================
 
+_bot = None
 
-        data=request.json
 
+_logs = []
 
 
-        side=data.get(
 
-            "side"
+_status = {
 
-        )
 
+    "api":"OK",
 
-        qty=data.get(
+    "bot":"STOPPED",
 
-            "qty"
+    "mode":"DEMO",
 
-        )
+    "symbol":"BTCUSDT",
 
+    "position":"NONE",
 
+    "position_size":0,
 
+    "entry_price":0,
 
+    "price":0,
 
-        if not _bot:
+    "mark_price":0,
 
+    "pnl":0,
 
-            return jsonify({
+    "liq_price":0,
 
-                "error":
+    "last_action":""
 
-                "BOT OFF"
 
-            })
 
+}
 
 
 
+_settings = {
 
-        if side=="Buy":
 
+    "leverage":5,
 
-            result = _bot.order_manager.buy(
+    "stop_loss":2,
 
-                qty
+    "take_profit":3,
 
-            )
+    "buy1":50,
 
+    "buy2":50,
 
+    "tp1":30,
 
-        elif side=="Sell":
+    "tp2":30,
 
+    "tp3":40
 
-            result = _bot.order_manager.sell(
 
-                qty
+}
 
-            )
 
 
-        else:
 
 
-            return jsonify({
+# =====================================================
+# BOT CONNECT
+# =====================================================
 
-                "error":
+def set_bot(bot):
 
-                "INVALID SIDE"
 
-            })
+    global _bot
 
 
+    _bot = bot
 
 
+    add_log(
 
-        return jsonify({
+        f"BOT {bot}"
 
-            "result":
+    )
 
-            result
 
-        })
 
 
+def get_bot():
 
 
-    except Exception as e:
-
-
-        add_log(
-
-            f"ORDER API ERROR {e}"
-
-        )
-
-
-        return jsonify({
-
-            "error":
-
-            str(e)
-
-        })
-
-
+    return _bot
 
 
 
@@ -218,310 +128,44 @@ def api_order():
 
 
 # =====================================================
-# CLOSE API
+# LOG
 # =====================================================
 
-@app.route(
+def add_log(msg):
 
-    "/api/close",
 
-    methods=["POST"]
+    now = time.strftime(
 
-)
+        "%H:%M:%S"
 
-def api_close():
+    )
 
 
-    try:
+    text = f"[{now}] {msg}"
 
 
-        result = _bot.order_manager.close()
+    print(text)
 
 
+    _logs.append(text)
 
-        return jsonify({
 
-            "result":
 
-            result
+    if len(_logs) > 200:
 
-        })
 
+        _logs.pop(0)
 
 
-    except Exception as e:
 
 
-        return jsonify({
 
-            "error":
 
-            str(e)
 
-        })
+def update_status(data):
 
 
-
-
-
-
-
-
-
-# =====================================================
-# LEVERAGE API
-# =====================================================
-
-@app.route(
-
-    "/api/leverage",
-
-    methods=["POST"]
-
-)
-
-def api_leverage():
-
-
-    try:
-
-
-        data=request.json
-
-
-
-        _settings["leverage"] = data.get(
-
-            "leverage",
-
-            5
-
-        )
-
-
-
-        result = _bot.order_manager.set_leverage()
-
-
-
-        return jsonify({
-
-            "result":
-
-            result
-
-        })
-
-
-
-    except Exception as e:
-
-
-        return jsonify({
-
-            "error":
-
-            str(e)
-
-        })
-
-# =====================================================
-# STOP LOSS API
-# =====================================================
-
-@app.route(
-    "/api/stoploss",
-    methods=["POST"]
-)
-def api_stoploss():
-
-
-    try:
-
-
-        data = request.json
-
-
-
-        price = data.get(
-            "price"
-        )
-
-
-
-        percent = data.get(
-            "percent"
-        )
-
-
-
-        _settings["stop_loss"] = percent
-
-
-
-        result = _bot.order_manager.set_stop_loss(
-
-            price
-
-        )
-
-
-
-        return jsonify({
-
-            "result":
-
-            result
-
-        })
-
-
-
-    except Exception as e:
-
-
-        add_log(
-
-            f"STOPLOSS ERROR {e}"
-
-        )
-
-
-        return jsonify({
-
-            "error":
-
-            str(e)
-
-        })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# TAKE PROFIT API
-# =====================================================
-
-@app.route(
-    "/api/takeprofit",
-    methods=["POST"]
-)
-def api_takeprofit():
-
-
-    try:
-
-
-        data=request.json
-
-
-
-        price=data.get(
-
-            "price"
-
-        )
-
-
-
-        result = _bot.order_manager.set_take_profit(
-
-            price
-
-        )
-
-
-
-        return jsonify({
-
-            "result":
-
-            result
-
-        })
-
-
-
-    except Exception as e:
-
-
-        return jsonify({
-
-            "error":
-
-            str(e)
-
-        })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# SETTINGS API
-# =====================================================
-
-@app.route(
-    "/api/settings",
-    methods=["POST"]
-)
-def api_settings():
-
-
-    try:
-
-
-        data=request.json
-
-
-
-        _settings.update(
-
-            data
-
-        )
-
-
-
-        add_log(
-
-            "SETTINGS UPDATED"
-
-        )
-
-
-
-        return jsonify({
-
-            "settings":
-
-            _settings
-
-        })
-
-
-
-    except Exception as e:
-
-
-        return jsonify({
-
-            "error":
-
-            str(e)
-
-        })
-
-
+    _status.update(data)
 
 
 
@@ -558,12 +202,490 @@ def get_trading_mode():
 
 
 
+# =====================================================
+# STATUS API
+# =====================================================
+
+@app.route("/api/status")
+
+def api_status():
+
+
+    return jsonify({
+
+
+        "logs":_logs[-100:],
+
+
+        "status":_status,
+
+
+        "settings":_settings
+
+
+    })
+
+
+
+
+
+
+
 
 # =====================================================
-# RUN SERVER
+# CANDLE API
+# =====================================================
+
+@app.route("/api/candles")
+
+def api_candles():
+
+
+    try:
+
+
+        from api.bybit_api import bybit_api
+
+
+
+        data = bybit_api.get_kline(
+
+            interval="5",
+
+            limit=100
+
+        )
+
+
+
+        if data:
+
+
+            return jsonify(data)
+
+
+
+        return jsonify({
+
+
+            "result":{
+
+                "list":[]
+
+            }
+
+
+        })
+
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"CANDLE ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "result":{
+
+                "list":[]
+
+            }
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# ORDER
+# =====================================================
+
+@app.route(
+    "/api/order",
+    methods=["POST"]
+)
+
+def api_order():
+
+
+    try:
+
+
+        data=request.json or {}
+
+
+
+        side=data.get(
+
+            "side"
+
+        )
+
+
+        qty=data.get(
+
+            "qty"
+
+        )
+
+
+
+        if not _bot:
+
+
+            return jsonify({
+
+                "error":"BOT OFF"
+
+            })
+
+
+
+
+
+        if side=="Buy":
+
+
+            result=_bot.order_manager.buy(
+
+                qty
+
+            )
+
+
+
+        elif side=="Sell":
+
+
+            result=_bot.order_manager.sell(
+
+                qty
+
+            )
+
+
+        else:
+
+
+            return jsonify({
+
+                "error":"INVALID SIDE"
+
+            })
+
+
+
+        return jsonify({
+
+            "result":result
+
+        })
+
+
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"ORDER ERROR {e}"
+
+        )
+
+
+        return jsonify({
+
+            "error":str(e)
+
+        })
+
+
+
+
+
+
+
+
+# =====================================================
+# CLOSE
+# =====================================================
+
+@app.route(
+    "/api/close",
+    methods=["POST"]
+)
+
+def api_close():
+
+
+    try:
+
+
+        result=_bot.order_manager.close()
+
+
+
+        return jsonify({
+
+            "result":result
+
+        })
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+            "error":str(e)
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# LEVERAGE
+# =====================================================
+
+@app.route(
+    "/api/leverage",
+    methods=["POST"]
+)
+
+def api_leverage():
+
+
+    try:
+
+
+        data=request.json or {}
+
+
+        _settings["leverage"]=data.get(
+
+            "leverage",
+
+            5
+
+        )
+
+
+
+        result=_bot.order_manager.set_leverage()
+
+
+
+        return jsonify({
+
+            "result":result
+
+        })
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+            "error":str(e)
+
+        })
+
+
+
+
+
+
+
+
+# =====================================================
+# STOP LOSS
+# =====================================================
+
+@app.route(
+    "/api/stoploss",
+    methods=["POST"]
+)
+
+def api_stoploss():
+
+
+    data=request.json or {}
+
+
+    price=data.get(
+
+        "price"
+
+    )
+
+
+    result=_bot.order_manager.set_stop_loss(
+
+        price
+
+    )
+
+
+    return jsonify({
+
+        "result":result
+
+    })
+
+
+
+
+
+
+
+
+# =====================================================
+# TAKE PROFIT
+# =====================================================
+
+@app.route(
+    "/api/takeprofit",
+    methods=["POST"]
+)
+
+def api_takeprofit():
+
+
+    data=request.json or {}
+
+
+
+    price=data.get(
+
+        "price"
+
+    )
+
+
+    result=_bot.order_manager.set_take_profit(
+
+        price
+
+    )
+
+
+
+    return jsonify({
+
+        "result":result
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SETTINGS
+# =====================================================
+
+@app.route(
+    "/api/settings",
+    methods=["POST"]
+)
+
+def api_settings():
+
+
+    data=request.json or {}
+
+
+
+    _settings.update(
+
+        data
+
+    )
+
+
+    add_log(
+
+        "SETTINGS UPDATE"
+
+    )
+
+
+
+    return jsonify({
+
+        "settings":_settings
+
+    })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# INDEX
+# =====================================================
+
+@app.route("/")
+
+def index():
+
+
+    return app.send_static_file(
+
+        "index.html"
+
+    )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SERVER RUN
 # =====================================================
 
 def run_server():
+
+
+    add_log(
+
+        "WEB SERVER START"
+
+    )
 
 
     app.run(
