@@ -1,41 +1,41 @@
 # =====================================================
 # web/server.py
-# VWAP SUPERTREND BOT
-# WEB SERVER + DASHBOARD API
+# VWAP SUPERTREND BOT V2
+# FLASK CONTROL SERVER
 # =====================================================
 
 
 from flask import (
+
     Flask,
+
     jsonify,
-    request,
-    send_from_directory
+
+    request
+
 )
 
-import os
+
+import threading
 import time
 
 
 
+import config
+
+
+
+
+
+
 # =====================================================
-# APP
+# FLASK APP
 # =====================================================
 
-BASE_DIR = os.path.dirname(
-    os.path.dirname(
-        os.path.abspath(__file__)
-    )
-)
+
+app = Flask(__name__)
 
 
-app = Flask(
-    __name__,
-    static_folder=os.path.join(
-        BASE_DIR,
-        "web",
-        "static"
-    )
-)
 
 
 
@@ -45,7 +45,9 @@ app = Flask(
 # GLOBAL DATA
 # =====================================================
 
+
 _bot = None
+
 
 
 _logs = []
@@ -54,30 +56,39 @@ _logs = []
 
 _status = {
 
-    "api":"OK",
-    "bot":"STOPPED",
 
-    "mode":"DEMO",
+    "bot":
 
-    "symbol":"BTCUSDT",
+    "STOPPED",
 
-    "position":"NONE",
 
-    "position_size":0,
 
-    "entry_price":0,
+    "position":
 
-    "price":0,
+    "NONE",
 
-    "mark_price":0,
 
-    "pnl":0,
 
-    "liq_price":0,
+    "symbol":
 
-    "last_action":""
+    config.SYMBOL,
+
+
+
+    "profit_percent":
+
+    0,
+
+
+
+    "leverage":
+
+    config.LEVERAGE
+
 
 }
+
+
 
 
 
@@ -85,25 +96,44 @@ _status = {
 
 _settings = {
 
-    "leverage":5,
 
-    "max_leverage":100,
+    "symbol":
 
-    "stop_loss":2,
+    config.SYMBOL,
 
-    "take_profit":3,
 
-    "buy1":50,
+    "leverage":
 
-    "buy2":50,
+    config.LEVERAGE,
 
-    "tp1":30,
 
-    "tp2":30,
+    "stop_loss":
 
-    "tp3":40
+    config.STOP_LOSS_PERCENT,
+
+
+
+    "tp1":
+
+    config.TP1_PERCENT,
+
+
+
+    "tp2":
+
+    config.TP2_PERCENT,
+
+
+
+    "tp3":
+
+    config.TP3_PERCENT
+
+
 
 }
+
+
 
 
 
@@ -115,22 +145,24 @@ _settings = {
 # BOT CONNECT
 # =====================================================
 
+
 def set_bot(bot):
+
 
     global _bot
 
+
     _bot = bot
 
+
+
     add_log(
-        f"BOT CONNECT {bot}"
+
+        "BOT CONNECTED"
+
     )
 
 
-
-
-def get_bot():
-
-    return _bot
 
 
 
@@ -142,39 +174,107 @@ def get_bot():
 # LOG
 # =====================================================
 
+
 def add_log(msg):
 
 
-    text = (
+    try:
 
-        "["
 
-        +
+        timestamp=time.strftime(
 
-        time.strftime("%H:%M:%S")
+            "%H:%M:%S"
 
-        +
+        )
 
-        "] "
 
-        +
 
-        str(msg)
+        text=f"[{timestamp}] {msg}"
+
+
+
+        _logs.append(text)
+
+
+
+        if len(_logs)>500:
+
+
+            del _logs[:-500]
+
+
+
+        print(text)
+
+
+
+
+    except:
+
+
+        pass
+
+
+
+
+
+
+
+
+
+
+# =====================================================
+# STATUS UPDATE
+# =====================================================
+
+
+def update_status(data):
+
+
+    try:
+
+
+        _status.update(
+
+            data
+
+        )
+
+
+    except Exception as e:
+
+
+        add_log(
+
+            f"STATUS ERROR {e}"
+
+        )
+
+
+
+
+
+
+
+
+
+# =====================================================
+# GET SYMBOL
+# =====================================================
+
+
+def get_trading_symbol():
+
+
+    return _settings.get(
+
+        "symbol",
+
+        config.SYMBOL
 
     )
 
 
-    print(text)
-
-
-    _logs.append(text)
-
-
-
-    if len(_logs)>300:
-
-        _logs.pop(0)
-
 
 
 
@@ -183,79 +283,27 @@ def add_log(msg):
 
 
 # =====================================================
-# STATUS
+# GET MODE
 # =====================================================
 
-def update_status(data):
-
-    if data:
-
-        _status.update(data)
-
-
-
-
-
-def get_status():
-
-    return _status
-
-
-
-
-
-def get_logs():
-
-    return _logs
-
-
-
-
-
-
-
-
-# =====================================================
-# CONFIG
-# =====================================================
 
 def get_trading_mode():
 
+
     try:
 
-        from config import MODE
 
-        return MODE
+        return config.MODE
+
 
 
     except:
+
 
         return "DEMO"
 
 
 
-
-
-def get_trading_symbol():
-
-    try:
-
-        from config import SYMBOL
-
-        return SYMBOL
-
-
-    except:
-
-        return "BTCUSDT"
-
-
-
-
-
-def get_settings():
-
-    return _settings
 
 
 
@@ -267,43 +315,61 @@ def get_settings():
 # INDEX
 # =====================================================
 
+
 @app.route("/")
+
 
 def index():
 
-    return send_from_directory(
 
-        os.path.join(
-            BASE_DIR,
-            "web"
-        ),
+    return jsonify({
 
-        "index.html"
 
-    )
+        "server":
+
+        "VWAP SUPERTREND BOT",
 
 
 
+        "status":
+
+        "running"
 
 
 
-
+    })
 
 # =====================================================
 # STATUS API
 # =====================================================
 
+
 @app.route("/api/status")
+
 
 def api_status():
 
+
     return jsonify({
 
-        "logs":_logs[-100:],
 
-        "status":_status,
+        "logs":
 
-        "settings":_settings
+        _logs[-100:],
+
+
+
+        "status":
+
+        _status,
+
+
+
+        "settings":
+
+        _settings
+
+
 
     })
 
@@ -319,27 +385,44 @@ def api_status():
 # CANDLE API
 # =====================================================
 
+
 @app.route("/api/candles")
 
+
 def api_candles():
+
 
     try:
 
 
-        from api.bybit_api import bybit_api
+        if _bot:
+
+
+            data = _bot.market_data.get_candles()
 
 
 
-        data = bybit_api.get_kline(
-
-            interval="5",
-
-            limit=100
-
-        )
+            if data is not None:
 
 
-        return jsonify(data)
+                return data.to_json()
+
+
+
+        return jsonify({
+
+
+            "result":{
+
+
+                "list":[]
+
+
+            }
+
+
+        })
+
 
 
 
@@ -355,13 +438,19 @@ def api_candles():
 
         return jsonify({
 
+
             "result":{
+
 
                 "list":[]
 
+
             }
 
+
         })
+
+
 
 
 
@@ -375,12 +464,18 @@ def api_candles():
 # ORDER API
 # =====================================================
 
+
 @app.route(
+
     "/api/order",
+
     methods=["POST"]
+
 )
 
+
 def api_order():
+
 
     try:
 
@@ -390,60 +485,123 @@ def api_order():
 
 
         side=data.get(
+
             "side"
+
         )
+
 
 
         qty=data.get(
+
             "qty"
+
         )
+
+
 
 
 
         if not _bot:
 
+
             return jsonify({
 
-                "error":"BOT OFF"
+
+                "error":
+
+                "BOT OFFLINE"
+
 
             })
 
 
 
 
-        result = _bot.order_manager.open_position(
 
-            side,
 
-            qty
 
-        )
+        if side=="Buy":
+
+
+            result=_bot.buy(
+
+                qty
+
+            )
+
+
+
+        elif side=="Sell":
+
+
+            result=_bot.sell(
+
+                qty
+
+            )
+
+
+
+        else:
+
+
+            return jsonify({
+
+
+                "error":
+
+                "INVALID SIDE"
+
+
+            })
+
+
+
+
 
 
 
         return jsonify({
 
-            "result":result
+
+            "result":
+
+            result
+
+
 
         })
+
+
+
 
 
 
     except Exception as e:
 
 
+
         add_log(
 
-            f"ORDER ERROR {e}"
+            f"ORDER API ERROR {e}"
 
         )
 
 
         return jsonify({
 
-            "error":str(e)
+
+            "error":
+
+            str(e)
+
+
 
         })
+
+
+
 
 
 
@@ -457,25 +615,45 @@ def api_order():
 # CLOSE API
 # =====================================================
 
+
 @app.route(
+
     "/api/close",
+
     methods=["POST"]
+
 )
 
+
 def api_close():
+
 
     try:
 
 
-        result = _bot.order_manager.close_position()
+        if not _bot:
+
+
+            return jsonify(False)
+
+
+
+        result=_bot.close()
 
 
 
         return jsonify({
 
-            "result":result
+
+            "result":
+
+            result
+
+
 
         })
+
+
 
 
 
@@ -484,7 +662,12 @@ def api_close():
 
         return jsonify({
 
-            "error":str(e)
+
+            "error":
+
+            str(e)
+
+
 
         })
 
@@ -496,16 +679,24 @@ def api_close():
 
 
 
+
+
 # =====================================================
-# LEVERAGE 1~100
+# LEVERAGE API
 # =====================================================
+
 
 @app.route(
+
     "/api/leverage",
+
     methods=["POST"]
+
 )
 
+
 def api_leverage():
+
 
     try:
 
@@ -520,7 +711,7 @@ def api_leverage():
 
                 "leverage",
 
-                5
+                config.LEVERAGE
 
             )
 
@@ -528,29 +719,29 @@ def api_leverage():
 
 
 
-        if leverage > 100:
-
-            leverage = 100
-
 
 
         if leverage < 1:
 
-            leverage = 1
+
+            leverage=1
+
+
+
+        if leverage > 100:
+
+
+            leverage=100
 
 
 
 
 
-        _settings["leverage"] = leverage
+        _settings["leverage"]=leverage
 
 
 
-        add_log(
-
-            f"LEVERAGE {leverage}X"
-
-        )
+        config.LEVERAGE=leverage
 
 
 
@@ -559,21 +750,36 @@ def api_leverage():
         if _bot:
 
 
-            try:
+            result=_bot.set_leverage()
 
 
-                _bot.order_manager.set_leverage(
-
-                    leverage
-
-                )
+        else:
 
 
-            except Exception:
+            result=False
 
 
-                pass
 
+
+
+        update_status({
+
+
+            "leverage":
+
+            leverage
+
+
+
+        })
+
+
+
+        add_log(
+
+            f"LEVERAGE CHANGE {leverage}X"
+
+        )
 
 
 
@@ -581,9 +787,244 @@ def api_leverage():
 
         return jsonify({
 
-            "result":True,
 
-            "leverage":leverage
+            "result":
+
+            result,
+
+
+            "leverage":
+
+            leverage
+
+
+
+        })
+
+
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+
+            "error":
+
+            str(e)
+
+
+
+        })
+
+# =====================================================
+# STOP LOSS API
+# =====================================================
+
+
+@app.route(
+
+    "/api/stoploss",
+
+    methods=["POST"]
+
+)
+
+
+def api_stoploss():
+
+
+    try:
+
+
+        data=request.json or {}
+
+
+
+        percent=float(
+
+            data.get(
+
+                "percent",
+
+                config.STOP_LOSS_PERCENT
+
+            )
+
+        )
+
+
+
+        _settings["stop_loss"]=percent
+
+
+
+        config.STOP_LOSS_PERCENT=percent
+
+
+
+
+        add_log(
+
+            f"STOP LOSS {percent}%"
+
+        )
+
+
+
+        return jsonify({
+
+
+            "stop_loss":
+
+            percent
+
+
+
+        })
+
+
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+
+            "error":
+
+            str(e)
+
+
+
+        })
+
+
+
+
+
+
+
+
+
+
+
+# =====================================================
+# TAKE PROFIT API
+# =====================================================
+
+
+@app.route(
+
+    "/api/takeprofit",
+
+    methods=["POST"]
+
+)
+
+
+def api_takeprofit():
+
+
+    try:
+
+
+        data=request.json or {}
+
+
+
+        tp1=float(
+
+            data.get(
+
+                "tp1",
+
+                config.TP1_PERCENT
+
+            )
+
+        )
+
+
+
+        tp2=float(
+
+            data.get(
+
+                "tp2",
+
+                config.TP2_PERCENT
+
+            )
+
+        )
+
+
+
+        tp3=float(
+
+            data.get(
+
+                "tp3",
+
+                config.TP3_PERCENT
+
+            )
+
+        )
+
+
+
+
+
+        _settings["tp1"]=tp1
+
+        _settings["tp2"]=tp2
+
+        _settings["tp3"]=tp3
+
+
+
+        config.TP1_PERCENT=tp1
+
+        config.TP2_PERCENT=tp2
+
+        config.TP3_PERCENT=tp3
+
+
+
+
+
+        add_log(
+
+            f"TP SET {tp1}/{tp2}/{tp3}"
+
+        )
+
+
+
+        return jsonify({
+
+
+            "tp1":
+
+            tp1,
+
+
+            "tp2":
+
+            tp2,
+
+
+            "tp3":
+
+            tp3
+
+
 
         })
 
@@ -595,7 +1036,12 @@ def api_leverage():
 
         return jsonify({
 
-            "error":str(e)
+
+            "error":
+
+            str(e)
+
+
 
         })
 
@@ -608,141 +1054,102 @@ def api_leverage():
 
 
 # =====================================================
-# STOP LOSS
+# SETTINGS API
 # =====================================================
+
 
 @app.route(
-    "/api/stoploss",
-    methods=["POST"]
-)
 
-def api_stoploss():
-
-
-    data=request.json or {}
-
-
-    _settings["stop_loss"] = data.get(
-
-        "percent",
-
-        _settings["stop_loss"]
-
-    )
-
-
-
-    return jsonify({
-
-        "settings":_settings
-
-    })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# TAKE PROFIT
-# =====================================================
-
-@app.route(
-    "/api/takeprofit",
-    methods=["POST"]
-)
-
-def api_takeprofit():
-
-
-    data=request.json or {}
-
-
-    _settings["take_profit"] = data.get(
-
-        "percent",
-
-        _settings["take_profit"]
-
-    )
-
-
-    return jsonify({
-
-        "settings":_settings
-
-    })
-
-
-
-
-
-
-
-
-
-# =====================================================
-# SETTINGS
-# =====================================================
-
-@app.route(
     "/api/settings",
+
     methods=["POST"]
+
 )
+
 
 def api_settings():
 
 
-    data=request.json or {}
+    try:
+
+
+        data=request.json or {}
 
 
 
-    if "leverage" in data:
+        _settings.update(
 
-
-        lev=int(data["leverage"])
-
-
-        lev=max(
-
-            1,
-
-            min(
-
-                lev,
-
-                100
-
-            )
+            data
 
         )
 
 
-        data["leverage"]=lev
+
+        if "symbol" in data:
+
+
+            _settings["symbol"]=data["symbol"].upper()
+
+
+
+            update_status({
+
+
+                "symbol":
+
+                _settings["symbol"]
+
+
+
+            })
 
 
 
 
-    _settings.update(data)
 
 
 
-    add_log(
+        add_log(
 
-        "SETTINGS UPDATED"
+            "SETTINGS UPDATED"
 
-    )
+        )
 
 
 
-    return jsonify({
 
-        "settings":_settings
 
-    })
+        return jsonify({
+
+
+            "settings":
+
+            _settings
+
+
+
+        })
+
+
+
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+
+            "error":
+
+            str(e)
+
+
+
+        })
+
+
 
 
 
@@ -753,8 +1160,145 @@ def api_settings():
 
 
 # =====================================================
-# SERVER START
+# BOT START
 # =====================================================
+
+
+@app.route(
+
+    "/api/start",
+
+    methods=["POST"]
+
+)
+
+
+def api_start():
+
+
+    try:
+
+
+        if not _bot:
+
+
+            return jsonify(False)
+
+
+
+        result=_bot.start()
+
+
+
+        return jsonify({
+
+
+            "result":
+
+            result
+
+
+
+        })
+
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+
+            "error":
+
+            str(e)
+
+
+
+        })
+
+
+
+
+
+
+
+
+
+
+
+# =====================================================
+# BOT STOP
+# =====================================================
+
+
+@app.route(
+
+    "/api/stop",
+
+    methods=["POST"]
+
+)
+
+
+def api_stop():
+
+
+    try:
+
+
+        if not _bot:
+
+
+            return jsonify(False)
+
+
+
+        result=_bot.stop()
+
+
+
+        return jsonify({
+
+
+            "result":
+
+            result
+
+
+
+        })
+
+
+
+
+    except Exception as e:
+
+
+        return jsonify({
+
+
+            "error":
+
+            str(e)
+
+
+
+        })
+
+
+
+
+
+
+
+
+
+# =====================================================
+# SERVER RUN
+# =====================================================
+
 
 def run_server():
 
@@ -766,14 +1310,22 @@ def run_server():
     )
 
 
+
     app.run(
 
-        host="0.0.0.0",
 
-        port=8000,
+        host=config.HOST,
+
+
+        port=config.PORT,
+
 
         debug=False,
 
+
         use_reloader=False
 
+
+
     )
+
