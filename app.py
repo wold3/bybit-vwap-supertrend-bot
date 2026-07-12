@@ -1,7 +1,7 @@
 # =====================================================
 # app.py
-# VWAP SUPERTREND BOT APPLICATION
-# AUTO TRADING ENGINE
+# VWAP SUPERTREND BOT V2
+# AUTO TRADING APPLICATION
 # =====================================================
 
 
@@ -56,17 +56,9 @@ class TradingApp:
 
 
 
-        # 중복 신호 방지
-
-        self.last_signal = None
-
-        self.last_signal_time = 0
-
-
-
         print(
 
-            "[BOT READY]"
+            "[BOT V2 READY]"
 
         )
 
@@ -81,6 +73,7 @@ class TradingApp:
     # =====================================================
     # START
     # =====================================================
+
 
     def start(self):
 
@@ -102,7 +95,11 @@ class TradingApp:
 
 
 
-            self.running = True
+
+
+            self.running=True
+
+
 
 
 
@@ -121,12 +118,7 @@ class TradingApp:
 
             "bot":
 
-            "RUNNING",
-
-
-            "auto_trade":
-
-            "ON"
+            "RUNNING"
 
         })
 
@@ -136,9 +128,10 @@ class TradingApp:
 
         add_log(
 
-            "AUTO TRADING START"
+            "BOT START"
 
         )
+
 
 
 
@@ -150,10 +143,8 @@ class TradingApp:
             target=self.market_loop,
 
 
-            daemon=True,
+            daemon=True
 
-
-            name="AUTO-TRADING"
 
         )
 
@@ -164,9 +155,10 @@ class TradingApp:
 
 
 
+
         add_log(
 
-            "MARKET LOOP START"
+            "AUTO TRADE ENABLED"
 
         )
 
@@ -187,37 +179,14 @@ class TradingApp:
     # STOP
     # =====================================================
 
+
     def stop(self):
 
 
         with self.lock:
 
 
-            if not self.running:
-
-
-                return False
-
-
-
-            self.running = False
-
-
-
-
-
-        update_status({
-
-            "bot":
-
-            "STOPPED",
-
-
-            "auto_trade":
-
-            "OFF"
-
-        })
+            self.running=False
 
 
 
@@ -225,9 +194,19 @@ class TradingApp:
 
         add_log(
 
-            "AUTO TRADING STOP"
+            "BOT STOP"
 
         )
+
+
+
+        update_status({
+
+            "bot":
+
+            "STOPPED"
+
+        })
 
 
 
@@ -242,32 +221,37 @@ class TradingApp:
 
 
 
+
     # =====================================================
     # MARKET LOOP
     # =====================================================
+
 
     def market_loop(self):
 
 
         add_log(
 
-            "AUTO ENGINE RUN"
+            "MARKET LOOP START"
 
         )
+
+
 
 
 
         while self.running:
 
 
+
             try:
 
 
 
-
-                # -----------------------------
+                # ---------------------------------
                 # POSITION UPDATE
-                # -----------------------------
+                # ---------------------------------
+
 
                 position_manager.refresh()
 
@@ -275,9 +259,51 @@ class TradingApp:
 
 
 
-                # -----------------------------
-                # MARKET DATA
-                # -----------------------------
+
+                # ---------------------------------
+                # TP / TRAILING CHECK
+                # ---------------------------------
+
+
+                order_manager.check_take_profit()
+
+
+
+                order_manager.check_trailing_stop()
+
+
+
+
+
+
+                pos = position_manager.get_position()
+
+
+
+
+
+                update_status({
+
+
+                    "current_position":
+
+                    pos
+
+
+
+                })
+
+
+
+
+
+
+
+
+                # ---------------------------------
+                # GET MARKET DATA
+                # ---------------------------------
+
 
                 df = market_data.get_candles(
 
@@ -287,6 +313,7 @@ class TradingApp:
 
                     limit=200
 
+
                 )
 
 
@@ -294,13 +321,6 @@ class TradingApp:
 
 
                 if df is None:
-
-
-                    add_log(
-
-                        "NO MARKET DATA"
-
-                    )
 
 
                     time.sleep(5)
@@ -314,9 +334,10 @@ class TradingApp:
 
 
 
-                # -----------------------------
+                # ---------------------------------
                 # STRATEGY SIGNAL
-                # -----------------------------
+                # ---------------------------------
+
 
                 signal = strategy.generate_signal(
 
@@ -329,92 +350,11 @@ class TradingApp:
 
 
 
-
-                # -----------------------------
-                # PRICE UPDATE
-                # -----------------------------
-
-                try:
-
-
-                    price = market_data.price()
-
-
-
-                except:
-
-
-                    price = 0
-
-
-
-
-
-
-                update_status({
-
-                    "price":
-
-                    price,
-
-
-                    "mark_price":
-
-                    price
-
-                })
-
-
-
-
-
-
-
-
-                # -----------------------------
-                # ORDER CHECK
-                # -----------------------------
-
                 if signal:
 
 
 
-                    now = time.time()
-
-
-
-                    # 같은 신호 5분 차단
-
-                    if (
-
-
-                        signal == self.last_signal
-
-                        and
-
-                        now - self.last_signal_time < 300
-
-
-                    ):
-
-
-                        time.sleep(5)
-
-
-                        continue
-
-
-
-
-
-
-
-                    self.last_signal = signal
-
-
-                    self.last_signal_time = now
-
-
+                    price = market_data.price()
 
 
 
@@ -428,11 +368,20 @@ class TradingApp:
 
 
 
+
                     update_status({
 
-                        "last_action":
 
-                        f"SIGNAL {signal}"
+                        "signal":
+
+                        signal,
+
+
+                        "price":
+
+                        price
+
+
 
                     })
 
@@ -442,10 +391,17 @@ class TradingApp:
 
 
 
-                    result = order_manager.open_position(
+
+                    # ---------------------------------
+                    # AUTO ORDER
+                    # ---------------------------------
+
+
+                    order_manager.open_position(
 
 
                         signal
+
 
                     )
 
@@ -454,44 +410,9 @@ class TradingApp:
 
 
 
-                    if result:
-
-
-                        add_log(
-
-                            f"AUTO ORDER {signal}"
-
-                        )
-
-
-
-                    else:
-
-
-                        add_log(
-
-                            "ORDER SKIPPED"
-
-                        )
-
-
-
-
-
-
-
-
-
-
-                # -----------------------------
-                # LOOP DELAY
-                # -----------------------------
 
 
                 time.sleep(5)
-
-
-
 
 
 
@@ -504,7 +425,7 @@ class TradingApp:
 
                 add_log(
 
-                    f"AUTO LOOP ERROR {e}"
+                    f"LOOP ERROR {e}"
 
                 )
 
@@ -517,38 +438,50 @@ class TradingApp:
 
 
 
-
-
-
-
         add_log(
 
-            "AUTO ENGINE STOP"
+            "MARKET LOOP STOP"
 
         )
-
-
-
-
-
-
-
-
 
     # =====================================================
     # MANUAL BUY
     # =====================================================
 
-    def buy(self,qty=None):
+
+    def buy(self, qty=None):
 
 
-        return order_manager.open_position(
+        try:
 
-            "Buy",
 
-            qty
+            add_log(
 
-        )
+                "MANUAL BUY"
+
+            )
+
+
+            return order_manager.buy(
+
+                qty
+
+            )
+
+
+
+        except Exception as e:
+
+
+            add_log(
+
+                f"BUY ERROR {e}"
+
+            )
+
+
+            return False
+
 
 
 
@@ -562,16 +495,40 @@ class TradingApp:
     # MANUAL SELL
     # =====================================================
 
-    def sell(self,qty=None):
+
+    def sell(self, qty=None):
 
 
-        return order_manager.open_position(
+        try:
 
-            "Sell",
 
-            qty
+            add_log(
 
-        )
+                "MANUAL SELL"
+
+            )
+
+
+            return order_manager.sell(
+
+                qty
+
+            )
+
+
+
+        except Exception as e:
+
+
+            add_log(
+
+                f"SELL ERROR {e}"
+
+            )
+
+
+            return False
+
 
 
 
@@ -585,10 +542,107 @@ class TradingApp:
     # CLOSE
     # =====================================================
 
+
     def close(self):
 
 
-        return order_manager.close_position()
+        try:
+
+
+            add_log(
+
+                "MANUAL CLOSE"
+
+            )
+
+
+            return order_manager.close_position()
+
+
+
+        except Exception as e:
+
+
+            add_log(
+
+                f"CLOSE ERROR {e}"
+
+            )
+
+
+            return False
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # REVERSE
+    # =====================================================
+
+
+    def reverse(self):
+
+
+        try:
+
+
+            return order_manager.reverse_position()
+
+
+
+        except Exception as e:
+
+
+            add_log(
+
+                f"REVERSE ERROR {e}"
+
+            )
+
+
+            return False
+
+
+
+
+
+
+
+
+
+
+    # =====================================================
+    # LEVERAGE
+    # =====================================================
+
+
+    def set_leverage(self):
+
+
+        try:
+
+
+            return order_manager.set_leverage()
+
+
+
+        except Exception as e:
+
+
+            add_log(
+
+                f"LEV ERROR {e}"
+
+            )
+
+
+            return False
 
 
 
@@ -603,6 +657,7 @@ class TradingApp:
     # STATUS
     # =====================================================
 
+
     def status(self):
 
 
@@ -614,9 +669,17 @@ class TradingApp:
             self.running,
 
 
-            "last_signal":
 
-            self.last_signal
+            "position":
+
+            position_manager.get_position(),
+
+
+
+            "order":
+
+            order_manager.status()
+
 
 
         }
