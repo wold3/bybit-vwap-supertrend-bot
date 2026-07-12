@@ -5,6 +5,9 @@
 
 <meta charset="UTF-8">
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
 <title>
 VWAP SUPERTREND BOT
 </title>
@@ -12,66 +15,90 @@ VWAP SUPERTREND BOT
 
 <style>
 
-body{
+
+body {
 
     background:#111;
 
-    color:#eee;
+    color:white;
 
-    font-family:Arial;
+    font-family:Arial,sans-serif;
+
+    margin:0;
+
+}
+
+
+
+.container {
 
     padding:20px;
 
 }
 
 
-.box{
 
-    border:1px solid #444;
+.panel {
+
+    background:#1b1b1b;
+
+    border-radius:10px;
 
     padding:15px;
 
     margin-bottom:15px;
 
-    border-radius:8px;
+}
+
+
+
+h2 {
+
+    margin-top:0;
 
 }
 
 
-button{
 
-    width:120px;
+button {
 
-    height:45px;
+    padding:12px 20px;
 
     margin:5px;
 
-    font-size:18px;
+    border:0;
+
+    border-radius:8px;
+
+    font-weight:bold;
 
     cursor:pointer;
 
 }
 
 
-.buy{
 
-    background:#1b8f3a;
+.buy {
 
-    color:white;
-
-}
-
-
-.sell{
-
-    background:#b32626;
+    background:#00c853;
 
     color:white;
 
 }
 
 
-.close{
+
+.sell {
+
+    background:#d50000;
+
+    color:white;
+
+}
+
+
+
+.stop {
 
     background:#555;
 
@@ -80,9 +107,78 @@ button{
 }
 
 
-#logs{
 
-    height:300px;
+.start {
+
+    background:#1565c0;
+
+    color:white;
+
+}
+
+
+
+select,input {
+
+    padding:10px;
+
+    background:#222;
+
+    color:white;
+
+    border:1px solid #555;
+
+    border-radius:5px;
+
+}
+
+
+
+.green {
+
+    color:#00ff66;
+
+}
+
+
+
+.red {
+
+    color:#ff3333;
+
+}
+
+
+
+.row {
+
+    display:flex;
+
+    flex-wrap:wrap;
+
+    gap:10px;
+
+}
+
+
+
+.item {
+
+    background:#222;
+
+    padding:10px;
+
+    border-radius:8px;
+
+    min-width:150px;
+
+}
+
+
+
+#logs {
+
+    height:250px;
 
     overflow:auto;
 
@@ -90,26 +186,22 @@ button{
 
     padding:10px;
 
-    font-family:monospace;
-
-}
-
-
-.value{
-
-    color:#00ff99;
-
-    font-weight:bold;
+    font-size:13px;
 
 }
 
 
 </style>
 
+
 </head>
 
 
 <body>
+
+
+<div class="container">
+
 
 
 <h1>
@@ -118,116 +210,40 @@ VWAP SUPERTREND BOT
 
 
 
-<div class="box">
+
+<div class="panel">
 
 
-<h3>
-STATUS
-</h3>
+<h2>
+BOT CONTROL
+</h2>
 
 
-<div>
-BOT :
-<span id="bot" class="value">
--
-</span>
-</div>
+<button class="start" onclick="botStart()">
+AUTO START
+</button>
 
 
-<div>
-MODE :
-<span id="mode" class="value">
--
-</span>
-</div>
-
-
-<div>
-SYMBOL :
-<span id="symbol" class="value">
--
-</span>
-</div>
-
-
-<div>
-POSITION :
-<span id="position" class="value">
--
-</span>
-</div>
-
-
-<div>
-SIZE :
-<span id="size" class="value">
--
-</span>
-</div>
-
-
-<div>
-ENTRY :
-<span id="entry" class="value">
--
-</span>
-</div>
-
-
-<div>
-PNL :
-<span id="pnl" class="value">
--
-</span>
-</div>
-
-
-</div>
+<button class="stop" onclick="botStop()">
+STOP
+</button>
 
 
 
-
-
-<div class="box">
-
-
-<h3>
-MANUAL ORDER
-</h3>
-
-
-<button
-
-class="buy"
-
-onclick="order('Buy')">
-
+<button class="buy" onclick="manualBuy()">
 BUY
-
 </button>
 
 
 
-<button
-
-class="sell"
-
-onclick="order('Sell')">
-
+<button class="sell" onclick="manualSell()">
 SELL
-
 </button>
 
 
 
-<button
-
-class="close"
-
-onclick="closePosition()">
-
+<button class="stop" onclick="closePosition()">
 CLOSE
-
 </button>
 
 
@@ -238,15 +254,75 @@ CLOSE
 
 
 
-<div class="box">
+
+<div class="panel">
 
 
-<h3>
-LOG
-</h3>
+<h2>
+MARKET STATUS
+</h2>
 
 
-<div id="logs">
+
+<div class="row">
+
+
+<div class="item">
+
+심볼
+
+<br>
+
+<span id="symbol">
+BTCUSDT
+</span>
+
+</div>
+
+
+
+<div class="item">
+
+가격
+
+<br>
+
+<span id="price">
+0
+</span>
+
+</div>
+
+
+
+
+<div class="item">
+
+수익률
+
+<br>
+
+<span id="profit">
+0%
+</span>
+
+</div>
+
+
+
+<div class="item">
+
+포지션
+
+<br>
+
+<span id="position">
+NONE
+</span>
+
+</div>
+
+
 
 </div>
 
@@ -258,268 +334,56 @@ LOG
 
 
 
-<script>
+<div class="panel">
 
 
-function order(side){
+<h2>
+LEVERAGE
+</h2>
 
 
-fetch(
 
-"/api/order",
+<select id="leverage">
 
-{
 
+<option value="1">
+1X
+</option>
 
-method:"POST",
 
+<option value="5">
+5X
+</option>
 
-headers:{
 
+<option value="10">
+10X
+</option>
 
-"Content-Type":
 
-"application/json"
+<option value="20">
+20X
+</option>
 
 
-},
+<option value="50">
+50X
+</option>
 
 
-body:JSON.stringify({
+<option value="100">
+100X
+</option>
 
 
-side:side,
+</select>
 
 
-qty:0.001
 
+<button onclick="changeLeverage()">
+CHANGE
+</button>
 
-})
 
 
-}
-
-
-)
-
-.then(
-
-r=>r.json()
-
-)
-
-.then(
-
-data=>{
-
-
-console.log(data);
-
-
-}
-
-);
-
-
-}
-
-
-
-
-
-
-function closePosition(){
-
-
-fetch(
-
-"/api/close",
-
-{
-
-
-method:"POST"
-
-}
-
-)
-
-.then(
-
-r=>r.json()
-
-)
-
-.then(
-
-data=>{
-
-
-console.log(data);
-
-
-}
-
-);
-
-
-}
-
-
-
-
-
-
-
-
-function update(){
-
-
-fetch(
-
-"/api/status"
-
-)
-
-
-.then(
-
-r=>r.json()
-
-)
-
-
-.then(
-
-data=>{
-
-
-let s=data.status;
-
-
-
-document.getElementById(
-
-"bot"
-
-).innerHTML=s.bot;
-
-
-
-document.getElementById(
-
-"mode"
-
-).innerHTML=s.mode;
-
-
-
-document.getElementById(
-
-"symbol"
-
-).innerHTML=s.symbol;
-
-
-
-document.getElementById(
-
-"position"
-
-).innerHTML=s.position;
-
-
-
-document.getElementById(
-
-"size"
-
-).innerHTML=s.position_size;
-
-
-
-document.getElementById(
-
-"entry"
-
-).innerHTML=s.entry_price;
-
-
-
-document.getElementById(
-
-"pnl"
-
-).innerHTML=s.pnl;
-
-
-
-
-let log="";
-
-
-data.logs.forEach(
-
-x=>{
-
-
-log += x+"<br>";
-
-
-}
-
-
-);
-
-
-
-let box=document.getElementById(
-
-"logs"
-
-);
-
-
-
-box.innerHTML=log;
-
-
-
-box.scrollTop=box.scrollHeight;
-
-
-
-}
-
-
-);
-
-
-
-}
-
-
-
-
-
-setInterval(
-
-update,
-
-1000
-
-);
-
-
-
-update();
-
-
-
-</script>
-
-
-</body>
-
-
-</html>
+</div>
