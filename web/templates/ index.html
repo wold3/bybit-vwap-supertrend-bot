@@ -387,3 +387,997 @@ CHANGE
 
 
 </div>
+
+<div class="panel">
+
+
+<h2>
+POSITION SETTINGS
+</h2>
+
+
+<div class="row">
+
+
+<div class="item">
+
+자본금
+
+<br>
+
+<input id="capital" 
+type="number"
+value="1000">
+
+</div>
+
+
+
+
+<div class="item">
+
+1차 매수 %
+
+<br>
+
+<select id="entry1">
+
+
+<option value="50">
+50%
+</option>
+
+
+<option value="60" selected>
+60%
+</option>
+
+
+<option value="70">
+70%
+</option>
+
+
+<option value="80">
+80%
+</option>
+
+
+</select>
+
+</div>
+
+
+
+
+
+<div class="item">
+
+2차 매수 %
+
+<br>
+
+<select id="entry2">
+
+
+<option value="20">
+20%
+</option>
+
+
+<option value="30">
+30%
+</option>
+
+
+<option value="40" selected>
+40%
+</option>
+
+
+<option value="50">
+50%
+</option>
+
+
+</select>
+
+</div>
+
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="panel">
+
+
+<h2>
+TAKE PROFIT
+</h2>
+
+
+
+<div class="row">
+
+
+<div class="item">
+
+TP 1차
+
+<br>
+
+
+<select id="tp1">
+
+
+<option value="2">
+2%
+</option>
+
+
+<option value="3">
+3%
+</option>
+
+
+<option value="5">
+5%
+</option>
+
+
+</select>
+
+
+</div>
+
+
+
+
+
+
+<div class="item">
+
+TP 2차
+
+<br>
+
+
+<select id="tp2">
+
+
+<option value="5">
+5%
+</option>
+
+
+<option value="8">
+8%
+</option>
+
+
+<option value="10">
+10%
+</option>
+
+
+</select>
+
+
+</div>
+
+
+
+
+
+
+<div class="item">
+
+TP 3차
+
+<br>
+
+
+<select id="tp3">
+
+
+<option value="10">
+10%
+</option>
+
+
+<option value="15">
+15%
+</option>
+
+
+<option value="20">
+20%
+</option>
+
+
+</select>
+
+
+</div>
+
+
+
+</div>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="panel">
+
+
+<h2>
+SPLIT SELL
+</h2>
+
+
+
+<div class="row">
+
+
+
+<div class="item">
+
+1차 매도
+
+<br>
+
+
+<select id="sell1">
+
+
+<option value="30">
+30%
+</option>
+
+
+<option value="40">
+40%
+</option>
+
+
+<option value="50">
+50%
+</option>
+
+
+</select>
+
+
+</div>
+
+
+
+
+
+
+<div class="item">
+
+2차 매도
+
+<br>
+
+
+<select id="sell2">
+
+
+<option value="30">
+30%
+</option>
+
+
+<option value="40" selected>
+40%
+</option>
+
+
+<option value="50">
+50%
+</option>
+
+
+</select>
+
+
+</div>
+
+
+
+
+
+
+<div class="item">
+
+3차 매도
+
+<br>
+
+
+<select id="sell3">
+
+
+<option value="20">
+20%
+</option>
+
+
+<option value="30" selected>
+30%
+</option>
+
+
+<option value="40">
+40%
+</option>
+
+
+</select>
+
+
+</div>
+
+
+</div>
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="panel">
+
+
+<h2>
+STOP LOSS
+</h2>
+
+
+
+<select id="stoploss">
+
+
+<option value="1">
+1%
+</option>
+
+
+<option value="2" selected>
+2%
+</option>
+
+
+<option value="3">
+3%
+</option>
+
+
+<option value="5">
+5%
+</option>
+
+
+</select>
+
+
+
+
+<button onclick="saveSettings()">
+
+SAVE SETTINGS
+
+</button>
+
+
+
+</div>
+
+
+
+
+
+
+
+
+
+<div class="panel">
+
+
+<h2>
+SYSTEM LOG
+
+</h2>
+
+
+
+<div id="logs">
+
+</div>
+
+
+</div>
+
+
+
+</div>
+
+<script>
+
+
+// =====================================================
+// STATUS UPDATE
+// =====================================================
+
+
+async function updateStatus(){
+
+
+    try{
+
+
+        const res = await fetch(
+            "/api/status"
+        );
+
+
+        const data = await res.json();
+
+
+
+        const s = data.status;
+
+
+
+        document.getElementById(
+            "symbol"
+        ).innerText =
+            s.symbol || "BTCUSDT";
+
+
+
+        document.getElementById(
+            "position"
+        ).innerText =
+            s.position || "NONE";
+
+
+
+
+
+        let profit =
+            parseFloat(
+                s.profit_percent || 0
+            );
+
+
+
+        let profitBox =
+            document.getElementById(
+                "profit"
+            );
+
+
+
+        profitBox.innerText =
+            profit.toFixed(2)
+            +
+            "%";
+
+
+
+
+        // 상승 녹색 / 하락 적색
+
+
+        if(profit >= 0){
+
+
+            profitBox.className =
+                "green";
+
+
+        }else{
+
+
+            profitBox.className =
+                "red";
+
+
+        }
+
+
+
+
+
+
+        let logs =
+            document.getElementById(
+                "logs"
+            );
+
+
+
+        logs.innerHTML =
+            data.logs.join(
+                "<br>"
+            );
+
+
+
+        logs.scrollTop =
+            logs.scrollHeight;
+
+
+
+    }
+
+    catch(e){
+
+
+        console.log(e);
+
+
+    }
+
+
+}
+
+
+
+
+
+
+
+
+
+// =====================================================
+// ORDER
+// =====================================================
+
+
+
+async function sendOrder(side){
+
+
+    let qty =
+        prompt(
+            "수량 입력",
+            "0.001"
+        );
+
+
+
+    await fetch(
+
+        "/api/order",
+
+        {
+
+
+            method:"POST",
+
+
+            headers:{
+
+
+                "Content-Type":
+
+                "application/json"
+
+
+            },
+
+
+            body:JSON.stringify({
+
+
+                side:side,
+
+
+                qty:qty
+
+
+
+            })
+
+        }
+
+    );
+
+
+
+}
+
+
+
+
+
+
+
+
+function manualBuy(){
+
+
+    sendOrder(
+        "Buy"
+    );
+
+
+}
+
+
+
+
+
+
+
+function manualSell(){
+
+
+    sendOrder(
+        "Sell"
+    );
+
+
+}
+
+
+
+
+
+
+
+async function closePosition(){
+
+
+    await fetch(
+
+        "/api/close",
+
+        {
+
+
+            method:"POST"
+
+
+        }
+
+    );
+
+
+}
+
+
+
+
+
+
+
+
+
+
+// =====================================================
+// BOT CONTROL
+// =====================================================
+
+
+
+async function botStart(){
+
+
+    await fetch(
+
+        "/api/start",
+
+        {
+
+
+            method:"POST"
+
+
+        }
+
+    );
+
+
+}
+
+
+
+
+
+
+
+async function botStop(){
+
+
+    await fetch(
+
+        "/api/stop",
+
+        {
+
+
+            method:"POST"
+
+
+        }
+
+    );
+
+
+}
+
+
+
+
+
+
+
+
+
+// =====================================================
+// LEVERAGE
+// =====================================================
+
+
+
+async function changeLeverage(){
+
+
+
+    let leverage =
+        document.getElementById(
+            "leverage"
+        ).value;
+
+
+
+
+    await fetch(
+
+        "/api/leverage",
+
+        {
+
+
+            method:"POST",
+
+
+            headers:{
+
+
+                "Content-Type":
+
+                "application/json"
+
+
+            },
+
+
+            body:JSON.stringify({
+
+
+                leverage:leverage
+
+
+
+            })
+
+
+        }
+
+    );
+
+
+
+}
+
+
+
+
+
+
+
+
+
+// =====================================================
+// SAVE SETTINGS
+// =====================================================
+
+
+
+async function saveSettings(){
+
+
+
+    let data={
+
+
+
+        capital:
+
+        document.getElementById(
+            "capital"
+        ).value,
+
+
+
+        entry1:
+
+        document.getElementById(
+            "entry1"
+        ).value,
+
+
+
+        entry2:
+
+        document.getElementById(
+            "entry2"
+        ).value,
+
+
+
+        tp1:
+
+        document.getElementById(
+            "tp1"
+        ).value,
+
+
+
+        tp2:
+
+        document.getElementById(
+            "tp2"
+        ).value,
+
+
+
+        tp3:
+
+        document.getElementById(
+            "tp3"
+        ).value,
+
+
+
+        sell1:
+
+        document.getElementById(
+            "sell1"
+        ).value,
+
+
+
+        sell2:
+
+        document.getElementById(
+            "sell2"
+        ).value,
+
+
+
+        sell3:
+
+        document.getElementById(
+            "sell3"
+        ).value,
+
+
+
+        stop_loss:
+
+        document.getElementById(
+            "stoploss"
+        ).value
+
+
+
+    };
+
+
+
+
+
+    await fetch(
+
+        "/api/settings",
+
+        {
+
+
+            method:"POST",
+
+
+            headers:{
+
+
+                "Content-Type":
+
+                "application/json"
+
+
+            },
+
+
+            body:
+
+            JSON.stringify(data)
+
+
+
+        }
+
+
+    );
+
+
+
+}
+
+
+
+
+
+
+
+
+
+// =====================================================
+// LOOP
+// =====================================================
+
+
+
+setInterval(
+
+    updateStatus,
+
+    2000
+
+);
+
+
+
+updateStatus();
+
+
+
+</script>
+
+
+</body>
+
+</html>
+    
