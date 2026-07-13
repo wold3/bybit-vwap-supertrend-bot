@@ -574,27 +574,21 @@ if not showHistory
 
                 for j = array.size(medianLines)-1 to 0
 
-                   line.delete(
-                        array.get(
-                             medianLines,
-                             j))
+                    line.delete(
+                         array.get(medianLines,j))
 
-                   line.delete(
-                        array.get(
-                             upperLines,
-                             j))
+                    line.delete(
+                         array.get(upperLines,j))
 
-                   line.delete(
-                        array.get(
-                             lowerLines,
-                             j))
+                    line.delete(
+                         array.get(lowerLines,j))
 
 
-        array.clear(medianLines)
-        array.clear(upperLines)
-        array.clear(lowerLines)
-        array.clear(trendArray)
-        array.clear(timeArray)
+                array.clear(medianLines)
+                array.clear(upperLines)
+                array.clear(lowerLines)
+                array.clear(trendArray)
+                array.clear(timeArray)
 
 
 
