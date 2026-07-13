@@ -135,6 +135,14 @@ showPivots    = input.bool(false, "Show Pivot Labels")
 bullColor     = input.color(color.lime, "Bull Color")
 bearColor     = input.color(color.red, "Bear Color")
 
+pitchType = input.string(
+     "Andrews",
+     "Pitchfork Type",
+     options = [
+          "Andrews",
+          "Schiff",
+          "Modified Schiff"
+     ])
 
 //=========================
 // PIVOT STORAGE
@@ -212,9 +220,40 @@ f_createPitchfork(
     if history
         clr := color.new(clr, historyOpacity)
 
+//=========================
+// PITCHFORK CALCULATION
+//=========================
 
-    midBar = math.round((bBar+cBar)/2)
-    midPrice = (bPrice+cPrice)/2
+float anchorPrice = aPrice
+int anchorBar = aBar
+
+
+// Andrews
+if pitchType == "Andrews"
+
+    anchorPrice := aPrice
+    anchorBar := aBar
+
+
+
+// Schiff
+if pitchType == "Schiff"
+
+    anchorPrice := (aPrice + bPrice) / 2
+    anchorBar := math.round((aBar+bBar)/2)
+
+
+
+// Modified Schiff
+if pitchType == "Modified Schiff"
+
+    anchorPrice := aPrice + (bPrice-aPrice)/2
+    anchorBar := aBar
+
+
+midBar = math.round((bBar+cBar)/2)
+
+midPrice = (bPrice+cPrice)/2
 
 
     dx = midBar-aBar
