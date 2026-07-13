@@ -526,70 +526,21 @@ while array.size(medianLines)>historyCount
     array.shift(timeArray)
 
 
-
-// History OFF
+//==================================================
+// HISTORY OFF CLEAN
+//==================================================
 
 if not showHistory
 
-    if array.size(medianLines)>0
+    while array.size(medianLines) > 0
 
-    for j = array.size(medianLines)-1 to 0
-
-        line.delete(array.get(medianLines,j))
-        line.delete(array.get(upperLines,j))
-        line.delete(array.get(lowerLines,j))
-
-    array.clear(medianLines)
-    array.clear(upperLines)
-    array.clear(lowerLines)
-
-        line.delete(
-             array.get(
-                  medianLines,
-                  j))
-
-        line.delete(
-             array.get(
-                  upperLines,
-                  j))
-
-        line.delete(
-             array.get(
-                  lowerLines,
-                  j))
-
-        array.remove(
-             medianLines,
-             j)
-
-        array.remove(
-             upperLines,
-             j)
-
-        // History OFF
-
-        if not showHistory
-
-            if array.size(medianLines) > 0
-
-                for j = array.size(medianLines)-1 to 0
-
-                    line.delete(
-                         array.get(medianLines,j))
-
-                    line.delete(
-                         array.get(upperLines,j))
-
-                    line.delete(
-                         array.get(lowerLines,j))
+        line.delete(array.pop(medianLines))
+        line.delete(array.pop(upperLines))
+        line.delete(array.pop(lowerLines))
 
 
-                array.clear(medianLines)
-                array.clear(upperLines)
-                array.clear(lowerLines)
-                array.clear(trendArray)
-                array.clear(timeArray)
-
+    array.clear(trendArray)
+    array.clear(timeArray)
 
 
 //==================================================
