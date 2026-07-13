@@ -150,6 +150,9 @@ var bool[] pHigh = array.new_bool()
 var line[] medianLines = array.new_line()
 var line[] upperLines  = array.new_line()
 var line[] lowerLines  = array.new_line()
+var line[] q25Lines = array.new_line()
+var line[] q50Lines = array.new_line()
+var line[] q75Lines = array.new_line()
 
 var bool[] trendArray = array.new_bool()
 
@@ -249,10 +252,55 @@ f_createPitchfork(
              medianY+(cPrice-midPrice),
              color=clr)
 
+//=========================
+// INTERNAL LEVELS
+//=========================
+
+// Upper / Lower 계산
+upperY = medianY + (bPrice-midPrice)
+lowerY = medianY + (cPrice-midPrice)
+
+
+// 25%
+q25Start = aPrice + (bPrice-aPrice)*0.25
+q25End   = medianY + (upperY-medianY)*0.25
+
+q25 = line.new(
+     aBar,
+     q25Start,
+     x2,
+     q25End,
+     color=color.new(clr,60))
+
+
+// 50%
+q50 = line.new(
+     aBar,
+     aPrice+(midPrice-aPrice)*0.5,
+     x2,
+     medianY,
+     color=color.new(clr,40),
+     width=1)
+
+
+// 75%
+q75Start = aPrice + (cPrice-aPrice)*0.75
+q75End   = medianY + (lowerY-medianY)*0.75
+
+q75 = line.new(
+     aBar,
+     q75Start,
+     x2,
+     q75End,
+     color=color.new(clr,60))
 
         array.push(medianLines, med)
         array.push(upperLines, upper)
         array.push(lowerLines, lower)
+
+        array.push(q25Lines, q25)
+        array.push(q50Lines, q50)
+        array.push(q75Lines, q75)
 
         array.push(trendArray, bull)
         array.push(timeArray, time)
