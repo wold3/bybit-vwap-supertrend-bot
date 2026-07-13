@@ -18,6 +18,11 @@ useDateFilter = input.bool(false, "Use Date Filter")
 historyDays = input.int(90, "History Days", minval=1)
 
 //=========================
+// DASHBOARD
+//=========================
+showDashboard = input.bool(true, "Show Dashboard")
+
+//=========================
 // MTF SETTINGS
 //=========================
 useMTF = input.bool(false, "Use Higher Timeframe")
@@ -187,6 +192,17 @@ pitchType = input.string(
      ])
 
 //=========================
+// SIGNAL SETTINGS
+//=========================
+showSignals = input.bool(true, "Show BUY SELL Signals")
+
+minScore = input.int(
+     2,
+     "Minimum Signal Score",
+     minval=1,
+     maxval=3)
+
+//=========================
 // PIVOT STORAGE
 //=========================
 var int[] pBar = array.new_int()
@@ -223,6 +239,18 @@ var int[] timeArray = array.new_int()
 
 var int lastPivotIndex = na
 
+//=========================
+// DASHBOARD STORAGE
+//=========================
+var table dash = table.new(
+     position.top_right,
+     2,
+     6)
+
+//=========================
+// SIGNAL STORAGE
+//=========================
+var label[] signalLabels = array.new_label()
 
 //=========================
 // PIVOT DETECTION
@@ -658,6 +686,254 @@ if enableAlert and array.size(medianLines)>0
             alert(
                  "Pitchfork Lower Break",
                  alert.freq_once_per_bar)
+
+//=========================
+// SIGNAL ENGINE
+//=========================
+
+if showSignals and array.size(medianLines)>0
+
+
+    lastIndex = array.size(medianLines)-1
+
+
+    median =
+         array.get(medianLines,lastIndex)
+
+    upper =
+         array.get(upperLines,lastIndex)
+
+    lower =
+         array.get(lowerLines,lastIndex)
+
+
+    medianPrice =
+         line.get_price(
+             median,
+             bar_index)
+
+    upperPrice =
+         line.get_price(
+             upper,
+             bar_index)
+
+    lowerPrice =
+         line.get_price(
+             lower,
+             bar_index)
+
+
+
+    bull =
+         array.get(
+             trendArray,
+             lastIndex)
+
+
+
+    scoreBuy = 0
+    scoreSell = 0
+
+
+
+    // 방향
+    if bull
+        scoreBuy += 1
+    else
+        scoreSell += 1
+
+
+
+    // 위치
+    if close > medianPrice
+
+        scoreBuy += 1
+
+    else
+
+        scoreSell += 1
+
+
+
+    // 채널
+    if close <= lowerPrice
+
+        scoreBuy += 1
+
+
+    if close >= upperPrice
+
+        scoreSell += 1
+
+
+
+    buySignal =
+         scoreBuy >= minScore
+
+
+    sellSignal =
+         scoreSell >= minScore
+
+
+
+    if buySignal
+
+        label.new(
+             bar_index,
+             low,
+             "BUY\nScore:"+str.tostring(scoreBuy),
+             style=label.style_label_up,
+             color=color.lime,
+             textcolor=color.black)
+
+
+
+    if sellSignal
+
+        label.new(
+             bar_index,
+             high,
+             "SELL\nScore:"+str.tostring(scoreSell),
+             style=label.style_label_down,
+             color=color.red,
+             textcolor=color.white)
+
+//=========================
+// DASHBOARD ENGINE
+//=========================
+
+if showDashboard
+
+    if barstate.islast
+
+        table.clear(dash)
+
+
+        table.cell(
+             dash,
+             0,
+             0,
+             "Pitchfork")
+
+
+        table.cell(
+             dash,
+             1,
+             0,
+             pitchType)
+
+
+
+        if array.size(medianLines)>0
+
+
+            idx = array.size(medianLines)-1
+
+
+            trend =
+                 array.get(
+                     trendArray,
+                     idx)
+
+
+            dir =
+                 trend ? "BULL" : "BEAR"
+
+
+            table.cell(
+                 dash,
+                 0,
+                 1,
+                 "Direction")
+
+
+            table.cell(
+                 dash,
+                 1,
+                 1,
+                 dir)
+
+
+
+            median =
+                 array.get(
+                     medianLines,
+                     idx)
+
+
+            medianPrice =
+                 line.get_price(
+                     median,
+                     bar_index)
+
+
+            distance =
+                 ((close-medianPrice)/medianPrice)*100
+
+
+
+            table.cell(
+                 dash,
+                 0,
+                 2,
+                 "Median %")
+
+
+            table.cell(
+                 dash,
+                 1,
+                 2,
+                 str.tostring(
+                     distance,
+                     "#.##")+"%")
+
+
+
+            table.cell(
+                 dash,
+                 0,
+                 3,
+                 "Price")
+
+
+            table.cell(
+                 dash,
+                 1,
+                 3,
+                 str.tostring(close))
+
+
+
+            table.cell(
+                 dash,
+                 0,
+                 4,
+                 "MTF")
+
+
+            table.cell(
+                 dash,
+                 1,
+                 4,
+                 useMTF ? higherTF : "OFF")
+
+
+
+            table.cell(
+                 dash,
+                 0,
+                 5,
+                 "Status")
+
+
+            table.cell(
+                 dash,
+                 1,
+                 5,
+                 "ACTIVE")
+
+
+
 
 
 
