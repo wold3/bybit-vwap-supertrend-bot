@@ -18,6 +18,25 @@ useDateFilter = input.bool(false, "Use Date Filter")
 historyDays = input.int(90, "History Days", minval=1)
 
 //=========================
+// MTF SETTINGS
+//=========================
+useMTF = input.bool(false, "Use Higher Timeframe")
+
+higherTF = input.timeframe(
+     "240",
+     "Higher Timeframe")
+
+
+//=========================
+// ALERT SETTINGS
+//=========================
+enableAlert = input.bool(true, "Enable Alerts")
+
+alertTouchMedian = input.bool(true, "Median Touch Alert")
+alertBreakUpper  = input.bool(true, "Upper Break Alert")
+alertBreakLower  = input.bool(true, "Lower Break Alert")
+
+//=========================
 // STORAGE
 //=========================
 var int[]   pBar   = array.new_int()
@@ -51,6 +70,25 @@ if not na(pl)
 
     if showPivots
         label.new(bar_index-pivotLen, pl, "L", style=label.style_label_up)
+
+//=========================
+// HIGHER TIMEFRAME DATA
+//=========================
+
+htfHigh = request.security(
+     syminfo.tickerid,
+     higherTF,
+     high)
+
+htfLow = request.security(
+     syminfo.tickerid,
+     higherTF,
+     low)
+
+htfClose = request.security(
+     syminfo.tickerid,
+     higherTF,
+     close)
 
 //=========================
 // DRAW
@@ -549,5 +587,81 @@ if array.size(medianLines)>0
 
 
     array.shift(trendArray)
+
+//=========================
+// ALERT ENGINE
+//=========================
+
+if enableAlert and array.size(medianLines)>0
+
+    lastMedian =
+         array.get(
+             medianLines,
+             array.size(medianLines)-1)
+
+
+    medianPrice =
+         line.get_price(
+             lastMedian,
+             bar_index)
+
+
+    if alertTouchMedian
+
+        if math.abs(close-medianPrice)
+             <= syminfo.mintick*5
+
+            alert(
+                 "Pitchfork Median Touch",
+                 alert.freq_once_per_bar)
+
+
+
+    if alertBreakUpper
+
+        lastUpper =
+             array.get(
+                 upperLines,
+                 array.size(upperLines)-1)
+
+
+        upperPrice =
+             line.get_price(
+                 lastUpper,
+                 bar_index)
+
+
+        if close > upperPrice
+
+            alert(
+                 "Pitchfork Upper Break",
+                 alert.freq_once_per_bar)
+
+
+
+    if alertBreakLower
+
+        lastLower =
+             array.get(
+                 lowerLines,
+                 array.size(lowerLines)-1)
+
+
+        lowerPrice =
+             line.get_price(
+                 lastLower,
+                 bar_index)
+
+
+        if close < lastLower
+
+            alert(
+                 "Pitchfork Lower Break",
+                 alert.freq_once_per_bar)
+
+
+
+
+
 
  
