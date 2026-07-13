@@ -77,6 +77,16 @@ if not na(pl)
         label.new(bar_index-pivotLen, pl, "L", style=label.style_label_up)
 
 //=========================
+// PIVOT CLEANUP
+//=========================
+
+while array.size(pBar) > 300
+
+    array.shift(pBar)
+    array.shift(pPrice)
+    array.shift(pHigh)
+
+//=========================
 // HIGHER TIMEFRAME DATA
 //=========================
 
@@ -776,9 +786,11 @@ if showSignals and array.size(medianLines)>0
 
 
 
-    if buySignal
+    if buySignal and bar_index != lastSignalBar
 
-        label.new(
+        lastSignalBar := bar_index
+
+        buyLabel = label.new(
              bar_index,
              low,
              "BUY\nScore:"+str.tostring(scoreBuy),
@@ -786,17 +798,21 @@ if showSignals and array.size(medianLines)>0
              color=color.lime,
              textcolor=color.black)
 
+        array.push(signalLabels, buyLabel)
+
 
 
     if sellSignal
 
-        label.new(
+        sellLabel = label.new(
              bar_index,
              high,
              "SELL\nScore:"+str.tostring(scoreSell),
              style=label.style_label_down,
              color=color.red,
              textcolor=color.white)
+
+        array.push(signalLabels, sellLabel)
 
 //=========================
 // DASHBOARD ENGINE
@@ -932,7 +948,14 @@ if showDashboard
                  5,
                  "ACTIVE")
 
+//=========================
+// LABEL CLEANUP
+//=========================
 
+while array.size(signalLabels) > 100
+
+    label.delete(
+         array.shift(signalLabels))
 
 
 
