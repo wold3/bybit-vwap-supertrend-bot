@@ -87,6 +87,12 @@ emaValue = ta.ema(close, emaLength)
 avgVolume = ta.sma(volume, 20)
 
 //=========================
+// ATR DATA
+//=========================
+
+atrValue = ta.atr(atrLength)
+
+//=========================
 // PIVOT CLEANUP
 //=========================
 
@@ -232,6 +238,31 @@ stopLoss = input.float(
 takeProfit = input.float(
      5.0,
      "Take Profit %",
+     step=0.1)
+
+//=========================
+// ATR RISK SETTINGS
+//=========================
+
+useATRStop = input.bool(true, "Use ATR Stop")
+
+atrLength = input.int(
+     14,
+     "ATR Length")
+
+atrMultiplier = input.float(
+     2.0,
+     "ATR Multiplier",
+     step=0.1)
+
+
+useTrailing = input.bool(
+     true,
+     "Use Trailing Stop")
+
+trailATR = input.float(
+     1.5,
+     "Trailing ATR",
      step=0.1)
 
 //=========================
@@ -845,20 +876,28 @@ if enableStrategy
 //=========================
 
 
-longStop =
-     strategy.position_avg_price *
-     (1-stopLoss/100)
+//=========================
+// DYNAMIC STOP
+//=========================
+
+longStop = 
+     useATRStop ?
+     strategy.position_avg_price - atrValue * atrMultiplier :
+     strategy.position_avg_price * (1-stopLoss/100)
+
+
+
+shortStop =
+     useATRStop ?
+     strategy.position_avg_price + atrValue * atrMultiplier :
+     strategy.position_avg_price * (1+stopLoss/100)
+
 
 
 longTarget =
      strategy.position_avg_price *
      (1+takeProfit/100)
 
-
-
-shortStop =
-     strategy.position_avg_price *
-     (1+stopLoss/100)
 
 
 shortTarget =
@@ -873,13 +912,22 @@ strategy.exit(
      stop=longStop,
      limit=longTarget)
 
+if useTrailing
+
+    strategy.exit(
+         "LONG TRAIL",
+         "LONG",
+         trail_points =
+             atrValue * trailATR)
 
 
-strategy.exit(
-     "SHORT EXIT",
-     "SHORT",
-     stop=shortStop,
-     limit=shortTarget)
+    strategy.exit(
+         "SHORT TRAIL",
+         "SHORT",
+         trail_points =
+             atrValue * trailATR)
+
+
 
 //=========================
 // FILTER CHECK
