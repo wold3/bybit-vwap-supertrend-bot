@@ -165,7 +165,7 @@ var int lastSignalBar = na
 var table riskTable = table.new(
      position.bottom_right,
      2,
-     7)
+     6)
 
 
 //==================================================
@@ -289,8 +289,7 @@ f_createPitchfork(
     if pitchType == "Schiff"
 
         anchorBar :=
-             math.round(
-                  (aBar+bBar)/2)
+             int(math.round((aBar+bBar)/2))
 
         anchorPrice :=
              (aPrice+bPrice)/2
@@ -308,8 +307,7 @@ f_createPitchfork(
 
 
     midBar =
-         math.round(
-             (bBar+cBar)/2)
+         int(math.round((bBar+cBar)/2))
 
 
     midPrice =
@@ -927,8 +925,12 @@ showDashboard = input.bool(
 
 if showDashboard and barstate.islast
 
-
-    table.clear(riskTable)
+    table.clear(
+         riskTable,
+         0,
+         0,
+         1,
+         6)
 
 
 
