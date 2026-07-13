@@ -882,15 +882,15 @@ if useTrailing
     strategy.exit(
          "LONG TRAIL",
          "LONG",
-         trail_points
-         trail_offset
+         trail_points = atrValue * 1.5,
+         trail_offset = atrValue * 1.5)
 
 
     strategy.exit(
          "SHORT TRAIL",
          "SHORT",
-         trail_points
-         trail_offset
+         trail_points = atrValue * 1.5,
+         trail_offset = atrValue * 1.5)
 
 //==================================================
 // WEBHOOK ALERT
