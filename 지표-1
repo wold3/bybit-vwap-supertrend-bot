@@ -566,9 +566,35 @@ if not showHistory
              upperLines,
              j)
 
-        array.remove(
-             lowerLines,
-             j)
+        // History OFF
+
+        if not showHistory
+
+            if array.size(medianLines) > 0
+
+                for j = array.size(medianLines)-1 to 0
+
+                   line.delete(
+                        array.get(
+                             medianLines,
+                             j))
+
+                   line.delete(
+                        array.get(
+                             upperLines,
+                             j))
+
+                   line.delete(
+                        array.get(
+                             lowerLines,
+                             j))
+
+
+        array.clear(medianLines)
+        array.clear(upperLines)
+        array.clear(lowerLines)
+        array.clear(trendArray)
+        array.clear(timeArray)
 
 
 
