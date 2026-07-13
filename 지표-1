@@ -566,6 +566,8 @@ if not showHistory
 // SIGNAL ENGINE
 //==================================================
 
+var bool buySignal = false
+var bool sellSignal = false
 
 if showSignals and array.size(medianLines)>0
 
@@ -652,7 +654,7 @@ if showSignals and array.size(medianLines)>0
          volume > avgVolume
 
 
-    buySignal =
+    buySignal :=
          buyScore >= minScore and
          volumeOK and
          (not useRSIFilter or rsiValue>50) and
@@ -660,11 +662,16 @@ if showSignals and array.size(medianLines)>0
 
 
 
-    sellSignal =
+    sellSignal :=
          sellScore >= minScore and
          volumeOK and
          (not useRSIFilter or rsiValue<50) and
          (not useTrendFilter or close<emaValue)
+
+else
+
+    buySignal := false
+    sellSignal := false
 
 //==================================================
 // STRATEGY SETTINGS
@@ -872,21 +879,18 @@ if usePartialTP
 
 if useTrailing
 
-
     strategy.exit(
          "LONG TRAIL",
          "LONG",
-         trail_points=
-          atrValue*1.5)
-
+         trail_points
+         trail_offset
 
 
     strategy.exit(
          "SHORT TRAIL",
          "SHORT",
-         trail_points=
-          atrValue*1.5)
-
+         trail_points
+         trail_offset
 
 //==================================================
 // WEBHOOK ALERT
