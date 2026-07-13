@@ -1,0 +1,330 @@
+//@version=6
+indicator("Auto Pitchfork Pro - Core", overlay=true, max_lines_count=500, max_labels_count=200)
+
+//=========================
+// INPUTS
+//=========================
+pivotLen      = input.int(8, "Pivot Length", minval=2)
+extendLines   = input.bool(true, "Extend Right")
+showPivots    = input.bool(false, "Show Pivot Labels")
+
+bullColor     = input.color(color.lime, "Bull Color")
+bearColor     = input.color(color.red, "Bear Color")
+
+showBullHistory = input.bool(true, "Show Bull History")
+showBearHistory = input.bool(true, "Show Bear History")
+
+useDateFilter = input.bool(false, "Use Date Filter")
+historyDays = input.int(90, "History Days", minval=1)
+
+//=========================
+// STORAGE
+//=========================
+var int[]   pBar   = array.new_int()
+var float[] pPrice = array.new_float()
+var bool[]  pHigh  = array.new_bool()
+
+var line medianLine = na
+var line upperLine  = na
+var line lowerLine  = na
+
+var int lastPivotIndex = na
+
+//=========================
+// PIVOTS
+//=========================
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow(low, pivotLen, pivotLen)
+
+if not na(ph)
+    array.push(pBar, bar_index - pivotLen)
+    array.push(pPrice, ph)
+    array.push(pHigh, true)
+
+    if showPivots
+        label.new(bar_index-pivotLen, ph, "H", style=label.style_label_down)
+
+if not na(pl)
+    array.push(pBar, bar_index - pivotLen)
+    array.push(pPrice, pl)
+    array.push(pHigh, false)
+
+    if showPivots
+        label.new(bar_index-pivotLen, pl, "L", style=label.style_label_up)
+
+//=========================
+// DRAW
+//=========================
+if array.size(pBar) >= 3
+
+    int i = array.size(pBar) - 1
+
+    aBar = array.get(pBar, i-2)
+    bBar = array.get(pBar, i-1)
+    cBar = array.get(pBar, i)
+
+    aPrice = array.get(pPrice, i-2)
+    bPrice = array.get(pPrice, i-1)
+    cPrice = array.get(pPrice, i)
+
+    aHigh = array.get(pHigh, i-2)
+    bHigh = array.get(pHigh, i-1)
+    cHigh = array.get(pHigh, i)
+
+    valid = aHigh != bHigh and bHigh != cHigh
+
+    if valid and cBar != lastPivotIndex
+
+        lastPivotIndex := cBar
+
+        if not na(medianLine)
+            line.delete(medianLine)
+            line.delete(upperLine)
+            line.delete(lowerLine)
+
+        clr = aHigh ? bearColor : bullColor
+
+        midBar   = math.round((bBar + cBar) / 2)
+        midPrice = (bPrice + cPrice) / 2
+
+        dx = midBar - aBar
+
+        if dx != 0
+
+            x2 = extendLines ? bar_index + 300 : midBar
+
+            slope = (midPrice - aPrice) / dx
+
+            y2 = aPrice + slope * (x2 - aBar)
+
+            medianLine := line.new(aBar, aPrice, x2, y2, color=clr, width=2)
+
+            upperLine := line.new(
+                 bBar,
+                 bPrice,
+                 x2,
+                 y2 + (bPrice - midPrice),
+                 color=clr)
+
+            lowerLine := line.new(
+                 cBar,
+                 cPrice,
+                 x2,
+                 y2 + (cPrice - midPrice),
+                 color=clr)
+
+//@version=6
+indicator("Auto Pitchfork Pro - Core + History", overlay=true, max_lines_count=500, max_labels_count=200)
+
+//=========================
+// INPUTS
+//=========================
+pivotLen      = input.int(8, "Pivot Length", minval=2)
+
+extendLines   = input.bool(true, "Extend Right")
+
+showCurrent   = input.bool(true, "Show Current Pitchfork")
+showHistory   = input.bool(true, "Show History Pitchforks")
+
+historyCount  = input.int(20, "History Count", minval=1, maxval=100)
+
+historyOpacity = input.int(75, "History Opacity", minval=0, maxval=100)
+
+showPivots    = input.bool(false, "Show Pivot Labels")
+
+bullColor     = input.color(color.lime, "Bull Color")
+bearColor     = input.color(color.red, "Bear Color")
+
+
+//=========================
+// PIVOT STORAGE
+//=========================
+var int[] pBar = array.new_int()
+var float[] pPrice = array.new_float()
+var bool[] pHigh = array.new_bool()
+
+
+//=========================
+// PITCHFORK STORAGE
+//=========================
+var line[] medianLines = array.new_line()
+var line[] upperLines  = array.new_line()
+var line[] lowerLines  = array.new_line()
+
+var bool[] trendArray = array.new_bool()
+
+var int[] timeArray = array.new_int()
+
+var int lastPivotIndex = na
+
+
+//=========================
+// PIVOT DETECTION
+//=========================
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow(low, pivotLen, pivotLen)
+
+
+if not na(ph)
+    array.push(pBar, bar_index - pivotLen)
+    array.push(pPrice, ph)
+    array.push(pHigh, true)
+
+    if showPivots
+        label.new(
+             bar_index-pivotLen,
+             ph,
+             "H",
+             style=label.style_label_down)
+
+
+if not na(pl)
+    array.push(pBar, bar_index - pivotLen)
+    array.push(pPrice, pl)
+    array.push(pHigh, false)
+
+    if showPivots
+        label.new(
+             bar_index-pivotLen,
+             pl,
+             "L",
+             style=label.style_label_up)
+
+
+//=========================
+// DRAW FUNCTION
+//=========================
+f_createPitchfork(
+     int aBar,
+     float aPrice,
+     int bBar,
+     float bPrice,
+     int cBar,
+     float cPrice,
+     bool bull,
+     bool history)=>
+
+    clr = bull ? bullColor : bearColor
+
+    if history
+        clr := color.new(clr, historyOpacity)
+
+
+    midBar = math.round((bBar+cBar)/2)
+    midPrice = (bPrice+cPrice)/2
+
+
+    dx = midBar-aBar
+
+    if dx != 0
+
+        x2 = extendLines ? bar_index+300 : midBar
+
+        slope = (midPrice-aPrice)/dx
+
+        medianY = aPrice+slope*(x2-aBar)
+
+
+        med = line.new(
+             aBar,
+             aPrice,
+             x2,
+             medianY,
+             color=clr,
+             width=2)
+
+
+        upper = line.new(
+             bBar,
+             bPrice,
+             x2,
+             medianY+(bPrice-midPrice),
+             color=clr)
+
+
+        lower = line.new(
+             cBar,
+             cPrice,
+             x2,
+             medianY+(cPrice-midPrice),
+             color=clr)
+
+
+        array.push(medianLines, med)
+        array.push(upperLines, upper)
+        array.push(lowerLines, lower)
+
+        array.push(trendArray, bull)
+        array.push(timeArray, time)
+
+
+//=========================
+// CREATE NEW PITCHFORK
+//=========================
+if array.size(pBar)>=3
+
+    i=array.size(pBar)-1
+
+
+    aBar=array.get(pBar,i-2)
+    bBar=array.get(pBar,i-1)
+    cBar=array.get(pBar,i)
+
+
+    aPrice=array.get(pPrice,i-2)
+    bPrice=array.get(pPrice,i-1)
+    cPrice=array.get(pPrice,i)
+
+
+    aHigh=array.get(pHigh,i-2)
+    bHigh=array.get(pHigh,i-1)
+    cHigh=array.get(pHigh,i)
+
+
+    valid=aHigh!=bHigh and bHigh!=cHigh
+
+
+    if valid and cBar!=lastPivotIndex
+
+        lastPivotIndex:=cBar
+
+
+        bull=not aHigh
+
+
+        if showCurrent
+
+            f_createPitchfork(
+                 aBar,
+                 aPrice,
+                 bBar,
+                 bPrice,
+                 cBar,
+                 cPrice,
+                 bull,
+                 false)
+
+
+//=========================
+// HISTORY MANAGEMENT
+//=========================
+if not showHistory
+
+    while array.size(medianLines)>0
+
+        line.delete(array.shift(medianLines))
+        line.delete(array.shift(upperLines))
+        line.delete(array.shift(lowerLines))
+        array.shift(trendArray)
+
+
+
+while array.size(medianLines)>historyCount
+
+    line.delete(array.shift(medianLines))
+    line.delete(array.shift(upperLines))
+    line.delete(array.shift(lowerLines))
+
+    array.shift(trendArray)
+
+ 
