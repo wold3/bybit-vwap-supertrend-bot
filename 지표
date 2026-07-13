@@ -162,18 +162,25 @@ var bool[] pHigh = array.new_bool()
 var line[] medianLines = array.new_line()
 var line[] upperLines  = array.new_line()
 var line[] lowerLines  = array.new_line()
+
+//=========================
+// PITCHFORK STORAGE
+//=========================
+var line[] medianLines = array.new_line()
+var line[] upperLines  = array.new_line()
+var line[] lowerLines  = array.new_line()
+
+// Fibonacci
 var line[] fib38Lines = array.new_line()
 var line[] fib62Lines = array.new_line()
 
+// Pitch Fan
 var line[] fanLines = array.new_line()
 
+// Action / Reaction
 var line[] reactionLines = array.new_line()
-var line[] q25Lines = array.new_line()
-var line[] q50Lines = array.new_line()
-var line[] q75Lines = array.new_line()
 
 var bool[] trendArray = array.new_bool()
-
 var int[] timeArray = array.new_int()
 
 var int lastPivotIndex = na
