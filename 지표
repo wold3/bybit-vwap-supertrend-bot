@@ -325,6 +325,48 @@ while array.size(medianLines)>historyCount
     line.delete(array.shift(upperLines))
     line.delete(array.shift(lowerLines))
 
+//=========================
+// FILTER HISTORY
+//=========================
+
+if array.size(medianLines)>0
+
+    for i = array.size(medianLines)-1 to 0
+
+        bull = array.get(trendArray,i)
+        t = array.get(timeArray,i)
+
+        remove = false
+
+        if bull and not showBullHistory
+            remove := true
+
+        if not bull and not showBearHistory
+            remove := true
+
+
+        if useDateFilter
+
+            daysOld = (time - t) / 86400000
+
+            if daysOld > historyDays
+                remove := true
+
+
+        if remove
+
+            line.delete(array.get(medianLines,i))
+            line.delete(array.get(upperLines,i))
+            line.delete(array.get(lowerLines,i))
+
+            array.remove(medianLines,i)
+            array.remove(upperLines,i)
+            array.remove(lowerLines,i)
+            array.remove(trendArray,i)
+            array.remove(timeArray,i)
+
+
+
     array.shift(trendArray)
 
  
