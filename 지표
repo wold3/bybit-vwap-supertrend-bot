@@ -256,20 +256,20 @@ midBar = math.round((bBar+cBar)/2)
 midPrice = (bPrice+cPrice)/2
 
 
-    dx = midBar-aBar
+    dx = midBar-anchorBar
 
     if dx != 0
 
         x2 = extendLines ? bar_index+300 : midBar
 
-        slope = (midPrice-aPrice)/dx
+        slope = (midPrice-anchorPrice)/dx
 
-        medianY = aPrice+slope*(x2-aBar)
+        medianY = anchorPrice+slope*(x2-anchorBar)
 
 
         med = line.new(
-             aBar,
-             aPrice,
+             anchorBar,
+             anchorPrice,
              x2,
              medianY,
              color=clr,
