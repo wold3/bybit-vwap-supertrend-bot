@@ -132,6 +132,10 @@ historyOpacity = input.int(75, "History Opacity", minval=0, maxval=100)
 
 showPivots    = input.bool(false, "Show Pivot Labels")
 
+showFibo      = input.bool(true, "Show Fibonacci Levels")
+showPitchFan  = input.bool(false, "Show Pitch Fan")
+showReaction  = input.bool(false, "Show Action Reaction")
+
 bullColor     = input.color(color.lime, "Bull Color")
 bearColor     = input.color(color.red, "Bear Color")
 
@@ -292,6 +296,61 @@ midPrice = (bPrice+cPrice)/2
              color=clr)
 
 //=========================
+// FIBONACCI PITCHFORK
+//=========================
+
+range = bPrice - cPrice
+
+fib38Price = midPrice + range * 0.382
+fib62Price = midPrice + range * 0.618
+
+
+if showFibo
+
+    fib38 = line.new(
+         anchorBar,
+         fib38Price,
+         x2,
+         fib38Price,
+         color=color.new(clr,55))
+
+    fib62 = line.new(
+         anchorBar,
+         fib62Price,
+         x2,
+         fib62Price,
+         color=color.new(clr,55))
+
+
+    array.push(fib38Lines,fib38)
+    array.push(fib62Lines,fib62)
+
+//=========================
+// PITCH FAN
+//=========================
+
+if showPitchFan
+
+    fan1 = line.new(
+         anchorBar,
+         anchorPrice,
+         x2,
+         anchorPrice+(medianY-anchorPrice)*0.382,
+         color=color.new(clr,70))
+
+
+    fan2 = line.new(
+         anchorBar,
+         anchorPrice,
+         x2,
+         anchorPrice+(medianY-anchorPrice)*0.618,
+         color=color.new(clr,70))
+
+
+    array.push(fanLines,fan1)
+    array.push(fanLines,fan2)
+
+//=========================
 // INTERNAL LEVELS
 //=========================
 
@@ -414,6 +473,25 @@ while array.size(medianLines)>historyCount
     line.delete(array.shift(medianLines))
     line.delete(array.shift(upperLines))
     line.delete(array.shift(lowerLines))
+
+//=========================
+// EXTRA HISTORY CLEANUP
+//=========================
+
+while array.size(fib38Lines) > historyCount
+
+    line.delete(array.shift(fib38Lines))
+    line.delete(array.shift(fib62Lines))
+
+
+while array.size(fanLines) > historyCount * 2
+
+    line.delete(array.shift(fanLines))
+
+
+while array.size(reactionLines) > historyCount
+
+    line.delete(array.shift(reactionLines))
 
 //=========================
 // FILTER HISTORY
