@@ -812,9 +812,12 @@ if enableAlert and array.size(medianLines)>0
 
 
     medianPrice =
-         line.get_price(
-             lastMedian,
-             bar_index)
+         medianPrice =
+              na(median) ?
+              na :
+              line.get_price(
+                   median,
+                   bar_index)
 
 
     if alertTouchMedian
@@ -1460,7 +1463,12 @@ while array.size(signalLabels) > 100
 
 if showRiskDashboard and barstate.islast
 
-    table.clear(riskTable)
+    table.clear(
+     riskTable,
+     0,
+     0,
+     1,
+     6)
 
 
     table.cell(
