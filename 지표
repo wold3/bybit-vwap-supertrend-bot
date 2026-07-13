@@ -74,7 +74,8 @@ pl = ta.pivotlow(low, pivotLen, pivotLen)
 
 if not na(ph)
     array.push(pBar, bar_index - pivotLen)
-    array.push(pPrice, ph)
+    array.push(pPrice, ph
+    lastHighPivot := ph
     array.push(pHigh, true)
 
     if showPivots
@@ -83,6 +84,7 @@ if not na(ph)
 if not na(pl)
     array.push(pBar, bar_index - pivotLen)
     array.push(pPrice, pl)
+    lastLowPivot := pl
     array.push(pHigh, false)
 
     if showPivots
@@ -261,6 +263,42 @@ takeProfit = input.float(
      step=0.1)
 
 //=========================
+// SMART TP SETTINGS
+//=========================
+
+useFibTP = input.bool(
+     true,
+     "Use Fibonacci TP")
+
+fibTPLevel = input.string(
+     "1.618",
+     "Fib TP Level",
+     options=[
+          "1.272",
+          "1.618",
+          "2.000"
+     ])
+
+//=========================
+// SMART RISK SETTINGS
+//=========================
+
+usePivotSL = input.bool(
+     true,
+     "Use Pivot Stop Loss")
+
+
+pivotBuffer = input.float(
+     0.5,
+     "Pivot Buffer %",
+     step=0.1)
+
+
+useSmartTP = input.bool(
+     true,
+     "Use Smart TP")
+
+//=========================
 // MULTI TAKE PROFIT
 //=========================
 
@@ -343,6 +381,8 @@ var int[] pBar = array.new_int()
 var float[] pPrice = array.new_float()
 var bool[] pHigh = array.new_bool()
 
+var float lastHighPivot = na
+var float lastLowPivot  = na
 
 //=========================
 // PITCHFORK STORAGE
@@ -977,6 +1017,64 @@ f_sendAlert(_side)=>
          alert.freq_once_per_bar)
 
 //=========================
+// SMART STOP
+//=========================
+
+smartLongStop =
+     usePivotSL and not na(lastLowPivot) ?
+     lastLowPivot * (1-pivotBuffer/100) :
+     longStop
+
+
+smartShortStop =
+     usePivotSL and not na(lastHighPivot) ?
+     lastHighPivot * (1+pivotBuffer/100) :
+     shortStop
+
+//=========================
+// SMART TP CALCULATION
+//=========================
+
+var float fibRange = na
+
+
+if array.size(pPrice)>=3
+
+    last =
+         array.size(pPrice)-1
+
+    p1 =
+         array.get(
+             pPrice,
+             last-2)
+
+    p2 =
+         array.get(
+             pPrice,
+             last)
+
+    fibRange :=
+         math.abs(p2-p1)
+
+
+
+fibMultiplier =
+     fibTPLevel=="1.272" ? 1.272 :
+     fibTPLevel=="1.618" ? 1.618 :
+     2.000
+
+
+
+longFibTP =
+     strategy.position_avg_price +
+     fibRange*fibMultiplier
+
+
+shortFibTP =
+     strategy.position_avg_price -
+     fibRange*fibMultiplier
+
+//=========================
 // EXIT MANAGEMENT
 //=========================
 
@@ -1051,13 +1149,17 @@ shortStop =
 
 
 
-longTarget =
+llongTarget =
+     useSmartTP and useFibTP ?
+     longFibTP :
      strategy.position_avg_price *
      (1+takeProfit/100)
 
 
 
 shortTarget =
+     useSmartTP and useFibTP ?
+     shortFibTP :
      strategy.position_avg_price *
      (1-takeProfit/100)
 
@@ -1066,13 +1168,13 @@ shortTarget =
 strategy.exit(
      "LONG EXIT",
      "LONG",
-     stop=longStop,
+     stop=smartLongStop
      limit=longTarget)
 
 strategy.exit(
      "SHORT EXIT",
      "SHORT",
-     stop=shortStop,
+     stop=smartShortStop
      limit=shortTarget)
 
 //=========================
