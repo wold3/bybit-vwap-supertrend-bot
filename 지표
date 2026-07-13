@@ -177,7 +177,14 @@ if array.size(pBar) >= 3
                  color=clr)
 
 //@version=6
-indicator("Auto Pitchfork Pro - Core + History", overlay=true, max_lines_count=500, max_labels_count=200)
+strategy(
+     "Auto Pitchfork Pro Strategy",
+     overlay=true,
+     max_lines_count=500,
+     max_labels_count=200,
+     initial_capital=10000,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10)
 
 //=========================
 // INPUTS
@@ -210,6 +217,22 @@ pitchType = input.string(
           "Schiff",
           "Modified Schiff"
      ])
+
+//=========================
+// STRATEGY SETTINGS
+//=========================
+
+enableStrategy = input.bool(true, "Enable Strategy")
+
+stopLoss = input.float(
+     2.0,
+     "Stop Loss %",
+     step=0.1)
+
+takeProfit = input.float(
+     5.0,
+     "Take Profit %",
+     step=0.1)
 
 //=========================
 // FILTER SETTINGS
@@ -796,7 +819,67 @@ if showSignals and array.size(medianLines)>0
 
         scoreSell += 1
 
+//=========================
+// STRATEGY ENTRY
+//=========================
 
+if enableStrategy
+
+
+    if buySignal
+
+        strategy.entry(
+             "LONG",
+             strategy.long)
+
+
+
+    if sellSignal
+
+        strategy.entry(
+             "SHORT",
+             strategy.short)
+
+//=========================
+// EXIT MANAGEMENT
+//=========================
+
+
+longStop =
+     strategy.position_avg_price *
+     (1-stopLoss/100)
+
+
+longTarget =
+     strategy.position_avg_price *
+     (1+takeProfit/100)
+
+
+
+shortStop =
+     strategy.position_avg_price *
+     (1+stopLoss/100)
+
+
+shortTarget =
+     strategy.position_avg_price *
+     (1-takeProfit/100)
+
+
+
+strategy.exit(
+     "LONG EXIT",
+     "LONG",
+     stop=longStop,
+     limit=longTarget)
+
+
+
+strategy.exit(
+     "SHORT EXIT",
+     "SHORT",
+     stop=shortStop,
+     limit=shortTarget)
 
 //=========================
 // FILTER CHECK
