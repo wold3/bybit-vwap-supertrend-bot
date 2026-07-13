@@ -77,6 +77,16 @@ if not na(pl)
         label.new(bar_index-pivotLen, pl, "L", style=label.style_label_up)
 
 //=========================
+// FILTER DATA
+//=========================
+
+rsiValue = ta.rsi(close, rsiLength)
+
+emaValue = ta.ema(close, emaLength)
+
+avgVolume = ta.sma(volume, 20)
+
+//=========================
 // PIVOT CLEANUP
 //=========================
 
@@ -200,6 +210,17 @@ pitchType = input.string(
           "Schiff",
           "Modified Schiff"
      ])
+
+//=========================
+// FILTER SETTINGS
+//=========================
+useVolumeFilter = input.bool(true, "Use Volume Filter")
+useRSIFilter    = input.bool(true, "Use RSI Filter")
+useTrendFilter  = input.bool(true, "Use Trend Filter")
+
+rsiLength = input.int(14, "RSI Length")
+
+emaLength = input.int(200, "EMA Length")
 
 //=========================
 // SIGNAL SETTINGS
@@ -777,12 +798,44 @@ if showSignals and array.size(medianLines)>0
 
 
 
-    buySignal =
-         scoreBuy >= minScore
+//=========================
+// FILTER CHECK
+//=========================
+
+volumeOK =
+     not useVolumeFilter or volume > avgVolume
 
 
-    sellSignal =
-         scoreSell >= minScore
+rsiBuyOK =
+     not useRSIFilter or rsiValue > 50
+
+
+rsiSellOK =
+     not useRSIFilter or rsiValue < 50
+
+
+trendBuyOK =
+     not useTrendFilter or close > emaValue
+
+
+trendSellOK =
+     not useTrendFilter or close < emaValue
+
+
+
+buySignal =
+     scoreBuy >= minScore and
+     volumeOK and
+     rsiBuyOK and
+     trendBuyOK
+
+
+
+sellSignal =
+     scoreSell >= minScore and
+     volumeOK and
+     rsiSellOK and
+     trendSellOK
 
 
 
