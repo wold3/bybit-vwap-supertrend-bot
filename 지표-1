@@ -1,0 +1,1045 @@
+//@version=6
+strategy(
+     "Auto Pitchfork Pro Ultimate v6",
+     overlay=true,
+     max_lines_count=500,
+     max_labels_count=300,
+     initial_capital=10000,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10)
+
+
+//==================================================
+// INPUT
+//==================================================
+
+// GENERAL
+pivotLen = input.int(
+     8,
+     "Pivot Length",
+     minval=2)
+
+extendLines = input.bool(
+     true,
+     "Extend Right")
+
+
+// PITCHFORK TYPE
+pitchType = input.string(
+     "Andrews",
+     "Pitchfork Type",
+     options=[
+          "Andrews",
+          "Schiff",
+          "Modified Schiff"
+     ])
+
+
+// HISTORY
+showCurrent = input.bool(
+     true,
+     "Show Current")
+
+showHistory = input.bool(
+     true,
+     "Show History")
+
+historyCount = input.int(
+     20,
+     "History Count",
+     minval=1,
+     maxval=100)
+
+historyOpacity = input.int(
+     75,
+     "History Opacity",
+     minval=0,
+     maxval=100)
+
+showBullHistory = input.bool(
+     true,
+     "Show Bull History")
+
+showBearHistory = input.bool(
+     true,
+     "Show Bear History")
+
+
+// COLORS
+bullColor = input.color(
+     color.lime,
+     "Bull Color")
+
+bearColor = input.color(
+     color.red,
+     "Bear Color")
+
+
+// SIGNAL
+showSignals = input.bool(
+     true,
+     "Show Signals")
+
+minScore = input.int(
+     2,
+     "Minimum Score",
+     minval=1,
+     maxval=3)
+
+
+// FILTER
+useVolumeFilter = input.bool(
+     true,
+     "Volume Filter")
+
+useRSIFilter = input.bool(
+     true,
+     "RSI Filter")
+
+useTrendFilter = input.bool(
+     true,
+     "EMA Trend Filter")
+
+
+rsiLength = input.int(
+     14,
+     "RSI Length")
+
+
+emaLength = input.int(
+     200,
+     "EMA Length")
+
+
+// MTF
+useMTF = input.bool(
+     false,
+     "Use MTF")
+
+higherTF = input.timeframe(
+     "240",
+     "Higher Timeframe")
+
+
+//==================================================
+// STORAGE
+//==================================================
+
+// Pivot
+var int[] pBar = array.new_int()
+var float[] pPrice = array.new_float()
+var bool[] pHigh = array.new_bool()
+
+
+// Pitchfork lines
+var line[] medianLines = array.new_line()
+var line[] upperLines = array.new_line()
+var line[] lowerLines = array.new_line()
+
+
+// Extra lines
+var line[] fib38Lines = array.new_line()
+var line[] fib62Lines = array.new_line()
+
+var line[] fanLines = array.new_line()
+
+var line[] reactionLines = array.new_line()
+
+
+// Trend
+var bool[] trendArray = array.new_bool()
+
+var int[] timeArray = array.new_int()
+
+
+// Labels
+var label[] signalLabels = array.new_label()
+
+
+// Control
+var int lastPivotIndex = na
+var int lastSignalBar = na
+
+
+// Dashboard
+var table riskTable = table.new(
+     position.bottom_right,
+     2,
+     7)
+
+
+//==================================================
+// DATA ENGINE
+//==================================================
+
+
+// Pivot detection
+
+ph = ta.pivothigh(
+     high,
+     pivotLen,
+     pivotLen)
+
+
+pl = ta.pivotlow(
+     low,
+     pivotLen,
+     pivotLen)
+
+
+
+if not na(ph)
+
+    array.push(
+         pBar,
+         bar_index-pivotLen)
+
+    array.push(
+         pPrice,
+         ph)
+
+    array.push(
+         pHigh,
+         true)
+
+
+
+if not na(pl)
+
+    array.push(
+         pBar,
+         bar_index-pivotLen)
+
+    array.push(
+         pPrice,
+         pl)
+
+    array.push(
+         pHigh,
+         false)
+
+
+
+// Pivot memory limit
+
+while array.size(pBar)>300
+
+    array.shift(pBar)
+    array.shift(pPrice)
+    array.shift(pHigh)
+
+
+
+// Indicators
+
+rsiValue = ta.rsi(
+     close,
+     rsiLength)
+
+
+emaValue = ta.ema(
+     close,
+     emaLength)
+
+
+avgVolume = ta.sma(
+     volume,
+     20)
+
+
+atrValue = ta.atr(14)
+
+
+
+// MTF
+
+htfClose = request.security(
+     syminfo.tickerid,
+     higherTF,
+     close)
+
+//==================================================
+// PITCHFORK ENGINE
+//==================================================
+
+f_createPitchfork(
+     int aBar,
+     float aPrice,
+     int bBar,
+     float bPrice,
+     int cBar,
+     float cPrice,
+     bool bull,
+     bool history)=>
+
+    clr = bull ? bullColor : bearColor
+
+    if history
+        clr := color.new(
+             clr,
+             historyOpacity)
+
+
+    // Pitchfork Type 계산
+
+    int anchorBar = aBar
+    float anchorPrice = aPrice
+
+
+    if pitchType == "Schiff"
+
+        anchorBar :=
+             math.round(
+                  (aBar+bBar)/2)
+
+        anchorPrice :=
+             (aPrice+bPrice)/2
+
+
+    if pitchType == "Modified Schiff"
+
+        anchorBar :=
+             aBar
+
+        anchorPrice :=
+             aPrice +
+             (bPrice-aPrice)/2
+
+
+
+    midBar =
+         math.round(
+             (bBar+cBar)/2)
+
+
+    midPrice =
+         (bPrice+cPrice)/2
+
+
+
+    dx =
+         midBar-anchorBar
+
+
+
+    if dx != 0
+
+
+        x2 =
+             extendLines ?
+             bar_index+300 :
+             midBar
+
+
+
+        slope =
+             (midPrice-anchorPrice)/dx
+
+
+        medianY =
+             anchorPrice+
+             slope*(x2-anchorBar)
+
+
+
+        upperY =
+             medianY+
+             (bPrice-midPrice)
+
+
+        lowerY =
+             medianY+
+             (cPrice-midPrice)
+
+
+
+        median =
+             line.new(
+                  anchorBar,
+                  anchorPrice,
+                  x2,
+                  medianY,
+                  color=clr,
+                  width=2)
+
+
+
+        upper =
+             line.new(
+                  bBar,
+                  bPrice,
+                  x2,
+                  upperY,
+                  color=clr)
+
+
+
+        lower =
+             line.new(
+                  cBar,
+                  cPrice,
+                  x2,
+                  lowerY,
+                  color=clr)
+
+
+
+        array.push(
+             medianLines,
+             median)
+
+        array.push(
+             upperLines,
+             upper)
+
+        array.push(
+             lowerLines,
+             lower)
+
+
+
+        array.push(
+             trendArray,
+             bull)
+
+
+        array.push(
+             timeArray,
+             time)
+
+
+//==================================================
+// CREATE CURRENT PITCHFORK
+//==================================================
+
+
+if array.size(pBar)>=3
+
+
+    i =
+         array.size(pBar)-1
+
+
+    aBar =
+         array.get(
+             pBar,
+             i-2)
+
+    bBar =
+         array.get(
+             pBar,
+             i-1)
+
+    cBar =
+         array.get(
+             pBar,
+             i)
+
+
+    aPrice =
+         array.get(
+             pPrice,
+             i-2)
+
+    bPrice =
+         array.get(
+             pPrice,
+             i-1)
+
+    cPrice =
+         array.get(
+             pPrice,
+             i)
+
+
+
+    aHigh =
+         array.get(
+             pHigh,
+             i-2)
+
+    bHigh =
+         array.get(
+             pHigh,
+             i-1)
+
+    cHigh =
+         array.get(
+             pHigh,
+             i)
+
+
+
+    valid =
+         aHigh != bHigh and
+         bHigh != cHigh
+
+
+
+    if valid and cBar != lastPivotIndex
+
+
+        lastPivotIndex := cBar
+
+
+        bull =
+             not aHigh
+
+
+
+        if showCurrent
+
+            f_createPitchfork(
+                 aBar,
+                 aPrice,
+                 bBar,
+                 bPrice,
+                 cBar,
+                 cPrice,
+                 bull,
+                 false)
+
+
+
+//==================================================
+// HISTORY MANAGER
+//==================================================
+
+
+while array.size(medianLines)>historyCount
+
+
+    line.delete(
+         array.shift(medianLines))
+
+
+    line.delete(
+         array.shift(upperLines))
+
+
+    line.delete(
+         array.shift(lowerLines))
+
+
+    array.shift(trendArray)
+
+    array.shift(timeArray)
+
+
+
+// History OFF
+
+if not showHistory
+
+    for j = array.size(medianLines)-1 to 0
+
+        line.delete(
+             array.get(
+                  medianLines,
+                  j))
+
+        line.delete(
+             array.get(
+                  upperLines,
+                  j))
+
+        line.delete(
+             array.get(
+                  lowerLines,
+                  j))
+
+        array.remove(
+             medianLines,
+             j)
+
+        array.remove(
+             upperLines,
+             j)
+
+        array.remove(
+             lowerLines,
+             j)
+
+
+
+//==================================================
+// SIGNAL ENGINE
+//==================================================
+
+
+if showSignals and array.size(medianLines)>0
+
+
+    idx =
+         array.size(medianLines)-1
+
+
+    median =
+         array.get(
+             medianLines,
+             idx)
+
+
+    upper =
+         array.get(
+             upperLines,
+             idx)
+
+
+    lower =
+         array.get(
+             lowerLines,
+             idx)
+
+
+
+    medianPrice =
+         line.get_price(
+              median,
+              bar_index)
+
+
+    upperPrice =
+         line.get_price(
+              upper,
+              bar_index)
+
+
+    lowerPrice =
+         line.get_price(
+              lower,
+              bar_index)
+
+
+
+    bull =
+         array.get(
+             trendArray,
+             idx)
+
+
+
+    buyScore = 0
+    sellScore = 0
+
+
+
+    if bull
+        buyScore += 1
+    else
+        sellScore += 1
+
+
+
+    if close > medianPrice
+        buyScore += 1
+    else
+        sellScore += 1
+
+
+
+    if close <= lowerPrice
+        buyScore += 1
+
+
+    if close >= upperPrice
+        sellScore += 1
+
+
+
+    volumeOK =
+         not useVolumeFilter or
+         volume > avgVolume
+
+
+    buySignal =
+         buyScore >= minScore and
+         volumeOK and
+         (not useRSIFilter or rsiValue>50) and
+         (not useTrendFilter or close>emaValue)
+
+
+
+    sellSignal =
+         sellScore >= minScore and
+         volumeOK and
+         (not useRSIFilter or rsiValue<50) and
+         (not useTrendFilter or close<emaValue)
+
+//==================================================
+// STRATEGY SETTINGS
+//==================================================
+
+enableStrategy = input.bool(
+     true,
+     "Enable Strategy")
+
+
+stopLoss = input.float(
+     2.0,
+     "Stop Loss %",
+     step=0.1)
+
+
+takeProfit = input.float(
+     5.0,
+     "Take Profit %",
+     step=0.1)
+
+
+
+// ATR RISK
+
+atrMultiplier = input.float(
+     2.0,
+     "ATR Stop Multiplier",
+     step=0.1)
+
+
+
+useTrailing = input.bool(
+     true,
+     "Use Trailing Stop")
+
+
+// Partial TP
+
+usePartialTP = input.bool(
+     true,
+     "Use Partial TP")
+
+
+tp1 = input.float(
+     2.0,
+     "TP1 %",
+     step=0.1)
+
+
+tp2 = input.float(
+     4.0,
+     "TP2 %",
+     step=0.1)
+
+
+tp3 = input.float(
+     6.0,
+     "TP3 %",
+     step=0.1)
+
+
+
+//==================================================
+// ENTRY
+//==================================================
+
+if enableStrategy
+
+
+    if buySignal and bar_index != lastSignalBar
+
+        lastSignalBar := bar_index
+
+        strategy.entry(
+             "LONG",
+             strategy.long)
+
+
+
+    if sellSignal and bar_index != lastSignalBar
+
+        lastSignalBar := bar_index
+
+        strategy.entry(
+             "SHORT",
+             strategy.short)
+
+
+
+//==================================================
+// STOP / TARGET
+//==================================================
+
+
+longStop =
+     strategy.position_avg_price -
+     atrValue * atrMultiplier
+
+
+shortStop =
+     strategy.position_avg_price +
+     atrValue * atrMultiplier
+
+
+
+longTarget =
+     strategy.position_avg_price *
+     (1+takeProfit/100)
+
+
+shortTarget =
+     strategy.position_avg_price *
+     (1-takeProfit/100)
+
+
+
+//==================================================
+// EXIT
+//==================================================
+
+
+strategy.exit(
+     "LONG EXIT",
+     "LONG",
+     stop=longStop,
+     limit=longTarget)
+
+
+
+strategy.exit(
+     "SHORT EXIT",
+     "SHORT",
+     stop=shortStop,
+     limit=shortTarget)
+
+
+
+//==================================================
+// PARTIAL TAKE PROFIT
+//==================================================
+
+
+if usePartialTP
+
+
+    strategy.exit(
+         "LONG TP1",
+         "LONG",
+         qty_percent=33,
+         limit=
+          strategy.position_avg_price*
+          (1+tp1/100))
+
+
+    strategy.exit(
+         "LONG TP2",
+         "LONG",
+         qty_percent=33,
+         limit=
+          strategy.position_avg_price*
+          (1+tp2/100))
+
+
+    strategy.exit(
+         "LONG TP3",
+         "LONG",
+         qty_percent=34,
+         limit=
+          strategy.position_avg_price*
+          (1+tp3/100))
+
+
+    strategy.exit(
+         "SHORT TP1",
+         "SHORT",
+         qty_percent=33,
+         limit=
+          strategy.position_avg_price*
+          (1-tp1/100))
+
+
+    strategy.exit(
+         "SHORT TP2",
+         "SHORT",
+         qty_percent=33,
+         limit=
+          strategy.position_avg_price*
+          (1-tp2/100))
+
+
+    strategy.exit(
+         "SHORT TP3",
+         "SHORT",
+         qty_percent=34,
+         limit=
+          strategy.position_avg_price*
+          (1-tp3/100))
+
+
+
+//==================================================
+// TRAILING STOP
+//==================================================
+
+if useTrailing
+
+
+    strategy.exit(
+         "LONG TRAIL",
+         "LONG",
+         trail_points=
+          atrValue*1.5)
+
+
+
+    strategy.exit(
+         "SHORT TRAIL",
+         "SHORT",
+         trail_points=
+          atrValue*1.5)
+
+
+//==================================================
+// WEBHOOK ALERT
+//==================================================
+
+enableWebhook = input.bool(
+     true,
+     "Enable Webhook")
+
+
+if enableWebhook
+
+
+    if buySignal
+
+        alert(
+             '{"side":"BUY","symbol":"'+
+             syminfo.ticker+
+             '","price":"'+
+             str.tostring(close)+
+             '"}',
+             alert.freq_once_per_bar)
+
+
+
+    if sellSignal
+
+        alert(
+             '{"side":"SELL","symbol":"'+
+             syminfo.ticker+
+             '","price":"'+
+             str.tostring(close)+
+             '"}',
+             alert.freq_once_per_bar)
+
+
+
+//==================================================
+// RISK DASHBOARD
+//==================================================
+
+
+showDashboard = input.bool(
+     true,
+     "Show Dashboard")
+
+
+
+if showDashboard and barstate.islast
+
+
+    table.clear(
+         riskTable,
+         0,
+         0,
+         1,
+         6)
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         0,
+         "POSITION")
+
+
+    table.cell(
+         riskTable,
+         1,
+         0,
+         strategy.position_size>0 ?
+         "LONG" :
+         strategy.position_size<0 ?
+         "SHORT" :
+         "NONE")
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         1,
+         "ENTRY")
+
+
+    table.cell(
+         riskTable,
+         1,
+         1,
+         str.tostring(
+             strategy.position_avg_price))
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         2,
+         "ATR")
+
+
+    table.cell(
+         riskTable,
+         1,
+         2,
+         str.tostring(
+             atrValue))
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         3,
+         "RSI")
+
+
+    table.cell(
+         riskTable,
+         1,
+         3,
+         str.tostring(
+             rsiValue))
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         4,
+         "EMA")
+
+
+    table.cell(
+         riskTable,
+         1,
+         4,
+         close>emaValue ?
+         "UP" :
+         "DOWN")
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         5,
+         "TF")
+
+
+    table.cell(
+         riskTable,
+         1,
+         5,
+         timeframe.period)
