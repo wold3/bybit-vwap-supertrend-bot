@@ -363,6 +363,9 @@ if not showHistory
         line.delete(array.shift(medianLines))
         line.delete(array.shift(upperLines))
         line.delete(array.shift(lowerLines))
+        line.delete(array.shift(q25Lines))
+        line.delete(array.shift(q50Lines))
+        line.delete(array.shift(q75Lines))
         array.shift(trendArray)
 
 
