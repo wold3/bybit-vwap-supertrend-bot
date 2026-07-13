@@ -17,7 +17,17 @@ showBearHistory = input.bool(true, "Show Bear History")
 useDateFilter = input.bool(false, "Use Date Filter")
 historyDays = input.int(90, "History Days", minval=1)
 
+//=========================
+// WEBHOOK ALERT
+//=========================
 
+enableWebhook = input.bool(
+     true,
+     "Enable Webhook")
+
+webhookID = input.string(
+     "AUTO_PITCHFORK",
+     "Webhook ID")
 
 //=========================
 // DASHBOARD
@@ -907,6 +917,19 @@ if enableStrategy
 
     if buySignal
 
+    if enableWebhook
+        f_sendAlert("BUY")
+
+    buyLabel = label.new(
+         bar_index,
+         low,
+         "BUY\nScore:"+str.tostring(scoreBuy),
+         style=label.style_label_up,
+         color=color.lime,
+         textcolor=color.black)
+
+    array.push(signalLabels,buyLabel)
+
         strategy.entry(
              "LONG",
              strategy.long)
@@ -915,9 +938,43 @@ if enableStrategy
 
     if sellSignal
 
+    if enableWebhook
+        f_sendAlert("SELL")
+
+    sellLabel = label.new(
+         bar_index,
+         high,
+         "SELL\nScore:"+str.tostring(scoreSell),
+         style=label.style_label_down,
+         color=color.red,
+         textcolor=color.white)
+
+    array.push(signalLabels,sellLabel)
+
         strategy.entry(
              "SHORT",
              strategy.short)
+
+//=========================
+// WEBHOOK MESSAGE
+//=========================
+
+f_sendAlert(_side)=>
+
+    msg =
+         "{"+
+         "\"id\":\""+webhookID+"\","+
+         "\"symbol\":\""+syminfo.ticker+"\","+
+         "\"side\":\""+_side+"\","+
+         "\"price\":\""+str.tostring(close)+"\","+
+         "\"timeframe\":\""+timeframe.period+"\","+
+         "\"sl\":\""+str.tostring(longStop)+"\","+
+         "\"tp\":\""+str.tostring(longTarget)+"\""+
+         "}"
+
+    alert(
+         msg,
+         alert.freq_once_per_bar)
 
 //=========================
 // EXIT MANAGEMENT
