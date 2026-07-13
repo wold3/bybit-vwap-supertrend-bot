@@ -17,6 +17,8 @@ showBearHistory = input.bool(true, "Show Bear History")
 useDateFilter = input.bool(false, "Use Date Filter")
 historyDays = input.int(90, "History Days", minval=1)
 
+
+
 //=========================
 // DASHBOARD
 //=========================
@@ -225,6 +227,14 @@ pitchType = input.string(
      ])
 
 //=========================
+// RISK DASHBOARD
+//=========================
+
+showRiskDashboard = input.bool(
+     true,
+     "Show Risk Dashboard")
+
+//=========================
 // STRATEGY SETTINGS
 //=========================
 
@@ -239,6 +249,35 @@ takeProfit = input.float(
      5.0,
      "Take Profit %",
      step=0.1)
+
+//=========================
+// MULTI TAKE PROFIT
+//=========================
+
+usePartialTP = input.bool(
+     true,
+     "Use Partial TP")
+
+
+tp1Percent = input.float(
+     2.0,
+     "TP1 %",
+     step=0.1)
+
+tp2Percent = input.float(
+     4.0,
+     "TP2 %",
+     step=0.1)
+
+tp3Percent = input.float(
+     6.0,
+     "TP3 %",
+     step=0.1)
+
+
+moveToBE = input.bool(
+     true,
+     "Move Stop To Break Even")
 
 //=========================
 // ATR RISK SETTINGS
@@ -322,7 +361,16 @@ var line[] reactionLines = array.new_line()
 var bool[] trendArray = array.new_bool()
 var int[] timeArray = array.new_int()
 
-var int lastPivotIndex = na
+var label[] signalLabels = array.new_label()
+
+//=========================
+// RISK TABLE STORAGE
+//=========================
+
+var table riskTable = table.new(
+     position.bottom_right,
+     2,
+     7)
 
 //=========================
 // DASHBOARD STORAGE
@@ -877,6 +925,58 @@ if enableStrategy
 
 
 //=========================
+// BREAK EVEN STOP
+//=========================
+
+if moveToBE
+
+    if strategy.position_size > 0
+
+        strategy.exit(
+             "LONG BE",
+             "LONG",
+             stop=strategy.position_avg_price)
+
+
+
+    if strategy.position_size < 0
+
+        strategy.exit(
+             "SHORT BE",
+             "SHORT",
+             stop=strategy.position_avg_price)
+
+//=========================
+// PARTIAL TARGET PRICE
+//=========================
+
+longTP1 =
+     strategy.position_avg_price *
+     (1 + tp1Percent/100)
+
+longTP2 =
+     strategy.position_avg_price *
+     (1 + tp2Percent/100)
+
+longTP3 =
+     strategy.position_avg_price *
+     (1 + tp3Percent/100)
+
+
+
+shortTP1 =
+     strategy.position_avg_price *
+     (1 - tp1Percent/100)
+
+shortTP2 =
+     strategy.position_avg_price *
+     (1 - tp2Percent/100)
+
+shortTP3 =
+     strategy.position_avg_price *
+     (1 - tp3Percent/100)
+
+//=========================
 // DYNAMIC STOP
 //=========================
 
@@ -911,6 +1011,60 @@ strategy.exit(
      "LONG",
      stop=longStop,
      limit=longTarget)
+
+strategy.exit(
+     "SHORT EXIT",
+     "SHORT",
+     stop=shortStop,
+     limit=shortTarget)
+
+//=========================
+// PARTIAL EXIT
+//=========================
+
+if usePartialTP
+
+    strategy.exit(
+         "LONG TP1",
+         "LONG",
+         qty_percent=33,
+         limit=longTP1)
+
+
+    strategy.exit(
+         "LONG TP2",
+         "LONG",
+         qty_percent=33,
+         limit=longTP2)
+
+
+    strategy.exit(
+         "LONG TP3",
+         "LONG",
+         qty_percent=34,
+         limit=longTP3)
+
+
+
+    strategy.exit(
+         "SHORT TP1",
+         "SHORT",
+         qty_percent=33,
+         limit=shortTP1)
+
+
+    strategy.exit(
+         "SHORT TP2",
+         "SHORT",
+         qty_percent=33,
+         limit=shortTP2)
+
+
+    strategy.exit(
+         "SHORT TP3",
+         "SHORT",
+         qty_percent=34,
+         limit=shortTP3)
 
 if useTrailing
 
@@ -1140,6 +1294,167 @@ while array.size(signalLabels) > 100
 
     label.delete(
          array.shift(signalLabels))
+
+//=========================
+// RISK DASHBOARD ENGINE
+//=========================
+
+if showRiskDashboard and barstate.islast
+
+    table.clear(riskTable)
+
+
+    table.cell(
+         riskTable,
+         0,
+         0,
+         "STATUS")
+
+
+    table.cell(
+         riskTable,
+         1,
+         0,
+         enableStrategy ? "ON" : "OFF")
+
+
+
+    posText =
+         strategy.position_size > 0 ? "LONG" :
+         strategy.position_size < 0 ? "SHORT" :
+         "NONE"
+
+
+    table.cell(
+         riskTable,
+         0,
+         1,
+         "POSITION")
+
+
+    table.cell(
+         riskTable,
+         1,
+         1,
+         posText)
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         2,
+         "ENTRY")
+
+
+    table.cell(
+         riskTable,
+         1,
+         2,
+         str.tostring(
+             strategy.position_avg_price,
+             "#.##"))
+
+
+
+    currentStop =
+         strategy.position_size > 0 ?
+         longStop :
+         shortStop
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         3,
+         "STOP")
+
+
+    table.cell(
+         riskTable,
+         1,
+         3,
+         str.tostring(
+             currentStop,
+             "#.##"))
+
+
+
+    currentTarget =
+         strategy.position_size > 0 ?
+         longTarget :
+         shortTarget
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         4,
+         "TARGET")
+
+
+    table.cell(
+         riskTable,
+         1,
+         4,
+         str.tostring(
+             currentTarget,
+             "#.##"))
+
+
+
+    risk =
+         math.abs(
+             strategy.position_avg_price-currentStop)
+
+
+    reward =
+         math.abs(
+             currentTarget-
+             strategy.position_avg_price)
+
+
+
+    rr =
+         risk != 0 ?
+         reward/risk :
+         0
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         5,
+         "R:R")
+
+
+    table.cell(
+         riskTable,
+         1,
+         5,
+         str.tostring(
+             rr,
+             "#.##"))
+
+
+
+    table.cell(
+         riskTable,
+         0,
+         6,
+         "ATR")
+
+
+    table.cell(
+         riskTable,
+         1,
+         6,
+         str.tostring(
+             atrValue,
+             "#.##"))
 
 
 
